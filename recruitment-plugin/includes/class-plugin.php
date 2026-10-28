@@ -33,6 +33,8 @@ class Recruitment_Plugin {
         add_action( 'init', [ $this, 'register_content' ] );
         add_action( 'init', [ $this, 'register_portal_pages' ] );
         add_action( 'init', [ $this, 'register_user_department_role' ] );
+        add_action( 'init', [ $this, 'register_applicant_role' ] );
+        add_action( 'template_redirect', [ $this, 'handle_applicant_account' ] );
         add_action( 'template_redirect', [ $this, 'handle_portal_login' ] );
         add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_public_assets' ] );
         add_filter( 'render_block', [ $this, 'remove_theme_chrome' ], 10, 2 );
@@ -58,6 +60,128 @@ class Recruitment_Plugin {
         if ( $administrator && ! $administrator->has_cap( 'manage_user_department' ) ) {
             $administrator->add_cap( 'manage_user_department' );
         }
+    }
+
+    public function register_applicant_role(): void {
+        if ( ! get_role( 'daw_applicant' ) ) {
+            add_role( 'daw_applicant', 'Applicant', [ 'read' => true ] );
+        }
+    }
+
+    public function handle_applicant_account(): void {
+        $screen = sanitize_key( wp_unslash( $_GET['recruitment_page'] ?? '' ) );
+        if ( ! in_array( $screen, [ 'applicant-login', 'applicant-register', 'account-profile' ], true ) || 'POST' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
+            return;
+        }
+
+        $preview_submission = recruitment_is_ui_preview()
+            || '1' === sanitize_text_field( wp_unslash( $_POST['daw_ui_preview'] ?? '' ) );
+        if ( $preview_submission ) {
+            wp_safe_redirect( recruitment_get_public_url( $screen, [ 'preview_notice' => 'read_only' ] ) );
+            exit;
+        }
+
+        $nonce = sanitize_text_field( wp_unslash( $_POST['applicant_account_nonce'] ?? '' ) );
+        if ( ! wp_verify_nonce( $nonce, 'applicant_account_' . $screen ) ) {
+            $this->redirect_to_applicant_screen( 'applicant-register' === $screen ? 'applicant-register' : $screen, 'invalid_request' );
+        }
+
+        if ( 'applicant-register' === $screen ) {
+            $email = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
+            $name = sanitize_text_field( wp_unslash( $_POST['full_name'] ?? '' ) );
+            $password = (string) wp_unslash( $_POST['password'] ?? '' );
+            $password_confirmation = (string) wp_unslash( $_POST['password_confirmation'] ?? '' );
+
+            if ( '' === $name || ! is_email( $email ) ) {
+                $this->redirect_to_applicant_screen( 'applicant-register', 'invalid_registration' );
+            }
+            if ( email_exists( $email ) ) {
+                $this->redirect_to_applicant_screen( 'applicant-register', 'email_exists' );
+            }
+            if ( strlen( $password ) < 10 || $password !== $password_confirmation ) {
+                $this->redirect_to_applicant_screen( 'applicant-register', 'password_mismatch' );
+            }
+
+            $user_login = sanitize_user( strstr( $email, '@', true ), true );
+            if ( '' === $user_login ) {
+                $user_login = 'applicant';
+            }
+            $base_login = $user_login;
+            while ( username_exists( $user_login ) ) {
+                $user_login = $base_login . '-' . strtolower( wp_generate_password( 5, false, false ) );
+            }
+
+            $user_id = wp_insert_user(
+                [
+                    'user_login'   => $user_login,
+                    'user_email'   => $email,
+                    'user_pass'    => $password,
+                    'display_name' => $name,
+                    'role'         => 'daw_applicant',
+                ]
+            );
+            if ( is_wp_error( $user_id ) ) {
+                error_log( 'Applicant account creation failed: ' . $user_id->get_error_message() );
+                $this->redirect_to_applicant_screen( 'applicant-register', 'registration_failed' );
+            }
+
+            wp_set_current_user( $user_id );
+            wp_set_auth_cookie( $user_id, is_ssl() );
+            wp_safe_redirect( recruitment_get_public_url( 'careers' ) );
+            exit;
+        }
+
+        if ( 'applicant-login' === $screen ) {
+            $login = sanitize_text_field( wp_unslash( $_POST['email'] ?? '' ) );
+            $password = (string) wp_unslash( $_POST['password'] ?? '' );
+            $candidate_user = is_email( $login ) ? get_user_by( 'email', $login ) : get_user_by( 'login', $login );
+            if ( $candidate_user && ! in_array( 'daw_applicant', (array) $candidate_user->roles, true ) ) {
+                $this->redirect_to_applicant_screen( 'applicant-login', 'invalid_credentials' );
+            }
+            $user = wp_signon(
+                [
+                    'user_login'    => $candidate_user ? $candidate_user->user_login : $login,
+                    'user_password' => $password,
+                    'remember'      => ! empty( $_POST['remember'] ),
+                ],
+                is_ssl()
+            );
+
+            if ( is_wp_error( $user ) ) {
+                $this->redirect_to_applicant_screen( 'applicant-login', 'invalid_credentials' );
+            }
+            if ( ! in_array( 'daw_applicant', (array) $user->roles, true ) ) {
+                $this->redirect_to_applicant_screen( 'applicant-login', 'applicant_account_required' );
+            }
+
+            wp_safe_redirect( recruitment_get_public_url( 'account-confirmation', [ 'login_success' => '1' ] ) );
+            exit;
+        }
+
+        if ( ! recruitment_is_applicant_user() ) {
+            $this->redirect_to_applicant_screen( 'applicant-login', 'applicant_account_required' );
+        }
+
+        $profile_fields = [ 'phone', 'birth_date', 'birth_place', 'address', 'gender', 'city', 'province', 'education_level', 'institution', 'major', 'graduation_year', 'gpa', 'certificate', 'company', 'position', 'work_period' ];
+        $display_name = sanitize_text_field( wp_unslash( $_POST['full_name'] ?? '' ) );
+        if ( '' !== $display_name ) {
+            $updated = wp_update_user( [ 'ID' => get_current_user_id(), 'display_name' => $display_name ] );
+            if ( is_wp_error( $updated ) ) {
+                error_log( 'Applicant profile update failed: ' . $updated->get_error_message() );
+                $this->redirect_to_applicant_screen( 'account-profile', 'profile_update_failed' );
+            }
+        }
+        foreach ( $profile_fields as $field ) {
+            update_user_meta( get_current_user_id(), 'daw_applicant_' . $field, sanitize_text_field( wp_unslash( $_POST[ $field ] ?? '' ) ) );
+        }
+
+        wp_safe_redirect( recruitment_get_public_url( 'account-profile', [ 'profile_saved' => '1' ] ) );
+        exit;
+    }
+
+    private function redirect_to_applicant_screen( string $screen, string $error ): void {
+        wp_safe_redirect( recruitment_get_public_url( $screen, [ 'account_error' => $error ] ) );
+        exit;
     }
 
     public function handle_portal_login(): void {
@@ -271,9 +395,12 @@ class Recruitment_Plugin {
 		if ( $page_id && $page_id === $department_login_page_id && ! isset( $_GET['recruitment_page'] ) ) {
 			$requested_screen = 'login';
 		}
-        $screen = [ 'application' => 'application-form' ][ $requested_screen ] ?? $requested_screen;
-        if ( 'tracking' === $requested_screen ) {
-            $screen = '' !== sanitize_text_field( wp_unslash( $_GET['token'] ?? '' ) ) ? 'tracking-detail' : 'application-status';
+        $screen = [
+            'application' => 'application-form',
+            'tracking' => 'application-history',
+        ][ $requested_screen ] ?? $requested_screen;
+        if ( in_array( $screen, [ 'applicant-login', 'applicant-register', 'account-confirmation', 'account-profile', 'application-confirmation', 'application-history', 'application-detail', 'application-process', 'application-status', 'tracking-detail', 'interview-booking' ], true ) && function_exists( 'nocache_headers' ) ) {
+            nocache_headers();
         }
         $page_data = [];
         if ( 'login' === $screen ) {

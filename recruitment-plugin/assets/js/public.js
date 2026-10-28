@@ -5,9 +5,12 @@
   }
   window.RecruitmentPublicScripts = true;
   document.documentElement.classList.add("js");
+  setupApplicationWizard();
+  setupApplicationHistoryControls();
   setupConsentButton();
-  setupTokenCopy();
   setupScreenExplorer();
+  setupApplicantAccountMenu();
+  setupAccountConfirmationRedirect();
   setupPsychologicalTestProcessing();
   setupPsychotestDeviceCheck();
 
@@ -77,6 +80,135 @@
       });
   }
 
+  function setupApplicationWizard() {
+    const form = document.querySelector("[data-application-wizard]");
+    if (!form) {
+      return;
+    }
+
+    const cards = [...form.querySelectorAll(".daw-recruitment__form-card")];
+    const actions = form.querySelector(".daw-recruitment__form-actions");
+    if (cards.length < 6 || !actions) {
+      return;
+    }
+
+    const stepLabels = ["Identitas", "Pendidikan", "Pengalaman & Keluarga", "Minat & Persetujuan"];
+    const progress = document.createElement("ol");
+    progress.className = "daw-application-wizard__progress";
+    progress.setAttribute("aria-label", "Tahapan formulir lamaran");
+    const panels = stepLabels.map(function createStep(label, index) {
+      const step = index + 1;
+      const item = document.createElement("li");
+      item.dataset.applicationStepIndicator = String(step);
+      item.innerHTML = `<span>${step}</span><strong>${label}</strong>`;
+      progress.appendChild(item);
+
+      const panel = document.createElement("div");
+      panel.className = "daw-application-wizard__panel";
+      panel.dataset.applicationStepPanel = String(step);
+      panel.hidden = step !== 1;
+      return panel;
+    });
+
+    const navigation = document.createElement("div");
+    navigation.className = "daw-application-wizard__navigation";
+    const back = document.createElement("button");
+    back.type = "button";
+    back.className = "daw-recruitment__button daw-recruitment__button--muted";
+    back.textContent = "Kembali";
+    back.hidden = true;
+    const next = document.createElement("button");
+    next.type = "button";
+    next.className = "daw-recruitment__button";
+    next.textContent = "Lanjut";
+    navigation.append(back, next);
+
+    const firstCard = cards[0];
+    form.insertBefore(progress, firstCard);
+    cards.forEach(function placeCard(card, index) {
+      const step = index < 1 ? 1 : index < 2 ? 2 : index < 4 ? 3 : 4;
+      panels[step - 1].appendChild(card);
+    });
+    panels.forEach((panel) => form.insertBefore(panel, actions));
+    panels[3].appendChild(actions);
+    form.insertBefore(navigation, panels[0]);
+
+    let activeStep = 1;
+    const renderStep = function renderStep(step) {
+      activeStep = step;
+      panels.forEach((panel, index) => {
+        panel.hidden = index + 1 !== activeStep;
+      });
+      progress.querySelectorAll("[data-application-step-indicator]").forEach((item) => {
+        const itemStep = Number(item.dataset.applicationStepIndicator);
+        item.classList.toggle("is-active", itemStep === activeStep);
+        item.classList.toggle("is-complete", itemStep < activeStep);
+      });
+      back.hidden = activeStep === 1;
+      next.hidden = activeStep === panels.length;
+      form.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+
+    next.addEventListener("click", function goToNextStep() {
+      const invalidField = panels[activeStep - 1].querySelector(":invalid");
+      if (invalidField) {
+        invalidField.reportValidity();
+        return;
+      }
+      renderStep(Math.min(activeStep + 1, panels.length));
+    });
+    back.addEventListener("click", function goToPreviousStep() {
+      renderStep(Math.max(activeStep - 1, 1));
+    });
+    form.addEventListener("submit", function revealInvalidStep(event) {
+      const invalidField = form.querySelector(":invalid");
+      if (!invalidField) {
+        return;
+      }
+      const panel = invalidField.closest("[data-application-step-panel]");
+      if (panel && Number(panel.dataset.applicationStepPanel) !== activeStep) {
+        event.preventDefault();
+        renderStep(Number(panel.dataset.applicationStepPanel));
+        invalidField.reportValidity();
+      }
+    });
+    renderStep(activeStep);
+  }
+
+  function setupApplicationHistoryControls() {
+    const filters = document.querySelectorAll("[data-application-filter]");
+    const search = document.querySelector("[data-application-search]");
+    const rows = [...document.querySelectorAll("[data-application-state]")];
+    if (!filters.length || !search || !rows.length) {
+      return;
+    }
+
+    let activeFilter = "all";
+    const updateRows = function updateRows() {
+      const query = search.value.trim().toLowerCase();
+      rows.forEach((row) => {
+        const matchesFilter = "all" === activeFilter
+          || activeFilter === row.dataset.applicationState
+          || ("finished" === activeFilter && "rejected" === row.dataset.applicationState);
+        const matchesSearch = (row.dataset.applicationSearch || "").includes(query);
+        row.hidden = !matchesFilter || !matchesSearch;
+      });
+    };
+
+    filters.forEach((button) => {
+      button.addEventListener("click", function setApplicationFilter() {
+        activeFilter = button.dataset.applicationFilter;
+        filters.forEach((filter) => {
+          const isActive = filter === button;
+          filter.classList.toggle("is-active", isActive);
+          filter.setAttribute("aria-pressed", String(isActive));
+        });
+        updateRows();
+      });
+    });
+    search.addEventListener("input", updateRows);
+  }
+
   function setupConsentButton() {
     const submitButton = document.querySelector("[data-submit-application]");
     const applicationForm = submitButton ? submitButton.closest("form") : null;
@@ -89,8 +221,9 @@
       const allConsented = [...consentCheckboxes].every(
         (checkbox) => checkbox.checked,
       );
-      submitButton.disabled = !allConsented;
-      submitButton.setAttribute("aria-disabled", String(!allConsented));
+      const previewOnly = "true" === applicationForm.dataset.previewOnly;
+      submitButton.disabled = previewOnly || !allConsented;
+      submitButton.setAttribute("aria-disabled", String(previewOnly || !allConsented));
     };
 
     consentCheckboxes.forEach((checkbox) =>
@@ -104,40 +237,6 @@
       submitButton.textContent = "Submitting...";
     });
     updateSubmitState();
-  }
-
-  function setupTokenCopy() {
-    const copyButton = document.querySelector("[data-copy-token]");
-    const tokenElement = document.querySelector("[data-application-token]");
-    const feedback = document.querySelector(".daw-recruitment__copy-feedback");
-    if (!copyButton || !tokenElement) {
-      return;
-    }
-
-    copyButton.addEventListener("click", function copyApplicationToken() {
-      const token = tokenElement.textContent.trim();
-      const showSuccess = function showCopySuccess() {
-        copyButton.classList.add("is-copied");
-        copyButton.setAttribute("aria-label", "Kode lamaran berhasil disalin");
-        if (feedback) {
-          feedback.textContent = "Tersalin";
-        }
-      };
-
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(token).then(showSuccess);
-        return;
-      }
-
-      const selection = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(tokenElement);
-      selection.removeAllRanges();
-      selection.addRange(range);
-      document.execCommand("copy");
-      selection.removeAllRanges();
-      showSuccess();
-    });
   }
 
   function setupScreenExplorer() {
@@ -190,6 +289,50 @@
         groupButtonElement.setAttribute("aria-expanded", String(!isOpen));
         body.hidden = isOpen;
       });
+    });
+  }
+
+  function setupAccountConfirmationRedirect() {
+    const notice = document.querySelector("[data-account-confirmation-redirect]");
+    if (!notice) {
+      return;
+    }
+
+    window.setTimeout(function redirectToApplicantProfile() {
+      window.location.assign(notice.dataset.accountConfirmationRedirect);
+    }, 1400);
+  }
+
+  function setupApplicantAccountMenu() {
+    const menu = document.querySelector("[data-account-menu]");
+    if (!menu) {
+      return;
+    }
+
+    const toggle = menu.querySelector("[data-account-menu-toggle]");
+    const panel = menu.querySelector("[data-account-menu-panel]");
+    if (!toggle || !panel) {
+      return;
+    }
+
+    const setOpen = function setAccountMenuOpen(isOpen) {
+      panel.hidden = !isOpen;
+      toggle.setAttribute("aria-expanded", String(isOpen));
+    };
+
+    toggle.addEventListener("click", function toggleAccountMenu() {
+      setOpen(panel.hidden);
+    });
+    document.addEventListener("click", function closeAccountMenu(event) {
+      if (!menu.contains(event.target)) {
+        setOpen(false);
+      }
+    });
+    document.addEventListener("keydown", function closeAccountMenuOnEscape(event) {
+      if ("Escape" === event.key) {
+        setOpen(false);
+        toggle.focus();
+      }
     });
   }
 

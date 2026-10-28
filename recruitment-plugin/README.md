@@ -2,7 +2,7 @@
 
 Custom WordPress plugin untuk sistem rekrutmen dengan dua area utama:
 
-- **Public / User Area** — halaman Karir (`/karir/`) tanpa login.
+- **Public / Applicant Area** — halaman Karir terbuka untuk umum; pendaftaran, profil, formulir lamaran, dan proses pelamar menggunakan akun WordPress ber-role `daw_applicant`.
 - **Admin / HRD Area** — dashboard rekrutmen (`/recruitment-admin/`) dengan autentikasi.
 
 ## Struktur Modular
@@ -56,13 +56,13 @@ Pastikan plugin aktif di WordPress dan halaman Career berisi shortcode berikut:
 [recruitment_careers]
 ```
 
-Kemudian buka **Settings > Permalinks** dan klik **Save Changes**, lalu bersihkan cache browser/plugin. Saat login sebagai administrator, **Screen Explorer** akan muncul sebagai popup floating dan dapat dipakai untuk membuka seluruh halaman preview. Preview manual memakai parameter berikut:
+Kemudian buka **Settings > Permalinks** dan klik **Save Changes**, lalu bersihkan cache browser/plugin. **Screen Explorer** menyediakan preview halaman front-end, termasuk halaman akun pelamar, tanpa perlu login. Preview dibatasi ke route front-end yang didukung; route admin tetap memerlukan kapabilitas WordPress. Preview hanya menampilkan data contoh dan menonaktifkan pengiriman form. Preview manual memakai parameter berikut:
 
 ```text
 ?daw_ui_preview=1
 ```
 
-Jika form dibuka sebagai administrator/developer, mode preview membantu melewati nonce lokal yang stale akibat cache. Pengunjung publik tetap menggunakan validasi nonce normal. Setelah submit, gunakan tombol **Tracking Lamaran** pada halaman konfirmasi karena URL tersebut membawa token lamaran secara otomatis.
+Mode preview hanya untuk tampilan dan tidak mengirim lamaran, membuat akun, atau menyimpan perubahan profil. Di luar preview, pelamar menggunakan akun; halaman input tracking dan halaman hasil berbasis token tidak lagi digunakan. Riwayat dan status lamaran menampilkan pemberitahuan integrasi sampai data akun tersambung ke Oracle. Booking wawancara juga dinonaktifkan sementara. Kolom dan indeks token Oracle dipertahankan dan tidak diubah oleh perubahan front-end ini.
 
 ## Catatan Migrasi
 

@@ -91,6 +91,36 @@ if ( ! function_exists( 'esc_attr' ) ) {
     }
 }
 
+if ( ! function_exists( 'esc_textarea' ) ) {
+    function esc_textarea( $value ): string {
+        return htmlspecialchars( (string) $value, ENT_QUOTES, 'UTF-8' );
+    }
+}
+
+if ( ! function_exists( 'wp_get_current_user' ) && ! defined( 'WPINC' ) ) {
+    function wp_get_current_user(): object {
+        return (object) [ 'ID' => 0, 'display_name' => 'Preview Applicant', 'user_email' => 'applicant@example.com', 'roles' => [] ];
+    }
+}
+
+if ( ! function_exists( 'get_current_user_id' ) ) {
+    function get_current_user_id(): int {
+        return (int) ( wp_get_current_user()->ID ?? 0 );
+    }
+}
+
+if ( ! function_exists( 'get_user_meta' ) ) {
+    function get_user_meta( int $user_id, string $key = '', bool $single = false ) {
+        return $single ? '' : [];
+    }
+}
+
+if ( ! function_exists( 'delete_user_meta' ) ) {
+    function delete_user_meta( int $user_id, string $meta_key ): bool {
+        return false;
+    }
+}
+
 if ( ! function_exists( 'wp_kses_post' ) ) {
     function wp_kses_post( $value ): string {
         return strip_tags( (string) $value, '<a><br><em><strong><p><ul><ol><li>' );
@@ -115,7 +145,7 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
     }
 }
 
-if ( ! function_exists( 'wp_safe_redirect' ) ) {
+if ( ! function_exists( 'wp_safe_redirect' ) && ! defined( 'WPINC' ) ) {
     function wp_safe_redirect( string $location, int $status = 302 ): void {
         if ( ob_get_level() ) {
             ob_end_clean();
@@ -226,8 +256,56 @@ function recruitment_get_public_url( string $screen = 'careers', array $args = [
         $page_id = absint( get_queried_object_id() );
     }
     $base_url = $page_id ? get_permalink( $page_id ) : home_url( '/' );
+    if ( recruitment_is_ui_preview() ) {
+        $args = array_merge( [ 'daw_ui_preview' => '1' ], $args );
+    }
 
     return add_query_arg( array_merge( [ 'recruitment_page' => sanitize_key( $screen ) ], $args ), $base_url );
+}
+
+function recruitment_is_ui_preview(): bool {
+    if ( '1' !== sanitize_text_field( wp_unslash( $_GET['daw_ui_preview'] ?? '' ) ) ) {
+        return false;
+    }
+
+    if ( ( defined( 'RECRUITMENT_SANDBOX' ) && RECRUITMENT_SANDBOX )
+        || ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options' ) ) ) {
+        return true;
+    }
+
+    $preview_screens = [
+        'careers',
+        'job-detail',
+        'application',
+        'application-form',
+        'application-confirmation',
+        'applicant-login',
+        'applicant-register',
+        'account-confirmation',
+        'account-profile',
+        'application-history',
+        'application-detail',
+        'application-process',
+        'application-status',
+        'tracking-detail',
+        'psych-test',
+        'psychotest',
+        'psychotest-preparation',
+        'psychotest-device',
+        'interview-booking',
+    ];
+    $screen = sanitize_key( wp_unslash( $_GET['recruitment_page'] ?? '' ) );
+
+    return in_array( $screen, $preview_screens, true );
+}
+
+function recruitment_is_applicant_user(): bool {
+    if ( ! function_exists( 'is_user_logged_in' ) || ! is_user_logged_in() || ! function_exists( 'wp_get_current_user' ) ) {
+        return false;
+    }
+
+    $user = wp_get_current_user();
+    return in_array( 'daw_applicant', (array) ( $user->roles ?? [] ), true );
 }
 
 /**

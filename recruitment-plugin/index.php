@@ -39,10 +39,10 @@ $requested_path = parse_url( $_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH );
 if ( '/interview-booking' === rtrim( (string) $requested_path, '/' ) ) {
     $requested_page = 'interview-booking';
 }
-$page = [ 'application' => 'application-form' ][ $requested_page ] ?? $requested_page;
-if ( 'tracking' === $requested_page ) {
-    $page = '' !== sanitize_text_field( wp_unslash( $_GET['token'] ?? '' ) ) ? 'tracking-detail' : 'application-status';
-}
+$page = [
+    'application' => 'application-form',
+    'tracking' => 'application-history',
+][ $requested_page ] ?? $requested_page;
 
 if ( $page === 'logout' ) {
     $auth->logout();

@@ -2205,6 +2205,159 @@ body:has(.daw-admin-login) main {
   max-width: 360px;
 }
 
+.daw-admin-login--split {
+  align-items: stretch;
+  background: #fff;
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(420px, 2fr);
+  min-height: 100vh;
+  padding: 0;
+  text-align: left;
+}
+.daw-admin-login--split .daw-admin-login__intro {
+  background: #1c1c1e;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 100vh;
+  padding: 32px;
+}
+.daw-admin-login--split .daw-admin-login__brand {
+  background: #c8102e;
+  border-radius: 9px;
+  box-shadow: none;
+  font-size: 16px;
+  height: 48px;
+  width: 48px;
+}
+.daw-admin-login--split .daw-admin-login__message {
+  margin: 0;
+  max-width: 520px;
+}
+.daw-admin-login--split .daw-admin-login__message h1 {
+  color: #fff;
+  font-size: clamp(32px, 4vw, 48px);
+  line-height: 1.12;
+  margin: 0 0 10px;
+}
+.daw-admin-login--split .daw-admin-login__subtitle {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+.daw-admin-login--split .daw-admin-login__message > p:last-child {
+  color: #aaaab2;
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 420px;
+}
+.daw-admin-login--split .daw-admin-login__stats {
+  display: flex;
+  gap: 30px;
+}
+.daw-admin-login--split .daw-admin-login__stats div {
+  display: grid;
+  gap: 2px;
+}
+.daw-admin-login--split .daw-admin-login__stats strong {
+  color: #fff;
+  font-size: 24px;
+}
+.daw-admin-login--split .daw-admin-login__stats span {
+  color: #888891;
+  font-size: 11px;
+}
+.daw-admin-login--split .daw-admin-login__panel {
+  align-items: center;
+  background: #fff;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 32px;
+  position: relative;
+}
+.daw-admin-login--split .daw-admin-login__content {
+  max-width: 420px;
+  width: 100%;
+}
+.daw-admin-login--split .daw-admin-login__card {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+.daw-admin-login--split .daw-admin-login__card h2 {
+  color: #17171a;
+  font-size: 25px;
+  margin: 0 0 5px;
+}
+.daw-admin-login--split .daw-admin-login__card > p {
+  color: #777780;
+  font-size: 12px;
+  margin: 0 0 24px;
+}
+.daw-admin-login--split .daw-admin-login__card form {
+  gap: 8px;
+}
+.daw-admin-login--split .daw-admin-login__card label {
+  font-size: 11px;
+  margin-top: 4px;
+}
+.daw-admin-login--split .daw-admin-login__card input[type="text"],
+.daw-admin-login--split .daw-admin-login__card input[type="password"],
+.daw-admin-login--split .daw-admin-login__card select {
+  font-size: 13px;
+  height: 42px;
+  margin-bottom: 6px;
+}
+.daw-admin-login--split .daw-admin-login__card form > button {
+  font-size: 13px;
+  height: 44px;
+  margin-top: 8px;
+}
+.daw-admin-login--split .daw-admin-login__lost-password,
+.daw-admin-login--split .daw-admin-login__back {
+  font-size: 11px;
+}
+.daw-admin-login--split .daw-admin-login__restricted {
+  color: #8c8c95;
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 20px 0 0;
+  text-align: center;
+}
+.daw-admin-login--split .daw-admin-login__copyright {
+  bottom: 18px;
+  left: 32px;
+  margin: 0;
+  max-width: none;
+  position: absolute;
+  right: 32px;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .daw-admin-login--split {
+    grid-template-columns: 1fr;
+  }
+  .daw-admin-login--split .daw-admin-login__intro {
+    min-height: 280px;
+    padding: 24px;
+  }
+  .daw-admin-login--split .daw-admin-login__message {
+    margin: 28px 0;
+  }
+  .daw-admin-login--split .daw-admin-login__panel {
+    min-height: 520px;
+    padding: 44px 24px 70px;
+  }
+}
+
 @media (max-width: 760px) {
   .admin-login {
     grid-template-columns: 1fr;

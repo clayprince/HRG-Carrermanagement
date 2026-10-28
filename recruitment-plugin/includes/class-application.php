@@ -60,34 +60,34 @@ class Recruitment_Application {
     }
 
     /**
-     * Validate, persist, and return the public token for one submission.
+     * Validate and persist one application.
      *
      * @param array<string, mixed> $request
      * @param array<string, mixed> $files
-     * @return array{errors: array<int, string>, payload: array<string, mixed>, token: string}
+     * @return array{errors: array<int, string>, payload: array<string, mixed>, success: bool}
      */
     public function submit( array $request, array $files = [] ): array {
         $prepared = $this->prepare_submission( $request, $files );
         if ( $prepared['errors'] ) {
-            return [ 'errors' => $prepared['errors'], 'payload' => $prepared['payload'], 'token' => '' ];
+            return [ 'errors' => $prepared['errors'], 'payload' => $prepared['payload'], 'success' => false ];
         }
 
         $fingerprint = hash( 'sha256', wp_json_encode( $prepared['payload'] ) );
         if ( isset( $_SESSION['recruitment_submission'][ $fingerprint ] ) ) {
-            return [ 'errors' => [], 'payload' => $prepared['payload'], 'token' => (string) $_SESSION['recruitment_submission'][ $fingerprint ] ];
+            return [ 'errors' => [], 'payload' => $prepared['payload'], 'success' => true ];
         }
 
         $saved = ( new Recruitment_Database() )->save_application( $prepared['payload'] );
-        if ( empty( $saved['success'] ) || empty( $saved['token'] ) ) {
+        if ( empty( $saved['success'] ) ) {
             return [
                 'errors'  => [ (string) ( $saved['error'] ?? 'Data lamaran gagal disimpan. Silakan coba lagi.' ) ],
                 'payload' => $prepared['payload'],
-                'token'   => '',
+                'success' => false,
             ];
         }
 
-        $_SESSION['recruitment_submission'][ $fingerprint ] = $saved['token'];
-        return [ 'errors' => [], 'payload' => $prepared['payload'], 'token' => $saved['token'] ];
+        $_SESSION['recruitment_submission'][ $fingerprint ] = true;
+        return [ 'errors' => [], 'payload' => $prepared['payload'], 'success' => true ];
     }
 
     /**

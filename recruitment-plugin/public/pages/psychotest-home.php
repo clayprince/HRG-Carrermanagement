@@ -1,12 +1,12 @@
 <?php
-$back_url = recruitment_get_public_url( 'tracking', [ 'daw_ui_preview' => '1', 'token' => 'DAW-PREVIEW-001' ] );
+$back_url = recruitment_get_public_url( 'application-process' );
 $preparation_url = recruitment_get_public_url( 'psychotest-preparation' );
 ?>
 <div class="daw-recruitment daw-recruitment--psychotest-home">
     <?php require recruitment_get_plugin_path( 'public/components/header.php' ); ?>
     <main class="daw-recruitment__psychotest-main">
         <div class="daw-recruitment__psychotest-shell">
-            <a class="daw-recruitment__back-link" href="<?= esc_url( $back_url ) ?>">&larr; Kembali ke Tracking</a>
+            <a class="daw-recruitment__back-link" href="<?= esc_url( $back_url ) ?>">&larr; Kembali ke Proses Lamaran</a>
 
             <header class="daw-recruitment__psychotest-header">
                 <div class="daw-recruitment__psychotest-header-copy">

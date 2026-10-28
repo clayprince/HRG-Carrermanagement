@@ -11,22 +11,20 @@ class Recruitment_Router {
         'job-detail'         => 'public/pages/job-detail.php',
         'application-form'   => 'public/pages/application-form.php',
         'application-confirmation' => 'public/pages/application-confirmation.php',
+        'applicant-login'    => 'public/pages/applicant-login.php',
+        'applicant-register' => 'public/pages/applicant-register.php',
+        'account-confirmation' => 'public/pages/account-confirmation.php',
+        'account-profile'    => 'public/pages/account-profile.php',
+        'application-history' => 'public/pages/application-history.php',
+        'application-detail' => 'public/pages/application-detail.php',
+        'application-process' => 'public/pages/application-process.php',
         'psych-test'         => 'public/pages/psychological-test.php',
         'interview-booking'  => 'public/pages/interview-booking.php',
         'psychotest'         => 'public/pages/psychotest-home.php',
         'psychotest-preparation' => 'public/pages/psychotest-preparation.php',
         'psychotest-device'  => 'public/pages/psychotest-device.php',
-        'application-status' => 'public/pages/application-status.php',
-        'tracking-detail'    => 'public/pages/application-tracking.php',
-        'tracking-result-lamaran-diterima' => 'public/pages/tracking-result-lamaran-diterima.php',
-        'tracking-result-seleksi-administrasi' => 'public/pages/tracking-result-seleksi-administrasi.php',
-        'tracking-result-tes-psikologi' => 'public/pages/tracking-result-tes-psikologi.php',
-        'tracking-result-wawancara-hr' => 'public/pages/tracking-result-wawancara-hr.php',
-        'tracking-result-wawancara-user' => 'public/pages/tracking-result-wawancara-user.php',
-        'tracking-result-diterima' => 'public/pages/tracking-result-diterima.php',
-        'tracking-result-proses-selesai' => 'public/pages/tracking-result-proses-selesai.php',
-        'tracking-result-administrasi-diperiksa' => 'public/pages/tracking-result-administrasi-diperiksa.php',
-        'tracking-result-keputusan-akhir-tidak-lolos' => 'public/pages/tracking-result-keputusan-akhir-tidak-lolos.php',
+        'application-status' => 'public/pages/application-history.php',
+        'tracking-detail'    => 'public/pages/application-process.php',
         'login'              => 'admin/pages/login.php',
         'dashboard'          => 'admin/pages/dashboard.php',
         'vacancies'          => 'admin/pages/vacancies.php',
@@ -62,6 +60,24 @@ class Recruitment_Router {
         'settings',
     ];
 
+    /** @var string[] */
+    private const APPLICANT_PROTECTED = [
+        'account-confirmation',
+        'account-profile',
+        'application-form',
+        'application-confirmation',
+        'application-history',
+        'application-detail',
+        'application-status',
+        'application-process',
+        'tracking-detail',
+        'interview-booking',
+        'psych-test',
+        'psychotest',
+        'psychotest-preparation',
+        'psychotest-device',
+    ];
+
     /**
      * @param array<string, mixed> $data
      */
@@ -72,6 +88,21 @@ class Recruitment_Router {
             && defined( 'RECRUITMENT_SANDBOX' )
             && RECRUITMENT_SANDBOX
             && '1' === sanitize_text_field( wp_unslash( $_GET['daw_ui_preview'] ?? '' ) );
+
+        $applicant_preview = recruitment_is_ui_preview();
+
+        if ( in_array( $slug, self::APPLICANT_PROTECTED, true ) && ! $applicant_preview && ! recruitment_is_applicant_user() ) {
+            $is_logged_in = function_exists( 'is_user_logged_in' ) && is_user_logged_in();
+            $redirect_args = [
+                'account_error' => $is_logged_in ? 'applicant_account_required' : '',
+                'redirect_to' => in_array( $slug, [ 'application-form', 'application-history', 'account-profile' ], true ) ? $slug : 'account-profile',
+            ];
+            if ( 'application-form' === $slug ) {
+                $redirect_args['job_id'] = absint( $_GET['job_id'] ?? 0 );
+            }
+            wp_safe_redirect( recruitment_get_public_url( 'applicant-login', $redirect_args ) );
+            exit;
+        }
 
         if ( in_array( $slug, self::PROTECTED, true ) && ! $sandbox_preview ) {
             if ( ! is_user_logged_in() ) {

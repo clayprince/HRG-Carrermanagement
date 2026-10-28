@@ -24,7 +24,7 @@ $complete_url = recruitment_get_public_url( 'psych-test', [ 'state' => 'complete
                 </div>
                 <div class="daw-psych-test-warning"><span aria-hidden="true">&#9888;</span><p>Pastikan seluruh rangkaian tes telah Anda selesaikan sebelum mengirim hasil. Setelah dikirim, jawaban tidak dapat diubah kembali.</p></div>
                 <a class="daw-psych-test-button" href="<?= esc_url( $processing_url ) ?>">Kirim Hasil</a>
-                <a class="daw-psych-test-secondary" href="<?= esc_url( recruitment_get_public_url( 'tracking', [ 'daw_ui_preview' => '1', 'token' => 'DAW-PREVIEW-001' ] ) ) ?>">Kembali ke Daftar Tes</a>
+                <a class="daw-psych-test-secondary" href="<?= esc_url( recruitment_get_public_url( 'application-process' ) ) ?>">Kembali ke Proses Lamaran</a>
             </section>
         <?php elseif ( 'processing' === $state ) : ?>
             <section class="daw-psych-test-card daw-psych-test-card--processing" data-psych-processing data-next-url="<?= esc_url( $complete_url ) ?>">
@@ -47,8 +47,8 @@ $complete_url = recruitment_get_public_url( 'psych-test', [ 'state' => 'complete
                     <span><i>&#10003;</i>DISC</span>
                     <span><i>&#10003;</i>PAPI Kostick</span>
                 </div>
-                <div class="daw-psych-test-next-notice"><strong>SELANJUTNYA</strong><p>Tim HR akan melakukan proses validasi dan memberikan informasi mengenai tahapan berikutnya melalui tracking lamaran.</p></div>
-                <a class="daw-psych-test-button" href="<?= esc_url( recruitment_get_public_url( 'tracking', [ 'daw_ui_preview' => '1', 'token' => 'DAW-PREVIEW-001' ] ) ) ?>">Kembali ke Tracking Lamaran</a>
+                <div class="daw-psych-test-next-notice"><strong>SELANJUTNYA</strong><p>Tim HR akan melakukan proses validasi dan memberikan informasi mengenai tahapan berikutnya melalui akun pelamar.</p></div>
+                <a class="daw-psych-test-button" href="<?= esc_url( recruitment_get_public_url( 'application-process' ) ) ?>">Kembali ke Proses Lamaran</a>
             </section>
         <?php endif; ?>
     </main>

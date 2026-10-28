@@ -38,7 +38,7 @@ $jobs = array_values( array_filter( $jobs, static function ( array $job ) use ( 
             <span class="daw-recruitment__eyebrow">Lowongan tersedia</span>
             <h1>Bangun Kariermu<br><span>Bersama DAW</span></h1>
             <p>Temukan peluang karier dan berkembang bersama PT. Daya Adicipta Wisesa, dealer resmi Honda di Indonesia Timur.</p>
-            <div class="daw-recruitment__hero-actions"><a class="daw-recruitment__button" href="#daw-vacancies">Lihat Lowongan</a><a class="daw-recruitment__button daw-recruitment__button--outline" href="<?= esc_url( recruitment_get_public_url( 'tracking' ) ) ?>">Tracking Lamaran</a></div>
+            <div class="daw-recruitment__hero-actions"><a class="daw-recruitment__button" href="#daw-vacancies">Lihat Lowongan</a><a class="daw-recruitment__button daw-recruitment__button--outline" href="<?= esc_url( recruitment_get_public_url( recruitment_is_applicant_user() ? 'application-history' : 'applicant-login' ) ) ?>">Akun Pelamar</a></div>
             <div class="daw-recruitment__stats"><div class="daw-recruitment__stat"><strong><?= esc_html( count( $jobs ) ) ?></strong><span>Lowongan Aktif</span></div><div class="daw-recruitment__stat"><strong>3</strong><span>Wilayah</span></div><div class="daw-recruitment__stat"><strong>12+</strong><span>Dealer &amp; AHASS</span></div><div class="daw-recruitment__stat"><strong>500+</strong><span>Karyawan</span></div></div>
         </div>
     </section>
