@@ -1,5 +1,6 @@
 <?php
-$screen_explorer_preview = '1' === sanitize_text_field( wp_unslash( $_GET['daw_ui_preview'] ?? '' ) ) || ( function_exists( 'current_user_can' ) && ( current_user_can( 'manage_options' ) || current_user_can( 'manage_recruitment' ) ) );
+$is_department_screen = 'daw-user-department' === sanitize_key( wp_unslash( $_GET['page'] ?? '' ) );
+$screen_explorer_preview = '1' === sanitize_text_field( wp_unslash( $_GET['daw_ui_preview'] ?? '' ) ) || ( function_exists( 'current_user_can' ) && ( current_user_can( 'manage_options' ) || current_user_can( 'manage_recruitment' ) || ( $is_department_screen && current_user_can( 'manage_user_department' ) ) ) );
 if ( ! $screen_explorer_preview ) {
     return;
 }
@@ -45,6 +46,13 @@ $screen_explorer_items = [
         [ 'label' => 'Catatan Wawancara User', 'screen' => 'user-interview', 'args' => [ 'view' => 'notes' ] ],
         [ 'label' => 'Pengaturan', 'screen' => 'settings' ],
     ],
+    'User Department' => [
+        [ 'label' => 'Dashboard', 'screen' => 'user-department', 'args' => [ 'view' => 'dashboard' ] ],
+        [ 'label' => 'Request Lowongan', 'screen' => 'user-department', 'args' => [ 'view' => 'requests' ] ],
+        [ 'label' => 'Kandidat Wawancara User', 'screen' => 'user-department', 'args' => [ 'view' => 'interviews' ] ],
+        [ 'label' => 'Data Pelamar', 'screen' => 'user-department', 'args' => [ 'view' => 'applicants' ] ],
+        [ 'label' => 'Hasil Wawancara User', 'screen' => 'user-department', 'args' => [ 'view' => 'results' ] ],
+    ],
 ];
 ?>
 <aside class="daw-screen-explorer" data-screen-explorer aria-label="Screen Explorer">
@@ -66,9 +74,14 @@ $screen_explorer_items = [
                 <div class="daw-screen-explorer__group-body">
                 <?php foreach ( $items as $item ) : ?>
                     <?php
-                    $is_admin = 'Admin' === $group && 'login' !== $item['screen'];
+                    $is_admin = in_array( $group, [ 'Admin', 'User Department' ], true ) && 'login' !== $item['screen'];
                     $args = $item['args'] ?? [];
-                    if ( $is_admin ) {
+                    if ( 'User Department' === $group ) {
+                        $url = add_query_arg(
+                            array_merge( [ 'page' => 'daw-user-department' ], $args ),
+                            admin_url( 'admin.php' )
+                        );
+                    } elseif ( $is_admin ) {
                         $url = recruitment_get_admin_url( $item['screen'] );
                         if ( $args ) {
                             $url = add_query_arg( $args, $url );

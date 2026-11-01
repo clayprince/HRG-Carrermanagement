@@ -9,37 +9,51 @@ Custom WordPress plugin untuk sistem rekrutmen dengan dua area utama:
 
 ```text
 recruitment-plugin/
-├── assets/                  # CSS, JavaScript, images, icons
-├── pages/                   # Entry point layout per halaman
-│   ├── public/
-│   └── admin/
-├── components/              # UI reusable
-│   ├── public/
-│   └── admin/
-├── routes/                  # Registry dan renderer route
+├── admin/                   # Dashboard HR, halaman, dan komponen admin
+├── assets/                  # CSS, JavaScript, gambar, dan ikon
+├── components/              # Komponen bersama
 ├── database/
-│   ├── connection/           # Konfigurasi dan koneksi bersama Oracle
-│   ├── migrations/           # Migrasi skema Oracle
-│   └── class-database.php    # Query dan transaksi domain rekrutmen
-├── includes/                # Helper, auth, dan bootstrap
-├── public/                  # Template lama selama migrasi bertahap
-├── admin/                   # Template lama selama migrasi bertahap
-└── templates/               # Email dan halaman error
+│   ├── connection/          # Koneksi Oracle lazy bersama
+│   ├── migrations/          # Migrasi skema Oracle
+│   └── class-database.php   # Gateway query/transaksi domain rekrutmen
+├── docs/                    # Panduan setup dan pengembangan
+├── includes/                # Bootstrap, autentikasi, dan layanan
+├── pages/                   # Halaman bersama
+├── public/                  # Loader, halaman, dan komponen publik
+├── routes/                  # Registry dan renderer route
+├── templates/               # Template email dan error
+├── index.php                # Entry point sandbox/compatibility
+└── recruitment-plugin.php   # Bootstrap plugin WordPress
 ```
 
-Alur request: `recruitment-plugin.php` -> `includes/class-plugin.php` -> `routes/class-router.php` -> `pages/*` -> `components/*`.
+Alur request WordPress dimulai dari `recruitment-plugin.php`, memuat
+`includes/class-plugin.php` dan `routes/class-router.php`, lalu meneruskan
+request ke halaman dan komponen yang sesuai.
 
-Konfigurasi Oracle dibaca dengan urutan prioritas: konstanta PHP, environment variable proses, file `.env` yang ditunjuk oleh `RECRUITMENT_DOTENV_PATH`, lalu option WordPress `recruitment_oracle_config`. Untuk konfigurasi lokal, simpan file `.env` di luar document root dan jangan commit file rahasia. Salin format dari [`.env.example`](../.env.example) ke file lokal, isi kredensial Oracle, lalu tentukan path file tersebut di `wp-config.php` sebelum plugin dimuat. Pada instalasi Laragon ini, path yang digunakan adalah `D:/laragon/etc/hr-management.oracle.env`:
+Oracle recruitment data uses the dedicated PDO_OCI connection, separate from
+the WordPress database configured by `DB_*` in `wp-config.php`. For local
+configuration, keep the Oracle env file outside the repository and document
+root. Copy the format from [`.env.example`](../.env.example), supply credentials
+locally, and set `RECRUITMENT_DOTENV_PATH` in `wp-config.php` before the plugin
+loads. Do not put credential values in this repository or in AI prompts.
 
-```php
-define( 'RECRUITMENT_DOTENV_PATH', 'D:/laragon/etc/hr-management.oracle.env' );
-```
+The Oracle connection reads `RECRUITMENT_ORACLE_DSN`,
+`RECRUITMENT_ORACLE_USER`, and `RECRUITMENT_ORACLE_PASSWORD` according to the
+priority and behavior documented in
+[`database/README.md`](database/README.md). The PHP `pdo_oci` driver must be
+available. Connection creation is lazy and shared for the request. Pages must
+not create their own PDO connection or embed Oracle queries; use the database
+gateway and existing service patterns.
 
-File `.env` harus berisi pasangan `KEY=VALUE`, satu per baris. Baris komentar penuh diawali `#`; nilai boleh dibungkus tanda kutip tunggal atau ganda. Pastikan PHP dapat membaca file tersebut. Untuk produksi, lebih baik gunakan environment variable yang dikelola server. Pastikan ekstensi PHP `pdo_oci` tersedia. Koneksi dibuat secara lazy dan digunakan bersama selama request; operasi data gagal dengan pesan error jika Oracle belum terkonfigurasi atau tidak tersedia. Page tidak boleh membuat koneksi atau menulis query langsung. Tidak ada fallback penyimpanan database sandbox.
+Use WordPress APIs for WordPress user accounts, roles, and options. Do not use
+Oracle for those records unless the feature requirements and existing data
+model explicitly call for it.
 
 Untuk instruksi setup lokal langkah demi langkah di Windows dan macOS, termasuk pemeriksaan PHP CLI/web dan troubleshooting, lihat [Panduan setup Oracle lokal](docs/oracle-env-setup.md). Setiap developer harus memakai path env lokalnya sendiri; jangan menyalin kredensial ke repository.
 
-Folder `public/` dan `admin/` dipertahankan sebagai bridge kompatibilitas agar migrasi template dapat dilakukan per halaman tanpa mengubah output.
+Folder `public/` dan `admin/` memuat loader serta halaman aktif plugin. Jangan
+menganggapnya sekadar bridge lama; ikuti struktur dan pemanggil yang benar-benar
+digunakan sebelum memindahkan template.
 
 ## Workflow Tim Setelah Git Pull
 
@@ -62,8 +76,15 @@ Kemudian buka **Settings > Permalinks** dan klik **Save Changes**, lalu bersihka
 ?daw_ui_preview=1
 ```
 
-Mode preview hanya untuk tampilan dan tidak mengirim lamaran, membuat akun, atau menyimpan perubahan profil. Di luar preview, pelamar menggunakan akun; halaman input tracking dan halaman hasil berbasis token tidak lagi digunakan. Riwayat dan status lamaran menampilkan pemberitahuan integrasi sampai data akun tersambung ke Oracle. Booking wawancara juga dinonaktifkan sementara. Kolom dan indeks token Oracle dipertahankan dan tidak diubah oleh perubahan front-end ini.
+Mode preview hanya untuk tampilan dan tidak mengirim lamaran, membuat akun,
+atau menyimpan perubahan profil. Perilaku tracking, status, dan booking dapat
+berubah mengikuti implementasi; periksa route dan layanan terkait sebelum
+mengubah dokumentasi atau alur tersebut. Lamaran publik yang tersimpan di
+Oracle dikelola melalui database gateway.
 
 ## Catatan Migrasi
 
-`index.php` tetap menjadi entry point sandbox. Pada WordPress, bootstrap utama menggunakan hooks, shortcode, dan `Recruitment_Router`. Asset didaftarkan melalui `wp_enqueue_style()` dan `wp_enqueue_script()`, sedangkan akses data diarahkan melalui `database/class-database.php`.
+`index.php` tetap menjadi entry point sandbox. Pada WordPress, bootstrap utama
+menggunakan hooks, shortcode, dan `Recruitment_Router`. Asset didaftarkan
+melalui `wp_enqueue_style()` dan `wp_enqueue_script()`. Untuk Oracle, baca
+[`database/README.md`](database/README.md) sebelum menambah atau mengubah CRUD.

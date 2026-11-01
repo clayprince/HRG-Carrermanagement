@@ -263,6 +263,22 @@ function recruitment_get_public_url( string $screen = 'careers', array $args = [
     return add_query_arg( array_merge( [ 'recruitment_page' => sanitize_key( $screen ) ], $args ), $base_url );
 }
 
+function recruitment_get_department_login_url( array $args = [] ): string {
+    $page_id = absint( get_option( 'recruitment_department_login_page_id', 0 ) );
+    $base_url = $page_id ? get_permalink( $page_id ) : recruitment_get_public_url( 'portal' );
+
+    return add_query_arg(
+        array_merge(
+            [
+                'recruitment_page' => 'login',
+                'target' => 'user_department',
+            ],
+            $args
+        ),
+        $base_url
+    );
+}
+
 function recruitment_is_ui_preview(): bool {
     if ( '1' !== sanitize_text_field( wp_unslash( $_GET['daw_ui_preview'] ?? '' ) ) ) {
         return false;

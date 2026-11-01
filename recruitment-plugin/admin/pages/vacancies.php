@@ -34,13 +34,13 @@ $status_labels = [ 'published' => 'Published', 'draft' => 'Draft', 'closed' => '
                 <div class="daw-vacancies__nav-children">
                     <a class="daw-vacancies__nav-item daw-vacancies__nav-subitem <?= ! $is_create_view ? 'is-active' : '' ?>" href="<?= esc_url( $list_url ) ?>" <?= ! $is_create_view ? 'aria-current="page"' : '' ?>>Semua Lowongan</a>
                     <a class="daw-vacancies__nav-item daw-vacancies__nav-subitem <?= $is_create_view ? 'is-active' : '' ?>" href="<?= esc_url( $create_url ) ?>" <?= $is_create_view ? 'aria-current="page"' : '' ?>>Tambah Lowongan</a>
+                    <a class="daw-vacancies__nav-item daw-vacancies__nav-subitem" href="<?= esc_url( recruitment_get_admin_url( 'applications' ) ) ?>">Pengajuan Lowongan</a>
                 </div>
             </details>
             <span class="daw-vacancies__nav-item">Form Lamaran</span>
             <span class="daw-vacancies__nav-item">Psikotes</span>
             <span class="daw-vacancies__nav-item">Jadwal Wawancara</span>
             <span class="daw-vacancies__nav-item">Email Recruitment</span>
-            <span class="daw-vacancies__nav-item">Approval Pengajuan</span>
             <span class="daw-vacancies__nav-item">Akun User Dept</span>
         </nav>
         <span class="daw-vacancies__collapse">‹‹ Ciutkan</span>

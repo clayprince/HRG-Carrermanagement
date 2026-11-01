@@ -32,8 +32,13 @@ class Recruitment_Plugin {
     public function init(): void {
         add_action( 'init', [ $this, 'register_content' ] );
         add_action( 'init', [ $this, 'register_portal_pages' ] );
+        add_action( 'init', [ $this, 'register_hr_role' ] );
         add_action( 'init', [ $this, 'register_user_department_role' ] );
         add_action( 'init', [ $this, 'register_applicant_role' ] );
+        add_action( 'wp_login', [ $this, 'record_account_login' ], 10, 2 );
+        add_filter( 'wp_authenticate_user', [ $this, 'reject_inactive_account' ] );
+        add_filter( 'wp_authenticate_user', [ $this, 'reject_direct_applicant_login' ], 20 );
+        add_filter( 'wp_authenticate_user', [ $this, 'reject_direct_employee_login' ], 20 );
         add_action( 'template_redirect', [ $this, 'handle_applicant_account' ] );
         add_action( 'template_redirect', [ $this, 'handle_portal_login' ] );
         add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_public_assets' ] );
@@ -62,10 +67,57 @@ class Recruitment_Plugin {
         }
     }
 
+    public function register_hr_role(): void {
+        $hr_role = get_role( 'daw_hr' );
+        if ( ! $hr_role ) {
+            $hr_role = add_role( 'daw_hr', 'HR Recruitment', [ 'read' => true ] );
+        }
+
+        if ( $hr_role && ! $hr_role->has_cap( 'manage_recruitment' ) ) {
+            $hr_role->add_cap( 'manage_recruitment' );
+        }
+    }
+
     public function register_applicant_role(): void {
         if ( ! get_role( 'daw_applicant' ) ) {
             add_role( 'daw_applicant', 'Applicant', [ 'read' => true ] );
         }
+    }
+
+    public function record_account_login( string $user_login, WP_User $user ): void {
+        update_user_meta( $user->ID, 'daw_last_login', current_time( 'mysql' ) );
+    }
+
+    public function reject_inactive_account( $user ) {
+        if ( $user instanceof WP_User && '1' === get_user_meta( $user->ID, 'daw_account_inactive', true ) ) {
+            return new WP_Error( 'daw_account_inactive', __( 'Akun ini sedang dinonaktifkan. Hubungi administrator.', 'recruitment-plugin' ) );
+        }
+
+        return $user;
+    }
+
+    public function reject_direct_applicant_login( $user ) {
+        if ( $user instanceof WP_User && in_array( 'daw_applicant', (array) $user->roles, true ) ) {
+            return new WP_Error( 'daw_applicant_oracle_login_required', __( 'Pelamar harus masuk melalui portal rekrutmen.', 'recruitment-plugin' ) );
+        }
+
+        return $user;
+    }
+
+    public function reject_direct_employee_login( $user ) {
+        if (
+            $user instanceof WP_User
+            && (
+                in_array( 'daw_hr', (array) $user->roles, true )
+                || in_array( 'daw_user_department', (array) $user->roles, true )
+                || '1' === get_user_meta( $user->ID, 'daw_department_user', true )
+                || '' !== (string) get_user_meta( $user->ID, 'daw_oracle_account_type', true )
+            )
+        ) {
+            return new WP_Error( 'daw_oracle_employee_login_required', __( 'Akun karyawan harus masuk melalui portal rekrutmen.', 'recruitment-plugin' ) );
+        }
+
+        return $user;
     }
 
     public function handle_applicant_account(): void {
@@ -102,31 +154,23 @@ class Recruitment_Plugin {
                 $this->redirect_to_applicant_screen( 'applicant-register', 'password_mismatch' );
             }
 
-            $user_login = sanitize_user( strstr( $email, '@', true ), true );
-            if ( '' === $user_login ) {
-                $user_login = 'applicant';
-            }
-            $base_login = $user_login;
-            while ( username_exists( $user_login ) ) {
-                $user_login = $base_login . '-' . strtolower( wp_generate_password( 5, false, false ) );
+            $existing_user_id = email_exists( $email );
+            if ( $existing_user_id ) {
+                $existing_user = get_user_by( 'id', $existing_user_id );
+                if ( ! $existing_user || ! in_array( 'daw_applicant', (array) $existing_user->roles, true ) ) {
+                    $this->redirect_to_applicant_screen( 'applicant-register', 'email_exists' );
+                }
             }
 
-            $user_id = wp_insert_user(
-                [
-                    'user_login'   => $user_login,
-                    'user_email'   => $email,
-                    'user_pass'    => $password,
-                    'display_name' => $name,
-                    'role'         => 'daw_applicant',
-                ]
-            );
-            if ( is_wp_error( $user_id ) ) {
-                error_log( 'Applicant account creation failed: ' . $user_id->get_error_message() );
+            $created = ( new Recruitment_Database() )->create_applicant_account( $email, $name, $password );
+            if ( empty( $created['success'] ) ) {
+                $error = (string) ( $created['error'] ?? 'registration_failed' );
+                $this->redirect_to_applicant_screen( 'applicant-register', 'email_exists' === $error ? 'email_exists' : 'registration_failed' );
+            }
+
+            if ( ! $this->establish_applicant_session( $email, $name, false ) ) {
                 $this->redirect_to_applicant_screen( 'applicant-register', 'registration_failed' );
             }
-
-            wp_set_current_user( $user_id );
-            wp_set_auth_cookie( $user_id, is_ssl() );
             wp_safe_redirect( recruitment_get_public_url( 'careers' ) );
             exit;
         }
@@ -134,24 +178,14 @@ class Recruitment_Plugin {
         if ( 'applicant-login' === $screen ) {
             $login = sanitize_text_field( wp_unslash( $_POST['email'] ?? '' ) );
             $password = (string) wp_unslash( $_POST['password'] ?? '' );
-            $candidate_user = is_email( $login ) ? get_user_by( 'email', $login ) : get_user_by( 'login', $login );
-            if ( $candidate_user && ! in_array( 'daw_applicant', (array) $candidate_user->roles, true ) ) {
-                $this->redirect_to_applicant_screen( 'applicant-login', 'invalid_credentials' );
+            $result = ( new Recruitment_Database() )->authenticate_applicant_account( $login, $password );
+            if ( empty( $result['success'] ) ) {
+                $error = (string) ( $result['error'] ?? 'invalid_credentials' );
+                $this->redirect_to_applicant_screen( 'applicant-login', 'service_unavailable' === $error ? 'account_unavailable' : 'invalid_credentials' );
             }
-            $user = wp_signon(
-                [
-                    'user_login'    => $candidate_user ? $candidate_user->user_login : $login,
-                    'user_password' => $password,
-                    'remember'      => ! empty( $_POST['remember'] ),
-                ],
-                is_ssl()
-            );
-
-            if ( is_wp_error( $user ) ) {
+            $account = $result['account'];
+            if ( ! $this->establish_applicant_session( $account['email'], $account['full_name'], ! empty( $_POST['remember'] ) ) ) {
                 $this->redirect_to_applicant_screen( 'applicant-login', 'invalid_credentials' );
-            }
-            if ( ! in_array( 'daw_applicant', (array) $user->roles, true ) ) {
-                $this->redirect_to_applicant_screen( 'applicant-login', 'applicant_account_required' );
             }
 
             wp_safe_redirect( recruitment_get_public_url( 'account-confirmation', [ 'login_success' => '1' ] ) );
@@ -179,6 +213,63 @@ class Recruitment_Plugin {
         exit;
     }
 
+    private function establish_applicant_session( string $email, string $display_name, bool $remember ): bool {
+        $user = get_user_by( 'email', $email );
+
+        if ( $user && ! in_array( 'daw_applicant', (array) $user->roles, true ) ) {
+            return false;
+        }
+
+        if ( ! $user ) {
+            $user_login = sanitize_user( strstr( $email, '@', true ), true );
+            if ( '' === $user_login ) {
+                $user_login = 'applicant';
+            }
+            $base_login = $user_login;
+            while ( username_exists( $user_login ) ) {
+                $user_login = $base_login . '-' . strtolower( wp_generate_password( 5, false, false ) );
+            }
+
+            $user_id = wp_insert_user(
+                [
+                    'user_login'   => $user_login,
+                    'user_email'   => $email,
+                    'user_pass'    => wp_generate_password( 64, true, true ),
+                    'display_name' => $display_name,
+                    'role'         => 'daw_applicant',
+                ]
+            );
+            if ( is_wp_error( $user_id ) ) {
+                error_log( 'Applicant WordPress session account creation failed: ' . $user_id->get_error_message() );
+                return false;
+            }
+            $user = get_user_by( 'id', $user_id );
+        } elseif ( '1' !== get_user_meta( $user->ID, 'daw_oracle_applicant_account', true ) ) {
+            $updated = wp_update_user(
+                [
+                    'ID'        => $user->ID,
+                    'user_pass' => wp_generate_password( 64, true, true ),
+                ]
+            );
+            if ( is_wp_error( $updated ) ) {
+                error_log( 'Applicant WordPress bridge password rotation failed: ' . $updated->get_error_message() );
+                return false;
+            }
+        }
+
+        if ( ! ( $user instanceof WP_User ) ) {
+            error_log( 'Applicant WordPress session account could not be loaded.' );
+            return false;
+        }
+
+        update_user_meta( $user->ID, 'daw_oracle_applicant_account', '1' );
+        wp_set_current_user( $user->ID );
+        wp_set_auth_cookie( $user->ID, $remember, is_ssl() );
+        do_action( 'wp_login', $user->user_login, $user );
+
+        return true;
+    }
+
     private function redirect_to_applicant_screen( string $screen, string $error ): void {
         wp_safe_redirect( recruitment_get_public_url( $screen, [ 'account_error' => $error ] ) );
         exit;
@@ -201,7 +292,9 @@ class Recruitment_Plugin {
 
         if ( is_user_logged_in() ) {
             $current_user = wp_get_current_user();
-            if ( user_can( $current_user, $capability ) ) {
+            $expected_account_type = 'user_department' === $target ? 'user_department' : 'hr';
+            $account_type = (string) get_user_meta( $current_user->ID, 'daw_oracle_account_type', true );
+            if ( user_can( $current_user, $capability ) && $expected_account_type === $account_type ) {
                 wp_safe_redirect( $dashboard_url );
                 exit;
             }
@@ -216,20 +309,20 @@ class Recruitment_Plugin {
             $this->redirect_to_portal_login( $target, 'invalid_request' );
         }
 
-        $user = wp_signon(
-            [
-                'user_login'    => sanitize_text_field( wp_unslash( $_POST['username'] ?? '' ) ),
-                'user_password' => (string) wp_unslash( $_POST['password'] ?? '' ),
-                'remember'      => true,
-            ],
-            is_ssl()
+        $authentication = ( new Recruitment_Database() )->authenticate_portal_account(
+            $target,
+            sanitize_text_field( wp_unslash( $_POST['username'] ?? '' ) ),
+            (string) wp_unslash( $_POST['password'] ?? '' )
         );
-
-        if ( is_wp_error( $user ) ) {
-            $this->redirect_to_portal_login( $target, 'invalid_credentials' );
+        if ( empty( $authentication['success'] ) ) {
+            $error = (string) ( $authentication['error'] ?? 'invalid_credentials' );
+            $this->redirect_to_portal_login( $target, 'service_unavailable' === $error ? 'service_unavailable' : 'invalid_credentials' );
         }
 
-        if ( ! user_can( $user, $capability ) ) {
+        if ( ! $this->establish_portal_session( $authentication['account'] ) ) {
+            $this->redirect_to_portal_login( $target, 'no_access' );
+        }
+        if ( ! current_user_can( $capability ) ) {
             wp_logout();
             $this->redirect_to_portal_login( $target, 'no_access' );
         }
@@ -239,35 +332,81 @@ class Recruitment_Plugin {
     }
 
     private function redirect_to_portal_login( string $target, string $error ): void {
-		$login_url = recruitment_get_public_url( 'portal' );
-		if ( 'user_department' === $target ) {
-			$department_page_id = absint( get_option( 'recruitment_department_login_page_id', 0 ) );
-			if ( $department_page_id ) {
-				$login_url = get_permalink( $department_page_id );
-			}
-		}
+        $login_url = 'user_department' === $target
+            ? recruitment_get_department_login_url( [ 'login_error' => $error ] )
+            : recruitment_get_public_url( 'login', [ 'target' => 'hr', 'login_error' => $error ] );
 
-        wp_safe_redirect(
-            add_query_arg(
-				[
-                    'recruitment_page' => 'login',
-                    'target' => $target,
-                    'login_error' => $error,
-                ],
-				$login_url
-            )
-        );
+        wp_safe_redirect( $login_url );
         exit;
+    }
+
+    /**
+     * Establish a restricted WordPress session for a verified Oracle employee.
+     *
+     * @param array{type: string, id: string, email: string, username: string, display_name: string, department_id: string, department: string} $account
+     */
+    private function establish_portal_session( array $account ): bool {
+        $is_hr = 'hr' === $account['type'];
+        $role = $is_hr ? 'daw_hr' : 'daw_user_department';
+        $prefix = $is_hr ? 'hr' : 'department';
+        $user_login = 'daw-oracle-' . $prefix . '-' . sanitize_key( $account['id'] );
+        $bridge_email = $prefix . '-' . sanitize_key( $account['id'] ) . '@oracle-bridge.invalid';
+        $user = get_user_by( 'login', $user_login );
+
+        if ( $user ) {
+            $mapped_type = (string) get_user_meta( $user->ID, 'daw_oracle_account_type', true );
+            $mapped_id = (string) get_user_meta( $user->ID, 'daw_oracle_account_id', true );
+            if ( $mapped_type !== $account['type'] || $mapped_id !== $account['id'] ) {
+                error_log( 'Oracle portal account conflicts with an existing WordPress login.' );
+                return false;
+            }
+            $user->set_role( $role );
+        } else {
+            $user_id = wp_insert_user(
+                [
+                    'user_login'   => $user_login,
+                    'user_email'   => $bridge_email,
+                    'user_pass'    => wp_generate_password( 64, true, true ),
+                    'display_name' => $account['display_name'],
+                    'role'         => $role,
+                ]
+            );
+            if ( is_wp_error( $user_id ) ) {
+                error_log( 'Oracle portal session account creation failed: ' . $user_id->get_error_message() );
+                return false;
+            }
+            $user = get_user_by( 'id', $user_id );
+        }
+
+        if ( ! ( $user instanceof WP_User ) ) {
+            error_log( 'Oracle portal session account could not be loaded.' );
+            return false;
+        }
+
+        update_user_meta( $user->ID, 'daw_oracle_account_type', $account['type'] );
+        update_user_meta( $user->ID, 'daw_oracle_account_id', $account['id'] );
+        update_user_meta( $user->ID, 'daw_oracle_email', $account['email'] );
+        if ( 'user_department' === $account['type'] ) {
+            update_user_meta( $user->ID, 'daw_department_user', '1' );
+            update_user_meta( $user->ID, 'daw_department', $account['department'] );
+            update_user_meta( $user->ID, 'daw_department_id', $account['department_id'] );
+        }
+
+        wp_set_current_user( $user->ID );
+        wp_set_auth_cookie( $user->ID, true, is_ssl() );
+        do_action( 'wp_login', $user->user_login, $user );
+
+        return true;
     }
 
     public function filter_admin_login_url( string $login_url, string $redirect = '', bool $force_reauth = false ): string {
         $redirect_query = (string) parse_url( $redirect, PHP_URL_QUERY );
         parse_str( $redirect_query, $query_args );
         $page = sanitize_key( $query_args['page'] ?? '' );
-        $hr_pages = [ 'recruitment-dashboard', 'recruitment-vacancies', 'recruitment-applicants', 'recruitment-applications', 'recruitment-user-interview', 'recruitment-form-builder', 'recruitment-psychotest-settings', 'recruitment-question-bank', 'recruitment-settings' ];
+        $hr_pages = [ 'recruitment-dashboard', 'recruitment-vacancies', 'recruitment-applicants', 'recruitment-applications', 'recruitment-hr-interview', 'recruitment-final-decision', 'recruitment-user-interview', 'recruitment-interview-schedule', 'recruitment-user-management', 'recruitment-form-builder', 'recruitment-psychotest-settings', 'recruitment-question-bank', 'recruitment-settings' ];
 
         if ( 'daw-user-department' === $page ) {
-            return recruitment_get_public_url( 'portal', [ 'recruitment_page' => 'login', 'target' => 'user_department' ] );
+            return recruitment_get_department_login_url();
         }
 
         if ( in_array( $page, $hr_pages, true ) ) {
@@ -408,6 +547,7 @@ class Recruitment_Plugin {
                 'invalid_request' => 'Sesi login tidak valid. Silakan coba kembali.',
                 'invalid_credentials' => 'Email/username atau password tidak sesuai.',
                 'no_access' => 'Akun ini belum memiliki akses ke portal yang dipilih.',
+                'service_unavailable' => 'Database akun belum tersedia. Silakan coba kembali nanti.',
             ];
             $error_key = sanitize_key( wp_unslash( $_GET['login_error'] ?? '' ) );
             $page_data['error'] = $error_messages[ $error_key ] ?? '';

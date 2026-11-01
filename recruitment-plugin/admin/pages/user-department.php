@@ -1,8 +1,8 @@
 <?php
 $current_user = wp_get_current_user();
-$display_name = ! empty( $current_user->display_name ) ? $current_user->display_name : 'Andi Wirawan';
-$department = (string) get_user_meta( $current_user->ID, 'department', true );
-$department = '' !== $department ? $department : 'Sales';
+$display_name = ! empty( $current_user->display_name ) ? $current_user->display_name : 'User Department';
+$department = (string) get_user_meta( $current_user->ID, 'daw_department', true );
+$department = '' !== $department ? $department : 'Department';
 $view = sanitize_key( wp_unslash( $_GET['view'] ?? 'dashboard' ) );
 $views = [ 'dashboard', 'requests', 'request-form', 'request-detail', 'interviews', 'interview-detail', 'profile', 'applicants', 'results' ];
 if ( ! in_array( $view, $views, true ) ) {
@@ -100,9 +100,19 @@ $request_form_notice = '';
 $request_form_values = [];
 $selected_request = null;
 
+$demo_request_statuses = get_option( 'daw_demo_department_request_statuses', [] );
+$demo_request_statuses = is_array( $demo_request_statuses ) ? $demo_request_statuses : [];
+foreach ( $requests as &$demo_request ) {
+	if ( isset( $demo_request_statuses[ $demo_request['code'] ] ) && is_array( $demo_request_statuses[ $demo_request['code'] ] ) ) {
+		$demo_request['status'] = (string) ( $demo_request_statuses[ $demo_request['code'] ]['status'] ?? $demo_request['status'] );
+		$demo_request['hr_note'] = (string) ( $demo_request_statuses[ $demo_request['code'] ]['hr_note'] ?? '' );
+	}
+}
+unset( $demo_request );
+
 foreach ( $stored_department_requests as $saved_code => $saved_request ) {
 	$fields = is_array( $saved_request['fields'] ?? null ) ? $saved_request['fields'] : [];
-	$requests[] = [
+	$request_summary = [
 		'code' => $saved_code,
 		'position' => (string) ( $fields['position'] ?? 'Posisi belum diisi' ),
 		'count' => (int) ( $fields['headcount'] ?? 1 ),
@@ -112,6 +122,12 @@ foreach ( $stored_department_requests as $saved_code => $saved_request ) {
 		'fields' => $fields,
 		'hr_note' => (string) ( $saved_request['hr_note'] ?? '' ),
 	];
+	$existing_index = array_search( $saved_code, array_column( $requests, 'code' ), true );
+	if ( false === $existing_index ) {
+		$requests[] = $request_summary;
+	} else {
+		$requests[ $existing_index ] = $request_summary;
+	}
 }
 
 if ( 'request-form' === $view ) {
@@ -472,6 +488,7 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 	<div class="daw-ud-workspace">
 		<header class="daw-ud-topbar"><h1><?= esc_html( $view_titles[ $view ] ) ?></h1><div><span class="daw-ud-user-avatar"><?= esc_html( strtoupper( substr( $greeting_name, 0, 1 ) ) ) ?></span><span><strong><?= esc_html( $display_name ) ?></strong><small><?= esc_html( $department ) ?> Department</small></span></div></header>
 		<main class="daw-ud-main">
+			<p class="daw-ud-demo-note" role="note">Prototipe: data kandidat, hasil wawancara, statistik, dan contoh request di halaman ini bukan data produksi Oracle. Request dan penilaian yang disimpan saat ini hanya tersimpan di WordPress.</p>
 			<?php if ( 'profile' === $view ) : ?>
 				<?php if ( ! $selected_interview ) : ?>
 					<section class="daw-ud-profile-overlay"><article class="daw-ud-profile-sheet"><p>Profil pelamar tidak ditemukan.</p><a class="button" href="<?= esc_url( $view_url( 'applicants' ) ) ?>">Kembali</a></article></section>
@@ -649,7 +666,6 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 				<section class="daw-ud-stats daw-ud-stats--four daw-ud-result-stats"><article><span>Total Dinilai</span><strong><?= esc_html( (string) count( $results ) ) ?></strong></article><article><span>Direkomendasikan Terima</span><strong class="is-green"><?= esc_html( (string) $result_stats['recommended'] ) ?></strong></article><article><span>Diterima HR</span><strong class="is-green"><?= esc_html( (string) $result_stats['accepted'] ) ?></strong></article><article><span>Menunggu Keputusan</span><strong class="is-orange"><?= esc_html( (string) $result_stats['pending'] ) ?></strong></article></section>
 				<div class="daw-ud-table-wrap"><table class="daw-ud-table"><thead><tr><th>Kandidat</th><th>Posisi</th><th>Tgl Wawancara</th><th>Skor</th><th>Rekomendasi Anda</th><th>Keputusan Final HR</th></tr></thead><tbody><?php foreach ( $results as $result ) : ?><tr><td><strong><?= esc_html( $result['name'] ) ?></strong><small><?= esc_html( $result['code'] ) ?></small></td><td><?= esc_html( $result['position'] ) ?></td><td><?= esc_html( $result['date'] ) ?></td><td class="score-<?= (int) $result['score'] >= 75 ? 'good' : 'low' ?>"><?= esc_html( (string) $result['score'] ) ?></td><td><span class="daw-ud-status <?= esc_attr( sanitize_title( $result['recommendation'] ) ) ?>"><?= esc_html( $result['recommendation'] ) ?></span></td><td class="decision-<?= esc_attr( sanitize_title( $result['decision'] ) ) ?>"><?= esc_html( $result['decision'] ) ?></td></tr><?php endforeach; ?></tbody></table></div>
 			<?php endif; ?>
-			<p class="daw-ud-demo-note">Data pada halaman ini merupakan prototipe tampilan dan belum terhubung ke data produksi.</p>
 		</main>
 	</div>
 </div>

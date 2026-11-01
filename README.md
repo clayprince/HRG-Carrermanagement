@@ -27,31 +27,17 @@ The goal is to support:
 
 ---
 
-## 2. Absolute restriction: README only
+## 2. Documentation and implementation
 
-This task is only to create or update the documentation in this README.
+Documentation describes the intended architecture and developer workflow; it
+does not replace the implementation as the source of truth. Treat proposed or
+conceptual workflows in this README as plans unless the current code confirms
+they are implemented.
 
-The application must not be modified as part of this task.
-
-Do not change any of the following unless a future request explicitly asks for a change:
-
-- PHP code
-- HTML
-- CSS
-- JavaScript
-- components
-- pages
-- routes
-- database logic
-- assets
-- forms
-- UI
-- navigation
-- permission logic
-- Page Explorer
-- recruitment workflow logic
-
-The current project is already implemented and working. The README is not a redesign specification; it is a rulebook for future safe development.
+For each task, follow the requested scope, inspect the relevant code and its
+existing changes, and preserve unrelated behavior. Documentation updates alone
+do not authorize application changes, and documentation must not impose a
+blanket restriction against code changes when a user explicitly requests them.
 
 ---
 
@@ -450,6 +436,22 @@ project/
 
 Important: this is a conceptual guideline. If the current project already uses a different clean structure, do not restructure it just to match the diagram. Preserve the existing architecture.
 
+### Database boundaries
+
+The WordPress database configured by `DB_*` in `wp-config.php` is separate from
+the Oracle database used for recruitment-domain records. Use WordPress APIs for
+WordPress users, roles, options, and plugin-managed WordPress data. For Oracle
+recruitment records, follow the shared connection and data gateway in
+[`recruitment-plugin/database/README.md`](recruitment-plugin/database/README.md);
+the file-specific AI rules are in
+[`.github/instructions/oracle-database.instructions.md`](.github/instructions/oracle-database.instructions.md);
+do not create a second connection or put Oracle SQL in page templates.
+
+Oracle credentials are held outside the repository. `wp-config.php` provides
+the `RECRUITMENT_DOTENV_PATH` pointer to the local configuration file; never
+copy credentials, print them in logs, or include their values in code or
+documentation.
+
 ---
 
 ## 11. Component reuse
@@ -714,28 +716,12 @@ This allows the number of departments and User Department accounts to grow.
 
 ---
 
-## 21. Preserve existing output
+## 21. Preserve existing behavior
 
-This rule is non-negotiable.
-
-The existing project output must remain available at all times.
-
-Creating or updating this README must not:
-
-- remove anything
-- replace anything
-- redesign anything
-- rename anything
-- restructure anything
-- disable anything
-- change routes
-- change Page Explorer
-- change role permissions
-- change data
-- change assets
-- change UI
-
-Only the README may be changed in this task.
+Keep changes limited to the requested scope and preserve existing behavior
+outside it. Do not remove, replace, redesign, rename, restructure, or disable
+features unless the request explicitly requires it. This applies to
+documentation and application changes alike.
 
 ---
 
@@ -771,20 +757,32 @@ Never make a large structural change just because it is easier or faster.
 The current repository includes a plugin-oriented structure with these main areas:
 
 ```text
-HRG-Carrermanagement/
+DAW/
 ├── README.md
 ├── daw-recruitment.php
+├── .github/
+│   ├── copilot-instructions.md
+│   └── instructions/
 ├── recruitment-plugin/
-│   ├── index.php
-│   ├── recruitment-plugin.php
 │   ├── admin/
+│   │   ├── pages/
+│   │   └── components/
 │   ├── public/
+│   │   ├── pages/
+│   │   └── components/
+│   ├── assets/
+│   ├── components/
+│   ├── database/
+│   │   ├── connection/
+│   │   └── migrations/
+│   ├── docs/
 │   ├── includes/
 │   ├── pages/
 │   ├── routes/
 │   ├── templates/
-│   ├── components/
-│   └── assets/
+│   ├── index.php
+│   ├── recruitment-plugin.php
+│   └── README.md
 └── ...
 ```
 
@@ -799,12 +797,14 @@ This README is the official project guidance for future development work.
 Before making any code changes, a developer or AI assistant should:
 
 - read this README
+- read relevant folder documentation and `.github/instructions` guidance
 - confirm which system area is being changed
 - confirm the user role involved
 - inspect the current implementation
 - preserve the existing UI and route behavior
 - keep the change minimal and scoped
 - avoid introducing feature conflicts
+- for Oracle CRUD, follow [`recruitment-plugin/database/README.md`](recruitment-plugin/database/README.md) and [the Oracle database instruction](.github/instructions/oracle-database.instructions.md)
 
 The project should evolve without breaking the validated working behavior already present in the codebase.
 

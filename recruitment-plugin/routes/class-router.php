@@ -35,7 +35,7 @@ class Recruitment_Router {
         'user-interview'     => 'admin/pages/user-interview.php',
         'user-department'    => 'admin/pages/user-department.php',
         'interview-schedule' => 'admin/pages/interview-schedule.php',
-        'user-management'    => 'admin/pages/user-management.php',
+        'user-management'    => 'admin/pages/user-management-oracle.php',
         'application-form-builder' => 'admin/pages/application-form-builder.php',
         'psychotest-settings' => 'admin/pages/psychotest-settings.php',
         'question-bank'      => 'admin/pages/question-bank.php',

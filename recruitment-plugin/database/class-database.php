@@ -21,6 +21,241 @@ class Recruitment_Database {
     }
 
     /**
+     * Create an Oracle-backed applicant login.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    public function create_applicant_account( string $email, string $full_name, string $password ): array {
+        $email = strtolower( trim( $email ) );
+        if ( ! filter_var( $email, FILTER_VALIDATE_EMAIL ) || '' === trim( $full_name ) || strlen( $password ) < 10 ) {
+            return [ 'success' => false, 'error' => 'invalid_account_data' ];
+        }
+
+        try {
+            $password_hash = password_hash( $password, PASSWORD_DEFAULT );
+            if ( false === $password_hash ) {
+                throw new RuntimeException( 'Applicant password could not be hashed.' );
+            }
+
+            $statement = $this->get_connection()->prepare(
+                'INSERT INTO akun_pelamar (email, nama_lengkap, password_hash, status_akun, dibuat_pada) VALUES (:email, :full_name, :password_hash, :status, CURRENT_TIMESTAMP)'
+            );
+            $statement->execute(
+                [
+                    'email'         => $email,
+                    'full_name'     => trim( $full_name ),
+                    'password_hash' => $password_hash,
+                    'status'        => 'ACTIVE',
+                ]
+            );
+
+            return [ 'success' => true ];
+        } catch ( PDOException $exception ) {
+            if ( $this->is_unique_violation( $exception ) ) {
+                return [ 'success' => false, 'error' => 'email_exists' ];
+            }
+            $this->log_error( 'Applicant account creation failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        } catch ( RuntimeException $exception ) {
+            $this->log_error( 'Applicant account creation failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /**
+     * Verify an applicant's Oracle-backed credentials.
+     *
+     * @return array{success: bool, account?: array{email: string, full_name: string}, error?: string}
+     */
+    public function authenticate_applicant_account( string $email, string $password ): array {
+        $email = strtolower( trim( $email ) );
+        if ( ! filter_var( $email, FILTER_VALIDATE_EMAIL ) || '' === $password ) {
+            return [ 'success' => false, 'error' => 'invalid_credentials' ];
+        }
+
+        try {
+            $statement = $this->get_connection()->prepare(
+                'SELECT email AS "email", nama_lengkap AS "full_name", password_hash AS "password_hash", status_akun AS "status" FROM akun_pelamar WHERE email = :email'
+            );
+            $statement->execute( [ 'email' => $email ] );
+            $account = $statement->fetch( PDO::FETCH_ASSOC );
+
+            if ( ! $account || 'ACTIVE' !== strtoupper( (string) $account['status'] ) || ! password_verify( $password, (string) $account['password_hash'] ) ) {
+                return [ 'success' => false, 'error' => 'invalid_credentials' ];
+            }
+
+            if ( password_needs_rehash( (string) $account['password_hash'], PASSWORD_DEFAULT ) ) {
+                $password_hash = password_hash( $password, PASSWORD_DEFAULT );
+                if ( false === $password_hash ) {
+                    throw new RuntimeException( 'Applicant password could not be rehashed.' );
+                }
+                $update = $this->get_connection()->prepare(
+                    'UPDATE akun_pelamar SET password_hash = :password_hash, diperbarui_pada = CURRENT_TIMESTAMP WHERE email = :email'
+                );
+                $update->execute( [ 'password_hash' => $password_hash, 'email' => $email ] );
+            }
+
+            return [
+                'success' => true,
+                'account' => [ 'email' => (string) $account['email'], 'full_name' => (string) $account['full_name'] ],
+            ];
+        } catch ( PDOException $exception ) {
+            $this->log_error( 'Applicant Oracle authentication failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        } catch ( RuntimeException $exception ) {
+            $this->log_error( 'Applicant Oracle authentication failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /**
+     * Verify a portal account stored in HR_USER or USERS_AD.
+     *
+     * @return array{success: bool, account?: array{type: string, id: string, email: string, username: string, display_name: string, department_id: string, department: string}, error?: string}
+     */
+    public function authenticate_portal_account( string $target, string $identifier, string $password ): array {
+        $identifier = strtolower( trim( $identifier ) );
+        if ( ! in_array( $target, [ 'hr', 'user_department' ], true ) || '' === $identifier || '' === $password ) {
+            return [ 'success' => false, 'error' => 'invalid_credentials' ];
+        }
+
+        try {
+            if ( 'hr' === $target ) {
+                if ( ! filter_var( $identifier, FILTER_VALIDATE_EMAIL ) ) {
+                    return [ 'success' => false, 'error' => 'invalid_credentials' ];
+                }
+
+                $statement = $this->get_connection()->prepare(
+                    'SELECT hr_id AS "id", nama_pengguna AS "email", password AS "password_hash" FROM hr_user WHERE LOWER(nama_pengguna) = :identifier'
+                );
+                $statement->execute( [ 'identifier' => $identifier ] );
+                $rows = $statement->fetchAll( PDO::FETCH_ASSOC );
+                if ( 1 !== count( $rows ) ) {
+                    return [ 'success' => false, 'error' => 'invalid_credentials' ];
+                }
+
+                $row = $rows[0];
+                $account = [
+                    'type'          => 'hr',
+                    'id'            => (string) $row['id'],
+                    'email'         => (string) $row['email'],
+                    'username'      => (string) $row['email'],
+                    'display_name'  => (string) $row['email'],
+                    'department_id' => '',
+                    'department'    => '',
+                ];
+                $password_column = 'password';
+                $id_column = 'hr_id';
+            } else {
+                $statement = $this->get_connection()->prepare(
+                    'SELECT userdepartemen_id AS "id", username AS "username", email AS "email", kata_sandi AS "password_hash", departemen_id AS "department_id", nama_departemen AS "department" FROM users_ad WHERE LOWER(email) = :email OR LOWER(username) = :username'
+                );
+                $statement->execute( [ 'email' => $identifier, 'username' => $identifier ] );
+                $rows = $statement->fetchAll( PDO::FETCH_ASSOC );
+                if ( 1 !== count( $rows ) ) {
+                    return [ 'success' => false, 'error' => 'invalid_credentials' ];
+                }
+
+                $row = $rows[0];
+                $account = [
+                    'type'          => 'user_department',
+                    'id'            => (string) $row['id'],
+                    'email'         => (string) $row['email'],
+                    'username'      => (string) $row['username'],
+                    'display_name'  => (string) $row['username'],
+                    'department_id' => (string) $row['department_id'],
+                    'department'    => (string) $row['department'],
+                ];
+                $password_column = 'kata_sandi';
+                $id_column = 'userdepartemen_id';
+            }
+
+            if ( ! password_verify( $password, (string) $row['password_hash'] ) ) {
+                return [ 'success' => false, 'error' => 'invalid_credentials' ];
+            }
+
+            if ( password_needs_rehash( (string) $row['password_hash'], PASSWORD_DEFAULT ) ) {
+                $password_hash = password_hash( $password, PASSWORD_DEFAULT );
+                if ( false === $password_hash ) {
+                    throw new RuntimeException( 'Portal account password could not be rehashed.' );
+                }
+                $update = $this->get_connection()->prepare(
+                    'UPDATE ' . ( 'hr' === $target ? 'hr_user' : 'users_ad' ) . ' SET ' . $password_column . ' = :password_hash WHERE ' . $id_column . ' = :account_id'
+                );
+                $update->execute( [ 'password_hash' => $password_hash, 'account_id' => $account['id'] ] );
+            }
+
+            return [ 'success' => true, 'account' => $account ];
+        } catch ( PDOException $exception ) {
+            $this->log_error( 'Portal Oracle authentication failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        } catch ( RuntimeException $exception ) {
+            $this->log_error( 'Portal Oracle authentication failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /**
+     * @return array<int, array{id: string, name: string}>
+     */
+    public function get_departments(): array {
+        return $this->fetch_all( 'SELECT departemen_id AS "id", nama_departemen AS "name" FROM departemen ORDER BY nama_departemen' );
+    }
+
+    /**
+     * Create an Oracle-backed department account with a PHP password hash.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    public function create_department_account( string $username, string $email, int $department_id, string $password ): array {
+        $username = trim( $username );
+        $email = strtolower( trim( $email ) );
+        if ( '' === $username || strlen( $username ) > 100 || ! filter_var( $email, FILTER_VALIDATE_EMAIL ) || strlen( $email ) > 50 || $department_id < 1 || strlen( $password ) < 8 ) {
+            return [ 'success' => false, 'error' => 'invalid_account_data' ];
+        }
+
+        try {
+            $department_statement = $this->get_connection()->prepare(
+                'SELECT nama_departemen FROM departemen WHERE departemen_id = :department_id'
+            );
+            $department_statement->execute( [ 'department_id' => $department_id ] );
+            $department_name = $department_statement->fetchColumn();
+            if ( false === $department_name ) {
+                return [ 'success' => false, 'error' => 'department_not_found' ];
+            }
+
+            $password_hash = password_hash( $password, PASSWORD_DEFAULT );
+            if ( false === $password_hash ) {
+                throw new RuntimeException( 'Department account password could not be hashed.' );
+            }
+
+            $statement = $this->get_connection()->prepare(
+                'INSERT INTO users_ad (departemen_id, nama_departemen, username, email, kata_sandi) VALUES (:department_id, :department_name, :username, :email, :password_hash)'
+            );
+            $statement->execute(
+                [
+                    'department_id'   => $department_id,
+                    'department_name' => (string) $department_name,
+                    'username'        => $username,
+                    'email'           => $email,
+                    'password_hash'   => $password_hash,
+                ]
+            );
+
+            return [ 'success' => true ];
+        } catch ( PDOException $exception ) {
+            if ( $this->is_unique_violation( $exception ) ) {
+                return [ 'success' => false, 'error' => 'duplicate_account' ];
+            }
+            $this->log_error( 'Department Oracle account creation failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        } catch ( RuntimeException $exception ) {
+            $this->log_error( 'Department Oracle account creation failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /**
      * Return all published vacancies from Oracle.
      *
      * @return array<int, array<string, mixed>>

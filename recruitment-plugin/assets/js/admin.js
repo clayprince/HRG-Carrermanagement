@@ -796,6 +796,32 @@ document.documentElement.classList.add("js");
     "[data-account-password-confirm]",
   );
   const passwordHelp = form.querySelector("[data-password-help]");
+  const accountType = form.querySelector("[data-account-type]");
+  const accountTypeField = form.querySelector("[data-account-type-field]");
+  const departmentField = form.querySelector("[data-account-department-field]");
+
+  const updateAccountFields = function updateAccountFields(kind, isEditing) {
+    const isApplicant = "applicant" === kind;
+    accountType.value = isApplicant ? "applicant" : "department";
+    accountTypeField.hidden = isEditing;
+    departmentField.hidden = isApplicant;
+    department.disabled = isApplicant;
+    department.required = !isApplicant;
+    if (isApplicant) {
+      department.value = "";
+    }
+    password.minLength = isApplicant ? 10 : 8;
+    passwordConfirmation.minLength = password.minLength;
+    passwordHelp.textContent = isEditing
+      ? "Kosongkan jika tidak ingin mengganti password."
+      : isApplicant
+        ? "Wajib diisi, minimal 10 karakter."
+        : "Wajib diisi, minimal 8 karakter.";
+  };
+
+  accountType.addEventListener("change", function changeAccountType() {
+    updateAccountFields(accountType.value, false);
+  });
 
   const openDialog = function openDialog(account) {
     form.reset();
@@ -807,9 +833,7 @@ document.documentElement.classList.add("js");
     department.value = account ? account.dataset.accountDepartment : "";
     password.required = !account;
     passwordConfirmation.required = !account;
-    passwordHelp.textContent = account
-      ? "Kosongkan jika tidak ingin mengganti password."
-      : "Wajib diisi, minimal 8 karakter.";
+    updateAccountFields(account ? account.dataset.accountKind : accountType.value, Boolean(account));
     title.textContent = account ? "Edit Akun" : "Tambah Akun";
     dialog.showModal();
     displayName.focus();

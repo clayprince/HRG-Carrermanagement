@@ -2331,6 +2331,19 @@ body:has(.daw-admin-login) main {
   margin: 20px 0 0;
   text-align: center;
 }
+.daw-admin-login--split .daw-admin-login__switch {
+  color: #c8102e;
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 12px;
+  text-align: center;
+  text-decoration: none;
+}
+.daw-admin-login--split .daw-admin-login__switch:hover {
+  color: #9e0c24;
+  text-decoration: underline;
+}
 .daw-admin-login--split .daw-admin-login__copyright {
   bottom: 18px;
   left: 32px;
@@ -5325,9 +5338,14 @@ body.daw-recruitment-admin:has(.daw-user-department) #wpcontent {
   text-align: center !important;
 }
 .daw-ud-demo-note {
-  color: #9298a1;
-  font-size: 7px;
-  margin: 12px 0 0;
+  background: #fff4d6;
+  border: 1px solid #f0d48b;
+  border-radius: 6px;
+  color: #6b5014;
+  font-size: 10px;
+  line-height: 1.5;
+  margin: 0 0 14px;
+  padding: 9px 12px;
 }
 @media (max-width: 782px) {
   body.daw-recruitment-admin:has(.daw-user-department) #wpcontent {
@@ -7061,6 +7079,24 @@ body:has(.daw-user-interview) {
 .daw-account-settings__table td:first-child {
   min-width: 150px;
 }
+.daw-account-settings__table td:first-child {
+  align-items: center;
+  display: flex;
+  gap: 9px;
+}
+.daw-account-settings__avatar {
+  align-items: center;
+  background: #e9eaed;
+  border-radius: 50%;
+  color: #3d4651;
+  display: inline-flex;
+  flex: 0 0 32px;
+  font-size: 10px;
+  font-weight: 700;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
 .daw-account-settings__table td:first-child strong,
 .daw-account-settings__table td:first-child small {
   display: block;
@@ -7089,8 +7125,32 @@ body:has(.daw-user-interview) {
   white-space: nowrap;
 }
 .daw-account-settings__role.is-department {
+  background: #fff3cc;
+  color: #b96a00;
+}
+.daw-account-settings__role.is-admin {
+  background: #e0edff;
+  color: #2861c8;
+}
+.daw-account-settings__role.is-applicant {
   background: #e9f5ee;
   color: #27734a;
+}
+.daw-account-settings__status {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 9px;
+  font-weight: 650;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+.daw-account-settings__status.is-active {
+  background: #dcf8e6;
+  color: #168446;
+}
+.daw-account-settings__status.is-inactive {
+  background: #eceef1;
+  color: #626a75;
 }
 .daw-account-settings__actions {
   align-items: center;
@@ -7099,6 +7159,33 @@ body:has(.daw-user-interview) {
 }
 .daw-account-settings__actions form {
   margin: 0;
+}
+.daw-account-settings__actions--text {
+  gap: 7px;
+  white-space: nowrap;
+}
+.daw-account-settings__actions--text form {
+  display: inline-flex;
+}
+.daw-account-settings__text-action {
+  background: transparent;
+  border: 0;
+  color: #737b86;
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  padding: 0;
+}
+.daw-account-settings__text-action:hover,
+.daw-account-settings__text-action.is-danger {
+  color: #c8102e;
+}
+.daw-account-settings__text-action.is-danger {
+  font-weight: 600;
+}
+.daw-account-settings__table th:last-child,
+.daw-account-settings__table td:last-child {
+  min-width: 220px;
 }
 .daw-account-settings__icon-button {
   align-items: center;
@@ -7210,6 +7297,9 @@ body:has(.daw-user-interview) {
   font-weight: 600;
   gap: 5px;
   min-width: 0;
+}
+.daw-account-settings__form-grid [hidden] {
+  display: none;
 }
 .daw-account-settings__form-grid input,
 .daw-account-settings__form-grid select {
@@ -8657,6 +8747,425 @@ body.daw-recruitment-admin.post-type-daw_vacancy .wrap > .page-title-action,
 body.daw-recruitment-admin.post-type-daw_vacancy .wrap > .wp-header-end {
   display: none;
 }
+
+body:has(.daw-requests-page) {
+  background: #f4f4f6;
+}
+.daw-requests-page {
+  color: #252a32;
+  margin: 0;
+  max-width: none;
+  padding: 0 30px 32px;
+}
+.daw-requests__header {
+  align-items: center;
+  background: #fff;
+  border-bottom: 1px solid #dedfe3;
+  display: flex;
+  justify-content: space-between;
+  margin: 0 -30px 30px;
+  min-height: 56px;
+  padding: 0 30px;
+}
+.daw-requests__header nav,
+.daw-requests__account {
+  align-items: center;
+  display: flex;
+}
+.daw-requests__header nav {
+  color: #777d86;
+  font-size: 13px;
+  gap: 12px;
+}
+.daw-requests__header nav a {
+  color: inherit;
+  text-decoration: none;
+}
+.daw-requests__header nav strong {
+  color: #242a32;
+  font-size: 15px;
+}
+.daw-requests__account {
+  gap: 10px;
+}
+.daw-requests__account > span:nth-child(2) strong,
+.daw-requests__account > span:nth-child(2) small {
+  display: block;
+}
+.daw-requests__account > span:nth-child(2) strong {
+  font-size: 12px;
+}
+.daw-requests__account > span:nth-child(2) small {
+  color: #77808c;
+  font-size: 10px;
+  margin-top: 2px;
+}
+.daw-requests__avatar {
+  align-items: center;
+  background: #c8102e;
+  border-radius: 50%;
+  color: #fff;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 700;
+  height: 34px;
+  justify-content: center;
+  width: 34px;
+}
+.daw-requests__account > a {
+  border: 1px solid #d5d7dc;
+  border-radius: 6px;
+  color: #555d68;
+  font-size: 12px;
+  margin-left: 4px;
+  padding: 7px 12px;
+  text-decoration: none;
+}
+.daw-requests__main {
+  margin: 0 auto;
+  max-width: 1284px;
+}
+.daw-requests__alert,
+.daw-requests__info {
+  align-items: center;
+  border-radius: 14px;
+  display: flex;
+  gap: 14px;
+  margin-bottom: 20px;
+  min-height: 52px;
+  padding: 12px 20px;
+}
+.daw-requests__alert {
+  background: #fff3cc;
+  border: 1px solid #f5d477;
+  color: #b86100;
+  font-size: 14px;
+}
+.daw-requests__alert span {
+  font-size: 20px;
+}
+.daw-requests__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.daw-requests__tabs a {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #d9dbe0;
+  border-radius: 10px;
+  color: #59616c;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 600;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 15px;
+  text-decoration: none;
+}
+.daw-requests__tabs a.is-active {
+  background: #c8102e;
+  border-color: #c8102e;
+  color: #fff;
+}
+.daw-requests__tabs a span {
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  font-size: 11px;
+  padding: 2px 6px;
+}
+.daw-requests__table-wrap {
+  background: #fff;
+  border: 1px solid #d9dbe0;
+  border-radius: 15px;
+  overflow-x: auto;
+}
+.daw-requests__table {
+  border-collapse: collapse;
+  min-width: 760px;
+  table-layout: fixed;
+  width: 100%;
+}
+.daw-requests__table th:nth-child(1) { width: 12%; }
+.daw-requests__table th:nth-child(2) { width: 10%; }
+.daw-requests__table th:nth-child(3) { width: 12%; }
+.daw-requests__table th:nth-child(4) { width: 12%; }
+.daw-requests__table th:nth-child(5) { width: 4%; }
+.daw-requests__table th:nth-child(6) { width: 8%; }
+.daw-requests__table th:nth-child(7) { width: 11%; }
+.daw-requests__table th:nth-child(8) { width: 18%; }
+.daw-requests__table th:nth-child(9) { width: 13%; }
+.daw-requests__table th,
+.daw-requests__table td {
+  border-bottom: 1px solid #e1e2e6;
+  padding: 12px 6px;
+  text-align: left;
+  vertical-align: middle;
+}
+.daw-requests__table th {
+  background: #f7f7f9;
+  color: #6f7782;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.daw-requests__table td {
+  color: #333a44;
+  font-size: 13px;
+}
+.daw-requests__table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.daw-requests__table td strong {
+  color: #202630;
+  font-family: Consolas, monospace;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.daw-requests__priority {
+  font-weight: 650;
+  white-space: nowrap;
+}
+.daw-requests__priority--tinggi,
+.daw-requests__priority--urgent {
+  color: #c97100 !important;
+}
+.daw-requests__priority--sedang {
+  color: #2764dd !important;
+}
+.daw-requests__priority--rendah {
+  color: #68717d !important;
+}
+.daw-requests__status {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+.daw-requests__status--review {
+  background: #fff0c2;
+  color: #bd6900;
+}
+.daw-requests__status--revision,
+.daw-requests__status--rejected {
+  background: #ffe2e2;
+  color: #c52b36;
+}
+.daw-requests__status--approved,
+.daw-requests__status--ready {
+  background: #dcf8e6;
+  color: #168446;
+}
+.daw-requests__status--draft {
+  background: #eceef1;
+  color: #626a75;
+}
+.daw-requests__action {
+  color: #c8102e;
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+}
+.daw-requests__action.is-review {
+  background: #c8102e;
+  border-radius: 9px;
+  color: #fff;
+  display: inline-flex;
+  justify-content: center;
+  min-width: 80px;
+  padding: 9px 14px;
+}
+.daw-requests__empty {
+  color: #707782 !important;
+  padding: 28px !important;
+  text-align: center !important;
+}
+.daw-requests__back {
+  color: #717985;
+  display: inline-flex;
+  font-size: 13px;
+  margin-bottom: 22px;
+  text-decoration: none;
+}
+.daw-requests__detail-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin: 0 0 18px;
+}
+.daw-requests__detail-heading p {
+  color: #68717d;
+  font-family: Consolas, monospace;
+  font-size: 13px;
+  margin: 0 0 5px;
+}
+.daw-requests__detail-heading div > span {
+  color: #818995;
+  font-size: 13px;
+}
+.daw-requests__info {
+  align-items: flex-start;
+  background: #e3efff;
+  border: 1px solid #a9cbff;
+  color: #2763d4;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+.daw-requests__card {
+  background: #fff;
+  border: 1px solid #d9dbe0;
+  border-radius: 15px;
+  margin-bottom: 20px;
+  padding: 24px;
+}
+.daw-requests__card h2 {
+  border-bottom: 1px solid #d9dbe0;
+  color: #242a32;
+  font-size: 16px;
+  margin: 0 0 18px;
+  padding: 0 0 13px;
+}
+.daw-requests__facts {
+  display: grid;
+  gap: 15px 22px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+.daw-requests__facts > div {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(135px, 0.8fr) minmax(0, 1fr);
+}
+.daw-requests__facts dt,
+.daw-requests__copy > span {
+  color: #737c87;
+  font-size: 13px;
+}
+.daw-requests__facts dd {
+  color: #252b34;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+}
+.daw-requests__copy {
+  border-top: 1px solid #d9dbe0;
+  margin-top: 18px;
+  padding-top: 13px;
+}
+.daw-requests__copy p {
+  color: #323943;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 5px 0 15px;
+}
+.daw-requests__copy p:last-child {
+  margin-bottom: 0;
+}
+.daw-requests__decision-options {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.daw-requests__decision-options label {
+  position: relative;
+}
+.daw-requests__decision-options input {
+  clip: rect(0, 0, 0, 0);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+}
+.daw-requests__decision-options span {
+  align-items: center;
+  border: 1px solid #d9dbe0;
+  border-radius: 10px;
+  color: #303741;
+  cursor: pointer;
+  display: flex;
+  font-size: 13px;
+  font-weight: 600;
+  justify-content: center;
+  min-height: 48px;
+  padding: 8px;
+  text-align: center;
+}
+.daw-requests__decision-options input:checked + span {
+  background: #fff4f5;
+  border-color: #c8102e;
+  color: #c8102e;
+}
+.daw-requests__decision-options input:focus-visible + span {
+  outline: 2px solid #c8102e;
+  outline-offset: 2px;
+}
+.daw-requests__note {
+  color: #59616c;
+  display: grid;
+  font-size: 12px;
+  gap: 6px;
+  margin-top: 18px;
+}
+.daw-requests__note textarea {
+  border: 1px solid #d9dbe0;
+  border-radius: 8px;
+  min-height: 78px;
+  padding: 10px;
+  resize: vertical;
+  width: 100%;
+}
+.daw-requests__decision-submit {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+.daw-requests__decision-submit button {
+  background: #c8102e;
+  border: 0;
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 650;
+  min-height: 44px;
+  padding: 0 22px;
+}
+.daw-requests__feedback {
+  color: #168446;
+  font-size: 13px;
+}
+.daw-requests__feedback--error {
+  color: #c52b36;
+}
+.daw-requests__processed {
+  color: #555d68;
+  font-size: 13px;
+}
+
+@media (max-width: 782px) {
+  .daw-requests-page {
+    padding: 0 14px 24px;
+  }
+  .daw-requests__header {
+    margin: 0 -14px 20px;
+    padding: 0 14px;
+  }
+  .daw-requests__account > span:nth-child(2) {
+    display: none;
+  }
+  .daw-requests__facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .daw-requests__decision-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .daw-vacancy-overview {
   background: #fff;
   border: 1px solid #d9dce0;

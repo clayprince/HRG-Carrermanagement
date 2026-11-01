@@ -6,7 +6,7 @@ $current_stage = sanitize_key( $_GET['stage'] ?? '' );
 $settings_section = sanitize_key( $_GET['section'] ?? 'email' );
 $dashboard_url = recruitment_get_admin_url( 'dashboard' );
 $settings_url = recruitment_get_admin_url( 'settings' );
-$vacancy_view = 'create' === sanitize_key( $_GET['view'] ?? '' ) ? 'create' : 'list';
+$vacancy_view = 'create' === sanitize_key( $_GET['view'] ?? '' ) ? 'create' : ( 'recruitment-applications' === $current_page ? 'requests' : 'list' );
 $stage_url = static function ( string $stage ) use ( $dashboard_url ): string {
     return add_query_arg( 'stage', $stage, $dashboard_url );
 };
@@ -23,6 +23,7 @@ $root_links = [
     [ 'label' => 'Lowongan', 'icon' => 'dashicons-portfolio', 'page' => 'recruitment-vacancies', 'post_type' => 'daw_vacancy', 'url' => recruitment_get_admin_url( 'vacancies' ), 'children' => [
         [ 'label' => 'Semua Lowongan', 'view' => 'list', 'url' => recruitment_get_admin_url( 'vacancies' ) ],
         [ 'label' => 'Tambah Lowongan', 'view' => 'create', 'url' => add_query_arg( 'view', 'create', recruitment_get_admin_url( 'vacancies' ) ) ],
+        [ 'label' => 'Pengajuan Lowongan', 'view' => 'requests', 'url' => recruitment_get_admin_url( 'applications' ) ],
     ] ],
     [ 'label' => 'Form Lamaran', 'icon' => 'dashicons-forms', 'page' => 'recruitment-form-builder', 'url' => admin_url( 'admin.php?page=recruitment-form-builder' ) ],
 ];
@@ -55,7 +56,8 @@ $root_links = [
 
         <?php foreach ( $root_links as $item ) :
             $is_active = ( isset( $item['page'] ) && $current_page === $item['page'] )
-                || ( isset( $item['post_type'] ) && $current_post_type === $item['post_type'] );
+                || ( isset( $item['post_type'] ) && $current_post_type === $item['post_type'] )
+                || ( 'Lowongan' === $item['label'] && 'recruitment-applications' === $current_page );
             ?>
             <?php if ( ! empty( $item['children'] ) ) : ?>
                 <div class="recruitment-dashboard__nav-group">
@@ -64,7 +66,8 @@ $root_links = [
                     </button>
                     <div class="recruitment-dashboard__nav-group-items" id="recruitment-vacancy-links" data-nav-group-panel <?= $is_active ? '' : 'hidden' ?>>
                         <?php foreach ( $item['children'] as $child ) :
-                            $child_is_active = $is_active && $vacancy_view === $child['view'];
+                            $child_is_active = ( $is_active && $vacancy_view === $child['view'] )
+                                || ( 'requests' === $child['view'] && 'recruitment-applications' === $current_page );
                             ?>
                             <a href="<?= esc_url( $child['url'] ) ?>" class="<?= $child_is_active ? 'is-active' : '' ?>" <?= $child_is_active ? 'aria-current="page"' : '' ?>><span class="recruitment-dashboard__nav-label"><?= esc_html( $child['label'] ) ?></span></a>
                         <?php endforeach; ?>
@@ -86,8 +89,7 @@ $root_links = [
         </div>
 
         <a href="<?= esc_url( admin_url( 'admin.php?page=recruitment-interview-schedule' ) ) ?>" class="<?= 'recruitment-interview-schedule' === $current_page ? 'is-active' : '' ?>" title="Jadwal Wawancara" <?= 'recruitment-interview-schedule' === $current_page ? 'aria-current="page"' : '' ?>><span class="dashicons dashicons-calendar-alt" aria-hidden="true"></span><span class="recruitment-dashboard__nav-label">Jadwal Wawancara</span></a>
-        <a href="<?= esc_url( recruitment_get_admin_url( 'applications' ) ) ?>" class="<?= 'recruitment-applications' === $current_page ? 'is-active' : '' ?>" title="Approval Pengajuan" <?= 'recruitment-applications' === $current_page ? 'aria-current="page"' : '' ?>><span class="dashicons dashicons-yes-alt" aria-hidden="true"></span><span class="recruitment-dashboard__nav-label">Approval Pengajuan</span></a>
-        <a href="<?= esc_url( admin_url( 'admin.php?page=recruitment-user-management' ) ) ?>" class="<?= 'recruitment-user-management' === $current_page ? 'is-active' : '' ?>" title="Pengaturan" <?= 'recruitment-user-management' === $current_page ? 'aria-current="page"' : '' ?>><span class="dashicons dashicons-admin-users" aria-hidden="true"></span><span class="recruitment-dashboard__nav-label">Pengaturan</span></a>
+        <a href="<?= esc_url( admin_url( 'admin.php?page=recruitment-user-management' ) ) ?>" class="<?= 'recruitment-user-management' === $current_page ? 'is-active' : '' ?>" title="Pengelolaan Akun User" <?= 'recruitment-user-management' === $current_page ? 'aria-current="page"' : '' ?>><span class="dashicons dashicons-admin-users" aria-hidden="true"></span><span class="recruitment-dashboard__nav-label">Pengelolaan Akun User</span></a>
     </nav>
     <div class="recruitment-dashboard__sidebar-footer">
         <button type="button" data-sidebar-collapse aria-expanded="true" title="Ciutkan navigasi">

@@ -21,11 +21,14 @@ $notes_url = add_query_arg( 'view', 'notes', $list_url );
                 <a class="daw-user-interview__nav-item is-active" href="<?= esc_url( $list_url ) ?>">Wawancara User</a>
                 <span class="daw-user-interview__nav-item">Final Decision</span>
                 <span class="daw-user-interview__nav-item">Database Pelamar</span>
-                <span class="daw-user-interview__nav-item">Lowongan</span>
+                <details class="daw-user-interview__nav-group" open>
+                    <summary class="daw-user-interview__nav-item">Lowongan</summary>
+                    <a class="daw-user-interview__nav-item daw-user-interview__nav-subitem" href="<?= esc_url( recruitment_get_admin_url( 'vacancies' ) ) ?>">Daftar Lowongan</a>
+                    <a class="daw-user-interview__nav-item daw-user-interview__nav-subitem" href="<?= esc_url( recruitment_get_admin_url( 'applications' ) ) ?>">Pengajuan Lowongan</a>
+                </details>
                 <span class="daw-user-interview__nav-item">Form Lamaran</span>
                 <span class="daw-user-interview__nav-item">Jadwal Wawancara</span>
                 <span class="daw-user-interview__nav-item">Email Recruitment</span>
-                <span class="daw-user-interview__nav-item">Approval Pengajuan</span>
                 <span class="daw-user-interview__nav-item">Akun User Dept</span>
             </nav>
         </aside>
