@@ -368,6 +368,8 @@ document.documentElement.classList.add("js");
       ).padStart(2, "0");
       const title = section.querySelector("[data-section-title]");
       const description = section.querySelector("[data-section-description]");
+      const sectionId = section.querySelector("[data-section-id]");
+      sectionId.name = `form_sections[${sectionIndex}][section_id]`;
       title.name = `form_sections[${sectionIndex}][title]`;
       description.name = `form_sections[${sectionIndex}][description]`;
       const questions = Array.from(
@@ -381,6 +383,7 @@ document.documentElement.classList.add("js");
           questionIndex + 1,
         );
         const fields = {
+          field_id: question.querySelector("[data-question-id]"),
           key: question.querySelector("[data-question-key]"),
           title: question.querySelector("[data-question-title]"),
           type: question.querySelector("[data-question-type]"),

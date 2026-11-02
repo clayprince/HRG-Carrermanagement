@@ -67,81 +67,63 @@ $default_sections = [
 ];
 
 $notice = '';
-$sections = get_option( 'recruitment_application_form', null );
-if ( ! is_array( $sections ) ) {
-    $sections = $default_sections;
+$warning = '';
+$error = '';
+$database = new Recruitment_Database();
+$form_result = $database->get_application_form();
+$form_ready = ! empty( $form_result['success'] );
+$sections = [];
+
+if ( $form_ready ) {
+    $sections = $form_result['sections'];
+    $has_questions = (bool) array_sum( array_map( static function ( $section ) {
+        return count( $section['questions'] ?? [] );
+    }, $sections ) );
+    if ( ! $has_questions ) {
+        $legacy_sections = get_option( 'recruitment_application_form', null );
+        if ( is_array( $legacy_sections ) ) {
+            $legacy_form = ( new Recruitment_Application() )->normalize_form_configuration( $legacy_sections );
+            $sections = $legacy_form['sections'];
+            $warning = 'Konfigurasi WordPress lama ditampilkan sebagai draf. Simpan perubahan untuk memindahkannya ke Oracle.';
+        } else {
+            $sections = $default_sections;
+            $warning = 'Form Oracle belum memiliki data. Simpan form awal ini agar dapat ditampilkan kepada pelamar.';
+        }
+    }
+} else {
+    $error = 'Form Oracle belum tersedia. Pastikan migrasi 003_dynamic_application_forms.sql telah ditinjau dan dijalankan oleh pemilik Oracle.';
 }
 
-if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['recruitment_form_builder_save'] ) ) {
+if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? '' ) && isset( $_POST['recruitment_form_builder_save'] ) ) {
     check_admin_referer( 'recruitment_form_builder_save' );
     if ( ! current_user_can( 'manage_recruitment' ) ) {
         wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengubah formulir ini.', 'recruitment-plugin' ) );
     }
 
-    $submitted_sections = isset( $_POST['form_sections'] ) ? wp_unslash( $_POST['form_sections'] ) : [];
-    $sections = [];
-    $used_keys = [];
-    foreach ( is_array( $submitted_sections ) ? $submitted_sections : [] as $section ) {
-        if ( ! is_array( $section ) ) {
-            continue;
-        }
-        $section_title = sanitize_text_field( $section['title'] ?? '' );
-        if ( '' === $section_title ) {
-            continue;
-        }
-
-        $questions = [];
-        foreach ( is_array( $section['questions'] ?? null ) ? $section['questions'] : [] as $question ) {
-            if ( ! is_array( $question ) ) {
-                continue;
-            }
-            $question_title = sanitize_text_field( $question['title'] ?? '' );
-            $question_type = sanitize_key( $question['type'] ?? 'short' );
-            if ( '' === $question_title || ! isset( $form_types[ $question_type ] ) ) {
-                continue;
-            }
-
-            $key = sanitize_key( $question['key'] ?? '' );
-            if ( '' === $key ) {
-                $key = sanitize_title( $question_title );
-            }
-            $base_key = $key ?: 'field';
-            $suffix = 2;
-            while ( isset( $used_keys[ $key ] ) ) {
-                $key = $base_key . '_' . $suffix;
-                $suffix++;
-            }
-            $used_keys[ $key ] = true;
-
-            $options = [];
-            if ( in_array( $question_type, [ 'dropdown', 'single_choice' ], true ) ) {
-                $raw_options = preg_split( '/\r\n|\r|\n/', (string) ( $question['options'] ?? '' ) ) ?: [];
-                foreach ( $raw_options as $option ) {
-                    $option = sanitize_text_field( $option );
-                    if ( '' !== $option ) {
-                        $options[] = $option;
-                    }
+    if ( ! $form_ready ) {
+        $error = 'Form belum dapat disimpan karena schema Oracle belum tersedia.';
+    } else {
+        $submitted_sections = isset( $_POST['form_sections'] ) ? wp_unslash( $_POST['form_sections'] ) : [];
+        $prepared_form = ( new Recruitment_Application() )->normalize_form_configuration( $submitted_sections );
+        $sections = $prepared_form['sections'];
+        if ( $prepared_form['errors'] ) {
+            $error = implode( ' ', $prepared_form['errors'] );
+        } else {
+            $saved = $database->save_application_form( $sections );
+            if ( ! empty( $saved['success'] ) ) {
+                $form_result = $database->get_application_form();
+                if ( ! empty( $form_result['success'] ) ) {
+                    $sections = $form_result['sections'];
+                    $notice = 'Perubahan formulir berhasil disimpan ke Oracle.';
+                    $warning = '';
+                } else {
+                    $error = 'Form tersimpan, tetapi tidak dapat dimuat ulang dari Oracle.';
                 }
+            } else {
+                $error = (string) ( $saved['error'] ?? 'Form lamaran gagal disimpan ke Oracle.' );
             }
-
-            $questions[] = [
-                'key' => $key,
-                'title' => $question_title,
-                'type' => $question_type,
-                'required' => ! empty( $question['required'] ),
-                'options' => $options,
-            ];
         }
-
-        $sections[] = [
-            'title' => $section_title,
-            'description' => sanitize_text_field( $section['description'] ?? '' ),
-            'questions' => $questions,
-        ];
     }
-
-    update_option( 'recruitment_application_form', $sections );
-    $notice = 'Perubahan formulir berhasil disimpan.';
 }
 
 $total_questions = array_sum( array_map( static function ( $section ) {
@@ -161,17 +143,24 @@ $total_questions = array_sum( array_map( static function ( $section ) {
             <div class="recruitment-form-builder__actions">
                 <button type="button" class="button" data-preview-form>Pratinjau</button>
                 <button type="button" class="button" data-add-section>+ Tambah Section</button>
-                <button type="submit" class="button button-primary">Simpan Perubahan</button>
+                <button type="submit" class="button button-primary" <?= $form_ready ? '' : 'disabled' ?>>Simpan Perubahan</button>
             </div>
         </header>
 
         <?php if ( $notice ) : ?>
             <div class="notice notice-success is-dismissible"><p><?= esc_html( $notice ) ?></p></div>
         <?php endif; ?>
+        <?php if ( $warning ) : ?>
+            <div class="notice notice-warning"><p><?= esc_html( $warning ) ?></p></div>
+        <?php endif; ?>
+        <?php if ( $error ) : ?>
+            <div class="notice notice-error"><p><?= esc_html( $error ) ?></p></div>
+        <?php endif; ?>
 
         <div class="recruitment-form-builder__sections" data-form-sections>
             <?php foreach ( $sections as $section_index => $section ) : ?>
                 <section class="recruitment-form-section" data-form-section>
+                    <input type="hidden" name="form_sections[<?= esc_attr( $section_index ) ?>][section_id]" value="<?= esc_attr( $section['id'] ?? '' ) ?>" data-section-id>
                     <header class="recruitment-form-section__header">
                         <span class="recruitment-form-section__number" data-section-number><?= esc_html( sprintf( '%02d', $section_index + 1 ) ) ?></span>
                         <div class="recruitment-form-section__heading">
@@ -201,10 +190,11 @@ $total_questions = array_sum( array_map( static function ( $section ) {
                                         <button type="button" class="button button-small" data-move-question="down" aria-label="Pindahkan pertanyaan ke bawah">↓</button>
                                         <details class="recruitment-form-question__edit"><summary class="button button-small">Edit</summary>
                                             <div class="recruitment-form-question__editor">
+                                                <input type="hidden" name="form_sections[<?= esc_attr( $section_index ) ?>][questions][<?= esc_attr( $question_index ) ?>][field_id]" value="<?= esc_attr( $question['id'] ?? '' ) ?>" data-question-id>
                                                 <input type="hidden" name="form_sections[<?= esc_attr( $section_index ) ?>][questions][<?= esc_attr( $question_index ) ?>][key]" value="<?= esc_attr( $question['key'] ?? '' ) ?>" data-question-key>
                                                 <label>Pertanyaan<input name="form_sections[<?= esc_attr( $section_index ) ?>][questions][<?= esc_attr( $question_index ) ?>][title]" value="<?= esc_attr( $question['title'] ?? '' ) ?>" data-question-title required></label>
                                                 <label>Jenis jawaban<select name="form_sections[<?= esc_attr( $section_index ) ?>][questions][<?= esc_attr( $question_index ) ?>][type]" data-question-type><?php foreach ( $form_types as $type => $label ) : ?><option value="<?= esc_attr( $type ) ?>" <?= selected( $question['type'] ?? 'short', $type, false ) ?>><?= esc_html( $label ) ?></option><?php endforeach; ?></select></label>
-                                                <label class="recruitment-form-question__options" data-question-options>Opsi jawaban<textarea name="form_sections[<?= esc_attr( $section_index ) ?>][questions][<?= esc_attr( $question_index ) ?>][options]" rows="3" data-question-options-value><?= esc_textarea( implode( "\n", (array) ( $question['options'] ?? [] ) ) ) ?></textarea><small>Satu opsi untuk setiap baris.</small></label>
+                                                <label class="recruitment-form-question__options" data-question-options>Opsi jawaban<textarea name="form_sections[<?= esc_attr( $section_index ) ?>][questions][<?= esc_attr( $question_index ) ?>][options]" rows="3" data-question-options-value><?= esc_textarea( implode( "\n", array_map( static function ( $option ) { return is_array( $option ) ? (string) ( $option['label'] ?? $option['value'] ?? '' ) : (string) $option; }, (array) ( $question['options'] ?? [] ) ) ) ) ?></textarea><small>Satu opsi untuk setiap baris.</small></label>
                                                 <label class="recruitment-form-question__required"><input type="checkbox" name="form_sections[<?= esc_attr( $section_index ) ?>][questions][<?= esc_attr( $question_index ) ?>][required]" value="1" data-question-required-input <?= checked( ! empty( $question['required'] ), true, false ) ?>> Wajib diisi</label>
                                                 <button type="button" class="button button-link-delete" data-remove-question>Hapus pertanyaan</button>
                                             </div>
@@ -230,6 +220,7 @@ $total_questions = array_sum( array_map( static function ( $section ) {
                 <div class="recruitment-form-question__identity"><strong data-question-label>Pertanyaan baru</strong><span class="recruitment-form-question__meta"><span data-question-type-label>Jawaban Singkat</span><span data-question-required>Opsional</span></span></div>
                 <div class="recruitment-form-question__actions"><button type="button" class="button button-small" data-move-question="up" aria-label="Pindahkan pertanyaan ke atas">↑</button><button type="button" class="button button-small" data-move-question="down" aria-label="Pindahkan pertanyaan ke bawah">↓</button>
                     <details class="recruitment-form-question__edit" open><summary class="button button-small">Edit</summary><div class="recruitment-form-question__editor">
+                        <input type="hidden" data-question-id>
                         <input type="hidden" data-question-key>
                         <label>Pertanyaan<input value="Pertanyaan baru" data-question-title required></label>
                         <label>Jenis jawaban<select data-question-type><?php foreach ( $form_types as $type => $label ) : ?><option value="<?= esc_attr( $type ) ?>"><?= esc_html( $label ) ?></option><?php endforeach; ?></select></label>
@@ -242,6 +233,7 @@ $total_questions = array_sum( array_map( static function ( $section ) {
     </template>
     <template data-section-template>
         <section class="recruitment-form-section" data-form-section>
+            <input type="hidden" data-section-id>
             <header class="recruitment-form-section__header"><span class="recruitment-form-section__number" data-section-number></span><div class="recruitment-form-section__heading"><label class="screen-reader-text">Nama section</label><input class="recruitment-form-section__title" value="Section baru" data-section-title required><input class="recruitment-form-section__description" placeholder="Deskripsi section" data-section-description></div><span class="recruitment-form-section__count"><span data-section-question-count>0</span> pertanyaan</span><div class="recruitment-form-section__actions"><button type="button" class="button button-small" data-move-section="up" aria-label="Pindahkan section ke atas">↑</button><button type="button" class="button button-small" data-move-section="down" aria-label="Pindahkan section ke bawah">↓</button><button type="button" class="button button-small button-link-delete" data-remove-section>Hapus</button></div></header><div class="recruitment-form-section__questions" data-section-questions></div><button type="button" class="recruitment-form-section__add-question" data-add-question>+ Tambah Pertanyaan</button>
         </section>
     </template>

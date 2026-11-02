@@ -1,82 +1,172 @@
 <?php
-$submitted = false;
-$errors    = [];
-$payload   = [];
-$submission_succeeded = false;
-$job_id    = absint( $_GET['job_id'] ?? $_POST['job_id'] ?? 0 );
+$request_method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$raw_job_id = 'POST' === $request_method ? ( $_POST['job_id'] ?? 0 ) : ( $_GET['job_id'] ?? 0 );
+$job_id = is_scalar( $raw_job_id ) ? absint( $raw_job_id ) : 0;
 $current_user = wp_get_current_user();
-$name     = (string) $current_user->display_name;
-$email    = (string) $current_user->user_email;
-$phone    = (string) get_user_meta( get_current_user_id(), 'daw_applicant_phone', true );
-$birth_place = (string) get_user_meta( get_current_user_id(), 'daw_applicant_birth_place', true );
-$birth_date = (string) get_user_meta( get_current_user_id(), 'daw_applicant_birth_date', true );
-$address = (string) get_user_meta( get_current_user_id(), 'daw_applicant_address', true );
-$ui_preview = recruitment_is_ui_preview() || ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options' ) );
+$name = (string) $current_user->display_name;
+$email = (string) $current_user->user_email;
+$ui_preview = recruitment_is_ui_preview()
+    || ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options' ) );
+$vacancy = $job_id ? get_post( $job_id ) : null;
+$vacancy_is_available = $vacancy
+    && 'daw_vacancy' === $vacancy->post_type
+    && 'publish' === $vacancy->post_status;
+$job = $vacancy_is_available ? recruitment_map_vacancy( $vacancy ) : [];
+$job_title = (string) ( $job['title'] ?? '' );
+$job_meta = trim( (string) ( $job['dealer'] ?? '' ) . ' · ' . (string) ( $job['location'] ?? '' ), ' ·' );
+$job_deadline = (string) ( $job['deadline'] ?? '' );
 
-if ( 'POST' === $_SERVER['REQUEST_METHOD'] ) {
-    $preview_submission = $ui_preview
-        || '1' === sanitize_text_field( wp_unslash( $_POST['daw_ui_preview'] ?? '' ) );
-    if ( $preview_submission ) {
+$form_result = ( new Recruitment_Database() )->get_application_form();
+$form_sections = ! empty( $form_result['success'] ) ? $form_result['sections'] : [];
+$form_available = (bool) array_sum( array_map( static function ( $section ) {
+    return count( $section['questions'] ?? [] );
+}, $form_sections ) );
+$form_sections = $form_available ? $form_sections : [];
+$answers_input = [];
+$pdp_checked = [];
+foreach ( [ 'pdp_accuracy', 'pdp_data', 'pdp_placement' ] as $consent_name ) {
+    $consent_value = $_POST[ $consent_name ] ?? null;
+    $pdp_checked[ $consent_name ] = is_scalar( $consent_value )
+        && '1' === (string) wp_unslash( $consent_value );
+}
+$errors = [];
+$submitted = false;
+
+if ( ! $vacancy_is_available ) {
+    $errors[] = 'Lowongan tidak tersedia atau sudah tidak dipublikasikan.';
+}
+if ( ! $form_available ) {
+    $errors[] = 'Form lamaran belum tersedia. Silakan hubungi tim HR.';
+}
+
+if ( 'POST' === $request_method ) {
+    $answers_input = isset( $_POST['answers'] ) && is_array( $_POST['answers'] )
+        ? wp_unslash( $_POST['answers'] )
+        : [];
+    $preview_flag = isset( $_POST['daw_ui_preview'] ) && is_scalar( $_POST['daw_ui_preview'] )
+        ? sanitize_text_field( wp_unslash( (string) $_POST['daw_ui_preview'] ) )
+        : '';
+    $nonce = isset( $_POST['recruitment_nonce'] ) && is_scalar( $_POST['recruitment_nonce'] )
+        ? sanitize_text_field( wp_unslash( (string) $_POST['recruitment_nonce'] ) )
+        : '';
+    $errors = [];
+    if ( $ui_preview || '1' === $preview_flag ) {
         $errors[] = 'Mode preview hanya untuk melihat tampilan. Lamaran tidak dikirim.';
-    } elseif ( ! isset( $_POST['recruitment_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['recruitment_nonce'] ) ), 'recruitment_apply' ) ) {
+    } elseif ( ! wp_verify_nonce( $nonce, 'recruitment_apply' ) ) {
         $errors[] = 'Sesi form tidak valid. Silakan coba lagi.';
+    } elseif ( ! $vacancy_is_available ) {
+        $errors[] = 'Lowongan tidak tersedia atau sudah tidak dipublikasikan.';
+    } elseif ( ! $form_available ) {
+        $errors[] = 'Form lamaran belum tersedia. Silakan hubungi tim HR.';
     } else {
-        $result  = ( new Recruitment_Application() )->submit( $_POST, $_FILES );
-        $errors  = $result['errors'];
-        $payload = $result['payload'];
-        $name    = $payload['applicant']['full_name'];
-        $email   = $payload['applicant']['email'];
-        $submission_succeeded = $result['success'];
-        if ( ! $errors && $submission_succeeded ) {
+        $result = ( new Recruitment_Application() )->submit(
+            wp_unslash( $_POST ),
+            $_FILES,
+            $form_sections,
+            $name,
+            $email,
+            $job
+        );
+        $errors = $result['errors'];
+        $name = (string) ( $result['payload']['applicant_name'] ?? $name );
+        $email = (string) ( $result['payload']['applicant_email'] ?? $email );
+        if ( $result['success'] ) {
             update_user_meta( get_current_user_id(), 'daw_application_confirmation_pending', '1' );
             wp_safe_redirect( recruitment_get_public_url( 'application-confirmation' ) );
             exit;
         }
     }
-    $submitted = ! $errors;
 }
 
-$job = recruitment_get_public_job( $job_id ) ?: recruitment_get_public_job( 1 );
-$job_title = $job['title'];
-$job_meta  = trim( $job['dealer'] . ' · ' . $job['location'], ' ·' );
-$job_deadline = $job['deadline'];
-$vacancy   = $job_id ? get_post( $job_id ) : null;
-if ( $vacancy && 'daw_vacancy' === $vacancy->post_type ) {
-    $job = recruitment_map_vacancy( $vacancy );
-    $job_title = $job['title'];
-    $job_meta  = trim( $job['dealer'] . ' · ' . $job['location'], ' ·' );
-    $job_deadline = $job['deadline'];
-}
+$has_form = $vacancy_is_available && $form_available;
 ?>
 <div class="daw-recruitment daw-recruitment--application">
     <?php require recruitment_get_plugin_path( 'public/components/header.php' ); ?>
     <main class="daw-recruitment__section daw-recruitment__application-main">
         <div class="daw-recruitment__container daw-recruitment__form-container">
-            <?php if ( $submitted ) : ?>
-                <section class="daw-recruitment__panel daw-recruitment__success"><h1>Lamaran Berhasil Dikirim</h1><p>Terima kasih, <?= esc_html( $name ) ?>. Lamaran Anda telah dikirim.</p><p>Status lamaran akan tersedia di akun setelah integrasi data aplikasi selesai.</p><a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'application-history' ) ) ?>">Kembali ke Akun</a></section>
-            <?php else : ?>
+            <?php if ( $has_form ) : ?>
                 <a class="daw-recruitment__back" href="<?= esc_url( recruitment_get_public_url( 'job-detail', [ 'job_id' => $job_id ] ) ) ?>">&larr; Kembali ke Detail Lowongan</a>
                 <section class="daw-recruitment__application-job"><span class="daw-recruitment__application-job-icon">&diams;</span><div><strong><?= esc_html( $job_title ) ?></strong><small><?= esc_html( $job_meta ) ?></small></div><span class="daw-recruitment__application-deadline">Deadline: <?= esc_html( $job_deadline ) ?></span></section>
-                <div class="daw-recruitment__alert daw-recruitment__alert--notice"><?= $ui_preview ? 'Mode preview: formulir dapat dilihat, tetapi lamaran tidak akan dikirim.' : 'Isi seluruh formulir dengan lengkap dan benar. Pastikan semua data dapat dipertanggung jawabkan.' ?></div>
+                <div class="daw-recruitment__alert daw-recruitment__alert--notice"><?= esc_html( $ui_preview ? 'Mode preview: formulir dapat dilihat, tetapi lamaran tidak akan dikirim.' : 'Isi seluruh formulir dengan lengkap dan benar. Pastikan semua data dapat dipertanggungjawabkan.' ) ?></div>
                 <?php foreach ( $errors as $error ) : ?><div class="daw-recruitment__alert"><?= esc_html( $error ) ?></div><?php endforeach; ?>
                 <form class="daw-recruitment__application-form" method="post" enctype="multipart/form-data" data-application-wizard <?= $ui_preview ? 'data-preview-only="true"' : '' ?>>
-                    <input type="hidden" name="job_id" value="<?= esc_attr( $job_id ) ?>"><input type="hidden" name="daw_ui_preview" value="<?= esc_attr( $ui_preview ? '1' : '0' ) ?>"><?php wp_nonce_field( 'recruitment_apply', 'recruitment_nonce' ); ?>
-                    <section class="daw-recruitment__form-card"><div class="daw-recruitment__form-card-title"><span>A</span><div><h2>Identitas</h2><p>Informasi pribadi</p></div></div><div class="daw-recruitment__form-fields">
-                        <label class="daw-recruitment__field daw-recruitment__field--full">Foto Terkini <em>*</em><span class="daw-recruitment__upload"><input type="file" name="photo" accept="image/jpeg,image/png"><strong>Upload Foto</strong><small>JPG / PNG · Maks 2MB</small></span></label>
-                        <label>Nama Lengkap <em>*</em><input name="full_name" required placeholder="Nama sesuai KTP" value="<?= esc_attr( $name ) ?>"></label>
-                        <label>Tempat Lahir <input name="birth_place" placeholder="Kota tempat lahir" value="<?= esc_attr( $birth_place ) ?>"></label><label>Tanggal Lahir <em>*</em><input name="birth_date" type="date" required value="<?= esc_attr( $birth_date ) ?>"></label>
-                        <label class="daw-recruitment__field--full">Alamat Saat Ini <em>*</em><textarea name="address" required rows="2" placeholder="Jalan, RT/RW, Kelurahan, Kecamatan, Kota/Kabupaten"><?= esc_textarea( $address ) ?></textarea></label>
-                        <label>Nomor Telepon / WhatsApp <em>*</em><input name="phone" required type="tel" placeholder="08xxxxxxxxxx" value="<?= esc_attr( $phone ) ?>"></label><label>Email Aktif <em>*</em><input name="email" type="email" required placeholder="" value="<?= esc_attr( $email ) ?>"></label>
-                        <label>Media Sosial yang Dimiliki<select name="social_platform"><option value="">Platform</option><option>Instagram</option><option>LinkedIn</option><option>Facebook</option><option>TikTok</option><option>YouTube</option><option>Lainnya</option></select></label><label><span>&nbsp;</span><input name="social_username" placeholder="@username atau URL profil"></label>
-                        <label class="daw-recruitment__field--full">Nomor KTP <em>*</em><input name="identity_number" required placeholder="16 digit nomor KTP"></label>
-                    </div></section>
-                    <section class="daw-recruitment__form-card"><div class="daw-recruitment__form-card-title"><span>B</span><div><h2>Pendidikan Formal</h2><p>Isi riwayat pendidikan dari SMA/SMK hingga jenjang tertinggi</p></div></div><div class="daw-recruitment__repeatable" data-repeatable="education"><div class="daw-recruitment__repeatable-title">PENDIDIKAN 1</div><div class="daw-recruitment__form-fields"><label>Jenjang Pendidikan <em>*</em><select name="education_level[]" required><option value="">Pilih jenjang</option><option>SMA / SMK</option><option>D3</option><option>S1</option><option>S2</option></select></label><label>Tahun Lulus <em>*</em><input name="graduation_year[]" required placeholder=""></label><label class="daw-recruitment__field--full">Nama Sekolah / Universitas <em>*</em><input name="school[]" required placeholder="Nama institusi pendidikan"></label><label>Jurusan / Program Studi<input name="major[]" placeholder=""></label></div></div><button class="daw-recruitment__add-row" type="button" data-add="education">＋ Tambah Pendidikan</button></section>
-                    <section class="daw-recruitment__form-card"><div class="daw-recruitment__form-card-title"><span>C</span><div><h2>Riwayat Pekerjaan</h2><p>Isi pengalaman kerja Anda. Kosongkan jika belum memiliki pengalaman.</p></div></div><div class="daw-recruitment__repeatable" data-repeatable="work"><div class="daw-recruitment__repeatable-title">PEKERJAAN 1</div><div class="daw-recruitment__form-fields"><label>Nama Perusahaan<input name="company[]" placeholder=""></label><label>Jabatan / Posisi<input name="position[]" placeholder=""></label><label>Periode Bekerja<input name="work_period[]" placeholder="Start - End"></label><label>Nama Atasan / Referensi<input name="supervisor[]" placeholder="Nama atasan langsung"></label><label class="daw-recruitment__field--full">Nomor Kontak Atasan / Referensi<input name="supervisor_phone[]" placeholder="Nomor telepon yang dapat dihubungi"></label></div></div><button class="daw-recruitment__add-row" type="button" data-add="work">＋ Tambah Pengalaman Kerja</button></section>
-                    <section class="daw-recruitment__form-card"><div class="daw-recruitment__form-card-title"><span>D</span><div><h2>Keluarga</h2><p>Informasi status pernikahan dan data keluarga</p></div></div><div class="daw-recruitment__form-fields"><fieldset class="daw-recruitment__field--full"><legend>Status Pernikahan <em>*</em></legend><div class="daw-recruitment__choice-row"><label><input type="radio" name="marital_status" value="single" required> Belum Menikah</label><label><input type="radio" name="marital_status" value="married"> Menikah</label><label><input type="radio" name="marital_status" value="divorced"> Cerai</label></div></fieldset><fieldset class="daw-recruitment__field--full"><legend>Apakah Anda memiliki hubungan keluarga dengan salah satu karyawan Daya Group? <em>*</em></legend><div class="daw-recruitment__choice-row"><label><input type="radio" name="family_relation" value="yes" required> Ya</label><label><input type="radio" name="family_relation" value="no"> Tidak</label></div></fieldset><fieldset class="daw-recruitment__field--full"><legend>Apakah Anda memiliki hubungan pribadi dengan salah satu karyawan atau berencana menikah dengan karyawan di masa yang akan datang? <em>*</em></legend><div class="daw-recruitment__choice-row"><label><input type="radio" name="personal_relation" value="yes" required> Ya</label><label><input type="radio" name="personal_relation" value="no"> Tidak</label></div></fieldset><label>Susunan Keluarga Inti<textarea name="immediate_family" rows="2" placeholder="Nama, hubungan, usia (jika perlu)"></textarea></label><label>Susunan Keluarga Pribadi<textarea name="personal_family" rows="2" placeholder="Nama, hubungan, usia (jika perlu)"></textarea></label></div></section>
-                    <section class="daw-recruitment__form-card"><div class="daw-recruitment__form-card-title"><span>E</span><div><h2>Minat dan Konsep Pribadi</h2><p>Ekspektasi Anda dalam bergabung dengan Daya Adicipta Wisesa</p></div></div><div class="daw-recruitment__form-fields"><label class="daw-recruitment__field--full">Referensi berapa gaji yang Saudara inginkan? <em>*</em><input name="salary_expectation" required placeholder=""></label><label class="daw-recruitment__field--full">Fasilitas yang diinginkan di luar gaji<textarea name="benefits" rows="2" placeholder=""></textarea></label><fieldset class="daw-recruitment__field--full"><legend>Apakah ada orang yang Saudara kenal dalam perusahaan kami? <em>*</em></legend><div class="daw-recruitment__choice-row"><label><input type="radio" name="known_employee" value="yes" required> Ya</label><label><input type="radio" name="known_employee" value="no"> Tidak</label></div></fieldset></div></section>
-                    <section class="daw-recruitment__form-card daw-recruitment__form-card--pdp"><div class="daw-recruitment__form-card-title"><span>♢</span><div><h2>Pernyataan dan Persetujuan Data Pribadi (PDP)</h2><p>Centang seluruh pernyataan di bawah sebelum mengirimkan lamaran.</p></div></div><div class="daw-recruitment__pdp-list"><label><input type="checkbox" name="pdp_accuracy" value="1" required data-pdp-consent> Saya menyatakan bahwa data-data yang saya isi dalam formulir ini adalah benar dan menggambarkan kondisi saya saat ini dan saya bersedia untuk mempertanggungjawabkannya.</label><label><input type="checkbox" name="pdp_data" value="1" required data-pdp-consent> Saya bersedia memberikan Data Pribadi saya seperti CV, Ijazah, Transkrip Nilai, Foto, KTP, SIM, NPWP, Nomor Rekening Bank, SPT Kartu Keluarga, Media Sosial Saya dan data lainnya untuk diakses, disimpan dan dipergunakan untuk proses recruitment di Daya Group.</label><label><input type="checkbox" name="pdp_placement" value="1" required data-pdp-consent> Saya bersedia ditempatkan di seluruh area penempatan Daya Adicipta Wisesa dan seluruh anak perusahaan di bawah naungan Daya Group.</label></div><p class="daw-recruitment__pdp-note">ⓘ Centang ketiga pernyataan di atas untuk mengaktifkan tombol Submit.</p></section>
-                    <div class="daw-recruitment__form-actions"><a class="daw-recruitment__button daw-recruitment__button--muted" href="<?= esc_url( recruitment_get_public_url( 'job-detail', [ 'job_id' => $job_id ] ) ) ?>">← Batal</a><button class="daw-recruitment__button daw-recruitment__submit" type="submit" disabled data-submit-application <?= $ui_preview ? 'aria-disabled="true" title="Tidak tersedia pada mode preview"' : '' ?>><?= $ui_preview ? 'Preview - Lamaran Nonaktif' : 'Submit Lamaran' ?></button></div>
+                    <input type="hidden" name="job_id" value="<?= esc_attr( $job_id ) ?>">
+                    <input type="hidden" name="daw_ui_preview" value="<?= esc_attr( $ui_preview ? '1' : '0' ) ?>">
+                    <?php wp_nonce_field( 'recruitment_apply', 'recruitment_nonce' ); ?>
+                    <?php foreach ( $form_sections as $section_index => $section ) : ?>
+                        <section class="daw-recruitment__form-card">
+                            <div class="daw-recruitment__form-card-title"><span><?= esc_html( sprintf( '%02d', $section_index + 1 ) ) ?></span><div><h2><?= esc_html( $section['title'] ) ?></h2><?php if ( '' !== (string) $section['description'] ) : ?><p><?= esc_html( $section['description'] ) ?></p><?php endif; ?></div></div>
+                            <div class="daw-recruitment__form-fields">
+                                <?php foreach ( $section['questions'] as $question ) : ?>
+                                    <?php
+                                    $key = (string) $question['key'];
+                                    $type = (string) $question['type'];
+                                    $required = ! empty( $question['required'] );
+                                    $field_name = 'answers[' . $key . ']';
+                                    $old_value = $answers_input[ $key ] ?? '';
+                                    $old_value = is_scalar( $old_value ) ? (string) $old_value : '';
+                                    if ( '' === $old_value && 'nama_lengkap' === $key ) {
+                                        $old_value = $name;
+                                    } elseif ( '' === $old_value && 'email_aktif' === $key ) {
+                                        $old_value = $email;
+                                    }
+                                    ?>
+                                    <?php if ( 'single_choice' === $type ) : ?>
+                                        <fieldset class="daw-recruitment__field--full">
+                                            <legend><?= esc_html( $question['title'] ) ?><?php if ( $required ) : ?> <em>*</em><?php endif; ?></legend>
+                                            <div class="daw-recruitment__choice-row">
+                                                <?php foreach ( $question['options'] as $option ) : ?>
+                                                    <?php $option_value = (string) ( $option['value'] ?? '' ); ?>
+                                                    <label><input type="radio" name="<?= esc_attr( $field_name ) ?>" value="<?= esc_attr( $option_value ) ?>" <?= checked( $old_value, $option_value, false ) ?> <?= $required ? 'required' : '' ?>> <?= esc_html( $option['label'] ?? $option_value ) ?></label>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        </fieldset>
+                                    <?php else : ?>
+                                        <label class="<?= 'paragraph' === $type || 'file' === $type ? 'daw-recruitment__field--full' : '' ?>">
+                                            <?= esc_html( $question['title'] ) ?><?php if ( $required ) : ?> <em>*</em><?php endif; ?>
+                                            <?php if ( 'paragraph' === $type ) : ?>
+                                                <textarea name="<?= esc_attr( $field_name ) ?>" rows="3" <?= $required ? 'required' : '' ?>><?= esc_textarea( $old_value ) ?></textarea>
+                                            <?php elseif ( 'dropdown' === $type ) : ?>
+                                                <select name="<?= esc_attr( $field_name ) ?>" <?= $required ? 'required' : '' ?>>
+                                                    <option value="">Pilih jawaban</option>
+                                                    <?php foreach ( $question['options'] as $option ) : ?>
+                                                        <?php $option_value = (string) ( $option['value'] ?? '' ); ?>
+                                                        <option value="<?= esc_attr( $option_value ) ?>" <?= selected( $old_value, $option_value, false ) ?>><?= esc_html( $option['label'] ?? $option_value ) ?></option>
+                                                    <?php endforeach; ?>
+                                                </select>
+                                            <?php elseif ( 'file' === $type ) : ?>
+                                                <span class="daw-recruitment__upload"><input type="file" name="<?= esc_attr( $field_name ) ?>" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" <?= $required ? 'required' : '' ?>><strong>Unggah file</strong><small>PDF / JPG / PNG · Maks 5 MB</small></span>
+                                            <?php else : ?>
+                                                <?php
+                                                $input_type = [
+                                                    'short' => 'text',
+                                                    'number' => 'number',
+                                                    'date' => 'date',
+                                                    'email' => 'email',
+                                                    'phone' => 'tel',
+                                                ][ $type ] ?? 'text';
+                                                ?>
+                                                <input type="<?= esc_attr( $input_type ) ?>" name="<?= esc_attr( $field_name ) ?>" value="<?= esc_attr( $old_value ) ?>" <?= $required ? 'required' : '' ?>>
+                                            <?php endif; ?>
+                                        </label>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </div>
+                        </section>
+                    <?php endforeach; ?>
+                    <section class="daw-recruitment__form-card daw-recruitment__form-card--pdp">
+                        <div class="daw-recruitment__form-card-title"><span>♢</span><div><h2>Pernyataan dan Persetujuan Data Pribadi (PDP)</h2><p>Centang seluruh pernyataan di bawah sebelum mengirimkan lamaran.</p></div></div>
+                        <div class="daw-recruitment__pdp-list">
+                            <label><input type="checkbox" name="pdp_accuracy" value="1" required data-pdp-consent <?= checked( $pdp_checked['pdp_accuracy'], true, false ) ?>> Saya menyatakan bahwa data-data yang saya isi dalam formulir ini adalah benar dan menggambarkan kondisi saya saat ini dan saya bersedia untuk mempertanggungjawabkannya.</label>
+                            <label><input type="checkbox" name="pdp_data" value="1" required data-pdp-consent <?= checked( $pdp_checked['pdp_data'], true, false ) ?>> Saya bersedia memberikan Data Pribadi saya seperti CV, Ijazah, Transkrip Nilai, Foto, KTP, SIM, NPWP, Nomor Rekening Bank, SPT Kartu Keluarga, Media Sosial Saya dan data lainnya untuk diakses, disimpan dan dipergunakan untuk proses recruitment di Daya Group.</label>
+                            <label><input type="checkbox" name="pdp_placement" value="1" required data-pdp-consent <?= checked( $pdp_checked['pdp_placement'], true, false ) ?>> Saya bersedia ditempatkan di seluruh area penempatan Daya Adicipta Wisesa dan seluruh anak perusahaan di bawah naungan Daya Group.</label>
+                        </div>
+                        <p class="daw-recruitment__pdp-note">ⓘ Centang ketiga pernyataan di atas untuk mengaktifkan tombol Submit.</p>
+                    </section>
+                    <div class="daw-recruitment__form-actions"><a class="daw-recruitment__button daw-recruitment__button--muted" href="<?= esc_url( recruitment_get_public_url( 'job-detail', [ 'job_id' => $job_id ] ) ) ?>">← Batal</a><button class="daw-recruitment__button daw-recruitment__submit" type="submit" <?= $ui_preview ? 'disabled aria-disabled="true" title="Tidak tersedia pada mode preview"' : 'disabled' ?> data-submit-application><?= $ui_preview ? 'Preview - Lamaran Nonaktif' : 'Submit Lamaran' ?></button></div>
                 </form>
+            <?php else : ?>
+                <section class="daw-recruitment__panel"><h1>Form Lamaran Tidak Tersedia</h1><?php foreach ( $errors as $error ) : ?><p><?= esc_html( $error ) ?></p><?php endforeach; ?><a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'careers' ) ) ?>">Lihat Lowongan</a></section>
             <?php endif; ?>
         </div>
     </main>

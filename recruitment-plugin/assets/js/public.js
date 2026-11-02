@@ -88,11 +88,14 @@
 
     const cards = [...form.querySelectorAll(".daw-recruitment__form-card")];
     const actions = form.querySelector(".daw-recruitment__form-actions");
-    if (cards.length < 6 || !actions) {
+    if (cards.length < 2 || !actions) {
       return;
     }
 
-    const stepLabels = ["Identitas", "Pendidikan", "Pengalaman & Keluarga", "Minat & Persetujuan"];
+    const stepLabels = cards.map(function getStepLabel(card, index) {
+      const heading = card.querySelector("h2");
+      return heading ? heading.textContent.trim() : `Tahap ${index + 1}`;
+    });
     const progress = document.createElement("ol");
     progress.className = "daw-application-wizard__progress";
     progress.setAttribute("aria-label", "Tahapan formulir lamaran");
@@ -100,7 +103,11 @@
       const step = index + 1;
       const item = document.createElement("li");
       item.dataset.applicationStepIndicator = String(step);
-      item.innerHTML = `<span>${step}</span><strong>${label}</strong>`;
+      const number = document.createElement("span");
+      number.textContent = String(step);
+      const title = document.createElement("strong");
+      title.textContent = label;
+      item.append(number, title);
       progress.appendChild(item);
 
       const panel = document.createElement("div");
@@ -123,14 +130,12 @@
     next.textContent = "Lanjut";
     navigation.append(back, next);
 
-    const firstCard = cards[0];
-    form.insertBefore(progress, firstCard);
+    form.insertBefore(progress, cards[0]);
     cards.forEach(function placeCard(card, index) {
-      const step = index < 1 ? 1 : index < 2 ? 2 : index < 4 ? 3 : 4;
-      panels[step - 1].appendChild(card);
+      panels[index].appendChild(card);
     });
     panels.forEach((panel) => form.insertBefore(panel, actions));
-    panels[3].appendChild(actions);
+    panels[panels.length - 1].appendChild(actions);
     form.insertBefore(navigation, panels[0]);
 
     let activeStep = 1;
