@@ -90,6 +90,7 @@ $root_links = [
 
         <a href="<?= esc_url( admin_url( 'admin.php?page=recruitment-interview-schedule' ) ) ?>" class="<?= 'recruitment-interview-schedule' === $current_page ? 'is-active' : '' ?>" title="Jadwal Wawancara" <?= 'recruitment-interview-schedule' === $current_page ? 'aria-current="page"' : '' ?>><span class="dashicons dashicons-calendar-alt" aria-hidden="true"></span><span class="recruitment-dashboard__nav-label">Jadwal Wawancara</span></a>
         <a href="<?= esc_url( admin_url( 'admin.php?page=recruitment-user-management' ) ) ?>" class="<?= 'recruitment-user-management' === $current_page ? 'is-active' : '' ?>" title="Pengelolaan Akun User" <?= 'recruitment-user-management' === $current_page ? 'aria-current="page"' : '' ?>><span class="dashicons dashicons-admin-users" aria-hidden="true"></span><span class="recruitment-dashboard__nav-label">Pengelolaan Akun User</span></a>
+        <a href="<?= esc_url( admin_url( 'admin.php?page=recruitment-hr-profile' ) ) ?>" class="<?= 'recruitment-hr-profile' === $current_page ? 'is-active' : '' ?>" title="Profil Admin HR" <?= 'recruitment-hr-profile' === $current_page ? 'aria-current="page"' : '' ?>><span class="dashicons dashicons-admin-users" aria-hidden="true"></span><span class="recruitment-dashboard__nav-label">Profil Admin HR</span></a>
     </nav>
     <div class="recruitment-dashboard__sidebar-footer">
         <button type="button" data-sidebar-collapse aria-expanded="true" title="Ciutkan navigasi">

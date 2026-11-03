@@ -41,6 +41,7 @@ class Recruitment_Plugin {
         add_filter( 'wp_authenticate_user', [ $this, 'reject_direct_employee_login' ], 20 );
         add_action( 'template_redirect', [ $this, 'handle_applicant_account' ] );
         add_action( 'template_redirect', [ $this, 'handle_portal_login' ] );
+        add_filter( 'logout_redirect', [ $this, 'redirect_portal_logout' ], 10, 3 );
         add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_public_assets' ] );
         add_filter( 'render_block', [ $this, 'remove_theme_chrome' ], 10, 2 );
         add_filter( 'the_content', [ $this, 'render_front_page' ] );
@@ -277,7 +278,7 @@ class Recruitment_Plugin {
 
     public function handle_portal_login(): void {
         $requested_screen = sanitize_key( wp_unslash( $_GET['recruitment_page'] ?? '' ) );
-        if ( ! in_array( $requested_screen, [ 'portal', 'login' ], true ) ) {
+        if ( ! in_array( $requested_screen, [ 'portal', 'login', 'forgot-password', 'reset-password' ], true ) ) {
             return;
         }
 
@@ -298,6 +299,16 @@ class Recruitment_Plugin {
                 wp_safe_redirect( $dashboard_url );
                 exit;
             }
+        }
+
+        if ( 'forgot-password' === $requested_screen && 'hr' === $target && 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
+            $this->handle_hr_password_reset_request();
+            return;
+        }
+
+        if ( 'reset-password' === $requested_screen && 'hr' === $target && 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
+            $this->handle_hr_password_reset();
+            return;
         }
 
         if ( 'login' !== $requested_screen || 'POST' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
@@ -329,6 +340,132 @@ class Recruitment_Plugin {
 
         wp_safe_redirect( $dashboard_url );
         exit;
+    }
+
+    private function handle_hr_password_reset_request(): void {
+        $nonce = sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ?? '' ) );
+        if ( ! wp_verify_nonce( $nonce, 'daw_hr_password_reset_request' ) ) {
+            wp_safe_redirect( recruitment_get_public_url( 'login', [ 'target' => 'hr', 'forgot_notice' => 'invalid_request' ] ) );
+            exit;
+        }
+
+        $email = strtolower( sanitize_email( wp_unslash( $_POST['email'] ?? '' ) ) );
+        if ( is_email( $email ) ) {
+            $ip_address = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '' ) );
+            $rate_key = 'daw_hr_reset_rate_' . hash( 'sha256', $ip_address );
+            $attempts = (int) get_transient( $rate_key );
+
+            if ( $attempts < 5 ) {
+                set_transient( $rate_key, $attempts + 1, 15 * MINUTE_IN_SECONDS );
+                $database = new Recruitment_Database();
+                $account = $database->get_active_hr_account_by_email( $email );
+                if ( ! empty( $account['success'] ) ) {
+                    $token = rtrim( strtr( base64_encode( random_bytes( 32 ) ), '+/', '-_' ), '=' );
+                    $token_hash = hash( 'sha256', $token );
+                    $token_key = 'daw_hr_reset_' . $token_hash;
+                    $account_token_key = 'daw_hr_reset_account_' . (string) $account['account']['id'];
+                    $previous_token_hash = (string) get_transient( $account_token_key );
+                    if ( '' !== $previous_token_hash ) {
+                        delete_transient( 'daw_hr_reset_' . $previous_token_hash );
+                    }
+                    set_transient( $token_key, (string) $account['account']['id'], 30 * MINUTE_IN_SECONDS );
+                    set_transient( $account_token_key, $token_hash, 30 * MINUTE_IN_SECONDS );
+                    $reset_url = recruitment_get_public_url(
+                        'reset-password',
+                        [ 'target' => 'hr', 'token' => $token ]
+                    );
+                    $sent = wp_mail(
+                        $account['account']['email'],
+                        'Permintaan reset password HR',
+                        "Kami menerima permintaan untuk mengatur ulang password akun HR Anda.\n\n"
+                            . "Gunakan tautan berikut dalam 30 menit. Tautan hanya dapat digunakan satu kali:\n"
+                            . $reset_url
+                            . "\n\nJika Anda tidak meminta reset, abaikan email ini."
+                    );
+                    if ( ! $sent ) {
+                        delete_transient( $token_key );
+                        delete_transient( $account_token_key );
+                        error_log( 'HR password reset email could not be sent.' );
+                    }
+                }
+            }
+        }
+
+        wp_safe_redirect( recruitment_get_public_url( 'login', [ 'target' => 'hr', 'forgot_notice' => 'submitted' ] ) );
+        exit;
+    }
+
+    private function handle_hr_password_reset(): void {
+        $token = sanitize_text_field( wp_unslash( $_POST['token'] ?? '' ) );
+        $notice = 'invalid_token';
+        $nonce = sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ?? '' ) );
+        $password = (string) wp_unslash( $_POST['new_password'] ?? '' );
+        $confirmation = (string) wp_unslash( $_POST['password_confirmation'] ?? '' );
+
+        if ( wp_verify_nonce( $nonce, 'daw_hr_password_reset' ) && 8 <= strlen( $password ) && $password === $confirmation && 43 === strlen( $token ) ) {
+            $token_hash = hash( 'sha256', $token );
+            $token_key = 'daw_hr_reset_' . $token_hash;
+            $account_id = get_transient( $token_key );
+            $account_token_hash = false !== $account_id
+                ? (string) get_transient( 'daw_hr_reset_account_' . (string) $account_id )
+                : '';
+            if ( false !== $account_id && '' !== $account_token_hash && hash_equals( $account_token_hash, $token_hash ) ) {
+                $result = ( new Recruitment_Database() )->reset_hr_password( (string) $account_id, $password );
+                if ( ! empty( $result['success'] ) ) {
+                    delete_transient( $token_key );
+                    delete_transient( 'daw_hr_reset_account_' . (string) $account_id );
+                    $this->revoke_oracle_account_sessions( 'hr', (string) $account_id );
+                    $notice = 'password_updated';
+                } elseif ( 'service_unavailable' === ( $result['error'] ?? '' ) ) {
+                    $notice = 'service_unavailable';
+                }
+            }
+        } elseif ( ! wp_verify_nonce( $nonce, 'daw_hr_password_reset' ) ) {
+            $notice = 'invalid_request';
+        } elseif ( 8 > strlen( $password ) || $password !== $confirmation ) {
+            $notice = 'invalid_password';
+        }
+
+        wp_safe_redirect( recruitment_get_public_url( 'login', [ 'target' => 'hr', 'reset_notice' => $notice ] ) );
+        exit;
+    }
+
+    public function redirect_portal_logout( string $redirect_to, string $requested_redirect_to, $user ): string {
+        if ( ! $user instanceof WP_User ) {
+            return $redirect_to;
+        }
+
+        $account_type = (string) get_user_meta( $user->ID, 'daw_oracle_account_type', true );
+        if ( 'user_department' === $account_type ) {
+            return recruitment_get_department_login_url();
+        }
+        if ( 'hr' === $account_type ) {
+            return recruitment_get_public_url( 'login', [ 'target' => 'hr' ] );
+        }
+
+        return $redirect_to;
+    }
+
+    private function revoke_oracle_account_sessions( string $account_type, string $account_id ): void {
+        $bridge_user_ids = get_users(
+            [
+                'fields' => 'ID',
+                'meta_query' => [
+                    [
+                        'key' => 'daw_oracle_account_id',
+                        'value' => $account_id,
+                    ],
+                    [
+                        'key' => 'daw_oracle_account_type',
+                        'value' => $account_type,
+                    ],
+                ],
+            ]
+        );
+
+        foreach ( $bridge_user_ids as $bridge_user_id ) {
+            WP_Session_Tokens::get_instance( absint( $bridge_user_id ) )->destroy_all();
+        }
     }
 
     private function redirect_to_portal_login( string $target, string $error ): void {
@@ -403,7 +540,7 @@ class Recruitment_Plugin {
         $redirect_query = (string) parse_url( $redirect, PHP_URL_QUERY );
         parse_str( $redirect_query, $query_args );
         $page = sanitize_key( $query_args['page'] ?? '' );
-        $hr_pages = [ 'recruitment-dashboard', 'recruitment-vacancies', 'recruitment-applicants', 'recruitment-applications', 'recruitment-hr-interview', 'recruitment-final-decision', 'recruitment-user-interview', 'recruitment-interview-schedule', 'recruitment-user-management', 'recruitment-form-builder', 'recruitment-psychotest-settings', 'recruitment-question-bank', 'recruitment-settings' ];
+        $hr_pages = [ 'recruitment-dashboard', 'recruitment-vacancies', 'recruitment-applicants', 'recruitment-applications', 'recruitment-hr-interview', 'recruitment-final-decision', 'recruitment-user-interview', 'recruitment-interview-schedule', 'recruitment-user-management', 'recruitment-hr-profile', 'recruitment-form-builder', 'recruitment-psychotest-settings', 'recruitment-question-bank', 'recruitment-settings' ];
 
         if ( 'daw-user-department' === $page ) {
             return recruitment_get_department_login_url();
@@ -538,11 +675,11 @@ class Recruitment_Plugin {
             'application' => 'application-form',
             'tracking' => 'application-history',
         ][ $requested_screen ] ?? $requested_screen;
-        if ( in_array( $screen, [ 'applicant-login', 'applicant-register', 'account-confirmation', 'account-profile', 'application-confirmation', 'application-history', 'application-detail', 'application-process', 'application-status', 'tracking-detail', 'interview-booking' ], true ) && function_exists( 'nocache_headers' ) ) {
+        if ( in_array( $screen, [ 'applicant-login', 'applicant-register', 'account-confirmation', 'account-profile', 'application-confirmation', 'application-history', 'application-detail', 'application-process', 'application-status', 'tracking-detail', 'interview-booking', 'login', 'forgot-password', 'reset-password' ], true ) && function_exists( 'nocache_headers' ) ) {
             nocache_headers();
         }
         $page_data = [];
-        if ( 'login' === $screen ) {
+        if ( in_array( $screen, [ 'login', 'forgot-password', 'reset-password' ], true ) ) {
             $error_messages = [
                 'invalid_request' => 'Sesi login tidak valid. Silakan coba kembali.',
                 'invalid_credentials' => 'Email/username atau password tidak sesuai.',
@@ -553,6 +690,8 @@ class Recruitment_Plugin {
             $page_data['error'] = $error_messages[ $error_key ] ?? '';
             $default_target = $page_id && $page_id === $department_login_page_id ? 'user_department' : 'hr';
             $page_data['target'] = 'user_department' === sanitize_key( wp_unslash( $_GET['target'] ?? $default_target ) ) ? 'user_department' : 'hr';
+            $page_data['forgot_notice'] = sanitize_key( wp_unslash( $_GET['forgot_notice'] ?? '' ) );
+            $page_data['reset_notice'] = sanitize_key( wp_unslash( $_GET['reset_notice'] ?? '' ) );
         }
         if ( 'application-form' === $screen && function_exists( 'nocache_headers' ) ) {
             nocache_headers();

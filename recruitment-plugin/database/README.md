@@ -38,6 +38,14 @@ read-only vacancy/application schema map is in
 - New account passwords use PHP `password_hash()` and are checked with
   `password_verify()`. WordPress users are restricted session/capability
   bridges, not copies of Oracle passwords.
+- The inspected account tables did not contain an account status column.
+  Migration `004_portal_account_status.sql` adds `STATUS_AKUN` to `HR_USER` and
+  `USERS_AD`, defaulting existing rows to `ACTIVE`. The migration is a draft
+  and has not been applied; the portal login/status-management code requires
+  it before it can operate against this schema.
+- User Department account listing and status changes use `USERS_AD` through
+  `Recruitment_Database`. HR password changes update `HR_USER.PASSWORD` after
+  verifying the current password. No password hashes are returned to screens.
 
 ## Schema alignment and migrations
 
@@ -71,6 +79,8 @@ the current Oracle schema unless the database owner confirms that the target
 schema contains the expected table and approves the change. Migration
 `002_applicant_accounts.sql` is likewise a file only; it is not applied by
 application code.
+Migration `004_portal_account_status.sql` is also only a reviewed draft and
+must not be applied until the Oracle owner approves it.
 
 ## Adding database functionality
 

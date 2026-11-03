@@ -7,6 +7,8 @@ class Recruitment_Admin {
 		add_action( 'admin_post_daw_save_department_request', [ $this, 'handle_department_request_post' ] );
 		add_action( 'admin_post_daw_review_department_request', [ $this, 'handle_department_request_review' ] );
 		add_action( 'admin_post_daw_create_department_account', [ $this, 'handle_department_account_creation' ] );
+		add_action( 'admin_post_daw_set_department_account_status', [ $this, 'handle_department_account_status' ] );
+		add_action( 'admin_post_daw_change_hr_password', [ $this, 'handle_hr_password_change' ] );
 		add_action( 'admin_menu', [ $this, 'remove_vacancy_post_type_submenu' ], 99 );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
 		add_action( 'in_admin_header', [ $this, 'render_admin_sidebar' ] );
@@ -97,6 +99,7 @@ class Recruitment_Admin {
 		add_submenu_page( 'recruitment-dashboard', 'Wawancara User', 'Wawancara User', 'manage_recruitment', 'recruitment-user-interview', [ $this, 'render_user_interview' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Jadwal Wawancara', 'Jadwal Wawancara', 'manage_recruitment', 'recruitment-interview-schedule', [ $this, 'render_interview_schedule' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Pengelolaan Akun User', 'Pengelolaan Akun User', 'manage_recruitment', 'recruitment-user-management', [ $this, 'render_user_management' ] );
+		add_submenu_page( 'recruitment-dashboard', 'Profil Admin HR', 'Profil Admin HR', 'manage_recruitment', 'recruitment-hr-profile', [ $this, 'render_hr_profile' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Form Lamaran', 'Form Lamaran', 'manage_recruitment', 'recruitment-form-builder', [ $this, 'render_form_builder' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Setting Psikotes', 'Setting Psikotes', 'manage_recruitment', 'recruitment-psychotest-settings', [ $this, 'render_psychotest_settings' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Bank Soal', 'Bank Soal', 'manage_recruitment', 'recruitment-question-bank', [ $this, 'render_question_bank' ] );
@@ -312,6 +315,10 @@ class Recruitment_Admin {
 		$this->render_page( 'user-management' );
 	}
 
+	public function render_hr_profile(): void {
+		$this->render_page( 'hr-profile' );
+	}
+
 	public function handle_department_account_creation(): void {
 		if ( ! current_user_can( 'manage_recruitment' ) ) {
 			wp_die( esc_html__( 'Anda tidak memiliki izin untuk membuat akun department.', 'recruitment-plugin' ) );
@@ -340,6 +347,69 @@ class Recruitment_Admin {
 		}
 
 		wp_safe_redirect( add_query_arg( 'notice', $notice, admin_url( 'admin.php?page=recruitment-user-management' ) ) );
+		exit;
+	}
+
+	public function handle_department_account_status(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengubah status akun department.', 'recruitment-plugin' ) );
+		}
+
+		$account_id = absint( $_POST['account_id'] ?? 0 );
+		check_admin_referer( 'daw_set_department_account_status_' . $account_id );
+		$status = strtoupper( sanitize_key( wp_unslash( $_POST['status'] ?? '' ) ) );
+		$notice = 'invalid';
+
+		if ( $account_id > 0 && in_array( $status, [ 'ACTIVE', 'INACTIVE' ], true ) ) {
+			$result = ( new Recruitment_Database() )->set_department_account_status( $account_id, $status );
+			if ( ! empty( $result['success'] ) ) {
+				if ( 'INACTIVE' === $status ) {
+					$this->revoke_department_account_sessions( $account_id );
+				}
+				$notice = 'status_updated';
+			} else {
+				$error = (string) ( $result['error'] ?? '' );
+				$notice = [
+					'account_not_found' => 'not_found',
+					'service_unavailable' => 'unavailable',
+				][ $error ] ?? 'invalid';
+			}
+		}
+
+		wp_safe_redirect( add_query_arg( 'notice', $notice, admin_url( 'admin.php?page=recruitment-user-management' ) ) );
+		exit;
+	}
+
+	public function handle_hr_password_change(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) || ! $this->is_hr_portal_user() ) {
+			wp_die( esc_html__( 'Hanya Admin HR yang dapat mengubah password ini.', 'recruitment-plugin' ) );
+		}
+
+		check_admin_referer( 'daw_change_hr_password' );
+		$current_password = (string) wp_unslash( $_POST['current_password'] ?? '' );
+		$new_password = (string) wp_unslash( $_POST['new_password'] ?? '' );
+		$password_confirmation = (string) wp_unslash( $_POST['password_confirmation'] ?? '' );
+		$notice = 'invalid';
+
+		if ( '' !== $current_password && strlen( $new_password ) >= 8 && $new_password === $password_confirmation ) {
+			$result = ( new Recruitment_Database() )->change_hr_password(
+				(string) get_user_meta( get_current_user_id(), 'daw_oracle_account_id', true ),
+				$current_password,
+				$new_password
+			);
+			if ( ! empty( $result['success'] ) ) {
+				WP_Session_Tokens::get_instance( get_current_user_id() )->destroy_others( wp_get_session_token() );
+				$notice = 'password_updated';
+			} else {
+				$error = (string) ( $result['error'] ?? '' );
+				$notice = [
+					'invalid_current_password' => 'current_password',
+					'service_unavailable' => 'unavailable',
+				][ $error ] ?? 'invalid';
+			}
+		}
+
+		wp_safe_redirect( add_query_arg( 'password_notice', $notice, admin_url( 'admin.php?page=recruitment-hr-profile' ) ) );
 		exit;
 	}
 
@@ -380,6 +450,7 @@ class Recruitment_Admin {
 			'recruitment-user-interview',
 			'recruitment-interview-schedule',
 			'recruitment-user-management',
+			'recruitment-hr-profile',
 			'recruitment-form-builder',
 			'recruitment-psychotest-settings',
 			'recruitment-question-bank',
@@ -401,5 +472,38 @@ class Recruitment_Admin {
 			&& in_array( $screen->id, [ 'users', 'users-network' ], true )
 			&& current_user_can( 'manage_recruitment' )
 			&& current_user_can( 'list_users' );
+	}
+
+	private function is_hr_portal_user(): bool {
+		$user = wp_get_current_user();
+		$account_id = (string) get_user_meta( get_current_user_id(), 'daw_oracle_account_id', true );
+
+		return $user instanceof WP_User
+			&& in_array( 'daw_hr', (array) $user->roles, true )
+			&& 'hr' === get_user_meta( $user->ID, 'daw_oracle_account_type', true )
+			&& ctype_digit( $account_id )
+			&& '0' !== $account_id;
+	}
+
+	private function revoke_department_account_sessions( int $account_id ): void {
+		$bridge_user_ids = get_users(
+			[
+				'fields' => 'ID',
+				'meta_query' => [
+					[
+						'key' => 'daw_oracle_account_id',
+						'value' => (string) $account_id,
+					],
+					[
+						'key' => 'daw_oracle_account_type',
+						'value' => 'user_department',
+					],
+				],
+			]
+		);
+
+		foreach ( $bridge_user_ids as $bridge_user_id ) {
+			WP_Session_Tokens::get_instance( absint( $bridge_user_id ) )->destroy_all();
+		}
 	}
 }

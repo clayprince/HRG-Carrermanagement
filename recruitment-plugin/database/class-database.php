@@ -126,7 +126,7 @@ class Recruitment_Database {
                 }
 
                 $statement = $this->get_connection()->prepare(
-                    'SELECT hr_id AS "id", nama_pengguna AS "email", password AS "password_hash" FROM hr_user WHERE LOWER(nama_pengguna) = :identifier'
+                    'SELECT hr_id AS "id", nama_pengguna AS "email", password AS "password_hash", status_akun AS "status" FROM hr_user WHERE LOWER(nama_pengguna) = :identifier'
                 );
                 $statement->execute( [ 'identifier' => $identifier ] );
                 $rows = $statement->fetchAll( PDO::FETCH_ASSOC );
@@ -148,7 +148,7 @@ class Recruitment_Database {
                 $id_column = 'hr_id';
             } else {
                 $statement = $this->get_connection()->prepare(
-                    'SELECT userdepartemen_id AS "id", username AS "username", email AS "email", kata_sandi AS "password_hash", departemen_id AS "department_id", nama_departemen AS "department" FROM users_ad WHERE LOWER(email) = :email OR LOWER(username) = :username'
+                    'SELECT userdepartemen_id AS "id", username AS "username", email AS "email", kata_sandi AS "password_hash", departemen_id AS "department_id", nama_departemen AS "department", status_akun AS "status" FROM users_ad WHERE LOWER(email) = :email OR LOWER(username) = :username'
                 );
                 $statement->execute( [ 'email' => $identifier, 'username' => $identifier ] );
                 $rows = $statement->fetchAll( PDO::FETCH_ASSOC );
@@ -170,7 +170,7 @@ class Recruitment_Database {
                 $id_column = 'userdepartemen_id';
             }
 
-            if ( ! password_verify( $password, (string) $row['password_hash'] ) ) {
+            if ( 'ACTIVE' !== strtoupper( (string) $row['status'] ) || ! password_verify( $password, (string) $row['password_hash'] ) ) {
                 return [ 'success' => false, 'error' => 'invalid_credentials' ];
             }
 
@@ -199,7 +199,78 @@ class Recruitment_Database {
      * @return array<int, array{id: string, name: string}>
      */
     public function get_departments(): array {
+        $this->last_error = null;
         return $this->fetch_all( 'SELECT departemen_id AS "id", nama_departemen AS "name" FROM departemen ORDER BY nama_departemen' );
+    }
+
+    /**
+     * Find an active HR account for a password-reset request.
+     *
+     * @return array{success: bool, account?: array{id: string, email: string}, error?: string}
+     */
+    public function get_active_hr_account_by_email( string $email ): array {
+        $email = strtolower( trim( $email ) );
+        if ( ! filter_var( $email, FILTER_VALIDATE_EMAIL ) ) {
+            return [ 'success' => false, 'error' => 'account_not_found' ];
+        }
+
+        try {
+            $statement = $this->get_connection()->prepare(
+                'SELECT hr_id AS "id", nama_pengguna AS "email" FROM hr_user WHERE LOWER(nama_pengguna) = :email AND status_akun = :status'
+            );
+            $statement->execute( [ 'email' => $email, 'status' => 'ACTIVE' ] );
+            $rows = $statement->fetchAll( PDO::FETCH_ASSOC );
+            if ( 1 !== count( $rows ) ) {
+                return [ 'success' => false, 'error' => 'account_not_found' ];
+            }
+
+            return [
+                'success' => true,
+                'account' => [ 'id' => (string) $rows[0]['id'], 'email' => (string) $rows[0]['email'] ],
+            ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_error( 'HR Oracle password reset lookup failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /**
+     * Return department accounts without exposing their password hashes.
+     *
+     * @return array<int, array{id: string, username: string, email: string, department_id: string, department: string, status: string}>
+     */
+    public function get_department_accounts(): array {
+        $this->last_error = null;
+        return $this->fetch_all(
+            'SELECT u.userdepartemen_id AS "id", u.username AS "username", u.email AS "email", u.departemen_id AS "department_id", NVL(d.nama_departemen, u.nama_departemen) AS "department", u.status_akun AS "status" FROM users_ad u LEFT JOIN departemen d ON d.departemen_id = u.departemen_id ORDER BY u.username'
+        );
+    }
+
+    /**
+     * Set the active state of one Oracle-backed department account.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    public function set_department_account_status( int $account_id, string $status ): array {
+        $status = strtoupper( trim( $status ) );
+        if ( $account_id < 1 || ! in_array( $status, [ 'ACTIVE', 'INACTIVE' ], true ) ) {
+            return [ 'success' => false, 'error' => 'invalid_account_status' ];
+        }
+
+        try {
+            $statement = $this->get_connection()->prepare(
+                'UPDATE users_ad SET status_akun = :status WHERE userdepartemen_id = :account_id'
+            );
+            $statement->execute( [ 'status' => $status, 'account_id' => $account_id ] );
+            if ( 1 !== $statement->rowCount() ) {
+                return [ 'success' => false, 'error' => 'account_not_found' ];
+            }
+
+            return [ 'success' => true ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_error( 'Department Oracle account status update failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
     }
 
     /**
@@ -230,7 +301,7 @@ class Recruitment_Database {
             }
 
             $statement = $this->get_connection()->prepare(
-                'INSERT INTO users_ad (departemen_id, nama_departemen, username, email, kata_sandi) VALUES (:department_id, :department_name, :username, :email, :password_hash)'
+                'INSERT INTO users_ad (departemen_id, nama_departemen, username, email, kata_sandi, status_akun) VALUES (:department_id, :department_name, :username, :email, :password_hash, :status)'
             );
             $statement->execute(
                 [
@@ -239,6 +310,7 @@ class Recruitment_Database {
                     'username'        => $username,
                     'email'           => $email,
                     'password_hash'   => $password_hash,
+                    'status'          => 'ACTIVE',
                 ]
             );
 
@@ -251,6 +323,84 @@ class Recruitment_Database {
             return [ 'success' => false, 'error' => 'service_unavailable' ];
         } catch ( RuntimeException $exception ) {
             $this->log_error( 'Department Oracle account creation failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /**
+     * Verify the current HR password and replace it with a new PHP password hash.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    public function change_hr_password( string $account_id, string $current_password, string $new_password ): array {
+        if ( ! ctype_digit( $account_id ) || '0' === $account_id || '' === $current_password || strlen( $new_password ) < 8 ) {
+            return [ 'success' => false, 'error' => 'invalid_password_data' ];
+        }
+
+        try {
+            $connection = $this->get_connection();
+            $lookup = $connection->prepare(
+                'SELECT password FROM hr_user WHERE hr_id = :account_id'
+            );
+            $lookup->execute( [ 'account_id' => $account_id ] );
+            $current_hash = $lookup->fetchColumn();
+            if ( false === $current_hash || ! password_verify( $current_password, (string) $current_hash ) ) {
+                return [ 'success' => false, 'error' => 'invalid_current_password' ];
+            }
+
+            $new_hash = password_hash( $new_password, PASSWORD_DEFAULT );
+            if ( false === $new_hash ) {
+                throw new RuntimeException( 'HR password could not be hashed.' );
+            }
+
+            $update = $connection->prepare(
+                'UPDATE hr_user SET password = :password_hash WHERE hr_id = :account_id'
+            );
+            $update->execute( [ 'password_hash' => $new_hash, 'account_id' => $account_id ] );
+            if ( 1 !== $update->rowCount() ) {
+                return [ 'success' => false, 'error' => 'account_not_found' ];
+            }
+
+            return [ 'success' => true ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_error( 'HR Oracle password update failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /**
+     * Replace an active HR password after validating a reset token in WordPress.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    public function reset_hr_password( string $account_id, string $new_password ): array {
+        if ( ! ctype_digit( $account_id ) || '0' === $account_id || strlen( $new_password ) < 8 ) {
+            return [ 'success' => false, 'error' => 'invalid_password_data' ];
+        }
+
+        try {
+            $password_hash = password_hash( $new_password, PASSWORD_DEFAULT );
+            if ( false === $password_hash ) {
+                throw new RuntimeException( 'HR reset password could not be hashed.' );
+            }
+
+            $statement = $this->get_connection()->prepare(
+                'UPDATE hr_user SET password = :password_hash WHERE hr_id = :account_id AND status_akun = :status'
+            );
+            $statement->execute(
+                [
+                    'password_hash' => $password_hash,
+                    'account_id'    => $account_id,
+                    'status'        => 'ACTIVE',
+                ]
+            );
+            if ( 1 !== $statement->rowCount() ) {
+                return [ 'success' => false, 'error' => 'account_not_found' ];
+            }
+
+            return [ 'success' => true ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_error( 'HR Oracle password reset failed', $exception );
             return [ 'success' => false, 'error' => 'service_unavailable' ];
         }
     }

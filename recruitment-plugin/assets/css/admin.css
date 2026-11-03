@@ -2397,6 +2397,233 @@ body:has(.daw-admin-login) main {
   }
 }
 
+.daw-admin-login--card {
+  align-items: center;
+  justify-content: center;
+  padding: 28px 20px;
+}
+.daw-admin-login--card .daw-admin-login__card {
+  background: #fff;
+  border: 1px solid #d5d8de;
+  border-radius: 16px;
+  box-shadow: 0 2px 5px rgba(25, 34, 45, 0.08);
+  margin: 0;
+  max-width: 700px;
+  padding: clamp(28px, 7vw, 64px) clamp(24px, 7vw, 54px);
+  width: 100%;
+}
+.daw-admin-login--card .daw-admin-login__eyebrow {
+  color: #c8102e;
+  font-size: 15px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  line-height: 1.4;
+  margin: 0 0 20px;
+  text-transform: uppercase;
+}
+.daw-admin-login--card .daw-admin-login__card h1 {
+  color: #17171a;
+  font-size: clamp(25px, 4vw, 36px);
+  font-weight: 500;
+  line-height: 1.2;
+  margin: 0 0 20px;
+}
+.daw-admin-login--card .daw-admin-login__card h2 {
+  color: #17171a;
+  font-size: 22px;
+  margin: 0 0 7px;
+}
+.daw-admin-login--card .daw-admin-login__description {
+  color: #777780;
+  font-size: 16px;
+  line-height: 1.55;
+  margin: 0 0 28px;
+}
+.daw-admin-login--card .daw-admin-login__card form {
+  display: grid;
+  gap: 8px;
+}
+.daw-admin-login--card .daw-admin-login__card label {
+  color: #343940;
+  font-size: 15px;
+  font-weight: 650;
+  margin: 4px 0 2px;
+}
+.daw-admin-login--card .daw-admin-login__card input[type="text"],
+.daw-admin-login--card .daw-admin-login__card input[type="email"],
+.daw-admin-login--card .daw-admin-login__card input[type="password"],
+.daw-admin-login--card .daw-admin-login__card select {
+  background: #fff;
+  border: 1px solid #cfd3da;
+  border-radius: 8px;
+  box-shadow: none;
+  color: #333a44;
+  font: inherit;
+  font-size: 16px;
+  height: 54px;
+  margin: 0 0 12px;
+  padding: 0 13px;
+  width: 100%;
+}
+.daw-admin-login--card .daw-admin-login__card input:focus,
+.daw-admin-login--card .daw-admin-login__card select:focus {
+  border-color: #c8102e;
+  outline: 3px solid rgba(200, 16, 46, 0.12);
+}
+.daw-admin-login--card .daw-admin-login__card form > button,
+.daw-admin-login--card .daw-admin-login__button-link {
+  align-items: center;
+  background: #c8102e;
+  border: 0;
+  border-radius: 7px;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 650;
+  justify-content: center;
+  min-height: 58px;
+  margin-top: 6px;
+  text-align: center;
+  text-decoration: none;
+  width: 100%;
+}
+.daw-admin-login--card .daw-admin-login__card form > button:hover,
+.daw-admin-login--card .daw-admin-login__button-link:hover {
+  background: #a90d27;
+  color: #fff;
+}
+.daw-admin-login--card .daw-admin-login__lost-password,
+.daw-admin-login--card .daw-admin-login__switch,
+.daw-admin-login--card .daw-admin-login__back {
+  color: #c8102e;
+  display: block;
+  font-size: 14px;
+  margin: 16px auto 0;
+  text-align: center;
+  text-decoration: none;
+}
+.daw-admin-login--card .daw-admin-login__switch {
+  font-weight: 650;
+  margin-top: 12px;
+}
+.daw-admin-login--card .daw-admin-login__back {
+  color: #252a31;
+  font-weight: 650;
+  margin-top: 32px;
+}
+.daw-admin-login--card .daw-admin-login__lost-password:hover,
+.daw-admin-login--card .daw-admin-login__switch:hover,
+.daw-admin-login--card .daw-admin-login__back:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.daw-admin-login--card .daw-admin-login__error,
+.daw-admin-login--card .daw-admin-login__notice {
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 18px;
+  padding: 11px 13px;
+}
+.daw-admin-login--card .daw-admin-login__error {
+  background: #fff0f0;
+  border: 1px solid #f0c4c4;
+  color: #a40000;
+}
+.daw-admin-login--card .daw-admin-login__notice {
+  background: #edf8f1;
+  border: 1px solid #b9e1c7;
+  color: #21673a;
+}
+.daw-admin-login__modal {
+  border: 1px solid #d5d8de;
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(25, 34, 45, 0.24);
+  color: #17202b;
+  max-width: min(440px, calc(100vw - 32px));
+  padding: 32px;
+  position: fixed;
+  width: 100%;
+}
+.daw-admin-login__modal::backdrop {
+  background: rgba(23, 32, 43, 0.55);
+}
+.daw-admin-login__modal [hidden] {
+  display: none !important;
+}
+.daw-admin-login__modal p {
+  margin: 0;
+}
+.daw-admin-login__modal h2 {
+  color: #17171a;
+  font-size: 22px;
+  margin: 0 32px 18px 0;
+}
+.daw-admin-login__modal form {
+  display: grid;
+  gap: 8px;
+}
+.daw-admin-login__modal label {
+  color: #343940;
+  font-size: 15px;
+  font-weight: 650;
+  margin: 4px 0 2px;
+}
+.daw-admin-login__modal input[type="email"] {
+  background: #fff;
+  border: 1px solid #cfd3da;
+  border-radius: 8px;
+  color: #333a44;
+  font: inherit;
+  height: 50px;
+  margin: 0 0 8px;
+  padding: 0 13px;
+  width: 100%;
+}
+.daw-admin-login__modal button[type="submit"] {
+  background: #c8102e;
+  border: 0;
+  border-radius: 7px;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 650;
+  min-height: 50px;
+  width: 100%;
+}
+.daw-admin-login__modal .daw-admin-login__modal-close {
+  background: transparent;
+  border: 0;
+  color: #343940;
+  cursor: pointer;
+  font-size: 26px;
+  line-height: 1;
+  padding: 4px;
+  position: absolute;
+  right: 12px;
+  top: 10px;
+}
+
+@media (max-width: 600px) {
+  .daw-admin-login--card {
+    padding: 16px;
+  }
+  .daw-admin-login--card .daw-admin-login__card {
+    border-radius: 12px;
+  }
+  .daw-admin-login--card .daw-admin-login__eyebrow {
+    font-size: 12px;
+  }
+  .daw-admin-login--card .daw-admin-login__description {
+    font-size: 14px;
+  }
+  .daw-admin-login__modal {
+    padding: 28px 22px;
+  }
+}
+
 .daw-feature-header {
   align-items: center;
   background: #fff;
@@ -6605,31 +6832,34 @@ body:has(.daw-user-interview) {
   }
 }
 .daw-interview-schedule {
-  --schedule-green: #2dbd79;
-  --schedule-amber: #eea000;
-  --schedule-red: #e24b55;
-  --schedule-purple: #8e63d9;
+  --schedule-green: #36ba7a;
+  --schedule-amber: #eda51a;
+  --schedule-red: #c8102e;
+  --schedule-ink: #252a31;
+  --schedule-muted: #78808b;
+  --schedule-border: #d9dce1;
+  color: var(--schedule-ink);
 }
 .daw-schedule__main {
   margin: 0;
-  padding: 12px 14px 18px;
+  padding: 18px 20px 24px;
 }
 .daw-schedule__intro {
   align-items: center;
   display: flex;
-  justify-content: space-between;
   gap: 16px;
-  margin: 0 0 12px;
+  justify-content: space-between;
+  margin: 0 0 18px;
 }
 .daw-schedule__intro h1 {
-  color: #252a31;
-  font-size: 16px;
+  color: var(--schedule-ink);
+  font-size: 20px;
   line-height: 1.3;
-  margin: 0 0 3px;
+  margin: 0 0 4px;
 }
 .daw-schedule__intro p {
-  color: #7b828d;
-  font-size: 9px;
+  color: var(--schedule-muted);
+  font-size: 13px;
   line-height: 1.45;
   margin: 0;
 }
@@ -6644,16 +6874,16 @@ body:has(.daw-user-interview) {
   align-items: center;
   color: #59616d;
   display: inline-flex;
-  font-size: 8px;
-  gap: 4px;
+  font-size: 12px;
+  gap: 7px;
   white-space: nowrap;
 }
 .daw-schedule__legend i {
   border: 1px solid currentColor;
-  border-radius: 3px;
+  border-radius: 4px;
   display: inline-block;
-  height: 8px;
-  width: 8px;
+  height: 13px;
+  width: 13px;
 }
 .daw-schedule__legend .is-available {
   background: #e9fbf1;
@@ -6668,27 +6898,28 @@ body:has(.daw-user-interview) {
   color: var(--schedule-red);
 }
 .daw-schedule__legend .is-selected {
-  background: #f2eaff;
-  color: var(--schedule-purple);
+  background: var(--schedule-red);
+  color: var(--schedule-red);
 }
 .daw-schedule__layout {
-  align-items: start;
+  align-items: stretch;
   display: grid;
-  gap: 12px;
-  grid-template-columns: minmax(0, 2fr) minmax(250px, 1fr);
+  gap: 18px;
+  grid-template-columns: minmax(0, 2fr) minmax(340px, 1fr);
 }
 .daw-schedule__calendar,
-.daw-schedule__saved {
+.daw-schedule__saved,
+.daw-schedule__config {
   background: #fff;
-  border: 1px solid #d5d8df;
-  border-radius: 8px;
+  border: 1px solid var(--schedule-border);
+  border-radius: 12px;
   overflow: hidden;
 }
 .daw-schedule__calendar {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 110px);
-  min-height: 520px;
+  height: calc(100vh - 155px);
+  min-height: 570px;
 }
 .daw-schedule__weekdays,
 .daw-schedule__days {
@@ -6697,31 +6928,31 @@ body:has(.daw-user-interview) {
 }
 .daw-schedule__weekdays {
   align-items: center;
-  color: #616875;
-  flex: 0 0 42px;
-  font-size: 8px;
+  color: #555e69;
+  flex: 0 0 60px;
+  font-size: 12px;
   font-weight: 600;
   text-align: center;
 }
 .daw-schedule__days {
   flex: 1;
   grid-template-rows: repeat(5, minmax(0, 1fr));
-  padding: 0 7px 7px;
+  padding: 0 12px 12px;
 }
 .daw-schedule__cell {
   min-height: 0;
-  padding: 1px;
+  padding: 2px;
 }
 .daw-schedule__date,
 .daw-schedule__blank {
   align-items: center;
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: 9px;
   box-sizing: border-box;
-  color: #252a31;
+  color: var(--schedule-ink);
   display: flex;
   font: inherit;
-  font-size: 9px;
+  font-size: 13px;
   height: 100%;
   justify-content: center;
   padding: 0;
@@ -6730,6 +6961,7 @@ body:has(.daw-user-interview) {
 .daw-schedule__date {
   background: transparent;
   cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 .daw-schedule__date:hover {
   background: #f7f7f9;
@@ -6738,43 +6970,298 @@ body:has(.daw-user-interview) {
 .daw-schedule__date.is-partial {
   background: #fff3c9;
   border-color: #ffd66b;
-  color: #e28a00;
+  color: #d78700;
 }
 .daw-schedule__date.is-full {
   background: #fff0f0;
   border-color: #ffc7c9;
   color: #dc555d;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+.daw-schedule__date.is-full:hover {
+  background: #fff0f0;
+  border-color: #ffc7c9;
 }
 .daw-schedule__date.is-selected,
 .daw-schedule__date.is-selected:hover {
-  background: #f2eaff;
-  border-color: #c7a9f4;
-  color: #7143b5;
+  background: var(--schedule-red);
+  border-color: var(--schedule-red);
+  color: #fff;
+  text-decoration: none;
+}
+.daw-schedule__calendar-footer {
+  align-items: center;
+  border-top: 1px solid #e3e5e9;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 12px;
+  justify-content: space-between;
+  margin: 0 16px;
+  min-height: 70px;
+  padding: 10px 0;
+}
+.daw-schedule__feedback {
+  border-top: 1px solid #e3e5e9;
+  color: #26734d;
+  font-size: 11px;
+  margin: 0 16px;
+  padding: 8px 0;
+}
+.daw-schedule__feedback.is-error {
+  color: #b42332;
+}
+.daw-schedule__feedback[hidden] {
+  display: none;
+}
+.daw-schedule__selection-summary {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.daw-schedule__selection-summary strong {
+  font-size: 13px;
+  line-height: 1.3;
+}
+.daw-schedule__selection-summary small {
+  color: var(--schedule-muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.daw-schedule__calendar-actions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 9px;
+}
+.daw-schedule__button {
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  gap: 8px;
+  justify-content: center;
+  line-height: 1.2;
+  min-height: 38px;
+  padding: 8px 14px;
+  transition: background-color 120ms ease, border-color 120ms ease, opacity 120ms ease;
+}
+.daw-schedule__button--primary {
+  background: var(--schedule-red);
+  border-color: var(--schedule-red);
+  color: #fff;
+}
+.daw-schedule__button--primary:hover {
+  background: #a90d27;
+  border-color: #a90d27;
+  color: #fff;
+}
+.daw-schedule__button--primary:disabled {
+  cursor: not-allowed;
+  opacity: .48;
+}
+.daw-schedule__button--secondary {
+  background: #fff;
+  border-color: var(--schedule-border);
+  color: #424a55;
+}
+.daw-schedule__button--secondary:hover {
+  background: #f7f8fa;
+  border-color: #b8bdc6;
+}
+.daw-schedule__side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.daw-schedule__config {
+  background: #fffafa;
+  border-color: #f1c4ca;
+  display: flex;
+  flex-direction: column;
+  max-height: min(72vh, 760px);
+  min-height: 0;
+}
+.daw-schedule__config[hidden] {
+  display: none;
+}
+.daw-schedule__config-header {
+  align-items: center;
+  background: #fff7f8;
+  border-bottom: 1px solid #f1c4ca;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+.daw-schedule__config-header h2 {
+  color: var(--schedule-ink);
+  font-size: 15px;
+  line-height: 1.35;
+  margin: 0;
+}
+.daw-schedule__config-header p {
+  color: var(--schedule-muted);
+  font-size: 12px;
+  line-height: 1.35;
+  margin: 3px 0 0;
+}
+.daw-schedule__text-button {
+  background: none;
+  border: 0;
+  color: #7b828d;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 12px;
+  padding: 4px;
+}
+.daw-schedule__text-button:hover {
+  color: var(--schedule-red);
+}
+.daw-schedule__slot-list {
+  display: grid;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 14px;
+}
+.daw-schedule__slot {
+  background: #fff;
+  border: 1px solid var(--schedule-border);
+  border-radius: 10px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+.daw-schedule__slot > header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+.daw-schedule__slot > header strong {
+  font-size: 12px;
+}
+.daw-schedule__slot label {
+  color: var(--schedule-muted);
+  display: grid;
+  font-size: 11px;
+  gap: 4px;
+  min-width: 0;
+}
+.daw-schedule__slot input {
+  background: #fff;
+  border: 1px solid #d2d6dc;
+  border-radius: 5px;
+  box-shadow: none;
+  box-sizing: border-box;
+  color: #3d444e;
+  font: inherit;
+  font-size: 12px;
+  height: 36px;
+  margin: 0;
+  max-width: 100%;
+  min-height: 0;
+  padding: 6px 9px;
+  width: 100%;
+}
+.daw-schedule__slot input:focus {
+  border-color: #c8102e;
+  box-shadow: 0 0 0 1px #c8102e;
+}
+.daw-schedule__time-fields {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.daw-schedule__mode {
+  display: grid;
+  gap: 7px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.daw-schedule__mode button {
+  background: #fff;
+  border: 1px solid #d2d6dc;
+  border-radius: 5px;
+  color: #777e88;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  min-height: 34px;
+}
+.daw-schedule__mode button.is-active {
+  background: #fff0f1;
+  border: 2px solid var(--schedule-red);
+  color: var(--schedule-red);
+}
+.daw-schedule__slot-online {
+  display: grid;
+  gap: 7px;
+}
+.daw-schedule__slot-online[hidden],
+.daw-schedule__slot-location[hidden] {
+  display: none;
+}
+.daw-schedule__slot-location {
+  grid-template-columns: 1fr;
+}
+.daw-schedule__capacity input {
+  max-width: 120px;
+}
+.daw-schedule__config-add {
+  border-top: 1px solid #eceef1;
+  flex: 0 0 auto;
+  padding: 10px 14px;
+}
+.daw-schedule__config-add .daw-schedule__button {
+  width: 100%;
+}
+.daw-schedule__config-footer {
+  background: #fff;
+  border-top: 1px solid #eceef1;
+  flex: 0 0 auto;
+  padding: 12px 14px;
+}
+.daw-schedule__config-footer > .daw-schedule__button {
+  min-height: 44px;
+  width: 100%;
 }
 .daw-schedule__date:focus-visible {
   outline: 2px solid #3c78c5;
   outline-offset: -3px;
 }
+.daw-schedule__saved {
+  flex: 0 0 auto;
+}
 .daw-schedule__saved-heading {
   align-items: center;
-  border-bottom: 1px solid #d5d8df;
+  border-bottom: 1px solid var(--schedule-border);
   display: flex;
   justify-content: space-between;
-  min-height: 34px;
-  padding: 0 10px;
+  min-height: 46px;
+  padding: 0 14px;
 }
 .daw-schedule__saved-heading h2 {
   color: #343a43;
-  font-size: 9px;
+  font-size: 13px;
   font-weight: 650;
   margin: 0;
 }
 .daw-schedule__saved-heading > span {
-  color: #7b828d;
-  font-size: 8px;
+  color: var(--schedule-muted);
+  font-size: 11px;
 }
 .daw-schedule__entry {
-  border-bottom: 1px solid #d5d8df;
+  border-bottom: 1px solid var(--schedule-border);
 }
 .daw-schedule__entry:last-child {
   border-bottom: 0;
@@ -6783,31 +7270,31 @@ body:has(.daw-user-interview) {
   align-items: center;
   cursor: pointer;
   display: flex;
-  gap: 8px;
+  gap: 10px;
   justify-content: space-between;
   list-style: none;
-  min-height: 36px;
-  padding: 5px 10px;
+  min-height: 54px;
+  padding: 7px 14px;
 }
 .daw-schedule__entry summary::-webkit-details-marker {
   display: none;
 }
 .daw-schedule__entry-date {
   display: grid;
-  gap: 1px;
+  gap: 3px;
   min-width: 0;
 }
 .daw-schedule__entry-date strong {
   color: #343a43;
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 650;
 }
 .daw-schedule__entry-date small {
-  color: #7b828d;
-  font-size: 7px;
+  color: var(--schedule-muted);
+  font-size: 10px;
 }
 .daw-schedule__entry-status {
-  font-size: 7px;
+  font-size: 10px;
   font-weight: 650;
   margin-left: auto;
   white-space: nowrap;
@@ -6818,55 +7305,91 @@ body:has(.daw-user-interview) {
 .daw-schedule__entry-status.is-partial {
   color: #dc8100;
 }
+.daw-schedule__entry-status.is-available {
+  color: #248b59;
+}
 .daw-schedule__chevron {
   border-bottom: 1px solid #858b95;
   border-right: 1px solid #858b95;
-  flex: 0 0 5px;
-  height: 5px;
+  flex: 0 0 6px;
+  height: 6px;
   transform: rotate(45deg) translateY(-2px);
   transition: transform 120ms ease;
-  width: 5px;
+  width: 6px;
 }
 .daw-schedule__entry[open] .daw-schedule__chevron {
   transform: rotate(225deg) translate(-1px, -1px);
 }
-.daw-schedule__entry > p {
+.daw-schedule__entry-details {
   border-top: 1px solid #eceef1;
+  padding: 9px 14px;
+}
+.daw-schedule__entry-details p {
   color: #626a75;
-  font-size: 8px;
+  font-size: 11px;
   margin: 0;
-  padding: 8px 10px;
 }
 @media (max-width: 900px) {
   .daw-schedule__layout {
     grid-template-columns: minmax(0, 1fr);
   }
   .daw-schedule__calendar {
-    height: 560px;
+    height: min(70vh, 680px);
     min-height: 0;
+  }
+  .daw-schedule__side {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .daw-schedule__config {
+    max-height: 680px;
   }
 }
 @media (max-width: 600px) {
   .daw-schedule__main {
-    padding: 12px 9px 18px;
+    padding: 14px 10px 18px;
   }
   .daw-schedule__intro {
     align-items: flex-start;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
   }
   .daw-schedule__legend {
     justify-content: flex-start;
-    gap: 8px;
+    gap: 10px;
+  }
+  .daw-schedule__layout {
+    gap: 12px;
   }
   .daw-schedule__calendar {
-    height: 470px;
+    height: min(68vh, 520px);
+    min-height: 390px;
   }
   .daw-schedule__days {
-    padding: 0 3px 3px;
+    padding: 0 5px 5px;
   }
   .daw-schedule__cell {
     padding: 1px;
+  }
+  .daw-schedule__side {
+    display: flex;
+  }
+  .daw-schedule__config {
+    max-height: 75vh;
+  }
+  .daw-schedule__calendar-footer {
+    align-items: flex-start;
+    flex-direction: column;
+    margin: 0 10px;
+    padding: 10px 0;
+  }
+  .daw-schedule__calendar-actions {
+    justify-content: flex-end;
+    width: 100%;
+  }
+  .daw-schedule__calendar-actions .daw-schedule__button {
+    padding-left: 10px;
+    padding-right: 10px;
   }
 }
 .daw-vacancies,

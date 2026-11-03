@@ -4,6 +4,32 @@ This file records material, verified project changes and guides future human
 and AI contributors. It is not a substitute for source review or a database
 migration log.
 
+## 2026-11-03
+
+### Portal login and account management
+
+- Portal login now requires an Oracle `STATUS_AKUN` of `ACTIVE` for HR and User
+  Department accounts. Department account creation, listing, and status changes
+  use the Oracle gateway; deactivation also revokes mapped WordPress bridge
+  sessions. Passwords remain hashed and are not exposed to the UI.
+- Added an Admin HR password-change form that verifies the current Oracle
+  password and updates `HR_USER.PASSWORD` with a PHP password hash. Other
+  WordPress sessions for that HR bridge are revoked after a successful change.
+- Added migration `004_portal_account_status.sql` as an unapplied draft. It
+  adds status columns and constraints to `HR_USER` and `USERS_AD`, defaulting
+  existing accounts to active. Applying it requires separate Oracle-owner
+  approval; the updated portal login/status flow requires the migration.
+- Forgot-password/reset is not implemented: the existing settings screen says
+  email settings are unavailable, and no HR reset-token or email flow exists.
+  Configure and verify an email delivery/reset design before implementing it.
+- The Oracle metadata audit read column definitions only; no account rows or
+  credentials were read, and no database schema or data was changed.
+- Unauthenticated direct requests to the HR profile and account-management
+  admin pages redirected to the HR login in the local WordPress site.
+- PHP/Oracle integration and real login/account/password scenarios remain
+  untested because the PHP CLI has no PDO_OCI driver. SQL*Plus connectivity and
+  the read-only account-column metadata query succeeded.
+
 ## 2026-11-02
 
 ### Oracle-backed form verification
@@ -21,6 +47,14 @@ migration log.
 - No application or applicant rows were created. The local WordPress site has
   no published `daw_vacancy` posts, so live submission persistence remains
   untested until a real vacancy is published.
+
+### Interview schedule design refinement
+
+- Updated the HR interview schedule to follow the supplied two-stage reference:
+  multi-date calendar selection followed by per-slot time, online/offline
+  method, meeting details or location, and capacity configuration.
+- Added expandable saved-schedule summaries and responsive calendar/configuration
+  panels. Schedule changes remain browser-preview-only and are not persisted.
 
 ## 2026-11-01
 

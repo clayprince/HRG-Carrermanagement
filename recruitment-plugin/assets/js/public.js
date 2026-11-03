@@ -5,6 +5,7 @@
   }
   window.RecruitmentPublicScripts = true;
   document.documentElement.classList.add("js");
+  setupPortalRole();
   setupApplicationWizard();
   setupApplicationHistoryControls();
   setupConsentButton();
@@ -78,6 +79,46 @@
           title.appendChild(removeControl);
         }
       });
+  }
+
+  function setupPortalRole() {
+    const roleSelect = document.querySelector("[data-portal-role]");
+    const forgotLink = document.querySelector("[data-portal-forgot]");
+    const forgotModal = document.querySelector("[data-portal-forgot-modal]");
+    if (!roleSelect || !forgotLink || !forgotModal) {
+      return;
+    }
+
+    const updateForgotLink = function updateForgotLink() {
+      const isDepartment = "user_department" === roleSelect.value;
+      forgotLink.href =
+        isDepartment
+          ? roleSelect.dataset.forgotDepartment
+          : roleSelect.dataset.forgotHr;
+      forgotModal.querySelector("[data-portal-forgot-department]").hidden =
+        !isDepartment;
+      forgotModal.querySelector("[data-portal-forgot-hr]").hidden =
+        isDepartment;
+    };
+
+    const openForgotModal = function openForgotModal(event) {
+      event.preventDefault();
+      updateForgotLink();
+      forgotModal.showModal();
+    };
+
+    roleSelect.addEventListener("change", updateForgotLink);
+    forgotLink.addEventListener("click", openForgotModal);
+    forgotModal
+      .querySelector("[data-portal-forgot-close]")
+      .addEventListener("click", function closeForgotModal() {
+        forgotModal.close();
+      });
+    updateForgotLink();
+
+    if ("true" === forgotModal.dataset.autoOpen) {
+      forgotModal.showModal();
+    }
   }
 
   function setupApplicationWizard() {

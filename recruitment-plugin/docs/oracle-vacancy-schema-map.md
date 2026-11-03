@@ -146,6 +146,13 @@ route requires a published post and rejects the demo vacancy fallback.
 - `DEPARTEMEN`: `DEPARTEMEN_ID`, `NAMA_DEPARTEMEN`, `STATUS_DEPARTEMEN`.
 - `USERS_AD`: `USERDEPARTEMEN_ID`, `DEPARTEMEN_ID`, `NAMA_DEPARTEMEN`,
   `USERNAME`, `EMAIL`, `KATA_SANDI`.
+- Read-only account metadata inspected on 2026-11-03 confirmed `HR_USER` has
+  `HR_ID`, `NAMA_PENGGUNA`, and `PASSWORD`, while `USERS_AD` has the columns
+  above; neither account table has an account status column. `DEPARTEMEN` has
+  `STATUS_DEPARTEMEN`, which is not an account status. Draft migration
+  `database/migrations/004_portal_account_status.sql` adds `STATUS_AKUN` to
+  both account tables, with existing accounts defaulted to `ACTIVE`. It has
+  not been applied.
 
 `STATUS_REQUEST_USER` contains `STATUS_LOWONGAN_ID`, `STATUS_KANDIDAT_ID`,
 `REQUEST_ID`, `STATUS_PENGAJUAN`, `CATATAN_REVIEW`, `TANGGAL_DIBUAT`, and
