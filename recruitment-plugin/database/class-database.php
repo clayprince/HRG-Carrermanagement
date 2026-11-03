@@ -766,8 +766,8 @@ class Recruitment_Database {
      */
     public function get_vacancies(): array {
         return $this->fetch_all(
-            'SELECT id, title, location, dealer, region, job_type, description FROM daw_vacancies WHERE status = :status ORDER BY id DESC',
-            [ 'status' => 'published' ]
+            'SELECT d.detail_lowongan_id AS "id", d.judul_pekerjaan AS "title", d.lokasi_penempatan AS "location", k.nama_dealer AS "dealer", d.kategori_kj AS "job_type", d.deskripsi_pekerjaan AS "description" FROM HRS_DETAIL_INFO_LOWONGAN d JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE k.status_kolom = :status ORDER BY d.detail_lowongan_id DESC',
+            [ 'status' => 1 ]
         );
     }
 
@@ -775,14 +775,18 @@ class Recruitment_Database {
      * @return array<int, array<string, mixed>>
      */
     public function get_applicants(): array {
-        return $this->fetch_all( 'SELECT id, name, email, phone, created_at FROM daw_applicants ORDER BY created_at DESC' );
+        return $this->fetch_all(
+            'SELECT pkl.profile_kandidat_login AS "id", NVL(p.nama_lengkap, p.nama_kandidat) AS "name", NVL(p.email, pkl.email) AS "email", NVL(p.nomor_telepon, TO_CHAR(pkl.nomor_telepon)) AS "phone", NVL(pkl.created_at, p.dibuat_pada) AS "created_at" FROM HRS_PROFILE_KANDIDAT_LOGIN pkl JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id ORDER BY NVL(pkl.created_at, p.dibuat_pada) DESC'
+        );
     }
 
     /**
      * @return array<int, array<string, mixed>>
      */
     public function get_applications(): array {
-        return $this->fetch_all( 'SELECT id, vacancy_id, applicant_id, application_token, status, created_at FROM daw_applications ORDER BY created_at DESC' );
+        return $this->fetch_all(
+            'SELECT lamaran_id AS "id", detail_lowongan_id AS "vacancy_id", profile_kandidat_id AS "applicant_id", status_terkini AS "status", NVL(created_at, tanggal_melamar) AS "created_at" FROM HRS_LAMARAN ORDER BY lamaran_id DESC'
+        );
     }
 
     /**
