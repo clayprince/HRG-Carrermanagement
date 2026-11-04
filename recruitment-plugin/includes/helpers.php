@@ -410,6 +410,7 @@ function recruitment_get_admin_url( string $slug = 'dashboard' ): string {
         'applications' => 'recruitment-applications',
         'user-interview' => 'recruitment-user-interview',
         'psychotest-settings' => 'recruitment-psychotest-settings',
+        'personality-results' => 'recruitment-personality-results',
         'question-bank' => 'recruitment-question-bank',
         'settings'     => 'recruitment-settings',
     ];

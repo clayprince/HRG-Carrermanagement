@@ -1,0 +1,341 @@
+<?php
+
+/**
+ * Candidate-facing Pauli assessment session controller.
+ */
+class Recruitment_Pauli_Assessment {
+
+    private const USER_META_KEY = 'recruitment_pauli_assessment';
+    private const IQ_USER_META_KEY = 'recruitment_iq_assessment';
+    private const COLUMN_COUNT = 20;
+    private const COLUMN_DURATION = 180;
+    private const TOTAL_DURATION = 3600;
+    private const NUMBER_COUNT = 100;
+    private const ANSWER_COUNT = 99;
+
+    private Recruitment_Database $database;
+
+    public function __construct() {
+        $this->database = new Recruitment_Database();
+    }
+
+    public function handle_public_request(): void {
+        if ( 'psych-pauli' !== sanitize_key( wp_unslash( $_GET['recruitment_page'] ?? '' ) ) ) {
+            return;
+        }
+
+        if ( ! is_user_logged_in() ) {
+            wp_safe_redirect( recruitment_get_public_url( 'applicant-login' ) );
+            exit;
+        }
+
+        $candidate_id = $this->get_current_candidate_id();
+        if ( $candidate_id < 1 ) {
+            wp_safe_redirect( add_query_arg( 'account_error', 'applicant_account_required', recruitment_get_public_url( 'applicant-login' ) ) );
+            exit;
+        }
+
+        $user_id = get_current_user_id();
+        $state = get_user_meta( $user_id, self::USER_META_KEY, true );
+        if ( 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
+            $this->handle_advance_request( $user_id, $candidate_id, is_array( $state ) ? $state : [] );
+        }
+
+        $state = is_array( $state ) ? $state : [];
+        if ( '1' === sanitize_text_field( wp_unslash( $_GET['start'] ?? '' ) ) ) {
+            if ( ! in_array( $state['status'] ?? '', [ 'active', 'complete' ], true )
+                || (int) ( $state['candidate_id'] ?? 0 ) !== $candidate_id ) {
+                $this->start_session( $user_id, $candidate_id );
+            }
+            wp_safe_redirect( recruitment_get_public_url( 'psych-pauli' ) );
+            exit;
+        }
+
+        if ( 'active' === ( $state['status'] ?? '' ) && (int) ( $state['candidate_id'] ?? 0 ) === $candidate_id ) {
+            $this->sync_elapsed_columns( $user_id, $candidate_id, $state );
+        }
+    }
+
+    public function save_column_ajax(): void {
+        check_ajax_referer( 'recruitment_pauli_save_column', 'nonce' );
+        $candidate_id = $this->get_current_candidate_id();
+        if ( $candidate_id < 1 ) {
+            $database_error = $this->database->has_error();
+            wp_send_json_error(
+                [ 'message' => $database_error ? 'Koneksi Oracle belum tersedia.' : 'Profil kandidat tidak valid.' ],
+                $database_error ? 503 : 403
+            );
+        }
+
+        $user_id = get_current_user_id();
+        $state = get_user_meta( $user_id, self::USER_META_KEY, true );
+        if ( ! is_array( $state ) || 'active' !== ( $state['status'] ?? '' ) || (int) ( $state['candidate_id'] ?? 0 ) !== $candidate_id ) {
+            wp_send_json_error( [ 'message' => 'Sesi tes Pauli tidak aktif.' ], 409 );
+        }
+
+        $segment = absint( wp_unslash( $_POST['segment'] ?? 0 ) );
+        $current_segment = absint( $state['current_segment'] ?? 0 );
+        $segment_deadline = absint( $state['started_at'] ?? 0 ) + ( ( $current_segment + 1 ) * self::COLUMN_DURATION );
+        if ( $segment !== $current_segment || time() >= $segment_deadline || $current_segment >= self::COLUMN_COUNT ) {
+            wp_send_json_error( [ 'message' => 'Kolom ini sudah berakhir. Halaman akan beralih ke kolom berikutnya.' ], 409 );
+        }
+
+        $answers = wp_unslash( $_POST['answers'] ?? '' );
+        if ( ! is_string( $answers ) || 1 !== preg_match( '/\A[0-9-]{99}\z/', $answers ) ) {
+            wp_send_json_error( [ 'message' => 'Jawaban kolom Pauli tidak valid.' ], 400 );
+        }
+
+        $saved = $this->save_column( $state, $current_segment, $answers );
+        if ( empty( $saved['success'] ) ) {
+            wp_send_json_error( [ 'message' => (string) ( $saved['error'] ?? 'Jawaban belum tersimpan.' ) ], 500 );
+        }
+        update_user_meta( $user_id, self::USER_META_KEY, $state );
+        wp_send_json_success( [ 'saved' => true ] );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function get_page_view(): array {
+        if ( ! is_user_logged_in() ) {
+            return [ 'login_required' => true ];
+        }
+        $user_id = get_current_user_id();
+        $candidate_id = $this->get_current_candidate_id();
+        if ( $candidate_id < 1 && $this->database->has_error() ) {
+            return [ 'error' => 'Koneksi Oracle belum tersedia. Silakan coba kembali nanti.' ];
+        }
+        $state = get_user_meta( $user_id, self::USER_META_KEY, true );
+        if ( $candidate_id < 1 || ! is_array( $state ) || (int) ( $state['candidate_id'] ?? 0 ) !== $candidate_id ) {
+            return [ 'ready' => false ];
+        }
+        if ( 'complete' === ( $state['status'] ?? '' ) ) {
+            return [
+                'complete' => true,
+                'score' => absint( $state['score'] ?? 0 ),
+            ];
+        }
+        if ( 'active' !== ( $state['status'] ?? '' ) ) {
+            return [ 'ready' => false ];
+        }
+
+        $segment = absint( $state['current_segment'] ?? 0 );
+        $column = $state['columns'][ $segment ] ?? null;
+        $catalog = $this->database->get_pauli_assessment();
+        $test = $catalog[0] ?? null;
+        if ( ! is_array( $test ) || (int) $test['ID'] !== (int) ( $state['test_id'] ?? 0 )
+            || 60 !== (int) $test['DURATION'] || self::COLUMN_COUNT !== count( $test['questions'] )
+            || ! is_array( $column ) || $segment >= self::COLUMN_COUNT ) {
+            return [ 'error' => 'Konfigurasi tes Pauli tidak lengkap. Silakan hubungi tim HR.' ];
+        }
+
+        $questions_by_id = [];
+        foreach ( $test['questions'] as $question ) {
+            $questions_by_id[ (int) $question['id'] ] = $question;
+        }
+        $question_id = absint( $column['question_id'] ?? 0 );
+        if ( ! isset( $questions_by_id[ $question_id ] ) || self::NUMBER_COUNT !== count( (array) ( $column['numbers'] ?? [] ) ) ) {
+            return [ 'error' => 'Kolom tes Pauli tidak tersedia. Silakan hubungi tim HR.' ];
+        }
+
+        $started_at = absint( $state['started_at'] ?? 0 );
+        $deadline = $started_at + self::TOTAL_DURATION;
+        $column_deadline = min( $started_at + ( ( $segment + 1 ) * self::COLUMN_DURATION ), $deadline );
+        $answers = (string) ( $column['answers'] ?? str_repeat( '-', self::ANSWER_COUNT ) );
+        if ( 1 !== preg_match( '/\A[0-9-]{99}\z/', $answers ) ) {
+            $answers = str_repeat( '-', self::ANSWER_COUNT );
+        }
+
+        return [
+            'ready' => true,
+            'test' => [
+                'title' => (string) $test['TITLE'],
+                'segment' => $segment,
+                'segment_count' => self::COLUMN_COUNT,
+                'segment_deadline' => $column_deadline,
+                'deadline' => $deadline,
+                'numbers' => array_map( 'absint', (array) $column['numbers'] ),
+                'answers' => $answers,
+            ],
+            'nonce' => wp_create_nonce( 'recruitment_pauli_save_column' ),
+            'advance_nonce' => wp_create_nonce( 'recruitment_pauli_advance' ),
+            'ajax_url' => admin_url( 'admin-ajax.php' ),
+        ];
+    }
+
+    private function get_current_candidate_id(): int {
+        if ( ! is_user_logged_in() ) {
+            return 0;
+        }
+        $user = wp_get_current_user();
+        if ( ! in_array( 'daw_applicant', (array) $user->roles, true ) ) {
+            return 0;
+        }
+        return absint( $user->ID );
+    }
+
+    private function start_session( int $user_id, int $candidate_id ): void {
+        $iq_state = get_user_meta( $user_id, self::IQ_USER_META_KEY, true );
+        if ( ! is_array( $iq_state ) || 'complete' !== ( $iq_state['status'] ?? '' )
+            || (int) ( $iq_state['candidate_id'] ?? 0 ) !== $candidate_id ) {
+            wp_die( esc_html__( 'Tes Pauli dapat dimulai setelah Tes IQ kandidat selesai.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+        }
+
+        $global_settings = (array) get_option( 'recruitment_psychotest_settings', [] );
+        $test_settings = (array) get_option( 'recruitment_psychotest_tests', [] );
+        if ( ( isset( $global_settings['status'] ) && 'active' !== $global_settings['status'] )
+            || ( isset( $test_settings['pauli']['active'] ) && empty( $test_settings['pauli']['active'] ) ) ) {
+            wp_die( esc_html__( 'Tes Pauli sedang dinonaktifkan oleh tim HR.', 'recruitment-plugin' ) );
+        }
+
+        $catalog = $this->database->get_pauli_assessment();
+        $test = $catalog[0] ?? null;
+        if ( ! is_array( $test ) || 60 !== (int) $test['DURATION'] || 1980 !== (int) $test['QUESTION_COUNT']
+            || self::COLUMN_COUNT !== count( $test['questions'] ) ) {
+            wp_die( esc_html__( 'Bank Pauli 60 menit belum tersedia atau belum lengkap. Silakan hubungi tim HR.', 'recruitment-plugin' ) );
+        }
+
+        $columns = [];
+        foreach ( $test['questions'] as $index => $question ) {
+            $numbers = [];
+            for ( $number = 0; $number < self::NUMBER_COUNT; $number++ ) {
+                $numbers[] = random_int( 0, 9 );
+            }
+            $columns[] = [
+                'question_id' => (int) $question['id'],
+                'numbers' => $numbers,
+                'answers' => str_repeat( '-', self::ANSWER_COUNT ),
+                'response_id' => 0,
+            ];
+        }
+
+        $now = time();
+        update_user_meta(
+            $user_id,
+            self::USER_META_KEY,
+            [
+                'version' => 1,
+                'candidate_id' => $candidate_id,
+                'test_id' => (int) $test['ID'],
+                'status' => 'active',
+                'started_at' => $now,
+                'deadline' => $now + self::TOTAL_DURATION,
+                'current_segment' => 0,
+                'columns' => $columns,
+                'result_id' => 0,
+                'score' => 0,
+            ]
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $state
+     */
+    private function handle_advance_request( int $user_id, int $candidate_id, array $state ): void {
+        $nonce = sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ?? '' ) );
+        if ( ! wp_verify_nonce( $nonce, 'recruitment_pauli_advance' ) ) {
+            wp_die( esc_html__( 'Permintaan tes tidak valid. Muat ulang halaman dan coba kembali.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+        }
+        if ( 'advance' !== sanitize_key( wp_unslash( $_POST['pauli_action'] ?? '' ) )
+            || 'active' !== ( $state['status'] ?? '' )
+            || (int) ( $state['candidate_id'] ?? 0 ) !== $candidate_id ) {
+            wp_die( esc_html__( 'Sesi tes Pauli tidak aktif atau tidak valid.', 'recruitment-plugin' ), '', [ 'response' => 409 ] );
+        }
+
+        $segment = absint( wp_unslash( $_POST['segment'] ?? 0 ) );
+        $current_segment = absint( $state['current_segment'] ?? 0 );
+        if ( $segment !== $current_segment || $current_segment >= self::COLUMN_COUNT
+            || time() < ( absint( $state['started_at'] ?? 0 ) + ( ( $current_segment + 1 ) * self::COLUMN_DURATION ) ) ) {
+            wp_die( esc_html__( 'Kolom Pauli hanya dapat ditutup setelah aba-aba tiga menit.', 'recruitment-plugin' ), '', [ 'response' => 409 ] );
+        }
+
+        $answers = wp_unslash( $_POST['answers'] ?? '' );
+        if ( ! is_string( $answers ) || 1 !== preg_match( '/\A[0-9-]{99}\z/', $answers ) ) {
+            wp_die( esc_html__( 'Jawaban kolom Pauli tidak valid.', 'recruitment-plugin' ), '', [ 'response' => 400 ] );
+        }
+        $saved = $this->save_column( $state, $current_segment, $answers );
+        if ( empty( $saved['success'] ) ) {
+            wp_die( esc_html( $saved['error'] ?? 'Jawaban kolom Pauli gagal disimpan.' ), '', [ 'response' => 500 ] );
+        }
+
+        $state['current_segment'] = $current_segment + 1;
+        update_user_meta( $user_id, self::USER_META_KEY, $state );
+        $this->sync_elapsed_columns( $user_id, $candidate_id, $state );
+        wp_safe_redirect( recruitment_get_public_url( 'psych-pauli' ) );
+        exit;
+    }
+
+    /**
+     * @param array<string, mixed> $state
+     */
+    private function sync_elapsed_columns( int $user_id, int $candidate_id, array &$state ): void {
+        if ( (int) ( $state['candidate_id'] ?? 0 ) !== $candidate_id || 'active' !== ( $state['status'] ?? '' ) ) {
+            return;
+        }
+
+        $started_at = absint( $state['started_at'] ?? 0 );
+        $target_segment = min( intdiv( max( 0, time() - $started_at ), self::COLUMN_DURATION ), self::COLUMN_COUNT );
+        while ( absint( $state['current_segment'] ?? 0 ) < $target_segment ) {
+            $segment = absint( $state['current_segment'] );
+            $column = $state['columns'][ $segment ] ?? [];
+            $answers = (string) ( $column['answers'] ?? str_repeat( '-', self::ANSWER_COUNT ) );
+            $saved = $this->save_column( $state, $segment, $answers );
+            if ( empty( $saved['success'] ) ) {
+                wp_die( esc_html( $saved['error'] ?? 'Jawaban kolom Pauli gagal disimpan.' ), '', [ 'response' => 500 ] );
+            }
+            $state['current_segment'] = $segment + 1;
+            update_user_meta( $user_id, self::USER_META_KEY, $state );
+        }
+
+        if ( absint( $state['current_segment'] ?? 0 ) >= self::COLUMN_COUNT && 'active' === ( $state['status'] ?? '' ) ) {
+            $this->complete_session( $user_id, $state );
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $state
+     * @return array{success: bool, error?: string}
+     */
+    private function save_column( array &$state, int $segment, string $answers ): array {
+        if ( 1 !== preg_match( '/\A[0-9-]{99}\z/', $answers ) ) {
+            return [ 'success' => false, 'error' => 'Jawaban kolom Pauli tidak valid.' ];
+        }
+        $column = $state['columns'][ $segment ] ?? null;
+        if ( ! is_array( $column ) || self::NUMBER_COUNT !== count( (array) ( $column['numbers'] ?? [] ) ) ) {
+            return [ 'success' => false, 'error' => 'Kolom Pauli tidak ditemukan.' ];
+        }
+
+        $saved = $this->database->save_pauli_column_response(
+            absint( $state['test_id'] ?? 0 ),
+            absint( $column['question_id'] ?? 0 ),
+            absint( $column['response_id'] ?? 0 ),
+            $answers,
+            (array) $column['numbers']
+        );
+        if ( empty( $saved['success'] ) || empty( $saved['response_id'] ) ) {
+            return [ 'success' => false, 'error' => (string) ( $saved['error'] ?? 'Jawaban kolom Pauli gagal disimpan.' ) ];
+        }
+        $state['columns'][ $segment ]['answers'] = $answers;
+        $state['columns'][ $segment ]['response_id'] = (int) $saved['response_id'];
+        return [ 'success' => true ];
+    }
+
+    /**
+     * @param array<string, mixed> $state
+     */
+    private function complete_session( int $user_id, array &$state ): void {
+        $result = $this->database->complete_pauli_assessment(
+            absint( $state['test_id'] ?? 0 ),
+            gmdate( 'Y-m-d H:i:s', absint( $state['started_at'] ?? 0 ) ),
+            array_column( (array) ( $state['columns'] ?? [] ), 'response_id' )
+        );
+        if ( empty( $result['success'] ) || empty( $result['result_id'] ) ) {
+            wp_die( esc_html( $result['error'] ?? 'Hasil tes Pauli gagal disimpan.' ), '', [ 'response' => 500 ] );
+        }
+        $state['status'] = 'complete';
+        $state['result_id'] = (int) $result['result_id'];
+        $state['score'] = (int) $result['score'];
+        $state['completed_at'] = time();
+        update_user_meta( $user_id, self::USER_META_KEY, $state );
+    }
+}

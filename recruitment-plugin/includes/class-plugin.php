@@ -35,6 +35,15 @@ class Recruitment_Plugin {
         add_action( 'init', [ $this, 'register_hr_role' ] );
         add_action( 'init', [ $this, 'register_user_department_role' ] );
         add_action( 'init', [ $this, 'register_applicant_role' ] );
+        $iq_assessment = new Recruitment_IQ_Assessment();
+        $pauli_assessment = new Recruitment_Pauli_Assessment();
+        $personality_assessment = new Recruitment_Personality_Assessment();
+        add_action( 'template_redirect', [ $iq_assessment, 'handle_public_request' ] );
+        add_action( 'template_redirect', [ $pauli_assessment, 'handle_public_request' ] );
+        add_action( 'template_redirect', [ $personality_assessment, 'handle_public_request' ] );
+        add_action( 'wp_ajax_recruitment_iq_save_answer', [ $iq_assessment, 'save_answer_ajax' ] );
+        add_action( 'wp_ajax_recruitment_pauli_save_column', [ $pauli_assessment, 'save_column_ajax' ] );
+        add_action( 'wp_ajax_recruitment_personality_save_answer', [ $personality_assessment, 'save_answer_ajax' ] );
         add_action( 'wp_login', [ $this, 'record_account_login' ], 10, 2 );
         add_filter( 'wp_authenticate_user', [ $this, 'reject_inactive_account' ] );
         add_filter( 'wp_authenticate_user', [ $this, 'reject_direct_applicant_login' ], 20 );

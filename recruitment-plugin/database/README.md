@@ -51,6 +51,17 @@ read-only vacancy/application schema map is in
   `HRS_ROLE_AKSES` through `Recruitment_Database`. No password hashes are
   returned to screens.
 
+## Psychometric assessment linking
+
+- Assessment sessions are associated with the authenticated WordPress
+  applicant ID in user meta. Oracle stores assessment questions, responses,
+  and result records through `Recruitment_Database`; no Oracle schema change
+  or assumed candidate foreign key is used for this bridge.
+- The HR personality-results screen follows those WordPress session records
+  to read the corresponding Oracle response and result IDs. This does not
+  establish a direct candidate-to-result relationship in Oracle.
+- IQ, Pauli, DISC, and PAPI routes require the `daw_applicant` role.
+
 ## Schema alignment and migrations
 
 The current Oracle schema uses tables such as `PROFIL_KANDIDAT`,

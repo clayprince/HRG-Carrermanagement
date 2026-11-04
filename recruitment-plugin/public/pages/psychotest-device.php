@@ -1,6 +1,10 @@
 <?php
-$back_url = recruitment_get_public_url( 'psychotest-preparation' );
-$next_url = recruitment_get_public_url( 'psych-test', [ 'state' => 'review' ] );
+$test_key = sanitize_key( wp_unslash( $_GET['test'] ?? 'iq' ) );
+$test_key = in_array( $test_key, [ 'iq', 'pauli', 'disc', 'papi' ], true ) ? $test_key : 'iq';
+$back_url = recruitment_get_public_url( 'psychotest-preparation', [ 'test' => $test_key ] );
+$target_page = 'iq' === $test_key ? 'psych-iq' : ( 'pauli' === $test_key ? 'psych-pauli' : 'psych-personality' );
+$target_args = 'psych-personality' === $target_page ? [ 'test' => $test_key, 'start' => '1' ] : [ 'start' => '1' ];
+$next_url = recruitment_get_public_url( $target_page, $target_args );
 ?>
 <div class="daw-recruitment daw-recruitment--psychotest-device">
     <?php require recruitment_get_plugin_path( 'public/components/header.php' ); ?>

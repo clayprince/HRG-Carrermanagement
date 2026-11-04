@@ -22,6 +22,9 @@ require_once __DIR__ . '/includes/helpers.php';
 require_once __DIR__ . '/database/class-database.php';
 require_once __DIR__ . '/includes/class-application.php';
 require_once __DIR__ . '/includes/class-auth.php';
+require_once __DIR__ . '/includes/class-iq-assessment.php';
+require_once __DIR__ . '/includes/class-pauli-assessment.php';
+require_once __DIR__ . '/includes/class-personality-assessment.php';
 require_once __DIR__ . '/routes/class-router.php';
 require_once __DIR__ . '/includes/class-plugin.php';
 

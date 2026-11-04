@@ -106,6 +106,7 @@ class Recruitment_Admin {
 		add_submenu_page( 'recruitment-dashboard', 'Profil Admin HR', 'Profil Admin HR', 'manage_recruitment', 'recruitment-hr-profile', [ $this, 'render_hr_profile' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Form Lamaran', 'Form Lamaran', 'manage_recruitment', 'recruitment-form-builder', [ $this, 'render_form_builder' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Setting Psikotes', 'Setting Psikotes', 'manage_recruitment', 'recruitment-psychotest-settings', [ $this, 'render_psychotest_settings' ] );
+		add_submenu_page( 'recruitment-dashboard', 'Hasil Kepribadian', 'Hasil Kepribadian', 'manage_recruitment', 'recruitment-personality-results', [ $this, 'render_personality_results' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Bank Soal', 'Bank Soal', 'manage_recruitment', 'recruitment-question-bank', [ $this, 'render_question_bank' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Pengaturan', 'Pengaturan', 'manage_recruitment', 'recruitment-settings', [ $this, 'render_settings' ] );
 	}
@@ -535,6 +536,10 @@ class Recruitment_Admin {
 		$this->render_page( 'psychotest-settings' );
 	}
 
+	public function render_personality_results(): void {
+		$this->render_page( 'personality-results' );
+	}
+
 	public function render_question_bank(): void {
 		$this->render_page( 'question-bank' );
 	}
@@ -567,6 +572,7 @@ class Recruitment_Admin {
 			'recruitment-hr-profile',
 			'recruitment-form-builder',
 			'recruitment-psychotest-settings',
+			'recruitment-personality-results',
 			'recruitment-question-bank',
 			'recruitment-settings',
 			'daw-user-department',
