@@ -19,11 +19,14 @@ if ( ! defined( 'RECRUITMENT_PLUGIN_URL' ) ) {
 }
 
 if ( ! defined( 'RECRUITMENT_SANDBOX' ) ) {
-    define( 'RECRUITMENT_SANDBOX', true );
+    define( 'RECRUITMENT_SANDBOX', '1' === getenv( 'RECRUITMENT_SANDBOX' ) );
 }
 
 ob_start();
 session_start();
+if ( empty( $_SESSION['recruitment_logout_nonce'] ) ) {
+    $_SESSION['recruitment_logout_nonce'] = bin2hex( random_bytes( 32 ) );
+}
 
 // Load core dependencies.
 require_once __DIR__ . '/includes/helpers.php';
@@ -44,10 +47,21 @@ $page = [
     'tracking' => 'application-history',
 ][ $requested_page ] ?? $requested_page;
 
-if ( $page === 'logout' ) {
+if (
+    'logout' === $page
+    && 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) )
+    && hash_equals(
+        (string) $_SESSION['recruitment_logout_nonce'],
+        (string) ( $_POST['logout_nonce'] ?? '' )
+    )
+) {
     $auth->logout();
     header( 'Location: ?page=login' );
     exit;
+}
+if ( 'logout' === $page ) {
+    http_response_code( 405 );
+    exit( 'Logout requires a valid POST request.' );
 }
 
 $error = null;

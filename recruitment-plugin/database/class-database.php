@@ -48,7 +48,6 @@ class Recruitment_Database {
                     'status'        => 'ACTIVE',
                 ]
             );
-
             return [ 'success' => true ];
         } catch ( PDOException $exception ) {
             if ( $this->is_unique_violation( $exception ) ) {
@@ -109,7 +108,7 @@ class Recruitment_Database {
     }
 
     /**
-     * Verify a portal account stored in HR_USER or USERS_AD.
+     * Verify a portal account stored in HRS_ROLE_AKSES.
      *
      * @return array{success: bool, account?: array{type: string, id: string, email: string, username: string, display_name: string, department_id: string, department: string}, error?: string}
      */
@@ -126,9 +125,9 @@ class Recruitment_Database {
                 }
 
                 $statement = $this->get_connection()->prepare(
-                    'SELECT hr_id AS "id", nama_pengguna AS "email", password AS "password_hash", status_akun AS "status" FROM hr_user WHERE LOWER(nama_pengguna) = :identifier'
+                    'SELECT role_akses_id AS "id", email AS "email", username AS "username", kata_sandi AS "password_hash", status_akun AS "status" FROM hrs_role_akses WHERE LOWER(email) = :identifier AND peran = :role'
                 );
-                $statement->execute( [ 'identifier' => $identifier ] );
+                $statement->execute( [ 'identifier' => $identifier, 'role' => 'ADMIN_HR' ] );
                 $rows = $statement->fetchAll( PDO::FETCH_ASSOC );
                 if ( 1 !== count( $rows ) ) {
                     return [ 'success' => false, 'error' => 'invalid_credentials' ];
@@ -144,13 +143,13 @@ class Recruitment_Database {
                     'department_id' => '',
                     'department'    => '',
                 ];
-                $password_column = 'password';
-                $id_column = 'hr_id';
+                $password_column = 'kata_sandi';
+                $id_column = 'role_akses_id';
             } else {
                 $statement = $this->get_connection()->prepare(
-                    'SELECT userdepartemen_id AS "id", username AS "username", email AS "email", kata_sandi AS "password_hash", departemen_id AS "department_id", nama_departemen AS "department", status_akun AS "status" FROM users_ad WHERE LOWER(email) = :email OR LOWER(username) = :username'
+                    'SELECT role_akses_id AS "id", username AS "username", NVL(nama_lengkap, username) AS "display_name", email AS "email", kata_sandi AS "password_hash", departemen_id AS "department_id", nama_departemen AS "department", status_akun AS "status" FROM hrs_role_akses WHERE (LOWER(email) = :email OR LOWER(username) = :username) AND peran = :role'
                 );
-                $statement->execute( [ 'email' => $identifier, 'username' => $identifier ] );
+                $statement->execute( [ 'email' => $identifier, 'username' => $identifier, 'role' => 'KEPALA_DEPARTEMEN' ] );
                 $rows = $statement->fetchAll( PDO::FETCH_ASSOC );
                 if ( 1 !== count( $rows ) ) {
                     return [ 'success' => false, 'error' => 'invalid_credentials' ];
@@ -167,7 +166,7 @@ class Recruitment_Database {
                     'department'    => (string) $row['department'],
                 ];
                 $password_column = 'kata_sandi';
-                $id_column = 'userdepartemen_id';
+                $id_column = 'role_akses_id';
             }
 
             if ( 'ACTIVE' !== strtoupper( (string) $row['status'] ) || ! password_verify( $password, (string) $row['password_hash'] ) ) {
@@ -180,7 +179,7 @@ class Recruitment_Database {
                     throw new RuntimeException( 'Portal account password could not be rehashed.' );
                 }
                 $update = $this->get_connection()->prepare(
-                    'UPDATE ' . ( 'hr' === $target ? 'hr_user' : 'users_ad' ) . ' SET ' . $password_column . ' = :password_hash WHERE ' . $id_column . ' = :account_id'
+                    'UPDATE hrs_role_akses SET ' . $password_column . ' = :password_hash WHERE ' . $id_column . ' = :account_id'
                 );
                 $update->execute( [ 'password_hash' => $password_hash, 'account_id' => $account['id'] ] );
             }
@@ -196,11 +195,58 @@ class Recruitment_Database {
     }
 
     /**
-     * @return array<int, array{id: string, name: string}>
+     * Create an Oracle-backed HR account with a PHP password hash.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    public function create_hr_account( string $email, string $password ): array {
+        $email = strtolower( trim( $email ) );
+        if ( ! filter_var( $email, FILTER_VALIDATE_EMAIL ) || strlen( $email ) > 254 || strlen( $password ) < 8 ) {
+            return [ 'success' => false, 'error' => 'invalid_account_data' ];
+        }
+
+        try {
+            $password_hash = password_hash( $password, PASSWORD_DEFAULT );
+            if ( false === $password_hash ) {
+                throw new RuntimeException( 'HR password could not be hashed.' );
+            }
+
+            $statement = $this->get_connection()->prepare(
+                'INSERT INTO hrs_role_akses (nama_pengguna, username, email, kata_sandi, peran, status_akun) VALUES (:email, :email, :email, :password_hash, :role, :status)'
+            );
+            $statement->execute(
+                [
+                    'email'         => $email,
+                    'password_hash' => $password_hash,
+                    'role'          => 'ADMIN_HR',
+                    'status'        => 'ACTIVE',
+                ]
+            );
+            $account_statement = $this->get_connection()->prepare( 'SELECT role_akses_id FROM hrs_role_akses WHERE username = :username AND email = :email' );
+            $account_statement->execute( [ 'username' => $username, 'email' => $email ] );
+            $account_id = (int) $account_statement->fetchColumn();
+            if ( $account_id > 0 ) {
+                $this->save_account_permissions( $account_id, [ 'request_lowongan', 'user_interview', 'interview_history' ] );
+            }
+            return [ 'success' => true ];
+        } catch ( PDOException $exception ) {
+            if ( $this->is_unique_violation( $exception ) ) {
+                return [ 'success' => false, 'error' => 'email_exists' ];
+            }
+            $this->log_error( 'HR account creation failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        } catch ( RuntimeException $exception ) {
+            $this->log_error( 'HR account creation failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /**
+     * @return array<int, array{id: string, name: string, status: string}>
      */
     public function get_departments(): array {
         $this->last_error = null;
-        return $this->fetch_all( 'SELECT departemen_id AS "id", nama_departemen AS "name" FROM departemen ORDER BY nama_departemen' );
+        return $this->fetch_all( 'SELECT departemen_id AS "id", nama_departemen AS "name", status_departemen AS "status" FROM HRS_DEPARTEMEN WHERE status_departemen IS NULL OR status_departemen = 1 ORDER BY nama_departemen' );
     }
 
     /**
@@ -216,9 +262,9 @@ class Recruitment_Database {
 
         try {
             $statement = $this->get_connection()->prepare(
-                'SELECT hr_id AS "id", nama_pengguna AS "email" FROM hr_user WHERE LOWER(nama_pengguna) = :email AND status_akun = :status'
+                'SELECT role_akses_id AS "id", email AS "email" FROM hrs_role_akses WHERE LOWER(email) = :email AND peran = :role AND status_akun = :status'
             );
-            $statement->execute( [ 'email' => $email, 'status' => 'ACTIVE' ] );
+            $statement->execute( [ 'email' => $email, 'role' => 'ADMIN_HR', 'status' => 'ACTIVE' ] );
             $rows = $statement->fetchAll( PDO::FETCH_ASSOC );
             if ( 1 !== count( $rows ) ) {
                 return [ 'success' => false, 'error' => 'account_not_found' ];
@@ -242,7 +288,30 @@ class Recruitment_Database {
     public function get_department_accounts(): array {
         $this->last_error = null;
         return $this->fetch_all(
-            'SELECT u.userdepartemen_id AS "id", u.username AS "username", u.email AS "email", u.departemen_id AS "department_id", NVL(d.nama_departemen, u.nama_departemen) AS "department", u.status_akun AS "status" FROM users_ad u LEFT JOIN departemen d ON d.departemen_id = u.departemen_id ORDER BY u.username'
+            "SELECT u.role_akses_id AS \"id\", u.username AS \"username\", u.email AS \"email\", u.departemen_id AS \"department_id\", NVL(d.nama_departemen, u.nama_departemen) AS \"department\", u.status_akun AS \"status\" FROM hrs_role_akses u LEFT JOIN HRS_DEPARTEMEN d ON d.departemen_id = u.departemen_id WHERE u.peran = 'KEPALA_DEPARTEMEN' ORDER BY u.username"
+        );
+    }
+
+    /**
+     * Return all portal accounts without exposing password hashes.
+     *
+     * @return array<int, array{id: string, username: string, email: string, department: string, role: string, status: string}>
+     */
+    public function get_portal_accounts(): array {
+        $this->last_error = null;
+        return $this->fetch_all(
+            "SELECT
+                u.role_akses_id AS \"id\",
+                NVL(u.nama_lengkap, NVL(u.username, u.email)) AS \"username\",
+                u.nama_lengkap AS \"full_name\",
+                u.email AS \"email\",
+                NVL(d.nama_departemen, u.nama_departemen) AS \"department\",
+                u.peran AS \"role\",
+                u.status_akun AS \"status\"
+            FROM HRS_ROLE_AKSES u
+            LEFT JOIN HRS_DEPARTEMEN d ON d.departemen_id = u.departemen_id
+            WHERE u.peran IN ('ADMIN_HR', 'KEPALA_DEPARTEMEN')
+            ORDER BY u.role_akses_id"
         );
     }
 
@@ -259,9 +328,9 @@ class Recruitment_Database {
 
         try {
             $statement = $this->get_connection()->prepare(
-                'UPDATE users_ad SET status_akun = :status WHERE userdepartemen_id = :account_id'
+                'UPDATE hrs_role_akses SET status_akun = :status WHERE role_akses_id = :account_id AND peran = :role'
             );
-            $statement->execute( [ 'status' => $status, 'account_id' => $account_id ] );
+            $statement->execute( [ 'status' => $status, 'account_id' => $account_id, 'role' => 'KEPALA_DEPARTEMEN' ] );
             if ( 1 !== $statement->rowCount() ) {
                 return [ 'success' => false, 'error' => 'account_not_found' ];
             }
@@ -287,7 +356,7 @@ class Recruitment_Database {
 
         try {
             $department_statement = $this->get_connection()->prepare(
-                'SELECT nama_departemen FROM departemen WHERE departemen_id = :department_id'
+                'SELECT nama_departemen FROM HRS_DEPARTEMEN WHERE departemen_id = :department_id'
             );
             $department_statement->execute( [ 'department_id' => $department_id ] );
             $department_name = $department_statement->fetchColumn();
@@ -301,15 +370,17 @@ class Recruitment_Database {
             }
 
             $statement = $this->get_connection()->prepare(
-                'INSERT INTO users_ad (departemen_id, nama_departemen, username, email, kata_sandi, status_akun) VALUES (:department_id, :department_name, :username, :email, :password_hash, :status)'
+                'INSERT INTO hrs_role_akses (departemen_id, nama_departemen, username, nama_lengkap, email, kata_sandi, peran, status_akun) VALUES (:department_id, :department_name, :username, :full_name, :email, :password_hash, :role, :status)'
             );
             $statement->execute(
                 [
                     'department_id'   => $department_id,
                     'department_name' => (string) $department_name,
                     'username'        => $username,
+                    'full_name'       => $username,
                     'email'           => $email,
                     'password_hash'   => $password_hash,
+                    'role'            => 'KEPALA_DEPARTEMEN',
                     'status'          => 'ACTIVE',
                 ]
             );
@@ -328,6 +399,128 @@ class Recruitment_Database {
     }
 
     /**
+     * Update one department account and optionally replace its password.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    public function update_department_account( int $account_id, string $username, string $full_name, string $email, int $department_id, ?string $password ): array {
+        if ( $account_id < 1 || '' === $username || '' === $full_name || ! filter_var( $email, FILTER_VALIDATE_EMAIL ) || $department_id < 1 ) {
+            return [ 'success' => false, 'error' => 'invalid_account_data' ];
+        }
+        try {
+            $connection = $this->get_connection();
+            $department = $connection->prepare( 'SELECT nama_departemen FROM HRS_DEPARTEMEN WHERE departemen_id = :id AND (status_departemen IS NULL OR status_departemen = 1)' );
+            $department->execute( [ 'id' => $department_id ] );
+            $department_name = $department->fetchColumn();
+            if ( false === $department_name ) {
+                return [ 'success' => false, 'error' => 'department_not_found' ];
+            }
+            $sql = 'UPDATE hrs_role_akses SET username = :username, nama_lengkap = :full_name, email = :email, departemen_id = :department_id, nama_departemen = :department_name';
+            $params = [ 'username' => $username, 'full_name' => $full_name, 'email' => strtolower( $email ), 'department_id' => $department_id, 'department_name' => $department_name, 'id' => $account_id, 'role' => 'KEPALA_DEPARTEMEN' ];
+            if ( null !== $password && strlen( $password ) >= 8 ) {
+                $password_hash = password_hash( $password, PASSWORD_DEFAULT );
+                if ( false === $password_hash ) {
+                    return [ 'success' => false, 'error' => 'invalid_password' ];
+                }
+                $sql .= ', kata_sandi = :password_hash';
+                $params['password_hash'] = $password_hash;
+            }
+            $statement = $connection->prepare( $sql . ' WHERE role_akses_id = :id AND peran = :role' );
+            $statement->execute( $params );
+            return 1 === $statement->rowCount() ? [ 'success' => true ] : [ 'success' => false, 'error' => 'account_not_found' ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_error( 'Department Oracle account update failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /**
+     * Delete one department account only.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    public function delete_department_account( int $account_id ): array {
+        try {
+            $statement = $this->get_connection()->prepare( 'DELETE FROM hrs_role_akses WHERE role_akses_id = :id AND peran = :role' );
+            $statement->execute( [ 'id' => $account_id, 'role' => 'KEPALA_DEPARTEMEN' ] );
+            return 1 === $statement->rowCount() ? [ 'success' => true ] : [ 'success' => false, 'error' => 'account_not_found' ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_error( 'Department Oracle account deletion failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+
+    }
+
+    /**
+     * Replace the feature grants for one account.
+     *
+     * @param string[] $features
+     */
+    public function save_account_permissions( int $account_id, array $features ): void {
+        $allowed = [ 'request_lowongan', 'user_interview', 'interview_history', 'recruitment_report' ];
+        $features = array_values( array_intersect( $allowed, $features ) );
+        $connection = $this->get_connection();
+        $delete = $connection->prepare( 'DELETE FROM HRS_ROLE_AKSES_FITUR WHERE ROLE_AKSES_ID = :id' );
+        $delete->execute( [ 'id' => $account_id ] );
+        $insert = $connection->prepare( 'INSERT INTO HRS_ROLE_AKSES_FITUR (ROLE_AKSES_ID, FITUR_KEY, DIIZINKAN) VALUES (:id, :feature, 1)' );
+        foreach ( $features as $feature ) {
+            $insert->execute( [ 'id' => $account_id, 'feature' => $feature ] );
+        }
+    }
+
+    /**
+     * Update non-secret identity fields for one HR account.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    public function update_hr_profile( string $account_id, string $username, string $email ): array {
+        if ( ! ctype_digit( $account_id ) || '0' === $account_id || '' === $username || ! filter_var( $email, FILTER_VALIDATE_EMAIL ) ) {
+            return [ 'success' => false, 'error' => 'invalid_profile_data' ];
+        }
+        try {
+            $connection = $this->get_connection();
+            $duplicate = $connection->prepare(
+                'SELECT COUNT(*) FROM hrs_role_akses WHERE (LOWER(username) = :username OR LOWER(email) = :email) AND role_akses_id <> :account_id'
+            );
+            $duplicate->execute( [ 'username' => strtolower( $username ), 'email' => strtolower( $email ), 'account_id' => $account_id ] );
+            if ( 0 < (int) $duplicate->fetchColumn() ) {
+                return [ 'success' => false, 'error' => 'duplicate_account' ];
+            }
+            $update = $connection->prepare(
+                'UPDATE hrs_role_akses SET username = :username, email = :email WHERE role_akses_id = :account_id AND peran = :role'
+            );
+            $update->execute( [ 'username' => $username, 'email' => strtolower( $email ), 'account_id' => $account_id, 'role' => 'ADMIN_HR' ] );
+            return 1 === $update->rowCount() ? [ 'success' => true ] : [ 'success' => false, 'error' => 'account_not_found' ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_error( 'HR Oracle profile update failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /**
+     * Verify a portal password without changing it.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    public function verify_portal_password( string $account_id, string $role, string $password ): array {
+        if ( ! ctype_digit( $account_id ) || '0' === $account_id || '' === $password || ! in_array( $role, [ 'ADMIN_HR', 'KEPALA_DEPARTEMEN' ], true ) ) {
+            return [ 'success' => false, 'error' => 'invalid_password_data' ];
+        }
+        try {
+            $statement = $this->get_connection()->prepare(
+                'SELECT kata_sandi FROM hrs_role_akses WHERE role_akses_id = :account_id AND peran = :role AND status_akun = :status'
+            );
+            $statement->execute( [ 'account_id' => $account_id, 'role' => $role, 'status' => 'ACTIVE' ] );
+            return password_verify( $password, (string) $statement->fetchColumn() )
+                ? [ 'success' => true ]
+                : [ 'success' => false, 'error' => 'invalid_current_password' ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_error( 'Portal password verification failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /**
      * Verify the current HR password and replace it with a new PHP password hash.
      *
      * @return array{success: bool, error?: string}
@@ -340,9 +533,9 @@ class Recruitment_Database {
         try {
             $connection = $this->get_connection();
             $lookup = $connection->prepare(
-                'SELECT password FROM hr_user WHERE hr_id = :account_id'
+                'SELECT kata_sandi FROM hrs_role_akses WHERE role_akses_id = :account_id AND peran = :role'
             );
-            $lookup->execute( [ 'account_id' => $account_id ] );
+            $lookup->execute( [ 'account_id' => $account_id, 'role' => 'ADMIN_HR' ] );
             $current_hash = $lookup->fetchColumn();
             if ( false === $current_hash || ! password_verify( $current_password, (string) $current_hash ) ) {
                 return [ 'success' => false, 'error' => 'invalid_current_password' ];
@@ -354,9 +547,9 @@ class Recruitment_Database {
             }
 
             $update = $connection->prepare(
-                'UPDATE hr_user SET password = :password_hash WHERE hr_id = :account_id'
+                'UPDATE hrs_role_akses SET kata_sandi = :password_hash WHERE role_akses_id = :account_id AND peran = :role'
             );
-            $update->execute( [ 'password_hash' => $new_hash, 'account_id' => $account_id ] );
+            $update->execute( [ 'password_hash' => $new_hash, 'account_id' => $account_id, 'role' => 'ADMIN_HR' ] );
             if ( 1 !== $update->rowCount() ) {
                 return [ 'success' => false, 'error' => 'account_not_found' ];
             }
@@ -364,6 +557,81 @@ class Recruitment_Database {
             return [ 'success' => true ];
         } catch ( PDOException | RuntimeException $exception ) {
             $this->log_error( 'HR Oracle password update failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /**
+     * Verify and replace a department account password.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    public function change_department_password( string $account_id, string $current_password, string $new_password ): array {
+        if ( ! ctype_digit( $account_id ) || '0' === $account_id || '' === $current_password || strlen( $new_password ) < 8 ) {
+            return [ 'success' => false, 'error' => 'invalid_password_data' ];
+        }
+
+        try {
+            $connection = $this->get_connection();
+            $lookup = $connection->prepare(
+                'SELECT kata_sandi FROM hrs_role_akses WHERE role_akses_id = :account_id AND peran = :role'
+            );
+            $lookup->execute( [ 'account_id' => $account_id, 'role' => 'KEPALA_DEPARTEMEN' ] );
+            $current_hash = $lookup->fetchColumn();
+            if ( false === $current_hash || ! password_verify( $current_password, (string) $current_hash ) ) {
+                return [ 'success' => false, 'error' => 'invalid_current_password' ];
+            }
+
+            $new_hash = password_hash( $new_password, PASSWORD_DEFAULT );
+            if ( false === $new_hash ) {
+                throw new RuntimeException( 'Department password could not be hashed.' );
+            }
+
+            $update = $connection->prepare(
+                'UPDATE hrs_role_akses SET kata_sandi = :password_hash WHERE role_akses_id = :account_id AND peran = :role'
+            );
+            $update->execute(
+                [
+                    'password_hash' => $new_hash,
+                    'account_id'    => $account_id,
+                    'role'          => 'KEPALA_DEPARTEMEN',
+                ]
+            );
+            if ( 1 !== $update->rowCount() ) {
+                return [ 'success' => false, 'error' => 'account_not_found' ];
+            }
+
+            return [ 'success' => true ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_error( 'Department Oracle password update failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /**
+     * Read the current Oracle status for a portal account.
+     *
+     * @return array{success: bool, status?: string, error?: string}
+     */
+    public function get_portal_account_status( string $account_type, string $account_id ): array {
+        $role = 'hr' === $account_type ? 'ADMIN_HR' : ( 'user_department' === $account_type ? 'KEPALA_DEPARTEMEN' : '' );
+        if ( '' === $role || ! ctype_digit( $account_id ) || '0' === $account_id ) {
+            return [ 'success' => false, 'error' => 'invalid_account' ];
+        }
+
+        try {
+            $statement = $this->get_connection()->prepare(
+                'SELECT status_akun FROM hrs_role_akses WHERE role_akses_id = :account_id AND peran = :role'
+            );
+            $statement->execute( [ 'account_id' => $account_id, 'role' => $role ] );
+            $status = $statement->fetchColumn();
+            if ( false === $status ) {
+                return [ 'success' => false, 'error' => 'account_not_found' ];
+            }
+
+            return [ 'success' => true, 'status' => strtoupper( (string) $status ) ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_error( 'Portal Oracle account status lookup failed', $exception );
             return [ 'success' => false, 'error' => 'service_unavailable' ];
         }
     }
@@ -385,12 +653,13 @@ class Recruitment_Database {
             }
 
             $statement = $this->get_connection()->prepare(
-                'UPDATE hr_user SET password = :password_hash WHERE hr_id = :account_id AND status_akun = :status'
+                'UPDATE hrs_role_akses SET kata_sandi = :password_hash WHERE role_akses_id = :account_id AND peran = :role AND status_akun = :status'
             );
             $statement->execute(
                 [
                     'password_hash' => $password_hash,
                     'account_id'    => $account_id,
+                    'role'          => 'ADMIN_HR',
                     'status'        => 'ACTIVE',
                 ]
             );

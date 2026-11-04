@@ -1057,6 +1057,91 @@ document.documentElement.classList.add("js");
   }
 
   const dialog = screen.querySelector("[data-account-dialog]");
+  if (dialog && dialog.hasAttribute("data-oracle-account-dialog")) {
+    const accountAction = dialog.querySelector("[data-account-action]");
+    const accountNonce = dialog.querySelector("[data-account-nonce]");
+    const accountTypes = dialog.querySelectorAll("[data-account-type]");
+    const accountForms = dialog.querySelectorAll("[data-account-form]");
+    const displayNameFields = dialog.querySelectorAll('[name="display_name"]');
+    const generatedUsername = dialog.querySelector("[data-generated-username]");
+    const setAccountType = function setAccountType(type) {
+      const isDepartment = "department" === type;
+      accountAction.value = isDepartment
+        ? "daw_create_department_account"
+        : "daw_create_hr_account";
+      accountNonce.value = isDepartment
+        ? accountNonce.dataset.departmentNonce
+        : accountNonce.dataset.hrNonce;
+      accountForms.forEach(function toggleAccountForm(accountForm) {
+        const active = accountForm.dataset.accountForm === type;
+        accountForm.hidden = !active;
+        accountForm.querySelectorAll("input, select").forEach(function toggleField(field) {
+          field.disabled = !active;
+          field.required = active && "hidden" !== field.type;
+        });
+      });
+      dialog.querySelectorAll("[data-account-type]").forEach(function updateRoleStyle(role) {
+      role.parentElement.classList.toggle("is-selected", role.checked);
+      });
+    };
+    displayNameFields.forEach(function bindDisplayName(field) {
+      field.addEventListener("input", function generateUsername() {
+      if (generatedUsername && !generatedUsername.disabled) {
+        generatedUsername.value = field.value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 100);
+      }
+      });
+    });
+    accountNonce.dataset.hrNonce = accountNonce.value;
+    accountNonce.dataset.departmentNonce = accountNonce.dataset.departmentNonce || "";
+    accountTypes.forEach(function bindAccountType(type) {
+      type.addEventListener("change", function changeAccountType() {
+        setAccountType(type.value);
+      });
+    });
+    const openOracleDialog = function openOracleDialog() {
+      const selectedType = dialog.querySelector("[data-account-type]:checked");
+      setAccountType(selectedType ? selectedType.value : "department");
+      if (!dialog.open) {
+        dialog.showModal();
+      }
+    };
+    document.addEventListener("click", function delegatedOracleAccountOpen(event) {
+      const trigger = event.target.closest("[data-open-account-dialog]");
+      if (trigger && screen.contains(trigger)) {
+        openOracleDialog();
+      }
+    });
+    screen.querySelectorAll("[data-close-account-dialog]").forEach(function bindOracleClose(button) {
+      button.addEventListener("click", function closeOracleDialog() {
+        dialog.close();
+      });
+    });
+    const editDialog = screen.querySelector("[data-edit-oracle-dialog]");
+    if (editDialog) {
+      screen.querySelectorAll("[data-edit-oracle-account]").forEach(function bindOracleEdit(button) {
+        button.addEventListener("click", function openOracleEdit() {
+          editDialog.querySelector("[data-edit-account-id]").value = button.dataset.accountId;
+          editDialog.querySelector("[data-edit-account-username]").value = button.dataset.accountUsername;
+          editDialog.querySelector("[data-edit-account-full-name]").value = button.dataset.accountFullName || button.dataset.accountUsername;
+          editDialog.querySelector("[data-edit-account-email]").value = button.dataset.accountEmail;
+          const department = editDialog.querySelector("[data-edit-account-department]");
+          const option = Array.from(department.options).find(function findDepartment(item) {
+            return item.textContent.trim() === button.dataset.accountDepartment;
+          });
+          if (option) {
+            department.value = option.value;
+          }
+          editDialog.showModal();
+        });
+      });
+      editDialog.querySelectorAll("[data-close-edit-account]").forEach(function bindEditClose(button) {
+        button.addEventListener("click", function closeOracleEdit() {
+          editDialog.close();
+        });
+      });
+    }
+    return;
+  }
   const form = screen.querySelector("[data-account-form]");
   if (!dialog || !form) {
     return;

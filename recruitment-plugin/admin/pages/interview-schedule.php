@@ -2,7 +2,7 @@
 $user = function_exists( 'wp_get_current_user' ) ? wp_get_current_user() : null;
 $display_name = $user && ! empty( $user->display_name ) ? $user->display_name : 'Admin HR';
 $user_email = $user && ! empty( $user->user_email ) ? $user->user_email : 'hr@daw.co.id';
-$logout_url = function_exists( 'wp_logout_url' ) ? wp_logout_url( home_url( '/' ) ) : '?page=login';
+$logout_form = recruitment_logout_form( 'Keluar', home_url( '/' ), 'daw-user-interview__logout' );
 $schedule_days = [
 	21 => [ 'status' => 'Penuh', 'class' => 'is-full', 'slots' => 3, 'booked' => 3 ],
 	22 => [ 'status' => 'Penuh', 'class' => 'is-full', 'slots' => 3, 'booked' => 3 ],
@@ -24,7 +24,7 @@ while ( 0 !== count( $calendar_days ) % 7 ) {
 		<div class="daw-user-interview__account">
 			<span class="daw-user-interview__avatar" aria-hidden="true">HR</span>
 			<span class="daw-user-interview__account-name"><strong><?= esc_html( $display_name ) ?></strong><small><?= esc_html( $user_email ) ?></small></span>
-			<a class="daw-user-interview__logout" href="<?= esc_url( $logout_url ) ?>">Keluar</a>
+			<?= $logout_form ?>
 		</div>
 	</header>
 

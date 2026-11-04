@@ -41,6 +41,12 @@ class Recruitment_Plugin {
         add_filter( 'wp_authenticate_user', [ $this, 'reject_direct_employee_login' ], 20 );
         add_action( 'template_redirect', [ $this, 'handle_applicant_account' ] );
         add_action( 'template_redirect', [ $this, 'handle_portal_login' ] );
+        add_action( 'admin_init', [ $this, 'validate_oracle_portal_session' ] );
+        add_action( 'admin_post_daw_logout', [ $this, 'handle_logout' ] );
+        add_action( 'admin_post_nopriv_daw_logout', [ $this, 'handle_logout' ] );
+        add_action( 'admin_post_daw_update_hr_profile', [ $this, 'handle_hr_profile_update' ] );
+        add_action( 'admin_post_daw_request_hr_email_change', [ $this, 'handle_hr_email_change_request' ] );
+        add_action( 'admin_post_daw_confirm_hr_email_change', [ $this, 'handle_hr_email_change_confirmation' ] );
         add_filter( 'logout_redirect', [ $this, 'redirect_portal_logout' ], 10, 3 );
         add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_public_assets' ] );
         add_filter( 'render_block', [ $this, 'remove_theme_chrome' ], 10, 2 );
@@ -77,6 +83,11 @@ class Recruitment_Plugin {
         if ( $hr_role && ! $hr_role->has_cap( 'manage_recruitment' ) ) {
             $hr_role->add_cap( 'manage_recruitment' );
         }
+
+        $administrator = get_role( 'administrator' );
+        if ( $administrator && ! $administrator->has_cap( 'manage_recruitment' ) ) {
+            $administrator->add_cap( 'manage_recruitment' );
+        }
     }
 
     public function register_applicant_role(): void {
@@ -87,6 +98,143 @@ class Recruitment_Plugin {
 
     public function record_account_login( string $user_login, WP_User $user ): void {
         update_user_meta( $user->ID, 'daw_last_login', current_time( 'mysql' ) );
+    }
+
+    public function validate_oracle_portal_session(): void {
+        if ( ! is_user_logged_in() ) {
+            return;
+        }
+
+        $user = wp_get_current_user();
+        $account_type = (string) get_user_meta( $user->ID, 'daw_oracle_account_type', true );
+        $account_id = (string) get_user_meta( $user->ID, 'daw_oracle_account_id', true );
+        if ( '' === $account_type || '' === $account_id ) {
+            $portal_roles = [ 'daw_hr', 'daw_user_department' ];
+            if ( array_intersect( $portal_roles, (array) $user->roles ) ) {
+                wp_logout();
+                wp_safe_redirect( recruitment_get_public_url( 'login', [ 'login_error' => 'no_access' ] ) );
+                exit;
+            }
+            return;
+        }
+
+        $status = ( new Recruitment_Database() )->get_portal_account_status( $account_type, $account_id );
+        if ( ! empty( $status['success'] ) ) {
+            $expected_role = 'hr' === $account_type ? 'daw_hr' : ( 'user_department' === $account_type ? 'daw_user_department' : '' );
+            $expected_capability = 'hr' === $account_type ? 'manage_recruitment' : ( 'user_department' === $account_type ? 'manage_user_department' : '' );
+            if ( '' === $expected_role || ! in_array( $expected_role, (array) $user->roles, true ) || ! user_can( $user, $expected_capability ) ) {
+                wp_logout();
+                wp_safe_redirect( recruitment_get_public_url( 'login', [ 'login_error' => 'no_access' ] ) );
+                exit;
+            }
+            if ( 'ACTIVE' !== (string) $status['status'] ) {
+                wp_logout();
+                $login_url = 'user_department' === $account_type
+                    ? recruitment_get_department_login_url( [ 'login_error' => 'inactive_account' ] )
+                    : recruitment_get_public_url( 'login', [ 'target' => 'hr', 'login_error' => 'inactive_account' ] );
+                wp_safe_redirect( $login_url );
+                exit;
+            }
+            return;
+        }
+
+        wp_logout();
+        $login_error = 'account_not_found' === ( $status['error'] ?? '' ) || 'invalid_account' === ( $status['error'] ?? '' )
+            ? 'no_access'
+            : 'service_unavailable';
+        $login_url = 'user_department' === $account_type
+            ? recruitment_get_department_login_url( [ 'login_error' => $login_error ] )
+            : recruitment_get_public_url( 'login', [ 'target' => 'hr', 'login_error' => $login_error ] );
+        wp_safe_redirect( $login_url );
+        exit;
+    }
+
+    public function handle_logout(): void {
+        if ( 'POST' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
+            wp_die( esc_html__( 'Permintaan logout tidak valid.', 'recruitment-plugin' ), '', [ 'response' => 405 ] );
+        }
+
+        check_admin_referer( 'daw_logout' );
+        $user = wp_get_current_user();
+        $account_type = $user instanceof WP_User
+            ? (string) get_user_meta( $user->ID, 'daw_oracle_account_type', true )
+            : '';
+        $redirect_to = ( 'hr' === $account_type || 'user_department' === $account_type )
+            ? recruitment_get_public_url( 'login', [ 'target' => 'hr' ] )
+            : wp_validate_redirect(
+                esc_url_raw( wp_unslash( $_POST['redirect_to'] ?? '' ) ),
+                recruitment_get_public_url( 'login', [ 'target' => 'hr' ] )
+            );
+        wp_logout();
+        wp_safe_redirect( $redirect_to );
+        exit;
+    }
+
+    public function handle_hr_profile_update(): void {
+        $user = wp_get_current_user();
+        if ( ! $user instanceof WP_User || 'hr' !== get_user_meta( $user->ID, 'daw_oracle_account_type', true ) ) {
+            wp_die( esc_html__( 'Profil tidak dapat diubah.', 'recruitment-plugin' ) );
+        }
+        check_admin_referer( 'daw_update_hr_profile' );
+        $account_id = (string) get_user_meta( $user->ID, 'daw_oracle_account_id', true );
+        $username = sanitize_user( wp_unslash( $_POST['username'] ?? '' ), true );
+        $email = (string) get_user_meta( $user->ID, 'daw_oracle_email', true );
+        $result = ( new Recruitment_Database() )->update_hr_profile( $account_id, $username, $email );
+        $notice = ! empty( $result['success'] ) ? 'profile_updated' : ( 'duplicate_account' === ( $result['error'] ?? '' ) ? 'duplicate' : 'profile_failed' );
+        if ( ! empty( $result['success'] ) ) {
+            wp_update_user( [ 'ID' => $user->ID, 'display_name' => $username ] );
+            update_user_meta( $user->ID, 'daw_oracle_username', $username );
+        }
+        wp_safe_redirect( add_query_arg( 'profile_notice', $notice, recruitment_get_admin_url( 'hr-profile' ) ) );
+        exit;
+    }
+
+    public function handle_hr_email_change_request(): void {
+        $user = wp_get_current_user();
+        if ( ! $user instanceof WP_User || 'hr' !== get_user_meta( $user->ID, 'daw_oracle_account_type', true ) ) {
+            wp_die( esc_html__( 'Profil tidak dapat diubah.', 'recruitment-plugin' ) );
+        }
+        check_admin_referer( 'daw_request_hr_email_change' );
+        $new_email = strtolower( sanitize_email( wp_unslash( $_POST['new_email'] ?? '' ) ) );
+        $password = (string) wp_unslash( $_POST['current_password'] ?? '' );
+        $account_id = (string) get_user_meta( $user->ID, 'daw_oracle_account_id', true );
+        $verification = ( new Recruitment_Database() )->verify_portal_password( $account_id, 'ADMIN_HR', $password );
+        if ( ! is_email( $new_email ) || empty( $verification['success'] ) ) {
+            wp_safe_redirect( add_query_arg( 'profile_notice', 'email_invalid', recruitment_get_admin_url( 'hr-profile' ) ) );
+            exit;
+        }
+        $token = bin2hex( random_bytes( 32 ) );
+        set_transient( 'daw_hr_email_change_' . hash( 'sha256', $token ), [ 'user_id' => $user->ID, 'account_id' => $account_id, 'email' => $new_email ], 30 * MINUTE_IN_SECONDS );
+        $url = add_query_arg( [ 'action' => 'daw_confirm_hr_email_change', 'token' => $token ], admin_url( 'admin-post.php' ) );
+        $sent = wp_mail( $new_email, 'Konfirmasi perubahan email akun HR', "Konfirmasi perubahan email Anda melalui tautan berikut dalam 30 menit:\n\n" . $url );
+        wp_safe_redirect( add_query_arg( 'profile_notice', $sent ? 'email_sent' : 'email_failed', recruitment_get_admin_url( 'hr-profile' ) ) );
+        exit;
+    }
+
+    public function handle_hr_email_change_confirmation(): void {
+        if ( ! is_user_logged_in() ) {
+            wp_safe_redirect( recruitment_get_public_url( 'login', [ 'target' => 'hr' ] ) );
+            exit;
+        }
+        $token = sanitize_text_field( wp_unslash( $_GET['token'] ?? '' ) );
+        $pending = get_transient( 'daw_hr_email_change_' . hash( 'sha256', $token ) );
+        $user = wp_get_current_user();
+        if ( ! is_array( $pending ) || ! $user instanceof WP_User || (int) ( $pending['user_id'] ?? 0 ) !== $user->ID ) {
+            wp_safe_redirect( add_query_arg( 'profile_notice', 'email_invalid', recruitment_get_admin_url( 'hr-profile' ) ) );
+            exit;
+        }
+        $result = ( new Recruitment_Database() )->update_hr_profile(
+            (string) $pending['account_id'],
+            (string) get_user_meta( $user->ID, 'daw_oracle_username', true ),
+            (string) $pending['email']
+        );
+        delete_transient( 'daw_hr_email_change_' . hash( 'sha256', $token ) );
+        if ( ! empty( $result['success'] ) ) {
+            update_user_meta( $user->ID, 'daw_oracle_email', $pending['email'] );
+            wp_update_user( [ 'ID' => $user->ID, 'user_email' => $pending['email'] ] );
+        }
+        wp_safe_redirect( add_query_arg( 'profile_notice', ! empty( $result['success'] ) ? 'email_updated' : 'profile_failed', recruitment_get_admin_url( 'hr-profile' ) ) );
+        exit;
     }
 
     public function reject_inactive_account( $user ) {
@@ -320,15 +468,20 @@ class Recruitment_Plugin {
             $this->redirect_to_portal_login( $target, 'invalid_request' );
         }
 
-        $authentication = ( new Recruitment_Database() )->authenticate_portal_account(
-            $target,
-            sanitize_text_field( wp_unslash( $_POST['username'] ?? '' ) ),
-            (string) wp_unslash( $_POST['password'] ?? '' )
-        );
+        $identifier = sanitize_text_field( wp_unslash( $_POST['username'] ?? '' ) );
+        $password = (string) wp_unslash( $_POST['password'] ?? '' );
+        $throttle_key = $this->get_login_throttle_key( $target, $identifier );
+        if ( $this->is_login_throttled( $throttle_key ) ) {
+            $this->redirect_to_portal_login( $target, 'login_throttled' );
+        }
+
+        $authentication = ( new Recruitment_Database() )->authenticate_portal_account( $target, $identifier, $password );
         if ( empty( $authentication['success'] ) ) {
+            $this->record_failed_login( $throttle_key );
             $error = (string) ( $authentication['error'] ?? 'invalid_credentials' );
             $this->redirect_to_portal_login( $target, 'service_unavailable' === $error ? 'service_unavailable' : 'invalid_credentials' );
         }
+        delete_transient( $throttle_key );
 
         if ( ! $this->establish_portal_session( $authentication['account'] ) ) {
             $this->redirect_to_portal_login( $target, 'no_access' );
@@ -340,6 +493,24 @@ class Recruitment_Plugin {
 
         wp_safe_redirect( $dashboard_url );
         exit;
+    }
+
+    private function get_login_throttle_key( string $target, string $identifier ): string {
+        $ip_address = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '' ) );
+        return 'daw_login_throttle_' . hash( 'sha256', $target . '|' . strtolower( trim( $identifier ) ) . '|' . $ip_address );
+    }
+
+    private function is_login_throttled( string $key ): bool {
+        $state = get_transient( $key );
+        return is_array( $state ) && ! empty( $state['blocked_until'] ) && time() < (int) $state['blocked_until'];
+    }
+
+    private function record_failed_login( string $key ): void {
+        $state = get_transient( $key );
+        $attempts = is_array( $state ) ? (int) ( $state['attempts'] ?? 0 ) : 0;
+        ++$attempts;
+        $blocked_until = $attempts >= 5 ? time() + ( 15 * MINUTE_IN_SECONDS ) : 0;
+        set_transient( $key, [ 'attempts' => $attempts, 'blocked_until' => $blocked_until ], 15 * MINUTE_IN_SECONDS );
     }
 
     private function handle_hr_password_reset_request(): void {
@@ -523,6 +694,7 @@ class Recruitment_Plugin {
         update_user_meta( $user->ID, 'daw_oracle_account_type', $account['type'] );
         update_user_meta( $user->ID, 'daw_oracle_account_id', $account['id'] );
         update_user_meta( $user->ID, 'daw_oracle_email', $account['email'] );
+        update_user_meta( $user->ID, 'daw_oracle_username', $account['username'] );
         if ( 'user_department' === $account['type'] ) {
             update_user_meta( $user->ID, 'daw_department_user', '1' );
             update_user_meta( $user->ID, 'daw_department', $account['department'] );
@@ -683,7 +855,9 @@ class Recruitment_Plugin {
             $error_messages = [
                 'invalid_request' => 'Sesi login tidak valid. Silakan coba kembali.',
                 'invalid_credentials' => 'Email/username atau password tidak sesuai.',
+                'login_throttled' => 'Terlalu banyak percobaan login. Silakan coba kembali beberapa menit lagi.',
                 'no_access' => 'Akun ini belum memiliki akses ke portal yang dipilih.',
+                'inactive_account' => 'Akun ini sedang nonaktif. Hubungi administrator.',
                 'service_unavailable' => 'Database akun belum tersedia. Silakan coba kembali nanti.',
             ];
             $error_key = sanitize_key( wp_unslash( $_GET['login_error'] ?? '' ) );

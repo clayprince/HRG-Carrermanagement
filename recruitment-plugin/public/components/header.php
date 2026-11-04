@@ -25,9 +25,9 @@
         foreach ( array_slice( $name_parts ?: [], 0, 2 ) as $name_part ) {
             $avatar_initials .= strtoupper( substr( $name_part, 0, 1 ) );
         }
-        $logout_url = $is_applicant_user
-            ? wp_logout_url( recruitment_get_public_url( 'careers' ) )
-            : recruitment_get_public_url( 'careers' );
+        $logout_form = $is_applicant_user
+            ? recruitment_logout_form( 'Keluar', recruitment_get_public_url( 'careers' ) )
+            : '';
         ?>
         <div class="daw-account-menu" data-account-menu>
             <button class="daw-account-menu__toggle" type="button" data-account-menu-toggle aria-expanded="false" aria-controls="daw-account-menu-panel">
@@ -45,7 +45,11 @@
                     <a href="<?= esc_url( recruitment_get_public_url( 'application-process' ) ) ?>"><strong>Tracking Lamaran</strong><small>Pantau tahap seleksi aktif</small></a>
                     <a href="<?= esc_url( recruitment_get_public_url( 'application-history' ) ) ?>"><strong>Detail &amp; Riwayat Lamaran</strong><small>Lihat seluruh lamaran</small></a>
                 </nav>
-                <a class="daw-account-menu__logout" href="<?= esc_url( $logout_url ) ?>"><?= $is_applicant_user ? 'Keluar' : 'Tutup preview' ?></a>
+                <?php if ( $is_applicant_user ) : ?>
+                    <?= $logout_form ?>
+                <?php else : ?>
+                    <a class="daw-account-menu__logout" href="<?= esc_url( recruitment_get_public_url( 'careers' ) ) ?>">Tutup preview</a>
+                <?php endif; ?>
             </section>
         </div>
     <?php else : ?>

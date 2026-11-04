@@ -8,7 +8,11 @@ class Recruitment_Admin {
 		add_action( 'admin_post_daw_review_department_request', [ $this, 'handle_department_request_review' ] );
 		add_action( 'admin_post_daw_create_department_account', [ $this, 'handle_department_account_creation' ] );
 		add_action( 'admin_post_daw_set_department_account_status', [ $this, 'handle_department_account_status' ] );
+		add_action( 'admin_post_daw_update_department_account', [ $this, 'handle_department_account_update' ] );
+		add_action( 'admin_post_daw_delete_department_account', [ $this, 'handle_department_account_delete' ] );
+		add_action( 'admin_post_daw_create_hr_account', [ $this, 'handle_hr_account_creation' ] );
 		add_action( 'admin_post_daw_change_hr_password', [ $this, 'handle_hr_password_change' ] );
+		add_action( 'admin_post_daw_change_department_password', [ $this, 'handle_department_password_change' ] );
 		add_action( 'admin_menu', [ $this, 'remove_vacancy_post_type_submenu' ], 99 );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
 		add_action( 'in_admin_header', [ $this, 'render_admin_sidebar' ] );
@@ -332,10 +336,23 @@ class Recruitment_Admin {
 		$password_confirmation = (string) wp_unslash( $_POST['password_confirmation'] ?? '' );
 		$notice = 'invalid';
 
+		if ( '' === $password && '' === $password_confirmation ) {
+			$password = wp_generate_password( 16, true, true );
+			$password_confirmation = $password;
+		}
+
 		if ( strlen( $password ) >= 8 && $password === $password_confirmation ) {
 			$result = ( new Recruitment_Database() )->create_department_account( $username, $email, $department_id, $password );
 			if ( ! empty( $result['success'] ) ) {
 				$notice = 'created';
+				wp_mail(
+					$email,
+					'Undangan akun Recruitment DAW',
+					"Akun User Department Anda telah dibuat.\n\n"
+						. "Username: " . $username . "\n"
+						. "Password sementara: " . $password . "\n\n"
+						. "Segera masuk dan ubah password Anda."
+				);
 			} else {
 				$error = (string) ( $result['error'] ?? '' );
 				$notice = [
@@ -380,6 +397,68 @@ class Recruitment_Admin {
 		exit;
 	}
 
+	public function handle_department_account_update(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengubah akun department.', 'recruitment-plugin' ) );
+		}
+		$account_id = absint( $_POST['account_id'] ?? 0 );
+		check_admin_referer( 'daw_update_department_account' );
+		$password = (string) wp_unslash( $_POST['password'] ?? '' );
+		$result = ( new Recruitment_Database() )->update_department_account(
+			$account_id,
+			sanitize_user( wp_unslash( $_POST['username'] ?? '' ), true ),
+			sanitize_text_field( wp_unslash( $_POST['full_name'] ?? '' ) ),
+			sanitize_email( wp_unslash( $_POST['email'] ?? '' ) ),
+			absint( $_POST['department_id'] ?? 0 ),
+			'' === $password ? null : $password
+		);
+		if ( ! empty( $result['success'] ) ) {
+			( new Recruitment_Database() )->save_account_permissions( $account_id, array_map( 'sanitize_key', (array) ( $_POST['permissions'] ?? [] ) ) );
+		}
+		$notice = ! empty( $result['success'] ) ? 'updated' : ( 'department_not_found' === ( $result['error'] ?? '' ) ? 'department' : 'invalid' );
+		wp_safe_redirect( add_query_arg( 'notice', $notice, admin_url( 'admin.php?page=recruitment-user-management' ) ) );
+		exit;
+	}
+
+	public function handle_department_account_delete(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk menghapus akun department.', 'recruitment-plugin' ) );
+		}
+		$account_id = absint( $_POST['account_id'] ?? 0 );
+		check_admin_referer( 'daw_delete_department_account_' . $account_id );
+		$result = ( new Recruitment_Database() )->delete_department_account( $account_id );
+		wp_safe_redirect( add_query_arg( 'notice', ! empty( $result['success'] ) ? 'deleted' : 'not_found', admin_url( 'admin.php?page=recruitment-user-management' ) ) );
+		exit;
+	}
+
+	public function handle_hr_account_creation(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Hanya administrator WordPress yang dapat membuat akun HR awal.', 'recruitment-plugin' ) );
+		}
+
+		check_admin_referer( 'daw_create_hr_account' );
+		$email = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
+		$password = (string) wp_unslash( $_POST['password'] ?? '' );
+		$password_confirmation = (string) wp_unslash( $_POST['password_confirmation'] ?? '' );
+		$notice = 'invalid';
+
+		if ( is_email( $email ) && strlen( $password ) >= 8 && $password === $password_confirmation ) {
+			$result = ( new Recruitment_Database() )->create_hr_account( $email, $password );
+			if ( ! empty( $result['success'] ) ) {
+				$notice = 'created';
+			} else {
+				$error = (string) ( $result['error'] ?? '' );
+				$notice = [
+					'email_exists' => 'duplicate',
+					'service_unavailable' => 'unavailable',
+				][ $error ] ?? 'invalid';
+			}
+		}
+
+		wp_safe_redirect( add_query_arg( 'hr_account_notice', $notice, admin_url( 'admin.php?page=recruitment-user-management' ) ) );
+		exit;
+	}
+
 	public function handle_hr_password_change(): void {
 		if ( ! current_user_can( 'manage_recruitment' ) || ! $this->is_hr_portal_user() ) {
 			wp_die( esc_html__( 'Hanya Admin HR yang dapat mengubah password ini.', 'recruitment-plugin' ) );
@@ -410,6 +489,41 @@ class Recruitment_Admin {
 		}
 
 		wp_safe_redirect( add_query_arg( 'password_notice', $notice, admin_url( 'admin.php?page=recruitment-hr-profile' ) ) );
+		exit;
+	}
+
+	public function handle_department_password_change(): void {
+		if ( ! current_user_can( 'manage_user_department' ) || ! $this->is_department_portal_user() ) {
+			wp_die( esc_html__( 'Hanya Admin Department yang dapat mengubah password ini.', 'recruitment-plugin' ) );
+		}
+
+		check_admin_referer( 'daw_change_department_password' );
+		$current_password = (string) wp_unslash( $_POST['current_password'] ?? '' );
+		$new_password = (string) wp_unslash( $_POST['new_password'] ?? '' );
+		$password_confirmation = (string) wp_unslash( $_POST['password_confirmation'] ?? '' );
+		$notice = 'invalid';
+
+		if ( '' !== $current_password && strlen( $new_password ) >= 8 && $new_password === $password_confirmation ) {
+			$result = ( new Recruitment_Database() )->change_department_password(
+				(string) get_user_meta( get_current_user_id(), 'daw_oracle_account_id', true ),
+				$current_password,
+				$new_password
+			);
+			if ( ! empty( $result['success'] ) ) {
+				$this->revoke_department_account_sessions( absint( get_user_meta( get_current_user_id(), 'daw_oracle_account_id', true ) ) );
+				wp_logout();
+				wp_safe_redirect( recruitment_get_department_login_url( [ 'password_notice' => 'password_updated' ] ) );
+				exit;
+			}
+
+			$error = (string) ( $result['error'] ?? '' );
+			$notice = [
+				'invalid_current_password' => 'current_password',
+				'service_unavailable' => 'unavailable',
+			][ $error ] ?? 'invalid';
+		}
+
+		wp_safe_redirect( add_query_arg( [ 'view' => 'account-settings', 'password_notice' => $notice ], admin_url( 'admin.php?page=daw-user-department' ) ) );
 		exit;
 	}
 
@@ -481,6 +595,17 @@ class Recruitment_Admin {
 		return $user instanceof WP_User
 			&& in_array( 'daw_hr', (array) $user->roles, true )
 			&& 'hr' === get_user_meta( $user->ID, 'daw_oracle_account_type', true )
+			&& ctype_digit( $account_id )
+			&& '0' !== $account_id;
+	}
+
+	private function is_department_portal_user(): bool {
+		$user = wp_get_current_user();
+		$account_id = (string) get_user_meta( get_current_user_id(), 'daw_oracle_account_id', true );
+
+		return $user instanceof WP_User
+			&& in_array( 'daw_user_department', (array) $user->roles, true )
+			&& 'user_department' === get_user_meta( $user->ID, 'daw_oracle_account_type', true )
 			&& ctype_digit( $account_id )
 			&& '0' !== $account_id;
 	}

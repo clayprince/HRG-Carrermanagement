@@ -1,0 +1,56 @@
+-- Department account profile and feature permissions.
+-- Execute only against the approved DAW_RECRUITMENT schema.
+
+DECLARE
+    column_count NUMBER;
+    table_count NUMBER;
+BEGIN
+    SELECT COUNT(*) INTO column_count FROM USER_TAB_COLUMNS
+    WHERE TABLE_NAME = 'HRS_ROLE_AKSES' AND COLUMN_NAME = 'NAMA_LENGKAP';
+    IF column_count = 0 THEN
+        EXECUTE IMMEDIATE 'ALTER TABLE HRS_ROLE_AKSES ADD (NAMA_LENGKAP VARCHAR2(100 CHAR))';
+    END IF;
+
+    SELECT COUNT(*) INTO column_count FROM USER_TAB_COLUMNS
+    WHERE TABLE_NAME = 'HRS_ROLE_AKSES' AND COLUMN_NAME = 'JABATAN';
+    IF column_count = 0 THEN
+        EXECUTE IMMEDIATE 'ALTER TABLE HRS_ROLE_AKSES ADD (JABATAN VARCHAR2(100 CHAR))';
+    END IF;
+
+    SELECT COUNT(*) INTO table_count FROM USER_TABLES
+    WHERE TABLE_NAME = 'HRS_ROLE_AKSES_FITUR';
+    IF table_count = 0 THEN
+        EXECUTE IMMEDIATE q'[
+            CREATE TABLE HRS_ROLE_AKSES_FITUR (
+                ROLE_AKSES_ID NUMBER(19,0) NOT NULL,
+                FITUR_KEY VARCHAR2(50 CHAR) NOT NULL,
+                DIIZINKAN NUMBER(1,0) DEFAULT 0 NOT NULL,
+                CONSTRAINT PK_HRS_ROLE_AKSES_FITUR PRIMARY KEY (ROLE_AKSES_ID, FITUR_KEY),
+                CONSTRAINT FK_HRS_ROLE_AKSES_FITUR FOREIGN KEY (ROLE_AKSES_ID)
+                    REFERENCES HRS_ROLE_AKSES (ROLE_AKSES_ID)
+                    ON DELETE CASCADE
+            )
+        ]';
+    END IF;
+END;
+/
+
+MERGE INTO HRS_DEPARTEMEN target
+USING (
+    SELECT 'Management Development' nama FROM dual UNION ALL
+    SELECT 'Retail' FROM dual UNION ALL
+    SELECT 'HC3' FROM dual UNION ALL
+    SELECT 'Network Development' FROM dual UNION ALL
+    SELECT 'Sales & Marketing' FROM dual UNION ALL
+    SELECT 'Technical Service' FROM dual UNION ALL
+    SELECT 'Part Sales' FROM dual UNION ALL
+    SELECT 'Promotion' FROM dual UNION ALL
+    SELECT 'Supply Chain' FROM dual UNION ALL
+    SELECT 'HR & GA' FROM dual UNION ALL
+    SELECT 'IT' FROM dual UNION ALL
+    SELECT 'FAT' FROM dual
+) source ON (UPPER(target.NAMA_DEPARTEMEN) = UPPER(source.nama))
+WHEN NOT MATCHED THEN
+    INSERT (NAMA_DEPARTEMEN, STATUS_DEPARTEMEN) VALUES (source.nama, 1);
+
+COMMIT;

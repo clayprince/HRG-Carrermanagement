@@ -32,25 +32,29 @@ read-only vacancy/application schema map is in
   `migrations/002_applicant_accounts.sql`; this migration has not been applied
   automatically and requires review and execution by the authorized Oracle
   owner before Oracle-backed applicant registration can work.
-- HR authenticates against `HR_USER`; `NAMA_PENGGUNA` is the email identifier.
-- User Department accounts authenticate against `USERS_AD` and use the
-  department relation from `DEPARTEMEN`.
+- Admin HR and Kepala Departemen authenticate against `HRS_ROLE_AKSES`.
+  `PERAN` must be `ADMIN_HR` or `KEPALA_DEPARTEMEN`; email and username are
+  stored in the same account row.
+- The first HR account can be created from the WordPress administrator-only
+  setup form under Recruitment > Pengelolaan Akun User. The entered password
+  is hashed before it is written to `HRS_ROLE_AKSES`; no default credential is
+  committed to the repository.
+- Department accounts use `DEPARTEMEN_ID` and `NAMA_DEPARTEMEN` in the same
+  `HRS_ROLE_AKSES` row.
 - New account passwords use PHP `password_hash()` and are checked with
   `password_verify()`. WordPress users are restricted session/capability
   bridges, not copies of Oracle passwords.
-- The inspected account tables did not contain an account status column.
-  Migration `004_portal_account_status.sql` adds `STATUS_AKUN` to `HR_USER` and
-  `USERS_AD`, defaulting existing rows to `ACTIVE`. The migration is a draft
-  and has not been applied; the portal login/status-management code requires
-  it before it can operate against this schema.
-- User Department account listing and status changes use `USERS_AD` through
-  `Recruitment_Database`. HR password changes update `HR_USER.PASSWORD` after
-  verifying the current password. No password hashes are returned to screens.
+- Migration `005_unified_portal_accounts.sql` adds `PERAN`, `STATUS_AKUN`, and
+  sufficient password/email widths to `HRS_ROLE_AKSES`, and classifies existing
+  rows by whether they have a department.
+- Account listing, status changes, and HR password changes use
+  `HRS_ROLE_AKSES` through `Recruitment_Database`. No password hashes are
+  returned to screens.
 
 ## Schema alignment and migrations
 
 The current Oracle schema uses tables such as `PROFIL_KANDIDAT`,
-`DETAIL_INFO_LOWONGAN`, `HR_USER`, `USERS_AD`, and `DEPARTEMEN`. Some existing
+`DETAIL_INFO_LOWONGAN`, `HRS_ROLE_AKSES`, `HRS_USERS_AD`, and `HRS_DEPARTEMEN`. Some existing
 vacancy/application methods in `class-database.php` still query legacy
 `DAW_*` tables and have not been reconciled with that schema. Inspect the live
 schema and each caller before building CRUD on those methods; do not assume

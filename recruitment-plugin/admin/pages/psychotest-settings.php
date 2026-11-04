@@ -34,7 +34,7 @@ if ( ! isset( $test_settings[ $selected_test ] ) ) {
 }
 $notice = '';
 $admin_user = wp_get_current_user();
-$logout_url = wp_logout_url( home_url( '/' ) );
+$logout_form = recruitment_logout_form( 'Keluar', home_url( '/' ) );
 
 if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['psychotest_settings_action'] ) ) {
     check_admin_referer( 'recruitment_psychotest_settings' );
@@ -90,7 +90,7 @@ $test_order = [ 'iq', 'pauli', 'personality', 'disc', 'papi' ];
 <div class="wrap daw-psychotest-settings" data-psychotest-settings>
     <header class="daw-psychotest-settings__header">
         <p class="daw-psychotest-settings__breadcrumb">DAW Admin <span>/</span> Setting Psikotes</p>
-        <div class="daw-psychotest-settings__heading"><div><h1>Setting Psikotes</h1><p>Kelola jadwal, persyaratan, dan konfigurasi setiap tes.</p></div><div class="daw-psychotest-settings__header-account"><span class="daw-psychotest-settings__avatar" aria-hidden="true">HR</span><span><strong><?= esc_html( $admin_user->display_name ) ?></strong><small><?= esc_html( $admin_user->user_email ) ?></small></span><a href="<?= esc_url( $logout_url ) ?>">Keluar</a></div></div>
+        <div class="daw-psychotest-settings__heading"><div><h1>Setting Psikotes</h1><p>Kelola jadwal, persyaratan, dan konfigurasi setiap tes.</p></div><div class="daw-psychotest-settings__header-account"><span class="daw-psychotest-settings__avatar" aria-hidden="true">HR</span><span><strong><?= esc_html( $admin_user->display_name ) ?></strong><small><?= esc_html( $admin_user->user_email ) ?></small></span><?= $logout_form ?></div></div>
     </header>
     <?php if ( $notice ) : ?><div class="notice notice-success is-dismissible"><p><?= esc_html( $notice ) ?></p></div><?php endif; ?>
 

@@ -2,7 +2,7 @@
 $user = wp_get_current_user();
 $display_name = $user && ! empty( $user->display_name ) ? $user->display_name : 'Admin HR';
 $user_email = $user && ! empty( $user->user_email ) ? $user->user_email : 'hr@daw.co.id';
-$logout_url = wp_logout_url( home_url( '/' ) );
+$logout_form = recruitment_logout_form( 'Keluar', home_url( '/' ), 'daw-user-interview__logout' );
 ?>
 <div class="daw-user-interview daw-interview-screen">
     <header class="daw-user-interview__header">
@@ -14,7 +14,7 @@ $logout_url = wp_logout_url( home_url( '/' ) );
         <div class="daw-user-interview__account">
             <span class="daw-user-interview__avatar" aria-hidden="true">HR</span>
             <span class="daw-user-interview__account-name"><strong><?= esc_html( $display_name ) ?></strong><small><?= esc_html( $user_email ) ?></small></span>
-            <a class="daw-user-interview__logout" href="<?= esc_url( $logout_url ) ?>">Keluar</a>
+            <?= $logout_form ?>
         </div>
     </header>
 

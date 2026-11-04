@@ -289,30 +289,33 @@ function recruitment_is_ui_preview(): bool {
         return true;
     }
 
-    $preview_screens = [
-        'careers',
-        'job-detail',
-        'application',
-        'application-form',
-        'application-confirmation',
-        'applicant-login',
-        'applicant-register',
-        'account-confirmation',
-        'account-profile',
-        'application-history',
-        'application-detail',
-        'application-process',
-        'application-status',
-        'tracking-detail',
-        'psych-test',
-        'psychotest',
-        'psychotest-preparation',
-        'psychotest-device',
-        'interview-booking',
-    ];
-    $screen = sanitize_key( wp_unslash( $_GET['recruitment_page'] ?? '' ) );
+    return false;
+}
 
-    return in_array( $screen, $preview_screens, true );
+function recruitment_logout_form( string $label, string $redirect_url, string $class = '' ): string {
+    if ( ! function_exists( 'admin_url' ) || ! function_exists( 'wp_nonce_field' ) ) {
+        return '';
+    }
+
+    if ( home_url( '/' ) === untrailingslashit( $redirect_url ) . '/' ) {
+        $account_type = is_user_logged_in() ? (string) get_user_meta( get_current_user_id(), 'daw_oracle_account_type', true ) : '';
+        $redirect_url = 'user_department' === $account_type
+            ? recruitment_get_department_login_url()
+            : ( 'hr' === $account_type
+                ? recruitment_get_public_url( 'login', [ 'target' => 'hr' ] )
+                : recruitment_get_public_url( 'applicant-login' ) );
+    }
+
+    ob_start();
+    ?>
+    <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" class="<?= esc_attr( $class ) ?>">
+        <input type="hidden" name="action" value="daw_logout">
+        <input type="hidden" name="redirect_to" value="<?= esc_attr( $redirect_url ) ?>">
+        <?php wp_nonce_field( 'daw_logout' ); ?>
+        <button type="submit" class="<?= esc_attr( $class ) ?>"><?= esc_html( $label ) ?></button>
+    </form>
+    <?php
+    return (string) ob_get_clean();
 }
 
 function recruitment_is_applicant_user(): bool {

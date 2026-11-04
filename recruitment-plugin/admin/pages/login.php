@@ -11,6 +11,7 @@ $token = sanitize_text_field( wp_unslash( $_GET['token'] ?? '' ) );
 $error = (string) ( $error ?? '' );
 $forgot_notice = (string) ( $forgot_notice ?? '' );
 $reset_notice = (string) ( $reset_notice ?? '' );
+$open_forgot = '1' === sanitize_key( wp_unslash( $_GET['forgot'] ?? '' ) );
 ?>
 <main class="daw-admin-login daw-admin-login--card">
     <section class="daw-admin-login__card" aria-labelledby="daw-admin-login-title">
@@ -60,7 +61,7 @@ $reset_notice = (string) ( $reset_notice ?? '' );
         <a class="daw-admin-login__back" href="<?= esc_url( $public_url ) ?>">Pergi ke tampilan pelamar</a>
     </section>
     <?php if ( 'login' === $mode ) : ?>
-        <dialog class="daw-admin-login__modal" data-portal-forgot-modal aria-label="Lupa password" data-auto-open="<?= in_array( $forgot_notice, [ 'submitted', 'invalid_request' ], true ) ? 'true' : 'false' ?>">
+        <dialog class="daw-admin-login__modal" data-portal-forgot-modal aria-label="Lupa password" data-auto-open="<?= $open_forgot || in_array( $forgot_notice, [ 'submitted', 'invalid_request' ], true ) ? 'true' : 'false' ?>">
             <button class="daw-admin-login__modal-close" type="button" data-portal-forgot-close aria-label="Tutup">&times;</button>
             <div data-portal-forgot-department hidden>
                 <p>Untuk mengubah password, silakan hubungi pihak HR. Reset password mandiri tidak tersedia untuk akun User Department</p>
