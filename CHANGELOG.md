@@ -8,20 +8,23 @@ migration log.
 
 ### Portal login and account management
 
+- Added a WordPress-administrator-only setup form for creating the first
+  Oracle-backed HR account. The email and password are entered during setup,
+  stored as a PHP password hash in `HRS_ROLE_AKSES`, and are never hard-coded.
+- Unified portal account persistence in `HRS_ROLE_AKSES`; `PERAN` now
+  distinguishes `ADMIN_HR` from `KEPALA_DEPARTEMEN`.
 - Portal login now requires an Oracle `STATUS_AKUN` of `ACTIVE` for HR and User
   Department accounts. Department account creation, listing, and status changes
   use the Oracle gateway; deactivation also revokes mapped WordPress bridge
   sessions. Passwords remain hashed and are not exposed to the UI.
 - Added an Admin HR password-change form that verifies the current Oracle
-  password and updates `HR_USER.PASSWORD` with a PHP password hash. Other
+  password and updates `HRS_ROLE_AKSES.KATA_SANDI` with a PHP password hash. Other
   WordPress sessions for that HR bridge are revoked after a successful change.
-- Added migration `004_portal_account_status.sql` as an unapplied draft. It
-  adds status columns and constraints to `HR_USER` and `USERS_AD`, defaulting
-  existing accounts to active. Applying it requires separate Oracle-owner
-  approval; the updated portal login/status flow requires the migration.
-- Forgot-password/reset is not implemented: the existing settings screen says
-  email settings are unavailable, and no HR reset-token or email flow exists.
-  Configure and verify an email delivery/reset design before implementing it.
+- Added migration `004_portal_account_status.sql` as an older unapplied draft.
+  The unified portal flow uses `005_unified_portal_accounts.sql` for
+  `HRS_ROLE_AKSES`; apply it only after Oracle-owner approval.
+- HR forgot-password/reset uses expiring, single-use WordPress transients and
+  `wp_mail`; SMTP delivery must be configured by the site owner.
 - The Oracle metadata audit read column definitions only; no account rows or
   credentials were read, and no database schema or data was changed.
 - Unauthenticated direct requests to the HR profile and account-management

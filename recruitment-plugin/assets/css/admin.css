@@ -2610,6 +2610,216 @@ body:has(.daw-admin-login) main {
   .daw-admin-login--card {
     padding: 16px;
   }
+
+  /* Account creation dialog refinements. */
+  .daw-account-settings__dialog {
+    margin: auto;
+    overflow: hidden;
+  }
+  .daw-account-settings__dialog > form {
+    max-height: min(90vh, 760px);
+    overflow-y: auto;
+  }
+  .daw-account-settings__dialog > form > header {
+    background: #fff;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  .daw-account-settings__dialog .daw-account-settings__form-grid {
+    align-items: start;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 22px 24px;
+  }
+  .daw-account-settings__role-switch {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+  .daw-account-settings__role-switch legend {
+    grid-column: 1 / -1;
+    margin: 0 0 2px;
+  }
+  .daw-account-settings__role-switch label {
+    align-items: center;
+    justify-content: center;
+    min-height: 42px;
+    padding: 0 12px;
+  }
+  .daw-account-settings__role-switch label input[type="radio"] {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    height: 1px;
+    margin: -1px;
+    opacity: 0;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    width: 1px;
+  }
+  .daw-account-settings__form-grid > [data-account-form] {
+    gap: 16px;
+  }
+  .daw-account-settings__form-grid > [data-account-form] > label {
+    gap: 7px;
+  }
+  .daw-account-settings__form-grid input:not([type="radio"]):not([type="checkbox"]),
+  .daw-account-settings__form-grid select {
+    box-sizing: border-box;
+    min-height: 42px;
+  }
+  .daw-account-settings__permissions {
+    gap: 10px;
+    padding: 14px;
+  }
+  .daw-account-settings__permissions label {
+    font-weight: 400;
+    grid-template-columns: auto 1fr;
+  }
+  .daw-account-settings__permissions input[type="checkbox"] {
+    appearance: auto;
+    accent-color: #c8102e;
+    height: 16px;
+    margin: 0;
+    opacity: 1;
+    position: static;
+    width: 16px;
+  }
+  .daw-account-settings__permissions label {
+    align-items: flex-start;
+    display: flex;
+    gap: 9px;
+  }
+  .daw-account-settings__permissions label span {
+    display: grid;
+    gap: 2px;
+  }
+  .daw-account-settings__permissions label small {
+    color: #78808b;
+    font-size: 10px;
+    font-weight: 400;
+  }
+  .daw-account-settings__dialog > form > footer {
+    background: #fff;
+    padding: 14px 24px 20px;
+    position: sticky;
+    bottom: 0;
+  }
+  @media (max-width: 600px) {
+    .daw-account-settings__dialog {
+      width: calc(100% - 20px);
+    }
+    .daw-account-settings__dialog .daw-account-settings__form-grid {
+      padding: 18px 16px;
+    }
+    .daw-account-settings__role-switch {
+      grid-template-columns: 1fr;
+    }
+    .daw-account-settings__role-switch legend {
+      grid-column: auto;
+    }
+  }
+
+  /* Account creation dialog refinements. */
+  .daw-account-settings__dialog {
+    margin: auto;
+    overflow: hidden;
+  }
+  .daw-account-settings__dialog > form {
+    max-height: min(90vh, 760px);
+    overflow-y: auto;
+  }
+  .daw-account-settings__dialog > form > header {
+    background: #fff;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  .daw-account-settings__dialog .daw-account-settings__form-grid {
+    align-items: start;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 22px 24px;
+  }
+  .daw-account-settings__role-switch {
+    display: grid;
+    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+  .daw-account-settings__role-switch legend {
+    grid-column: 1 / -1;
+    margin: 0 0 2px;
+  }
+  .daw-account-settings__role-switch label {
+    align-items: center;
+    justify-content: center;
+    min-height: 42px;
+    padding: 0 12px;
+  }
+  .daw-account-settings__role-switch label input[type="radio"] {
+    appearance: none;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    height: 1px;
+    margin: -1px;
+    opacity: 0;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    width: 1px;
+  }
+  .daw-account-settings__form-grid > [data-account-form] {
+    gap: 16px;
+  }
+  .daw-account-settings__form-grid > [data-account-form] > label {
+    gap: 7px;
+  }
+  .daw-account-settings__form-grid input:not([type="radio"]):not([type="checkbox"]),
+  .daw-account-settings__form-grid select {
+    box-sizing: border-box;
+    min-height: 42px;
+  }
+  .daw-account-settings__permissions {
+    gap: 10px;
+    padding: 14px;
+  }
+  .daw-account-settings__permissions label {
+    font-weight: 400;
+    grid-template-columns: auto 1fr;
+  }
+  .daw-account-settings__permissions input[type="checkbox"] {
+    appearance: auto;
+    accent-color: #c8102e;
+    height: 16px;
+    margin: 0;
+    opacity: 1;
+    position: static;
+    width: 16px;
+  }
+  .daw-account-settings__dialog > form > footer {
+    background: #fff;
+    padding: 14px 24px 20px;
+    position: sticky;
+    bottom: 0;
+  }
+  @media (max-width: 600px) {
+    .daw-account-settings__dialog {
+      width: calc(100% - 20px);
+    }
+    .daw-account-settings__dialog .daw-account-settings__form-grid {
+      padding: 18px 16px;
+    }
+    .daw-account-settings__role-switch {
+      grid-template-columns: 1fr;
+    }
+    .daw-account-settings__role-switch legend {
+      grid-column: auto;
+    }
+  }
   .daw-admin-login--card .daw-admin-login__card {
     border-radius: 12px;
   }
@@ -3800,6 +4010,33 @@ body.daw-recruitment-admin:has(.daw-user-department) #wpcontent {
   align-items: center;
   display: flex;
   gap: 7px;
+}
+.daw-ud-topbar__account {
+  gap: 12px !important;
+}
+.daw-ud-topbar__identity {
+  align-items: center;
+  display: flex;
+  gap: 7px;
+}
+.daw-ud-topbar__identity > span:last-child {
+  display: grid;
+  gap: 2px;
+}
+.daw-ud-topbar__logout {
+  margin: 0;
+}
+.daw-ud-topbar__logout {
+  background: transparent;
+  border: 0;
+  color: #c8102e;
+  cursor: pointer;
+  font-size: 8px;
+  font-weight: 700;
+  padding: 4px 0;
+}
+.daw-ud-topbar__logout:hover {
+  text-decoration: underline;
 }
 .daw-ud-topbar > div > span:last-child {
   display: grid;
@@ -7766,7 +8003,7 @@ body:has(.daw-user-interview) {
   box-shadow: 0 18px 60px rgba(24, 30, 39, 0.22);
   color: var(--account-ink);
   max-height: min(90vh, 720px);
-  max-width: 590px;
+  max-width: 720px;
   padding: 0;
   width: calc(100% - 32px);
 }
@@ -7812,6 +8049,84 @@ body:has(.daw-user-interview) {
   gap: 12px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   padding: 17px 18px;
+}
+.daw-account-settings__form-grid > [data-account-form] {
+  display: grid;
+  gap: 12px;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr);
+}
+.daw-account-settings__form-grid > [data-account-form][hidden] {
+  display: none;
+}
+.daw-account-settings__role-switch {
+  border: 0;
+  display: flex;
+  gap: 8px;
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 0;
+}
+.daw-account-settings__role-switch legend {
+  color: #454d57;
+  font-size: 10px;
+  font-weight: 600;
+  margin-right: 5px;
+}
+.daw-account-settings__role-switch label {
+  align-items: center;
+  background: #f4f5f7;
+  border: 1px solid #d4d8de;
+  border-radius: 4px;
+  color: #59616b;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 11px;
+  gap: 5px;
+  padding: 8px 10px;
+}
+.daw-account-settings__role-switch label.is-selected {
+  background: #1d1d1f;
+  border-color: #1d1d1f;
+  color: #fff;
+}
+.daw-account-settings__permissions {
+  background: #f5f5f7;
+  border: 0;
+  border-radius: 6px;
+  display: grid;
+  gap: 7px;
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 12px;
+}
+.daw-account-settings__permissions legend {
+  color: #454d57;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 0;
+}
+.daw-account-settings__permissions label {
+  align-items: center;
+  color: #454d57;
+  display: flex;
+  font-size: 11px;
+  gap: 7px;
+}
+.daw-account-settings__permissions input {
+  accent-color: #c8102e;
+  height: auto;
+  width: auto;
+}
+.daw-account-settings__invitation {
+  background: #e4efff;
+  border: 1px solid #a9ccff;
+  border-radius: 5px;
+  color: #1762c0;
+  font-size: 11px;
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 11px 12px;
 }
 .daw-account-settings__form-grid label {
   color: #454d57;
@@ -10583,5 +10898,92 @@ body.daw-recruitment-admin.post-type-daw_vacancy .wp-list-table .no-items td {
   }
   .daw-question-bank__dialog-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Keep the account dialog controls aligned with their field types. */
+.daw-account-settings__dialog {
+  margin: auto;
+  overflow: hidden;
+}
+.daw-account-settings__dialog > form {
+  max-height: min(90vh, 760px);
+  overflow-y: auto;
+}
+.daw-account-settings__dialog > form > header {
+  background: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.daw-account-settings__dialog .daw-account-settings__form-grid {
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 22px 24px;
+}
+.daw-account-settings__role-switch {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+}
+.daw-account-settings__role-switch legend {
+  grid-column: 1 / -1;
+  margin: 0 0 2px;
+}
+.daw-account-settings__role-switch label {
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 12px;
+}
+.daw-account-settings__role-switch label input[type="radio"] {
+  appearance: none;
+  height: 1px;
+  margin: -1px;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+}
+.daw-account-settings__form-grid > [data-account-form] {
+  gap: 16px;
+}
+.daw-account-settings__form-grid input:not([type="radio"]):not([type="checkbox"]),
+.daw-account-settings__form-grid select {
+  box-sizing: border-box;
+  min-height: 42px;
+}
+.daw-account-settings__permissions {
+  gap: 10px;
+  padding: 14px;
+}
+.daw-account-settings__permissions input[type="checkbox"] {
+  appearance: auto;
+  accent-color: #c8102e;
+  height: 16px;
+  margin: 0;
+  opacity: 1;
+  position: static;
+  width: 16px;
+}
+.daw-account-settings__dialog > form > footer {
+  background: #fff;
+  padding: 14px 24px 20px;
+  position: sticky;
+  bottom: 0;
+}
+@media (max-width: 600px) {
+  .daw-account-settings__dialog {
+    width: calc(100% - 20px);
+  }
+  .daw-account-settings__dialog .daw-account-settings__form-grid {
+    padding: 18px 16px;
+  }
+  .daw-account-settings__role-switch {
+    grid-template-columns: 1fr;
+  }
+  .daw-account-settings__role-switch legend {
+    grid-column: auto;
   }
 }

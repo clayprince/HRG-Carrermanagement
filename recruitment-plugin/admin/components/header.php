@@ -10,7 +10,7 @@ $user = wp_get_current_user();
     <a class="recruitment-admin__brand" href="<?= esc_url( recruitment_get_admin_url( 'recruitment-dashboard' ) ) ?>"><span> D </span> DAW Recruitment</a>
     <nav aria-label="Admin navigasi">
         <a href="<?= esc_url( recruitment_get_public_url( 'careers' ) ) ?>">Public Site</a>
-        <span><?= esc_html( $user->display_name ) ?></span>
-        <a class="nav-action" href="<?= esc_url( wp_logout_url( home_url( '/' ) ) ) ?>">Logout</a>
+        <a href="<?= esc_url( recruitment_get_admin_url( 'hr-profile' ) ) ?>"><?= esc_html( $user->display_name ) ?></a>
+        <?= recruitment_logout_form( 'Logout', recruitment_get_public_url( 'login', [ 'target' => 'hr' ] ), 'nav-action' ) ?>
     </nav>
 </header>

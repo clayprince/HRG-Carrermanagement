@@ -151,7 +151,7 @@ $reviewed = '1' === sanitize_text_field( wp_unslash( $_GET['reviewed'] ?? '' ) )
 <div class="wrap daw-requests-page">
 	<header class="daw-requests__header">
 		<nav aria-label="Breadcrumb"><a href="<?= esc_url( recruitment_get_admin_url( 'dashboard' ) ) ?>">DAW Admin</a><span>/</span><strong><?= $selected_request ? 'Detail Pengajuan FPTK' : 'Pengajuan Lowongan' ?></strong></nav>
-		<div class="daw-requests__account"><span class="daw-requests__avatar" aria-hidden="true">HR</span><span><strong><?= esc_html( $current_user->display_name ) ?></strong><small><?= esc_html( $current_user->user_email ) ?></small></span><a href="<?= esc_url( wp_logout_url( home_url( '/' ) ) ) ?>">Keluar</a></div>
+		<div class="daw-requests__account"><span class="daw-requests__avatar" aria-hidden="true">HR</span><span><strong><?= esc_html( $current_user->display_name ) ?></strong><small><?= esc_html( $current_user->user_email ) ?></small></span><?= recruitment_logout_form( 'Keluar', home_url( '/' ) ) ?></div>
 	</header>
 	<main class="daw-requests__main">
 		<?php if ( $selected_request ) : ?>

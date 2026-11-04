@@ -2,7 +2,7 @@
 $user = function_exists( 'wp_get_current_user' ) ? wp_get_current_user() : null;
 $display_name = $user && ! empty( $user->display_name ) ? $user->display_name : 'Admin HR';
 $user_email = $user && ! empty( $user->user_email ) ? $user->user_email : 'hr@daw.co.id';
-$logout_url = function_exists( 'wp_logout_url' ) ? wp_logout_url( home_url( '/' ) ) : '?page=login';
+$logout_form = recruitment_logout_form( 'Keluar', home_url( '/' ) );
 $list_url = recruitment_get_admin_url( 'vacancies' );
 $create_url = add_query_arg( 'view', 'create', $list_url );
 $view = sanitize_key( $_GET['view'] ?? 'list' );
@@ -52,7 +52,7 @@ $status_labels = [ 'published' => 'Published', 'draft' => 'Draft', 'closed' => '
             <div class="daw-vacancies__account">
                 <span class="daw-vacancies__avatar" aria-hidden="true">HR</span>
                 <span><strong><?= esc_html( $display_name ) ?></strong><small><?= esc_html( $user_email ) ?></small></span>
-                <a href="<?= esc_url( $logout_url ) ?>">Keluar</a>
+                <?= $logout_form ?>
             </div>
         </header>
 

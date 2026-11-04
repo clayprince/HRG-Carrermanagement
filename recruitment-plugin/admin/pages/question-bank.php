@@ -102,13 +102,13 @@ foreach ( $questions as $question ) {
 }
 $active_count = count( array_filter( $questions, static function ( $question ) { return 'active' === ( $question['status'] ?? 'active' ); } ) );
 $admin_user = wp_get_current_user();
-$logout_url = wp_logout_url( home_url( '/' ) );
+$logout_form = recruitment_logout_form( 'Keluar', home_url( '/' ) );
 $test_filter_url = static function ( string $test ): string {
     return add_query_arg( [ 'page' => 'recruitment-question-bank', 'test' => $test ], admin_url( 'admin.php' ) );
 };
 ?>
 <div class="wrap daw-question-bank" data-question-bank>
-    <header class="daw-question-bank__header"><div><p class="daw-question-bank__breadcrumb"><a href="<?= esc_url( recruitment_get_admin_url( 'psychotest-settings' ) ) ?>">Setting Psikotes</a><span>/</span>Bank Soal</p><h1>Bank Soal Psikotes</h1><p>Kelola soal untuk setiap jenis tes psikotes.</p></div><span class="daw-question-bank__profile"><span>HR</span><span class="daw-question-bank__profile-copy"><strong><?= esc_html( $admin_user->display_name ) ?></strong><small><?= esc_html( $admin_user->user_email ) ?></small></span><a href="<?= esc_url( $logout_url ) ?>">Keluar</a></span></header>
+    <header class="daw-question-bank__header"><div><p class="daw-question-bank__breadcrumb"><a href="<?= esc_url( recruitment_get_admin_url( 'psychotest-settings' ) ) ?>">Setting Psikotes</a><span>/</span>Bank Soal</p><h1>Bank Soal Psikotes</h1><p>Kelola soal untuk setiap jenis tes psikotes.</p></div><span class="daw-question-bank__profile"><span>HR</span><span class="daw-question-bank__profile-copy"><strong><?= esc_html( $admin_user->display_name ) ?></strong><small><?= esc_html( $admin_user->user_email ) ?></small></span><?= $logout_form ?></span></header>
     <?php if ( $notice ) : ?><div class="notice notice-success is-dismissible"><p><?= esc_html( $notice ) ?></p></div><?php endif; ?>
     <section class="daw-question-bank__stats" aria-label="Jumlah soal per tes">
         <?php foreach ( $test_labels as $test_key => $test_label ) : ?><a href="<?= esc_url( $test_filter_url( $test_key ) ) ?>" class="daw-question-bank__stat"><strong><?= esc_html( (string) $test_counts[ $test_key ] ) ?></strong><span><?= esc_html( $test_label ) ?></span></a><?php endforeach; ?>

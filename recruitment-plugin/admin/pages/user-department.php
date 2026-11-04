@@ -4,7 +4,7 @@ $display_name = ! empty( $current_user->display_name ) ? $current_user->display_
 $department = (string) get_user_meta( $current_user->ID, 'daw_department', true );
 $department = '' !== $department ? $department : 'Department';
 $view = sanitize_key( wp_unslash( $_GET['view'] ?? 'dashboard' ) );
-$views = [ 'dashboard', 'requests', 'request-form', 'request-detail', 'interviews', 'interview-detail', 'profile', 'applicants', 'results' ];
+$views = [ 'dashboard', 'requests', 'request-form', 'request-detail', 'interviews', 'interview-detail', 'profile', 'applicants', 'results', 'account-settings' ];
 if ( ! in_array( $view, $views, true ) ) {
 	$view = 'dashboard';
 }
@@ -20,6 +20,7 @@ $view_titles = [
 	'interviews' => 'Kandidat Wawancara User',
 	'interview-detail' => 'Detail Kandidat',
 	'profile' => 'Profil Lengkap Pelamar',
+	'account-settings' => 'Pengaturan Akun',
 	'applicants' => 'Data Pelamar',
 	'results' => 'Hasil Wawancara User',
 ];
@@ -481,15 +482,50 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 			<a class="<?= 'interviews' === $view ? 'is-active' : '' ?>" href="<?= esc_url( $view_url( 'interviews' ) ) ?>"><span class="dashicons dashicons-groups" aria-hidden="true"></span><span>Kandidat Wawancara User</span><b><?= esc_html( (string) ( $interview_stats['waiting'] + $interview_stats['scheduled'] ) ) ?></b></a>
 			<a class="<?= 'applicants' === $view ? 'is-active' : '' ?>" href="<?= esc_url( $view_url( 'applicants' ) ) ?>"><span class="dashicons dashicons-database" aria-hidden="true"></span>Data Pelamar</a>
 			<a class="<?= 'results' === $view ? 'is-active' : '' ?>" href="<?= esc_url( $view_url( 'results' ) ) ?>"><span class="dashicons dashicons-list-view" aria-hidden="true"></span>Hasil Wawancara User</a>
+			<a class="<?= 'account-settings' === $view ? 'is-active' : '' ?>" href="<?= esc_url( $view_url( 'account-settings' ) ) ?>"><span class="dashicons dashicons-admin-generic" aria-hidden="true"></span>Pengaturan Akun</a>
 		</nav>
 		<div class="daw-ud-sidebar__footer"><span class="dashicons dashicons-building" aria-hidden="true"></span><?= esc_html( $department ) ?> Department</div>
 	</aside>
 
 	<div class="daw-ud-workspace">
-		<header class="daw-ud-topbar"><h1><?= esc_html( $view_titles[ $view ] ) ?></h1><div><span class="daw-ud-user-avatar"><?= esc_html( strtoupper( substr( $greeting_name, 0, 1 ) ) ) ?></span><span><strong><?= esc_html( $display_name ) ?></strong><small><?= esc_html( $department ) ?> Department</small></span></div></header>
+		<header class="daw-ud-topbar"><h1><?= esc_html( $view_titles[ $view ] ) ?></h1><div class="daw-ud-topbar__account"><div class="daw-ud-topbar__identity"><span class="daw-ud-user-avatar"><?= esc_html( strtoupper( substr( $greeting_name, 0, 1 ) ) ) ?></span><span><strong><?= esc_html( $display_name ) ?></strong><small><?= esc_html( $department ) ?> Department</small></span></div><?= recruitment_logout_form( 'Logout', recruitment_get_public_url( 'login', [ 'target' => 'hr' ] ), 'daw-ud-topbar__logout' ) ?></div></header>
 		<main class="daw-ud-main">
 			<p class="daw-ud-demo-note" role="note">Prototipe: data kandidat, hasil wawancara, statistik, dan contoh request di halaman ini bukan data produksi Oracle. Request dan penilaian yang disimpan saat ini hanya tersimpan di WordPress.</p>
-			<?php if ( 'profile' === $view ) : ?>
+			<?php if ( 'account-settings' === $view ) : ?>
+				<?php
+				$password_notice = sanitize_key( wp_unslash( $_GET['password_notice'] ?? '' ) );
+				$password_messages = [
+					'password_updated' => [ 'Password berhasil diperbarui. Silakan login kembali.', 'success' ],
+					'current_password' => [ 'Password saat ini tidak sesuai.', 'error' ],
+					'invalid' => [ 'Pastikan password baru minimal 8 karakter dan konfirmasinya sesuai.', 'error' ],
+					'unavailable' => [ 'Password tidak dapat diperbarui karena layanan Oracle belum tersedia.', 'error' ],
+				];
+				?>
+				<section class="daw-account-settings">
+					<header class="daw-account-settings__heading">
+						<div>
+							<p class="daw-account-settings__breadcrumb">User Department <span>/</span> Pengaturan Akun</p>
+							<h2>Pengaturan Akun</h2>
+							<p>Ubah password akun department yang sedang digunakan.</p>
+						</div>
+					</header>
+					<?php if ( isset( $password_messages[ $password_notice ] ) ) : ?>
+						<div class="daw-account-settings__notice <?= esc_attr( 'error' === $password_messages[ $password_notice ][1] ? 'is-error' : '' ) ?>" role="status"><?= esc_html( $password_messages[ $password_notice ][0] ) ?></div>
+					<?php endif; ?>
+					<section class="daw-account-settings__panel" aria-label="Ubah password User Department">
+						<form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>">
+							<input type="hidden" name="action" value="daw_change_department_password">
+							<?php wp_nonce_field( 'daw_change_department_password' ); ?>
+							<div class="daw-account-settings__form-grid">
+								<label>Password saat ini<input type="password" name="current_password" autocomplete="current-password" required></label>
+								<label>Password baru<input type="password" name="new_password" minlength="8" autocomplete="new-password" required></label>
+								<label>Konfirmasi password baru<input type="password" name="password_confirmation" minlength="8" autocomplete="new-password" required></label>
+							</div>
+							<footer><button type="submit" class="daw-account-settings__save">Simpan Password</button></footer>
+						</form>
+					</section>
+				</section>
+			<?php elseif ( 'profile' === $view ) : ?>
 				<?php if ( ! $selected_interview ) : ?>
 					<section class="daw-ud-profile-overlay"><article class="daw-ud-profile-sheet"><p>Profil pelamar tidak ditemukan.</p><a class="button" href="<?= esc_url( $view_url( 'applicants' ) ) ?>">Kembali</a></article></section>
 				<?php else : ?>

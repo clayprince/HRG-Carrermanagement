@@ -141,7 +141,7 @@ $pipeline_rows = [
             <div class="recruitment-dashboard__profile">
                 <span class="recruitment-dashboard__profile-avatar" aria-hidden="true">HR</span>
                 <span class="recruitment-dashboard__profile-copy"><strong><?= esc_html( $admin_user->display_name ) ?></strong><small><?= esc_html( $admin_user->user_email ) ?></small></span>
-                <a class="recruitment-dashboard__logout" href="<?= esc_url( wp_logout_url( home_url( '/' ) ) ) ?>">Keluar</a>
+                <?= recruitment_logout_form( 'Keluar', home_url( '/' ), 'recruitment-dashboard__logout' ) ?>
             </div>
         </header>
 
