@@ -28,15 +28,7 @@ $request_filter = sanitize_text_field( wp_unslash( $_GET['status'] ?? '' ) );
 $interview_filter = sanitize_text_field( wp_unslash( $_GET['interview_status'] ?? '' ) );
 $search = sanitize_text_field( wp_unslash( $_GET['search'] ?? '' ) );
 
-$requests = [
-	[ 'code' => 'FPTK-2026-031', 'position' => 'Sales Executive', 'count' => 2, 'priority' => 'Tinggi', 'date' => '20 Sep 2026', 'status' => 'Disetujui' ],
-	[ 'code' => 'FPTK-2026-029', 'position' => 'Sales Admin', 'count' => 1, 'priority' => 'Sedang', 'date' => '17 Sep 2026', 'status' => 'Perlu Revisi' ],
-	[ 'code' => 'FPTK-2026-025', 'position' => 'Customer Service', 'count' => 3, 'priority' => 'Urgent', 'date' => '10 Sep 2026', 'status' => 'Lowongan Dibuka' ],
-	[ 'code' => 'FPTK-2026-023', 'position' => 'After Sales Technician', 'count' => 2, 'priority' => 'Tinggi', 'date' => '5 Sep 2026', 'status' => 'Ready for Recruitment' ],
-	[ 'code' => 'FPTK-2026-020', 'position' => 'Sales Supervisor', 'count' => 1, 'priority' => 'Sedang', 'date' => '28 Agu 2026', 'status' => 'Review HR' ],
-	[ 'code' => 'FPTK-2026-018', 'position' => 'Body Repair Advisor', 'count' => 1, 'priority' => 'Rendah', 'date' => '20 Agu 2026', 'status' => 'Draft' ],
-	[ 'code' => 'FPTK-2026-015', 'position' => 'Finance Staff', 'count' => 2, 'priority' => 'Sedang', 'date' => '15 Agu 2026', 'status' => 'Draft' ],
-];
+$requests = [];
 $request_sections = [
 	1 => [ 'title' => 'Informasi Permintaan', 'description' => 'Isi data dasar kebutuhan rekrutmen.', 'fields' => [
 		[ 'key' => 'department', 'label' => 'Departemen', 'type' => 'text', 'required' => true, 'default' => $department ],
@@ -101,16 +93,6 @@ $request_form_notice = '';
 $request_form_values = [];
 $selected_request = null;
 
-$demo_request_statuses = get_option( 'daw_demo_department_request_statuses', [] );
-$demo_request_statuses = is_array( $demo_request_statuses ) ? $demo_request_statuses : [];
-foreach ( $requests as &$demo_request ) {
-	if ( isset( $demo_request_statuses[ $demo_request['code'] ] ) && is_array( $demo_request_statuses[ $demo_request['code'] ] ) ) {
-		$demo_request['status'] = (string) ( $demo_request_statuses[ $demo_request['code'] ]['status'] ?? $demo_request['status'] );
-		$demo_request['hr_note'] = (string) ( $demo_request_statuses[ $demo_request['code'] ]['hr_note'] ?? '' );
-	}
-}
-unset( $demo_request );
-
 foreach ( $stored_department_requests as $saved_code => $saved_request ) {
 	$fields = is_array( $saved_request['fields'] ?? null ) ? $saved_request['fields'] : [];
 	$request_summary = [
@@ -119,16 +101,12 @@ foreach ( $stored_department_requests as $saved_code => $saved_request ) {
 		'count' => (int) ( $fields['headcount'] ?? 1 ),
 		'priority' => (string) ( $fields['priority'] ?? 'Sedang' ),
 		'date' => ! empty( $saved_request['updated_at'] ) ? date_i18n( 'd M Y', strtotime( $saved_request['updated_at'] ) ) : '—',
+		'updated_at' => (string) ( $saved_request['updated_at'] ?? '' ),
 		'status' => (string) ( $saved_request['status'] ?? 'Draft' ),
 		'fields' => $fields,
 		'hr_note' => (string) ( $saved_request['hr_note'] ?? '' ),
 	];
-	$existing_index = array_search( $saved_code, array_column( $requests, 'code' ), true );
-	if ( false === $existing_index ) {
-		$requests[] = $request_summary;
-	} else {
-		$requests[ $existing_index ] = $request_summary;
-	}
+	$requests[] = $request_summary;
 }
 
 if ( 'request-form' === $view ) {
@@ -420,7 +398,20 @@ foreach ( $interviews as $interview ) {
 	}
 }
 
-$request_statuses = [ 'Draft' => 2, 'Menunggu Review HR' => 3, 'Perlu Revisi' => 1, 'Disetujui' => 5, 'Lowongan Dibuka' => 2 ];
+$request_statuses = array_fill_keys( [ 'Draft', 'Menunggu Review HR', 'Perlu Revisi', 'Disetujui', 'Lowongan Dibuka' ], 0 );
+foreach ( $requests as $request ) {
+	if ( isset( $request_statuses[ $request['status'] ] ) ) {
+		++$request_statuses[ $request['status'] ];
+	}
+}
+$recent_requests = $requests;
+usort(
+	$recent_requests,
+	static function ( array $left, array $right ): int {
+		return strtotime( $right['updated_at'] ?? '' ) <=> strtotime( $left['updated_at'] ?? '' );
+	}
+);
+$recent_requests = array_slice( $recent_requests, 0, 4 );
 $filtered_requests = [];
 foreach ( $requests as $request ) {
 	$matches_status = '' === $request_filter || $request['status'] === $request_filter || ( 'Review HR' === $request_filter && 'Menunggu Review HR' === $request['status'] );
@@ -573,7 +564,7 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 				<section class="daw-ud-welcome"><p>Selamat datang, <strong><?= esc_html( $display_name ) ?></strong></p><span>Departemen <?= esc_html( $department ) ?> — <?= esc_html( date_i18n( 'l, j F Y' ) ) ?></span></section>
 				<section class="daw-ud-section"><div class="daw-ud-section__heading"><h2>Permintaan Lowongan</h2><a href="<?= esc_url( $view_url( 'requests' ) ) ?>">Lihat Semua</a></div><div class="daw-ud-stats daw-ud-stats--four"><article><span>Draft</span><strong><?= esc_html( (string) $request_statuses['Draft'] ) ?></strong></article><article><span>Menunggu Review HR</span><strong class="is-orange"><?= esc_html( (string) $request_statuses['Menunggu Review HR'] ) ?></strong></article><article><span>Perlu Revisi</span><strong class="is-red"><?= esc_html( (string) $request_statuses['Perlu Revisi'] ) ?></strong><small>Perlu tindakan</small></article><article><span>Disetujui</span><strong class="is-green"><?= esc_html( (string) $request_statuses['Disetujui'] ) ?></strong></article></div></section>
 				<section class="daw-ud-section"><div class="daw-ud-section__heading"><h2>Kandidat User Interview</h2><a href="<?= esc_url( $view_url( 'interviews' ) ) ?>">Lihat Semua</a></div><div class="daw-ud-stats daw-ud-stats--three"><article><span>Menunggu Jadwal</span><strong class="is-orange"><?= esc_html( (string) $interview_stats['waiting'] ) ?></strong></article><article><span>Terjadwal</span><strong><?= esc_html( (string) $interview_stats['scheduled'] ) ?></strong></article><article><span>Sudah Dinilai</span><strong class="is-green"><?= esc_html( (string) $interview_stats['done'] ) ?></strong></article></div></section>
-				<section class="daw-ud-section daw-ud-activity-section"><h2>Aktivitas Terkini</h2><div class="daw-ud-activity"><div><i class="is-green"></i><span>Request FPTK-2026-031 disetujui HR<small>22 Sep 2026</small></span></div><div><i class="is-blue"></i><span>Kandidat Budi Santoso terjadwal wawancara user — 24 Sep 2026<small>20 Sep 2026</small></span></div><div><i class="is-orange"></i><span>Request FPTK-2026-029 perlu revisi — lihat catatan HR<small>18 Sep 2026</small></span></div><div><i class="is-green"></i><span>Hasil wawancara Aiko Hanako berhasil dikirim<small>15 Sep 2026</small></span></div></div></section>
+				<section class="daw-ud-section daw-ud-activity-section"><h2>Aktivitas Request Lowongan</h2><div class="daw-ud-activity"><?php if ( empty( $recent_requests ) ) : ?><p class="daw-ud-empty">Belum ada aktivitas request lowongan.</p><?php else : ?><?php foreach ( $recent_requests as $request ) : ?><div><i class="<?= in_array( $request['status'], [ 'Disetujui', 'Lowongan Dibuka' ], true ) ? 'is-green' : ( 'Perlu Revisi' === $request['status'] ? 'is-orange' : 'is-blue' ) ?>"></i><span><?= esc_html( $request['code'] . ' — ' . $request['position'] . ': ' . $request['status'] ) ?><small><?= esc_html( $request['date'] ) ?></small></span></div><?php endforeach; ?><?php endif; ?></div></section>
 
 			<?php elseif ( 'request-form' === $view ) : ?>
 				<?php
@@ -617,9 +608,9 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 					<section class="daw-ud-request-detail-heading"><div><p>Pengajuan Tenaga Kerja</p><h2><?= esc_html( $selected_request['position'] ) ?></h2><span><?= esc_html( $selected_request['code'] ) ?> · <?= esc_html( $request_fields['department'] ?? $department ) ?></span></div><span class="daw-ud-status <?= esc_attr( sanitize_title( $selected_request['status'] ) ) ?>"><?= esc_html( $selected_request['status'] ) ?></span></section>
 					<section class="daw-ud-request-detail-grid">
 						<article class="daw-ud-request-detail-card"><h3>Ringkasan Permintaan</h3><dl><?php foreach ( [ 'Departemen' => $request_fields['department'] ?? $department, 'Hiring User' => $request_fields['hiring_user'] ?? $display_name, 'Jumlah Kebutuhan' => $selected_request['count'], 'Level Jabatan' => $request_fields['job_level'] ?? '—', 'Kategori Karyawan' => $request_fields['employment_type'] ?? '—', 'Status Karyawan' => $request_fields['employee_status'] ?? '—', 'Prioritas' => $selected_request['priority'], 'Target Pemenuhan' => $request_fields['target_date'] ?? '—', 'Tanggal Pengajuan' => $selected_request['date'] ] as $label => $value ) : ?><div><dt><?= esc_html( $label ) ?></dt><dd><?= esc_html( (string) $value ) ?></dd></div><?php endforeach; ?></dl></article>
-						<article class="daw-ud-request-detail-card"><h3>Tujuan Posisi</h3><div class="daw-ud-request-detail-copy"><strong>Ringkasan Peran</strong><p><?= esc_html( $request_fields['role_summary'] ?? ( 'FPTK-2026-029' === $selected_request['code'] ? 'Pemenuhan kebutuhan posisi Sales Admin pada departemen.' : 'Detail peran belum dicatat pada data contoh ini.' ) ) ?></p><strong>KPI / Target Utama</strong><p><?= esc_html( $request_fields['kpi'] ?? 'Belum tersedia' ) ?></p><strong>Alasan Kebutuhan</strong><p><?= esc_html( $request_fields['reason'] ?? ( 'FPTK-2026-029' === $selected_request['code'] ? 'Mohon lengkapi profil kandidat minimum pendidikan.' : 'Belum tersedia' ) ) ?></p></div></article>
+						<article class="daw-ud-request-detail-card"><h3>Tujuan Posisi</h3><div class="daw-ud-request-detail-copy"><strong>Ringkasan Peran</strong><p><?= esc_html( $request_fields['role_summary'] ?? 'Belum tersedia' ) ?></p><strong>KPI / Target Utama</strong><p><?= esc_html( $request_fields['kpi'] ?? 'Belum tersedia' ) ?></p><strong>Alasan Kebutuhan</strong><p><?= esc_html( $request_fields['reason'] ?? 'Belum tersedia' ) ?></p></div></article>
 						<article class="daw-ud-request-detail-card"><h3>Profil Kandidat</h3><dl><?php foreach ( [ 'Pendidikan Minimum' => $request_fields['minimum_education'] ?? '—', 'Jurusan' => $request_fields['major'] ?? '—', 'Pengalaman Minimum' => $request_fields['minimum_experience'] ?? '—', 'Keahlian Wajib' => $request_fields['required_skills'] ?? '—', 'Rentang Gaji' => $request_fields['salary_range'] ?? '—' ] as $label => $value ) : ?><div><dt><?= esc_html( $label ) ?></dt><dd><?= esc_html( (string) $value ) ?></dd></div><?php endforeach; ?></dl></article>
-						<article class="daw-ud-request-detail-card"><h3>Proses & Catatan</h3><div class="daw-ud-request-timeline"><div><i></i><span>Draft dibuat<small><?= esc_html( $selected_request['date'] ) ?></small></span></div><div><i></i><span><?= esc_html( $selected_request['status'] ) ?><small><?= esc_html( $selected_request['date'] ) ?></small></span></div></div><p class="daw-ud-request-hr-note"><strong>Catatan HR</strong><br><?= esc_html( ( $selected_request['hr_note'] ?? '' ) ?: ( 'FPTK-2026-029' === $selected_request['code'] ? 'Mohon lengkapi profil kandidat minimum pendidikan.' : 'Belum ada catatan dari HR.' ) ) ?></p></article>
+						<article class="daw-ud-request-detail-card"><h3>Proses & Catatan</h3><div class="daw-ud-request-timeline"><div><i></i><span>Draft dibuat<small><?= esc_html( $selected_request['date'] ) ?></small></span></div><div><i></i><span><?= esc_html( $selected_request['status'] ) ?><small><?= esc_html( $selected_request['date'] ) ?></small></span></div></div><p class="daw-ud-request-hr-note"><strong>Catatan HR</strong><br><?= esc_html( ( $selected_request['hr_note'] ?? '' ) ?: 'Belum ada catatan dari HR.' ) ?></p></article>
 					</section>
 					<div class="daw-ud-request-detail-actions"><a class="button" href="<?= esc_url( $view_url( 'requests' ) ) ?>">Tutup</a><?php if ( isset( $stored_department_requests[ $selected_request['code'] ] ) && in_array( $selected_request['status'], [ 'Draft', 'Perlu Revisi' ], true ) ) : ?><a class="daw-ud-primary-button" href="<?= esc_url( add_query_arg( [ 'view' => 'request-form', 'request_code' => $selected_request['code'], 'step' => '1' ], $page_url ) ) ?>">Edit Pengajuan</a><?php endif; ?></div>
 				<?php endif; ?>
@@ -627,7 +618,8 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 			<?php elseif ( 'requests' === $view ) : ?>
 				<div class="daw-ud-page-heading"><p>Total <?= esc_html( (string) count( $requests ) ) ?> permintaan</p><a class="daw-ud-primary-button" href="<?= esc_url( add_query_arg( [ 'view' => 'request-form', 'request_code' => 'new', 'step' => '1' ], $page_url ) ) ?>"><span class="dashicons dashicons-plus-alt2" aria-hidden="true"></span>Buat Request Baru</a></div>
 				<nav class="daw-ud-pills" aria-label="Filter status request"><?php foreach ( [ 'Semua' => '', 'Draft' => 'Draft', 'Perlu Revisi' => 'Perlu Revisi', 'Review HR' => 'Review HR', 'Disetujui' => 'Disetujui', 'Lowongan Dibuka' => 'Lowongan Dibuka' ] as $label => $value ) : ?><a class="<?= $request_filter === $value ? 'is-active' : '' ?>" href="<?= esc_url( add_query_arg( [ 'status' => $value ], $view_url( 'requests' ) ) ) ?>"><?= esc_html( $label ) ?></a><?php endforeach; ?></nav>
-				<?php if ( '' === $request_filter || 'Perlu Revisi' === $request_filter ) : ?><div class="daw-ud-alert"><span class="dashicons dashicons-warning" aria-hidden="true"></span><span><strong>Ada permintaan yang perlu direvisi</strong><small>FPTK-2026-029: Mohon lengkapi profil kandidat minimum pendidikan.</small></span></div><?php endif; ?>
+				<?php $revision_requests = array_values( array_filter( $requests, static fn( array $request ): bool => 'Perlu Revisi' === $request['status'] ) ); ?>
+				<?php if ( $revision_requests && ( '' === $request_filter || 'Perlu Revisi' === $request_filter ) ) : ?><div class="daw-ud-alert"><span class="dashicons dashicons-warning" aria-hidden="true"></span><span><strong><?= esc_html( (string) count( $revision_requests ) ) ?> permintaan perlu direvisi</strong><small><?= esc_html( $revision_requests[0]['code'] . ': ' . ( $revision_requests[0]['hr_note'] ?: 'Silakan periksa catatan HR.' ) ) ?></small></span></div><?php endif; ?>
 				<form class="daw-ud-search" method="get" action="<?= esc_url( admin_url( 'admin.php' ) ) ?>"><input type="hidden" name="page" value="daw-user-department" /><input type="hidden" name="view" value="requests" /><input type="hidden" name="status" value="<?= esc_attr( $request_filter ) ?>" /><label><span class="screen-reader-text">Cari request</span><input type="search" name="search" value="<?= esc_attr( $search ) ?>" placeholder="Cari nomor FPTK atau posisi..." /></label><button class="button" type="submit">Cari</button></form>
 				<div class="daw-ud-table-wrap"><table class="daw-ud-table"><thead><tr><th>No. FPTK</th><th>Posisi</th><th>Jml</th><th>Prioritas</th><th>Tgl Pengajuan</th><th>Status</th><th>Aksi</th></tr></thead><tbody><?php if ( empty( $filtered_requests ) ) : ?><tr><td colspan="7" class="daw-ud-empty">Tidak ada request yang cocok.</td></tr><?php endif; ?><?php foreach ( $filtered_requests as $request ) : ?><tr><td><strong><?= esc_html( $request['code'] ) ?></strong></td><td><?= esc_html( $request['position'] ) ?></td><td><?= esc_html( (string) $request['count'] ) ?></td><td class="priority-<?= esc_attr( strtolower( $request['priority'] ) ) ?>"><?= esc_html( $request['priority'] ) ?></td><td><?= esc_html( $request['date'] ) ?></td><td><span class="daw-ud-status <?= esc_attr( sanitize_title( $request['status'] ) ) ?>"><?= esc_html( $request['status'] ) ?></span></td><td class="daw-ud-request-row-actions"><a class="daw-ud-link" href="<?= esc_url( add_query_arg( [ 'view' => 'request-detail', 'request_code' => $request['code'] ], $page_url ) ) ?>">Lihat</a><?php if ( isset( $stored_department_requests[ $request['code'] ] ) && in_array( $request['status'], [ 'Draft', 'Perlu Revisi' ], true ) ) : ?><a href="<?= esc_url( add_query_arg( [ 'view' => 'request-form', 'request_code' => $request['code'], 'step' => '1' ], $page_url ) ) ?>">Edit</a><?php endif; ?></td></tr><?php endforeach; ?></tbody></table></div>
 

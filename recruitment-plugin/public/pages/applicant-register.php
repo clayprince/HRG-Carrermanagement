@@ -5,6 +5,7 @@ $errors = [
     'email_exists' => 'Email ini sudah terdaftar. Silakan masuk ke akun Anda.',
     'password_mismatch' => 'Kata sandi harus minimal 10 karakter dan kedua isian harus sama.',
     'registration_failed' => 'Akun belum dapat dibuat. Silakan coba kembali.',
+    'account_unavailable' => 'Pembuatan akun Oracle dinonaktifkan karena skema ERD saat ini belum menyediakan penyimpanan akun yang aman.',
 ];
 $error = $errors[ sanitize_key( wp_unslash( $_GET['account_error'] ?? '' ) ) ] ?? '';
 $preview = recruitment_is_ui_preview();
@@ -13,19 +14,11 @@ $preview = recruitment_is_ui_preview();
     <?php require recruitment_get_plugin_path( 'public/components/header.php' ); ?>
     <main class="daw-account-auth__main daw-account-auth__main--center">
         <section class="daw-account-auth__card">
-            <span class="daw-recruitment__eyebrow">MEMULAI</span><h2>Buat akun pelamar</h2><p>Lengkapi informasi berikut untuk mendaftar.</p>
+            <span class="daw-recruitment__eyebrow">AKUN PELAMAR</span><h2>Pembuatan akun belum tersedia</h2><p>Struktur ERD Oracle saat ini belum menyediakan penyimpanan akun pelamar yang aman.</p>
             <?php if ( $preview ) : ?><div class="daw-account__preview-note">Mode preview: pengiriman formulir dinonaktifkan.</div><?php endif; ?>
             <?php if ( $error ) : ?><div class="daw-account__alert" role="alert"><?= esc_html( $error ) ?></div><?php endif; ?>
-            <form method="post" action="<?= esc_url( recruitment_get_public_url( 'applicant-register' ) ) ?>">
-                <?php wp_nonce_field( 'applicant_account_applicant-register', 'applicant_account_nonce' ); ?>
-                <?php if ( $preview ) : ?><input type="hidden" name="daw_ui_preview" value="1"><?php endif; ?>
-                <label>Nama lengkap<input type="text" name="full_name" autocomplete="name" required></label>
-                <label>Email<input type="email" name="email" autocomplete="email" required></label>
-                <label>Kata sandi<input type="password" name="password" autocomplete="new-password" minlength="10" required><small>Gunakan minimal 10 karakter.</small></label>
-                <label>Konfirmasi kata sandi<input type="password" name="password_confirmation" autocomplete="new-password" minlength="10" required></label>
-                <button class="daw-recruitment__button" type="submit" <?= $preview ? 'disabled' : '' ?>>Buat Akun</button>
-            </form>
-            <p class="daw-account-auth__switch">Sudah punya akun? <a href="<?= esc_url( recruitment_get_public_url( 'applicant-login' ) ) ?>">Masuk</a></p>
+            <div class="daw-account__alert" role="note">Anda tetap dapat mengisi dan mengirim lamaran tanpa membuat akun.</div>
+            <a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'careers' ) ) ?>">Lihat lowongan</a>
         </section>
     </main>
     <?php require recruitment_get_plugin_path( 'public/components/footer.php' ); ?>

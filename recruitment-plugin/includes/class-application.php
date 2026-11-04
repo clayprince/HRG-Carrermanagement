@@ -18,6 +18,101 @@ class Recruitment_Application {
         'single_choice' => true,
     ];
 
+    /** @var array<string, string> */
+    private const FIXED_FIELD_TYPES = [
+        'foto_terkini'             => 'file',
+        'nama_lengkap'             => 'short',
+        'jenis_kelamin'            => 'single_choice',
+        'tempat_lahir'             => 'short',
+        'tanggal_lahir'            => 'date',
+        'alamat_saat_ini'          => 'paragraph',
+        'nomor_telepon'            => 'phone',
+        'email_aktif'              => 'email',
+        'nomor_ktp'                => 'short',
+        'pendidikan_terakhir'      => 'dropdown',
+        'nama_institusi'           => 'short',
+        'jurusan_program_studi'    => 'short',
+        'ipk'                      => 'number',
+        'tahun_lulus'              => 'number',
+        'nama_perusahaan'          => 'short',
+        'jabatan_posisi'           => 'short',
+        'tanggal_mulai_kerja'      => 'date',
+        'tanggal_selesai_kerja'    => 'date',
+        'alasan_berhenti'          => 'paragraph',
+        'status_pernikahan'        => 'single_choice',
+        'susunan_keluarga_inti'    => 'paragraph',
+        'gaji_yang_diharapkan'     => 'short',
+        'motivasi_bergabung'       => 'paragraph',
+    ];
+
+    /**
+     * The form is fixed to the applicant fields available in the Oracle ERD.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_fixed_form_sections(): array {
+        return [
+            [
+                'title' => 'Identitas',
+                'description' => 'Informasi pribadi pelamar',
+                'questions' => [
+                    [ 'key' => 'foto_terkini', 'title' => 'Foto Terkini', 'type' => 'file', 'required' => true, 'options' => [] ],
+                    [ 'key' => 'nama_lengkap', 'title' => 'Nama Lengkap', 'type' => 'short', 'required' => true, 'options' => [] ],
+                    [ 'key' => 'jenis_kelamin', 'title' => 'Jenis Kelamin', 'type' => 'single_choice', 'required' => true, 'options' => [ 'Laki-laki', 'Perempuan' ] ],
+                    [ 'key' => 'tempat_lahir', 'title' => 'Tempat Lahir', 'type' => 'short', 'required' => true, 'options' => [] ],
+                    [ 'key' => 'tanggal_lahir', 'title' => 'Tanggal Lahir', 'type' => 'date', 'required' => true, 'options' => [] ],
+                    [ 'key' => 'alamat_saat_ini', 'title' => 'Alamat Saat Ini', 'type' => 'paragraph', 'required' => true, 'options' => [] ],
+                    [ 'key' => 'nomor_telepon', 'title' => 'Nomor Telepon / WhatsApp', 'type' => 'phone', 'required' => true, 'options' => [] ],
+                    [ 'key' => 'email_aktif', 'title' => 'Email Aktif', 'type' => 'email', 'required' => true, 'options' => [] ],
+                    [ 'key' => 'nomor_ktp', 'title' => 'Nomor KTP', 'type' => 'short', 'required' => true, 'options' => [] ],
+                ],
+            ],
+            [
+                'title' => 'Pendidikan',
+                'description' => 'Riwayat pendidikan terakhir',
+                'questions' => [
+                    [ 'key' => 'pendidikan_terakhir', 'title' => 'Pendidikan Terakhir', 'type' => 'dropdown', 'required' => true, 'options' => [ 'SMA / SMK', 'Diploma (D1/D2/D3)', 'S1 (Sarjana)', 'S2 (Magister)' ] ],
+                    [ 'key' => 'nama_institusi', 'title' => 'Nama Institusi', 'type' => 'short', 'required' => true, 'options' => [] ],
+                    [ 'key' => 'jurusan_program_studi', 'title' => 'Jurusan / Program Studi', 'type' => 'short', 'required' => false, 'options' => [] ],
+                    [ 'key' => 'ipk', 'title' => 'IPK', 'type' => 'number', 'required' => false, 'options' => [] ],
+                    [ 'key' => 'tahun_lulus', 'title' => 'Tahun Lulus', 'type' => 'number', 'required' => true, 'options' => [] ],
+                ],
+            ],
+            [
+                'title' => 'Pengalaman Kerja',
+                'description' => 'Riwayat pekerjaan sebelumnya',
+                'questions' => [
+                    [ 'key' => 'nama_perusahaan', 'title' => 'Nama Perusahaan', 'type' => 'short', 'required' => false, 'options' => [] ],
+                    [ 'key' => 'jabatan_posisi', 'title' => 'Jabatan / Posisi', 'type' => 'short', 'required' => false, 'options' => [] ],
+                    [ 'key' => 'tanggal_mulai_kerja', 'title' => 'Tanggal Mulai', 'type' => 'date', 'required' => false, 'options' => [] ],
+                    [ 'key' => 'tanggal_selesai_kerja', 'title' => 'Tanggal Selesai', 'type' => 'date', 'required' => false, 'options' => [] ],
+                    [ 'key' => 'alasan_berhenti', 'title' => 'Deskripsi / Alasan Berhenti', 'type' => 'paragraph', 'required' => false, 'options' => [] ],
+                ],
+            ],
+            [
+                'title' => 'Keluarga',
+                'description' => 'Informasi status dan latar belakang keluarga',
+                'questions' => [
+                    [ 'key' => 'status_pernikahan', 'title' => 'Status Pernikahan', 'type' => 'single_choice', 'required' => true, 'options' => [ 'Belum Menikah', 'Menikah', 'Cerai' ] ],
+                    [ 'key' => 'susunan_keluarga_inti', 'title' => 'Susunan Keluarga Inti', 'type' => 'paragraph', 'required' => false, 'options' => [] ],
+                ],
+            ],
+            [
+                'title' => 'Minat dan Konsep Pribadi',
+                'description' => 'Ekspektasi dan motivasi pelamar',
+                'questions' => [
+                    [ 'key' => 'gaji_yang_diharapkan', 'title' => 'Gaji yang Diharapkan', 'type' => 'short', 'required' => true, 'options' => [] ],
+                    [ 'key' => 'motivasi_bergabung', 'title' => 'Motivasi Bergabung', 'type' => 'paragraph', 'required' => true, 'options' => [] ],
+                ],
+            ],
+        ];
+    }
+
+    /** @return array<string, string> */
+    public function get_fixed_field_types(): array {
+        return self::FIXED_FIELD_TYPES;
+    }
+
     /**
      * @param mixed $submitted
      * @return array{sections: array<int, array<string, mixed>>, errors: array<int, string>}
@@ -102,6 +197,9 @@ class Recruitment_Application {
                     $suffix++;
                 }
                 $used_keys[ $key ] = true;
+                if ( isset( self::FIXED_FIELD_TYPES[ $key ] ) && self::FIXED_FIELD_TYPES[ $key ] !== $question_type ) {
+                    $errors[] = 'Jenis jawaban field inti "' . $key . '" tidak dapat diubah.';
+                }
 
                 $options = [];
                 if ( in_array( $question_type, [ 'dropdown', 'single_choice' ], true ) ) {
@@ -157,6 +255,18 @@ class Recruitment_Application {
         if ( 0 === $question_count ) {
             $errors[] = 'Form harus memiliki sedikitnya satu pertanyaan.';
         }
+        foreach ( self::FIXED_FIELD_TYPES as $key => $type ) {
+            if ( ! isset( $used_keys[ $key ] ) ) {
+                $errors[] = 'Field inti "' . $key . '" tidak dapat dihapus dari form.';
+            }
+        }
+        foreach ( $sections as $section ) {
+            foreach ( $section['questions'] as $question ) {
+                if ( 'foto_terkini' === $question['key'] && empty( $question['required'] ) ) {
+                    $errors[] = 'Foto Terkini harus tetap menjadi field wajib.';
+                }
+            }
+        }
 
         return [ 'sections' => $sections, 'errors' => array_values( array_unique( $errors ) ) ];
     }
@@ -184,6 +294,23 @@ class Recruitment_Application {
         }
 
         $answers = [];
+        $field_max_lengths = [
+            'nama_lengkap' => 255,
+            'jenis_kelamin' => 100,
+            'tempat_lahir' => 100,
+            'email_aktif' => 50,
+            'nomor_telepon' => 255,
+            'nomor_ktp' => 255,
+            'pendidikan_terakhir' => 100,
+            'nama_institusi' => 255,
+            'jurusan_program_studi' => 255,
+            'nama_perusahaan' => 255,
+            'jabatan_posisi' => 255,
+            'alasan_berhenti' => 200,
+            'status_pernikahan' => 100,
+            'susunan_keluarga_inti' => 255,
+            'gaji_yang_diharapkan' => 255,
+        ];
         foreach ( $sections as $section ) {
             foreach ( $section['questions'] as $question ) {
                 $key = (string) $question['key'];
@@ -219,6 +346,22 @@ class Recruitment_Application {
                 $value = $this->normalize_answer( $type, (string) $raw_value );
                 if ( '' !== trim( $value ) && $this->text_length( $value ) > 10000 ) {
                     $errors[] = 'Jawaban untuk field "' . $question['title'] . '" maksimal 10.000 karakter.';
+                    continue;
+                }
+                if (
+                    '' !== trim( $value )
+                    && isset( $field_max_lengths[ $key ] )
+                    && $this->text_length( $value ) > $field_max_lengths[ $key ]
+                ) {
+                    $errors[] = 'Jawaban untuk field "' . $question['title'] . '" maksimal ' . $field_max_lengths[ $key ] . ' karakter.';
+                    continue;
+                }
+                if ( 'tahun_lulus' === $key && '' !== trim( $value ) && ( ! ctype_digit( $value ) || strlen( $value ) > 19 ) ) {
+                    $errors[] = 'Tahun lulus harus berupa angka bulat maksimal 19 digit.';
+                    continue;
+                }
+                if ( 'ipk' === $key && '' !== trim( $value ) && 1 !== preg_match( '/^\d{1,14}(?:\.\d{1,4})?$/D', $value ) ) {
+                    $errors[] = 'IPK harus berupa angka dengan maksimal 14 digit sebelum dan 4 digit setelah titik desimal.';
                     continue;
                 }
                 if ( ! $this->valid_answer( $type, $value, $question['options'] ) ) {

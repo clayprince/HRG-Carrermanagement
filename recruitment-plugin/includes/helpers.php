@@ -333,58 +333,54 @@ function recruitment_is_applicant_user(): bool {
  * @return array<int, array<string, mixed>>
  */
 function recruitment_get_public_jobs(): array {
-    $fallback_jobs = [
-        [ 'id' => '1', 'title' => 'Sales Executive', 'location' => 'Airmadidi', 'dealer' => 'DAW Airmadidi', 'region' => 'Sulawesi Utara', 'type' => 'Full Time', 'description' => 'Bergabunglah dengan tim penjualan DAW dan jadilah bagian dari keluarga Honda yang terus berkembang.', 'deadline' => '30 September 2026', 'postedDate' => '1 Agustus 2026', 'requirements' => [ 'Pendidikan minimal D3 semua jurusan', 'Memiliki kemampuan komunikasi yang baik' ] ],
-        [ 'id' => '2', 'title' => 'Service Advisor', 'location' => 'Manado', 'dealer' => 'DAW Manado', 'region' => 'Sulawesi Utara', 'type' => 'Full Time', 'description' => 'Menjadi penghubung antara pelanggan dan bengkel serta memastikan setiap kendaraan mendapatkan penanganan terbaik.', 'deadline' => '30 September 2026', 'postedDate' => '1 Agustus 2026', 'requirements' => [ 'Pendidikan minimal D3 Teknik Otomotif atau terkait', 'Berpengalaman sebagai Service Advisor min. 2 tahun' ] ],
-        [ 'id' => '3', 'title' => 'Kepala Bengkel / Foreman', 'location' => 'Gorontalo', 'dealer' => 'AHASS Gorontalo', 'region' => 'Gorontalo', 'type' => 'Full Time', 'description' => 'Memimpin operasional bengkel AHASS dan memastikan semua pekerjaan servis berjalan sesuai standar Honda.', 'deadline' => '30 September 2026', 'postedDate' => '1 Agustus 2026', 'requirements' => [ 'Pendidikan minimal SMK Teknik Otomotif', 'Pengalaman sebagai mekanik min. 3 tahun' ] ],
-        [ 'id' => '4', 'title' => 'Marketing Coordinator', 'location' => 'Ternate', 'dealer' => 'DAW Ternate', 'region' => 'Maluku Utara', 'type' => 'Full Time', 'description' => 'Mengelola kegiatan marketing dan promosi untuk meningkatkan brand awareness Honda di wilayah Maluku Utara.', 'deadline' => '30 September 2026', 'postedDate' => '1 Agustus 2026', 'requirements' => [ 'Pendidikan minimal S1 Marketing / Komunikasi', 'Pengalaman di bidang marketing min. 2 tahun' ] ],
-        [ 'id' => '5', 'title' => 'Finance & Accounting Staff', 'location' => 'Manado', 'dealer' => 'DAW Head Office', 'region' => 'Sulawesi Utara', 'type' => 'Full Time', 'description' => 'Bertanggung jawab dalam pengelolaan keuangan dan laporan akuntansi perusahaan.', 'deadline' => '30 September 2026', 'postedDate' => '1 Agustus 2026', 'requirements' => [ 'Pendidikan minimal S1 Akuntansi / Keuangan', 'Berpengalaman min. 1 tahun di bidang keuangan' ] ],
-        [ 'id' => '6', 'title' => 'Mekanik / Teknisi Motor', 'location' => 'Kotamobagu', 'dealer' => 'AHASS Kotamobagu', 'region' => 'Sulawesi Utara', 'type' => 'Full Time', 'description' => 'Melakukan perawatan dan perbaikan kendaraan Honda sesuai standar layanan AHASS.', 'deadline' => '30 September 2026', 'postedDate' => '1 Agustus 2026', 'requirements' => [ 'Pendidikan minimal SMK Teknik Otomotif', 'Memiliki sertifikat pelatihan Honda' ] ],
-    ];
-
-    $vacancies = get_posts( [ 'post_type' => 'daw_vacancy', 'post_status' => 'publish', 'numberposts' => -1 ] );
-    if ( ! $vacancies ) {
-        return $fallback_jobs;
-    }
-
-    $jobs = [];
-    foreach ( $vacancies as $vacancy ) {
-        $jobs[] = recruitment_map_vacancy( $vacancy );
-    }
-
-    return $jobs;
+    return array_map( 'recruitment_map_vacancy', ( new Recruitment_Database() )->get_vacancies() );
 }
 
 /**
  * @return array<string, mixed>|null
  */
 function recruitment_get_public_job( int $job_id ): ?array {
-    foreach ( recruitment_get_public_jobs() as $job ) {
-        if ( (int) $job['id'] === $job_id ) {
-            return $job;
-        }
-    }
-
-    return null;
+    $vacancy = ( new Recruitment_Database() )->get_vacancy( $job_id );
+    return is_array( $vacancy ) && 1 === (int) ( $vacancy['status'] ?? 0 )
+        ? recruitment_map_vacancy( $vacancy )
+        : null;
 }
 
 /**
- * @param WP_Post|object $vacancy
+ * @param array<string, mixed> $vacancy
  * @return array<string, mixed>
  */
 function recruitment_map_vacancy( $vacancy ): array {
-    $deadline = (string) get_post_meta( $vacancy->ID, '_daw_deadline', true );
+    $deadline = strtotime( (string) ( $vacancy['deadline'] ?? '' ) );
+    $posted_at = strtotime( (string) ( $vacancy['posted_at'] ?? '' ) );
+    $responsibilities = preg_split( '/\r\n|\r|\n/', trim( (string) ( $vacancy['responsibilities'] ?? '' ) ) ) ?: [];
+    $requirements = [];
+    foreach (
+        [
+            'education_requirement' => 'Pendidikan',
+            'experience_requirement' => 'Pengalaman',
+            'certification_requirement' => 'Sertifikasi',
+        ] as $field => $label
+    ) {
+        $value = trim( (string) ( $vacancy[ $field ] ?? '' ) );
+        if ( '' !== $value ) {
+            $requirements[] = $label . ': ' . $value;
+        }
+    }
+
     return [
-        'id' => (string) $vacancy->ID,
-        'title' => get_the_title( $vacancy ),
-        'location' => (string) get_post_meta( $vacancy->ID, '_daw_location', true ),
-        'dealer' => (string) get_post_meta( $vacancy->ID, '_daw_dealer', true ),
-        'region' => (string) get_post_meta( $vacancy->ID, '_daw_region', true ),
-        'type' => (string) get_post_meta( $vacancy->ID, '_daw_type', true ),
-        'description' => wp_trim_words( wp_strip_all_tags( $vacancy->post_content ), 24 ),
-        'deadline' => $deadline ?: 'Belum ditentukan',
-        'postedDate' => get_the_date( 'j F Y', $vacancy ),
-        'requirements' => [ 'Lihat detail lowongan untuk persyaratan lengkap.' ],
+        'id' => (string) ( $vacancy['id'] ?? '' ),
+        'title' => (string) ( $vacancy['title'] ?? '' ),
+        'location' => (string) ( $vacancy['location'] ?? '' ),
+        'dealer' => (string) ( $vacancy['dealer'] ?? '' ),
+        'region' => (string) ( $vacancy['location'] ?? '' ),
+        'type' => (string) ( $vacancy['type'] ?? '' ),
+        'description' => (string) ( $vacancy['description'] ?? '' ),
+        'responsibilities' => array_values( array_filter( array_map( 'trim', $responsibilities ) ) ),
+        'deadline' => false !== $deadline ? date_i18n( 'j F Y', $deadline ) : 'Belum ditentukan',
+        'postedDate' => false !== $posted_at ? date_i18n( 'j F Y', $posted_at ) : '—',
+        'requirements' => $requirements,
+        'status' => 1 === (int) ( $vacancy['status'] ?? 0 ) ? 'published' : 'draft',
     ];
 }
 

@@ -11,45 +11,7 @@ $filters = [
 if ( ! isset( $filters[ $filter ] ) ) {
 	$filter = 'all';
 }
-$sample_requests = [
-	'FPTK-2026-032' => [
-		'code' => 'FPTK-2026-032', 'department' => 'Sales', 'position' => 'Sales Executive', 'hiring_user' => 'Andi Wirawan', 'count' => 2, 'priority' => 'Tinggi', 'date' => '22 Sep 2026', 'status' => 'Review HR',
-		'fields' => [ 'job_level' => 'Staff', 'employment_type' => 'Pegawai Tetap', 'employee_status' => 'Baru', 'target_date' => '31 Oktober 2026', 'location' => 'Manado, Sulawesi Utara', 'reason' => 'Adanya peningkatan target penjualan Q4 2026 sebesar 30% dan ekspansi ke wilayah Depok & Tangerang. Posisi ini diperlukan untuk mendukung coverage area yang lebih luas.', 'role_summary' => 'Bertanggung jawab atas pencapaian target penjualan unit kendaraan, membangun dan memelihara hubungan pelanggan, serta melakukan prospecting di wilayah yang ditentukan.', 'kpi' => 'Penjualan minimum 5 unit/bulan, customer satisfaction score ≥ 85, follow-up leads dalam 24 jam.', 'minimum_education' => 'S1 (semua jurusan)', 'minimum_experience' => 'Min. 1 tahun di bidang sales', 'age_range' => '22–35 tahun', 'certifications' => 'SIM A (wajib)', 'required_skills' => 'Komunikasi dan negosiasi baik, target-oriented, menguasai wilayah Jakarta Selatan & sekitarnya.', 'salary_range' => 'Rp 7.000.000 – Rp 10.000.000', 'recruitment_budget' => 'Tersedia', 'headcount_confirmation' => 'Sesuai Rencana' ],
-	],
-	'FPTK-2026-030' => [
-		'code' => 'FPTK-2026-030', 'department' => 'After Sales', 'position' => 'Service Advisor', 'hiring_user' => 'Benny Kurnia', 'count' => 1, 'priority' => 'Urgent', 'date' => '20 Sep 2026', 'status' => 'Review HR',
-		'fields' => [ 'job_level' => 'Staff', 'employment_type' => 'Pegawai Tetap', 'employee_status' => 'Baru', 'target_date' => '31 Oktober 2026', 'location' => 'Manado, Sulawesi Utara', 'reason' => 'Kebutuhan tenaga kerja untuk meningkatkan pelayanan pelanggan bengkel.', 'role_summary' => 'Melayani pelanggan dan mengoordinasikan kebutuhan servis kendaraan.', 'kpi' => 'Mencapai target kepuasan pelanggan dan waktu layanan.', 'minimum_education' => 'D3 Otomotif', 'minimum_experience' => 'Min. 1 tahun di bidang otomotif', 'age_range' => '22–35 tahun', 'certifications' => 'SIM A', 'required_skills' => 'Komunikasi dan pemahaman teknis otomotif.', 'salary_range' => 'Rp 6.000.000 – Rp 8.000.000', 'recruitment_budget' => 'Tersedia', 'headcount_confirmation' => 'Sesuai Rencana' ],
-	],
-	'FPTK-2026-029' => [
-		'code' => 'FPTK-2026-029', 'department' => 'Sales', 'position' => 'Sales Admin', 'hiring_user' => 'Andi Wirawan', 'count' => 1, 'priority' => 'Sedang', 'date' => '17 Sep 2026', 'status' => 'Perlu Revisi',
-		'fields' => [ 'job_level' => 'Staff', 'employment_type' => 'Pegawai Tetap', 'employee_status' => 'Pengganti', 'target_date' => '30 Oktober 2026', 'location' => 'Manado, Sulawesi Utara', 'reason' => 'Penggantian tenaga administrasi penjualan.', 'role_summary' => 'Mengelola administrasi dan dokumentasi proses penjualan.', 'kpi' => 'Akurasi dan ketepatan waktu laporan penjualan.', 'minimum_education' => 'D3 Administrasi', 'minimum_experience' => 'Min. 1 tahun', 'age_range' => '22–35 tahun', 'certifications' => '—', 'required_skills' => 'Teliti, mampu mengoperasikan aplikasi perkantoran.', 'salary_range' => 'Rp 5.000.000 – Rp 7.000.000', 'recruitment_budget' => 'Tersedia', 'headcount_confirmation' => 'Sesuai Rencana' ],
-	],
-	'FPTK-2026-027' => [
-		'code' => 'FPTK-2026-027', 'department' => 'Finance', 'position' => 'Finance Staff', 'hiring_user' => 'Dewi Susanti', 'count' => 2, 'priority' => 'Sedang', 'date' => '14 Sep 2026', 'status' => 'Disetujui',
-		'fields' => [ 'job_level' => 'Staff', 'employment_type' => 'Pegawai Tetap', 'employee_status' => 'Baru', 'target_date' => '30 Oktober 2026', 'location' => 'Manado, Sulawesi Utara', 'reason' => 'Penambahan kapasitas tim keuangan.', 'role_summary' => 'Membantu pencatatan transaksi serta penyusunan laporan keuangan.', 'kpi' => 'Laporan bulanan akurat dan tepat waktu.', 'minimum_education' => 'S1 Akuntansi', 'minimum_experience' => 'Min. 1 tahun', 'age_range' => '22–35 tahun', 'certifications' => '—', 'required_skills' => 'Memahami akuntansi dan pengolahan data.', 'salary_range' => 'Rp 6.000.000 – Rp 8.000.000', 'recruitment_budget' => 'Tersedia', 'headcount_confirmation' => 'Sesuai Rencana' ],
-	],
-	'FPTK-2026-025' => [
-		'code' => 'FPTK-2026-025', 'department' => 'Sales', 'position' => 'Customer Service', 'hiring_user' => 'Andi Wirawan', 'count' => 3, 'priority' => 'Urgent', 'date' => '10 Sep 2026', 'status' => 'Ready for Recruitment',
-		'fields' => [ 'job_level' => 'Staff', 'employment_type' => 'Pegawai Tetap', 'employee_status' => 'Baru', 'target_date' => '31 Oktober 2026', 'location' => 'Manado, Sulawesi Utara', 'reason' => 'Penambahan cakupan pelayanan pelanggan.', 'role_summary' => 'Memberikan layanan dan informasi kepada pelanggan.', 'kpi' => 'Customer satisfaction score minimal 85.', 'minimum_education' => 'SMA/SMK', 'minimum_experience' => 'Pengalaman layanan pelanggan diutamakan', 'age_range' => '20–35 tahun', 'certifications' => '—', 'required_skills' => 'Komunikasi yang baik dan berorientasi pada pelanggan.', 'salary_range' => 'Rp 5.000.000 – Rp 7.000.000', 'recruitment_budget' => 'Tersedia', 'headcount_confirmation' => 'Sesuai Rencana' ],
-	],
-	'FPTK-2026-022' => [
-		'code' => 'FPTK-2026-022', 'department' => 'Body Repair', 'position' => 'Body Repair Advisor', 'hiring_user' => 'Hendra Saputra', 'count' => 1, 'priority' => 'Rendah', 'date' => '5 Sep 2026', 'status' => 'Ditolak',
-		'fields' => [ 'job_level' => 'Staff', 'employment_type' => 'Kontrak', 'employee_status' => 'Baru', 'target_date' => '30 November 2026', 'location' => 'Manado, Sulawesi Utara', 'reason' => 'Permintaan penambahan tenaga untuk area body repair.', 'role_summary' => 'Mengoordinasikan kebutuhan pelanggan dan proses perbaikan bodi kendaraan.', 'kpi' => 'Ketepatan waktu dan kepuasan pelanggan.', 'minimum_education' => 'D3 Otomotif', 'minimum_experience' => 'Min. 1 tahun', 'age_range' => '22–35 tahun', 'certifications' => '—', 'required_skills' => 'Pemahaman dasar perbaikan bodi kendaraan.', 'salary_range' => 'Rp 5.000.000 – Rp 7.000.000', 'recruitment_budget' => 'Menunggu Persetujuan', 'headcount_confirmation' => 'Perlu Persetujuan' ],
-	],
-];
-
-$demo_statuses = get_option( 'daw_demo_department_request_statuses', [] );
-$demo_statuses = is_array( $demo_statuses ) ? $demo_statuses : [];
-foreach ( $demo_statuses as $code => $saved_status ) {
-	if ( isset( $sample_requests[ $code ] ) && is_array( $saved_status ) ) {
-		$sample_requests[ $code ]['status'] = (string) ( $saved_status['status'] ?? $sample_requests[ $code ]['status'] );
-		$sample_requests[ $code ]['hr_note'] = (string) ( $saved_status['hr_note'] ?? '' );
-		$sample_requests[ $code ]['updated_at'] = (string) ( $saved_status['updated_at'] ?? '' );
-		$sample_requests[ $code ]['vacancy_id'] = absint( $saved_status['vacancy_id'] ?? 0 );
-	}
-}
-
-$requests = $sample_requests;
+$requests = [];
 $department_users = get_users(
 	[
 		'meta_key' => 'daw_department_job_requests',
@@ -84,6 +46,9 @@ foreach ( $department_users as $department_user ) {
 			'hr_note' => (string) ( $saved_request['hr_note'] ?? '' ),
 			'owner_id' => (int) $department_user->ID,
 			'vacancy_id' => absint( $saved_request['vacancy_id'] ?? 0 ),
+			'publication_location' => (string) ( $saved_request['publication_location'] ?? $fields['location'] ?? '' ),
+			'dealer' => (string) ( $saved_request['dealer'] ?? '' ),
+			'deadline' => (string) ( $saved_request['deadline'] ?? '' ),
 		];
 	}
 }
@@ -145,7 +110,13 @@ $detail_url = static function ( array $request ): string {
 		admin_url( 'admin.php' )
 	);
 };
-$review_error = 'note_required' === sanitize_key( wp_unslash( $_GET['review_error'] ?? '' ) );
+$review_error = sanitize_key( wp_unslash( $_GET['review_error'] ?? '' ) );
+$review_error_messages = [
+	'note_required' => 'Tambahkan catatan untuk meminta revisi atau menolak pengajuan.',
+	'publication_details' => 'Isi lokasi, Dealer/AHASS, dan deadline lamaran yang valid sebelum menyetujui.',
+	'publication_failed' => 'Lowongan gagal diterbitkan di Oracle. Pengajuan tetap menunggu keputusan; periksa koneksi dan coba lagi.',
+	'link_failed' => 'Lowongan sudah diterbitkan, tetapi status pengajuan tidak berhasil diperbarui. Periksa lowongan Oracle sebelum mencoba lagi.',
+];
 $reviewed = '1' === sanitize_text_field( wp_unslash( $_GET['reviewed'] ?? '' ) );
 ?>
 <div class="wrap daw-requests-page">
@@ -176,25 +147,39 @@ $reviewed = '1' === sanitize_text_field( wp_unslash( $_GET['reviewed'] ?? '' ) )
 			?>
 			<a class="daw-requests__back" href="<?= esc_url( $filter_url( $filter ) ) ?>">&larr; Kembali</a>
 			<div class="daw-requests__detail-heading"><div><p><?= esc_html( $selected_request['code'] ) ?></p><span>Diajukan oleh <?= esc_html( $selected_request['hiring_user'] ) ?> — <?= esc_html( $selected_request['date'] ) ?></span></div><span class="daw-requests__status daw-requests__status--<?= esc_attr( $status_classes[ $status ] ?? 'draft' ) ?>"><?= esc_html( $display_status ) ?></span></div>
-			<div class="daw-requests__info" role="note">Jika disetujui, sistem akan membuat lowongan sebagai draft di Daftar Lowongan berdasarkan data FPTK ini. HR dapat meninjau dan memublikasikannya setelahnya.</div>
+			<?php if ( 'Disetujui' === $status && empty( $selected_request['vacancy_id'] ) ) : ?>
+				<div class="daw-requests__info" role="note">Pengajuan ini sebelumnya disetujui tetapi belum diterbitkan. Lengkapi Dealer/AHASS dan deadline untuk langsung menerbitkannya.</div>
+			<?php elseif ( 'Lowongan Dibuka' === $status ) : ?>
+				<div class="daw-requests__info" role="status">Lowongan sudah diterbitkan<?php if ( ! empty( $selected_request['vacancy_id'] ) ) : ?> (ID lowongan Oracle: <?= esc_html( (string) $selected_request['vacancy_id'] ) ?>)<?php endif; ?>.</div>
+			<?php endif; ?>
 			<section class="daw-requests__card"><h2>Informasi Permintaan</h2><dl class="daw-requests__facts"><?php foreach ( $detail_fields as $label => $value ) : ?><div><dt><?= esc_html( $label ) ?></dt><dd><?= esc_html( (string) $value ) ?></dd></div><?php endforeach; ?></dl><div class="daw-requests__copy"><span>Alasan Kebutuhan</span><p><?= esc_html( $fields['reason'] ?? 'Belum tersedia' ) ?></p></div></section>
 			<section class="daw-requests__card"><h2>Tujuan Posisi</h2><div class="daw-requests__copy"><span>Ringkasan Peran</span><p><?= esc_html( $fields['role_summary'] ?? 'Belum tersedia' ) ?></p><span>KPI / Target Utama</span><p><?= esc_html( $fields['kpi'] ?? 'Belum tersedia' ) ?></p></div></section>
 			<section class="daw-requests__card"><h2>Profil Kandidat</h2><dl class="daw-requests__facts"><div><dt>Pendidikan Minimum</dt><dd><?= esc_html( $fields['minimum_education'] ?? '—' ) ?></dd></div><div><dt>Pengalaman</dt><dd><?= esc_html( $fields['minimum_experience'] ?? '—' ) ?></dd></div><div><dt>Usia</dt><dd><?= esc_html( $fields['age_range'] ?? '—' ) ?></dd></div><div><dt>SIM</dt><dd><?= esc_html( $fields['certifications'] ?? '—' ) ?></dd></div></dl><div class="daw-requests__copy"><span>Keahlian Wajib</span><p><?= esc_html( $fields['required_skills'] ?? '—' ) ?></p></div></section>
 			<section class="daw-requests__card"><h2>Validasi Requirement</h2><dl class="daw-requests__facts"><div><dt>Budget Gaji</dt><dd><?= esc_html( $fields['salary_range'] ?? '—' ) ?></dd></div><div><dt>Anggaran Rekrutmen</dt><dd><?= esc_html( $fields['recruitment_budget'] ?? '—' ) ?></dd></div><div><dt>Konfirmasi Headcount</dt><dd><?= esc_html( $fields['headcount_confirmation'] ?? '—' ) ?></dd></div></dl></section>
 			<section class="daw-requests__card daw-requests__decision"><h2>Keputusan HR</h2>
-				<?php if ( $review_error ) : ?><p class="daw-requests__feedback daw-requests__feedback--error" role="alert">Tambahkan catatan untuk meminta revisi atau menolak pengajuan.</p><?php elseif ( $reviewed ) : ?><p class="daw-requests__feedback" role="status">Keputusan pengajuan berhasil disimpan.</p><?php endif; ?>
-				<?php if ( in_array( $status, $status_filters['review'], true ) ) : ?>
-					<form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>">
+				<?php if ( isset( $review_error_messages[ $review_error ] ) ) : ?><p class="daw-requests__feedback daw-requests__feedback--error" role="alert"><?= esc_html( $review_error_messages[ $review_error ] ) ?></p><?php elseif ( $reviewed ) : ?><p class="daw-requests__feedback" role="status">Keputusan berhasil disimpan. Pengajuan yang disetujui langsung diterbitkan di portal lowongan.</p><?php endif; ?>
+				<?php if ( in_array( $status, $status_filters['review'], true ) || ( 'Disetujui' === $status && empty( $selected_request['vacancy_id'] ) ) ) : ?>
+					<form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" data-department-review-form>
 						<input type="hidden" name="action" value="daw_review_department_request"><input type="hidden" name="request_code" value="<?= esc_attr( $selected_request['code'] ) ?>"><input type="hidden" name="owner_id" value="<?= esc_attr( (string) ( $selected_request['owner_id'] ?? 0 ) ) ?>">
-						<?php if ( empty( $selected_request['owner_id'] ) ) : ?><input type="hidden" name="vacancy_title" value="<?= esc_attr( $selected_request['position'] ) ?>"><input type="hidden" name="vacancy_content" value="<?= esc_attr( $fields['role_summary'] ?? '' ) ?>"><input type="hidden" name="vacancy_location" value="<?= esc_attr( $fields['location'] ?? '' ) ?>"><input type="hidden" name="vacancy_type" value="<?= esc_attr( $fields['employment_type'] ?? '' ) ?>"><?php endif; ?>
 						<?php wp_nonce_field( 'daw_review_department_request' ); ?>
 						<div class="daw-requests__decision-options">
-							<label><input type="radio" name="decision" value="approve" required><span>Setujui &amp; Buat Lowongan</span></label>
-							<label><input type="radio" name="decision" value="revise" required><span>Perlu Revisi</span></label>
-							<label><input type="radio" name="decision" value="reject" required><span>Tolak</span></label>
+							<?php if ( 'Disetujui' === $status ) : ?>
+								<input type="hidden" name="decision" value="approve">
+							<?php else : ?>
+								<label><input type="radio" name="decision" value="approve" required><span>Setujui &amp; Terbitkan</span></label>
+								<label><input type="radio" name="decision" value="revise" required><span>Perlu Revisi</span></label>
+								<label><input type="radio" name="decision" value="reject" required><span>Tolak</span></label>
+							<?php endif; ?>
 						</div>
+						<fieldset class="daw-requests__publish-fields" data-publish-request-fields <?= 'Disetujui' === $status ? '' : 'hidden' ?>>
+							<legend>Data yang diperlukan untuk menerbitkan lowongan</legend>
+							<label>Lokasi Penempatan<input name="location" maxlength="100" value="<?= esc_attr( (string) ( $selected_request['publication_location'] ?? '' ) ) ?>" data-publish-required="<?= 'Disetujui' === $status ? 'true' : 'false' ?>" <?= 'Disetujui' === $status ? 'required' : '' ?>></label>
+							<label>Dealer / AHASS<input name="dealer" maxlength="100" value="<?= esc_attr( (string) ( $selected_request['dealer'] ?? '' ) ) ?>" data-publish-required="<?= 'Disetujui' === $status ? 'true' : 'false' ?>" <?= 'Disetujui' === $status ? 'required' : '' ?>></label>
+							<label>Deadline Lamaran<input name="deadline" type="date" value="<?= esc_attr( (string) ( $selected_request['deadline'] ?? '' ) ) ?>" data-publish-required="<?= 'Disetujui' === $status ? 'true' : 'false' ?>" <?= 'Disetujui' === $status ? 'required' : '' ?>></label>
+							<p>Lengkapi lokasi bila belum dicantumkan. Setelah disetujui, lowongan langsung diterbitkan di portal pelamar.</p>
+						</fieldset>
 						<label class="daw-requests__note">Catatan HR<textarea name="hr_note" rows="3" placeholder="Tambahkan catatan, terutama jika meminta revisi atau menolak..."><?= esc_textarea( $selected_request['hr_note'] ?? '' ) ?></textarea></label>
-						<div class="daw-requests__decision-submit"><button type="submit">Konfirmasi Keputusan</button></div>
+						<div class="daw-requests__decision-submit"><button type="submit"><?= 'Disetujui' === $status ? 'Terbitkan Lowongan' : 'Konfirmasi Keputusan' ?></button></div>
 					</form>
 				<?php else : ?>
 					<p class="daw-requests__processed">Keputusan: <strong><?= esc_html( $status ) ?></strong></p><p class="daw-requests__processed">Catatan HR: <?= esc_html( $selected_request['hr_note'] ?? 'Belum ada catatan.' ) ?></p>

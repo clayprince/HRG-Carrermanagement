@@ -7,11 +7,10 @@ $name = (string) $current_user->display_name;
 $email = (string) $current_user->user_email;
 $ui_preview = recruitment_is_ui_preview()
     || ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options' ) );
-$vacancy = $job_id ? get_post( $job_id ) : null;
-$vacancy_is_available = $vacancy
-    && 'daw_vacancy' === $vacancy->post_type
-    && 'publish' === $vacancy->post_status;
-$job = $vacancy_is_available ? recruitment_map_vacancy( $vacancy ) : [];
+$vacancy_database = new Recruitment_Database();
+$vacancy_record = $job_id ? $vacancy_database->get_vacancy( $job_id ) : null;
+$vacancy_is_available = is_array( $vacancy_record ) && 1 === (int) ( $vacancy_record['status'] ?? 0 );
+$job = $vacancy_is_available ? recruitment_map_vacancy( $vacancy_record ) : [];
 $job_title = (string) ( $job['title'] ?? '' );
 $job_meta = trim( (string) ( $job['dealer'] ?? '' ) . ' · ' . (string) ( $job['location'] ?? '' ), ' ·' );
 $job_deadline = (string) ( $job['deadline'] ?? '' );
@@ -33,7 +32,9 @@ $errors = [];
 $submitted = false;
 
 if ( ! $vacancy_is_available ) {
-    $errors[] = 'Lowongan tidak tersedia atau sudah tidak dipublikasikan.';
+    $errors[] = $vacancy_database->has_error()
+        ? 'Lowongan belum dapat dimuat dari Oracle. Silakan coba kembali nanti.'
+        : 'Lowongan tidak tersedia atau sudah tidak dipublikasikan.';
 }
 if ( ! $form_available ) {
     $errors[] = 'Form lamaran belum tersedia. Silakan hubungi tim HR.';

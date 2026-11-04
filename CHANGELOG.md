@@ -4,6 +4,55 @@ This file records material, verified project changes and guides future human
 and AI contributors. It is not a substitute for source review or a database
 migration log.
 
+## 2026-11-04
+
+### Publishing approved vacancy requests
+
+- HR approval now creates the Oracle request, landing entry, and detail record
+  in one transaction, publishing the vacancy immediately and linking its Oracle
+  ID back to the department request. Retrying an interrupted approval reuses
+  the vacancy identified by its FPTK instead of creating a duplicate.
+- HR's own vacancy form follows the department request's six-step structure and
+  saves new vacancies as Draft for separate publication.
+- Added migration `009_hr_vacancy_form_details.sql` for HR request values not
+  represented by ERD columns. With the database owner's approval, applied and
+  verified it on the connected local Oracle schema.
+- Published request `FPTK-2026-001` to Oracle and verified it appears on the
+  public careers page. No applicant records were changed.
+
+### Restoring the dynamic application-form builder
+
+- Aligned builder queries with `HRS_BAGIAN_PENDAFTARAN`, the current ERD table
+  name. Oracle errors now include the failed load stage and, when available,
+  the sanitized ORA code in the server log.
+- Added migration `008_dynamic_application_forms_hrs.sql` for the current
+  `HRS_*` schema, which lacked the section active flag and dynamic-form tables.
+  With the database owner's approval, applied all five migration blocks to
+  the connected local Oracle schema. The builder then loaded 5 sections and 23
+  questions with editing controls enabled. No applicant records were changed.
+
+### Alignment with the updated Oracle ERD
+
+- Fixed-form application submissions now write candidate, education, work
+  experience, family, personal-interest, PDP, login-profile, application, and
+  initial status-history records to the `HRS_*` tables in one transaction.
+- Public and admin vacancy listing/creation/status changes use Oracle. The
+  landing status maps 0 to Draft and 1 to Published; WordPress vacancy posts
+  are no longer a public source.
+- The application-form builder can manage Oracle-backed sections and
+  questions. Core fields remain required by the ERD mapping and cannot be
+  removed or assigned incompatible answer types; admins can edit their labels
+  and required state and add custom questions.
+- Custom answers are stored as snapshots in `RECRUIT_FORM_ANSWERS` alongside
+  the fixed candidate/application records. This requires migration 003 on the
+  target Oracle schema; the plugin does not apply migrations automatically.
+- Applicant and portal account login, registration, password reset, and
+  account management are disabled because the updated ERD does not support
+  safe credential storage/status.
+- Updated the Oracle schema note to distinguish the supplied ERD from a live
+  database verification. PHP lint, JavaScript syntax, and static INSERT-column
+  comparisons passed; live Oracle transactions were not tested.
+
 ## 2026-11-03
 
 ### Portal login and account management

@@ -323,7 +323,10 @@ class Recruitment_Plugin {
             $created = ( new Recruitment_Database() )->create_applicant_account( $email, $name, $password );
             if ( empty( $created['success'] ) ) {
                 $error = (string) ( $created['error'] ?? 'registration_failed' );
-                $this->redirect_to_applicant_screen( 'applicant-register', 'email_exists' === $error ? 'email_exists' : 'registration_failed' );
+                $this->redirect_to_applicant_screen(
+                    'applicant-register',
+                    'email_exists' === $error ? 'email_exists' : ( 'schema_unsupported' === $error ? 'account_unavailable' : 'registration_failed' )
+                );
             }
 
             if ( ! $this->establish_applicant_session( $email, $name, false ) ) {
@@ -339,7 +342,10 @@ class Recruitment_Plugin {
             $result = ( new Recruitment_Database() )->authenticate_applicant_account( $login, $password );
             if ( empty( $result['success'] ) ) {
                 $error = (string) ( $result['error'] ?? 'invalid_credentials' );
-                $this->redirect_to_applicant_screen( 'applicant-login', 'service_unavailable' === $error ? 'account_unavailable' : 'invalid_credentials' );
+                $this->redirect_to_applicant_screen(
+                    'applicant-login',
+                    in_array( $error, [ 'service_unavailable', 'schema_unsupported' ], true ) ? 'account_unavailable' : 'invalid_credentials'
+                );
             }
             $account = $result['account'];
             if ( ! $this->establish_applicant_session( $account['email'], $account['full_name'], ! empty( $_POST['remember'] ) ) ) {
@@ -488,7 +494,10 @@ class Recruitment_Plugin {
         if ( empty( $authentication['success'] ) ) {
             $this->record_failed_login( $throttle_key );
             $error = (string) ( $authentication['error'] ?? 'invalid_credentials' );
-            $this->redirect_to_portal_login( $target, 'service_unavailable' === $error ? 'service_unavailable' : 'invalid_credentials' );
+            $this->redirect_to_portal_login(
+                $target,
+                'schema_unsupported' === $error ? 'schema_unsupported' : ( 'service_unavailable' === $error ? 'service_unavailable' : 'invalid_credentials' )
+            );
         }
         delete_transient( $throttle_key );
 
@@ -776,12 +785,14 @@ class Recruitment_Plugin {
             'daw_vacancy',
             [
                 'labels'       => [ 'name' => 'Lowongan', 'singular_name' => 'Lowongan' ],
-                'public'       => true,
-                'show_in_rest' => true,
-                'supports'     => [ 'title', 'editor', 'excerpt' ],
-                'menu_icon'    => 'dashicons-businessperson',
-                'show_in_menu' => 'recruitment-dashboard',
-                'rewrite'      => [ 'slug' => 'lowongan' ],
+                    'public'       => false,
+                    'publicly_queryable' => false,
+                    'show_ui'      => false,
+                    'show_in_menu' => false,
+                    'show_in_rest' => false,
+                    'supports'     => [ 'title', 'editor', 'excerpt' ],
+                    'menu_icon'    => 'dashicons-businessperson',
+                    'rewrite'      => false,
             ]
         );
     }
@@ -868,6 +879,7 @@ class Recruitment_Plugin {
                 'no_access' => 'Akun ini belum memiliki akses ke portal yang dipilih.',
                 'inactive_account' => 'Akun ini sedang nonaktif. Hubungi administrator.',
                 'service_unavailable' => 'Database akun belum tersedia. Silakan coba kembali nanti.',
+                'schema_unsupported' => 'Login Oracle dinonaktifkan karena struktur ERD terbaru belum menyediakan skema akun yang aman.',
             ];
             $error_key = sanitize_key( wp_unslash( $_GET['login_error'] ?? '' ) );
             $page_data['error'] = $error_messages[ $error_key ] ?? '';
