@@ -2374,7 +2374,7 @@ class Recruitment_Database {
         if ( ! isset( $question_types[0]['type'] ) ) {
             return [ 'success' => false, 'error' => 'Soal tes IQ tidak ditemukan.' ];
         }
-        $maximum_answers = false !== stripos( (string) $question_types[0]['type'], 'multi' ) ? 2 : 1;
+        $maximum_answers = $this->psychotest_allows_multiple_answers( (string) $question_types[0]['type'] ) ? 2 : 1;
         if ( $maximum_answers < count( $selected_answer_ids ) ) {
             return [ 'success' => false, 'error' => 'Jumlah pilihan melebihi batas untuk soal ini.' ];
         }
@@ -2836,16 +2836,17 @@ class Recruitment_Database {
         try {
             $statement = $this->get_connection()->prepare( $sql );
             $statement->execute( $parameters );
-            $rows = $statement->fetchAll( PDO::FETCH_ASSOC );
-            foreach ( $rows as &$row ) {
+            $rows = [];
+            // Read CLOB locators before fetching another row; PDO_OCI can reuse them.
+            while ( false !== ( $row = $statement->fetch( PDO::FETCH_ASSOC ) ) ) {
                 foreach ( $row as &$value ) {
                     if ( is_resource( $value ) || ( is_object( $value ) && method_exists( $value, 'load' ) ) ) {
                         $value = $this->oracle_lob_to_string( $value );
                     }
                 }
                 unset( $value );
+                $rows[] = $row;
             }
-            unset( $row );
             return $rows;
         } catch ( PDOException | RuntimeException $exception ) {
             $this->last_error = $exception->getMessage();
@@ -2897,12 +2898,13 @@ class Recruitment_Database {
                         }
                         if ( ! isset( $tests[ $test_id ]['questions_by_id'][ $question_id ] ) ) {
                             $question_text = (string) ( $row['question_text'] ?? '' );
+                            $prompt = $this->decode_psychotest_prompt( $question_text );
                             $items = in_array( $tests[ $test_id ]['test_key'], [ 'disc', 'papi' ], true )
                                 ? $this->decode_psychotest_items( $question_text )
                                 : [];
                             $tests[ $test_id ]['questions_by_id'][ $question_id ] = [
                                 'id' => $question_id,
-                                'prompt' => $question_text,
+                                'prompt' => $prompt,
                                 'items' => $items,
                                 'type' => $this->psychotest_question_type( (string) ( $row['question_type'] ?? '' ), $tests[ $test_id ]['test_key'] ),
                                 'number' => absint( $row['question_order'] ?? $question_id ),
@@ -2980,7 +2982,19 @@ class Recruitment_Database {
                     if ( 'pauli' === $test_key ) {
                         return 'numeric';
                     }
-                    return false !== stripos( $type, 'multi' ) ? 'multi_select' : 'multiple_choice';
+                    return $this->psychotest_allows_multiple_answers( $type ) ? 'multi_select' : 'multiple_choice';
+                }
+
+                private function psychotest_allows_multiple_answers( string $type ): bool {
+                    return in_array( strtolower( trim( $type ) ), [ 'multi_select', 'multiple_select' ], true );
+                }
+
+                private function decode_psychotest_prompt( string $text ): string {
+                    $decoded = json_decode( $text, true );
+                    if ( is_array( $decoded ) && isset( $decoded['prompt'] ) && is_string( $decoded['prompt'] ) ) {
+                        return trim( $decoded['prompt'] );
+                    }
+                    return trim( $text );
                 }
 
                 /**
@@ -2989,7 +3003,10 @@ class Recruitment_Database {
                 private function decode_psychotest_items( string $text ): array {
                     $decoded = json_decode( $text, true );
                     if ( is_array( $decoded ) ) {
-                        $items = array_values( array_filter( $decoded, 'is_string' ) );
+                        $values = isset( $decoded['items'] ) && is_array( $decoded['items'] )
+                            ? $decoded['items']
+                            : $decoded;
+                        $items = array_values( array_filter( $values, 'is_string' ) );
                     } else {
                         $items = preg_split( '/\r\n|\r|\n/', $text ) ?: [];
                     }

@@ -51,6 +51,10 @@ $psychotest_home_url = recruitment_get_public_url( 'psychotest' );
                     <form method="post" action="<?= esc_url( recruitment_get_public_url( 'psych-iq' ) ) ?>" data-iq-form>
                         <?php wp_nonce_field( 'recruitment_iq_advance' ); ?>
                         <input type="hidden" name="iq_action" value="advance">
+                        <div class="daw-iq-assessment__progress">
+                            <span data-iq-progress-label>0 dari <?= esc_html( (string) count( $view['questions'] ) ) ?> soal dijawab</span>
+                            <progress max="<?= esc_attr( (string) count( $view['questions'] ) ) ?>" value="0" data-iq-progress-bar aria-label="Progress menjawab soal"></progress>
+                        </div>
                         <div class="daw-iq-assessment__questions">
                             <?php foreach ( $view['questions'] as $question ) :
                                 $question_id = (int) $question['id'];
@@ -60,7 +64,7 @@ $psychotest_home_url = recruitment_get_public_url( 'psychotest' );
                                 <fieldset class="daw-iq-assessment__question" data-iq-question="<?= esc_attr( (string) $question_id ) ?>" data-max-select="<?= esc_attr( 'checkbox' === $input_type ? '2' : '1' ) ?>">
                                     <legend><strong>Nomor <?= esc_html( (string) $question['number'] ) ?></strong> <?= esc_html( $question['prompt'] ) ?></legend>
                                     <input type="hidden" name="answer_present[<?= esc_attr( (string) $question_id ) ?>]" value="1">
-                                    <?php foreach ( $question['choices'] as $choice ) :
+                                    <?php foreach ( $question['choices'] as $choice_index => $choice ) :
                                         $choice_id = (int) $choice['id'];
                                         ?>
                                         <label class="daw-iq-assessment__choice">
@@ -71,13 +75,17 @@ $psychotest_home_url = recruitment_get_public_url( 'psychotest' );
                                                 data-iq-answer
                                                 <?= checked( in_array( $choice_id, $selected_answers, true ), true, false ) ?>
                                             >
-                                            <span><?= esc_html( $choice['text'] ) ?></span>
+                                            <span class="daw-iq-assessment__choice-key" aria-hidden="true"><?= esc_html( chr( 65 + (int) $choice_index ) ) ?></span>
+                                            <span class="daw-iq-assessment__choice-text"><?= esc_html( $choice['text'] ) ?></span>
                                         </label>
                                     <?php endforeach; ?>
                                 </fieldset>
                             <?php endforeach; ?>
                         </div>
-                        <button type="submit" class="daw-psych-test-button">Selesaikan subtes</button>
+                        <div class="daw-iq-assessment__footer">
+                            <span>Pastikan jawaban tersimpan sebelum mengakhiri subtes.</span>
+                            <button type="submit" class="daw-psych-test-button">Selesaikan subtes <?= esc_html( (string) ( $view['test']['index'] + 1 ) ) ?></button>
+                        </div>
                     </form>
                 </section>
             <?php endif; ?>

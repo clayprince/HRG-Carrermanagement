@@ -161,7 +161,7 @@ class Recruitment_IQ_Assessment {
                 'deadline' => (int) $test_state['deadline'],
                 'index' => $index,
                 'count' => count( $state['tests'] ),
-                'instructions' => (string) $test['INSTRUCTIONS'],
+                'instructions' => 'Baca setiap soal dengan teliti dan pilih jawaban sesuai petunjuk pada soal. Jawaban disimpan otomatis. Waktu subtes: ' . (int) $test['DURATION'] . ' menit.',
             ],
             'questions' => $questions,
             'nonce' => wp_create_nonce( 'recruitment_iq_save_answer' ),

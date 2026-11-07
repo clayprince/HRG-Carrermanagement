@@ -16,6 +16,9 @@ the Oracle gateway. Do not treat the databases as interchangeable.
 - Use prepared statements, bound parameters, and transactions for related
   multi-record writes. Return and report errors using existing gateway
   conventions.
+- The Oracle gateway converts CLOB values while fetching each row. Keep this
+  row-by-row conversion: PDO_OCI may reuse LOB locators when results are
+  fetched in bulk, causing distinct question text to appear identical.
 
 The connection reads settings in this order: PHP constants, process
 environment variables, the file pointed to by `RECRUITMENT_DOTENV_PATH`, then

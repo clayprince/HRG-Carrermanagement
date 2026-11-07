@@ -549,11 +549,26 @@
     const form = root.querySelector("[data-iq-form]");
     const status = root.querySelector("[data-iq-save-status]");
     const timer = root.querySelector("[data-iq-timer]");
+    const progressLabel = root.querySelector("[data-iq-progress-label]");
+    const progressBar = root.querySelector("[data-iq-progress-bar]");
     if (!form || !status || !timer) {
       return;
     }
 
     const pendingTimers = new Map();
+    const updateProgress = function updateProgress() {
+      const questions = [...form.querySelectorAll("[data-iq-question]")];
+      const answered = questions.filter((question) =>
+        question.querySelector("[data-iq-answer]:checked"),
+      ).length;
+      if (progressLabel) {
+        progressLabel.textContent = `${answered} dari ${questions.length} soal dijawab`;
+      }
+      if (progressBar) {
+        progressBar.value = answered;
+        progressBar.setAttribute("aria-valuetext", `${answered} dari ${questions.length} soal dijawab`);
+      }
+    };
     let saveQueue = Promise.resolve();
     const saveQuestion = function saveQuestion(question) {
       const inputs = question.querySelectorAll("[data-iq-answer]:checked");
@@ -598,6 +613,7 @@
         status.textContent = `Pilih paling banyak ${question.dataset.maxSelect || 1} jawaban untuk soal ini.`;
         return;
       }
+      updateProgress();
       window.clearTimeout(pendingTimers.get(question));
       pendingTimers.set(
         question,
@@ -623,6 +639,7 @@
         .catch(function preventIncompleteSubmit() {});
     });
 
+    updateProgress();
     const deadline = Number(root.dataset.deadline || 0);
     const updateTimer = function updateIqTimer() {
       const remaining = Math.max(0, deadline - Math.floor(Date.now() / 1000));
