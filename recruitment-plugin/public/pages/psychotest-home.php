@@ -1,15 +1,23 @@
 <?php
 $back_url = recruitment_get_public_url( 'application-process' );
-$user_id = get_current_user_id();
-$iq_state = get_user_meta( $user_id, 'recruitment_iq_assessment', true );
-$pauli_state = get_user_meta( $user_id, 'recruitment_pauli_assessment', true );
-$personality_state = get_user_meta( $user_id, 'recruitment_personality_assessment', true );
+$user_id = recruitment_get_assessment_user_id();
+$iq_state = recruitment_get_assessment_state( $user_id, 'recruitment_iq_assessment' );
+$pauli_state = recruitment_get_assessment_state( $user_id, 'recruitment_pauli_assessment' );
+$personality_state = recruitment_get_assessment_state( $user_id, 'recruitment_personality_assessment' );
 $iq_complete = is_array( $iq_state ) && 'complete' === ( $iq_state['status'] ?? '' );
 $pauli_complete = is_array( $pauli_state ) && 'complete' === ( $pauli_state['status'] ?? '' );
 $disc_complete = is_array( $personality_state ) && 'complete' === ( $personality_state['tests']['disc']['status'] ?? '' );
 $papi_complete = is_array( $personality_state ) && 'complete' === ( $personality_state['tests']['papi']['status'] ?? '' );
 $completed_count = count( array_filter( [ $iq_complete, $pauli_complete, $disc_complete, $papi_complete ] ) );
 $progress = (int) round( $completed_count / 4 * 100 );
+$assessment_database = new Recruitment_Database();
+$pauli_assessments = $assessment_database->get_pauli_assessment();
+$pauli_duration = $assessment_database->has_error()
+    ? 0
+    : absint( $pauli_assessments[0]['DURATION'] ?? 0 );
+$pauli_duration_label = $pauli_duration > 0
+    ? $pauli_duration . ' menit'
+    : 'Belum tersedia';
 $tests = [
     [
         'number' => '01',
@@ -26,7 +34,7 @@ $tests = [
         'number' => '02',
         'title' => 'PAULI',
         'description' => 'Tes Ketelitian dan Konsentrasi Kerja',
-        'duration' => '60 menit',
+        'duration' => $pauli_duration_label,
         'complete' => $pauli_complete,
         'active' => is_array( $pauli_state ) && 'active' === ( $pauli_state['status'] ?? '' ),
         'unlocked' => $iq_complete,
@@ -67,7 +75,7 @@ $tests = [
                 <div class="daw-recruitment__psychotest-header-copy">
                     <span class="daw-recruitment__eyebrow daw-recruitment__eyebrow--red">TES PSIKOLOGI ONLINE</span>
                     <h1>Tes Psikologi</h1>
-                    <p>Selesaikan tes secara berurutan. Jawaban tersimpan saat Anda mengerjakannya.</p>
+                    <p>Selesaikan tes secara berurutan. Jawaban tersimpan saat Anda mengerjakannya. Durasi Pauli berubah mengikuti jumlah kolom yang ditetapkan HR.</p>
                 </div>
                 <div class="daw-recruitment__psychotest-counter" aria-label="Progress tes psikologi">
                     <span class="daw-recruitment__muted-small"><?= esc_html( (string) $completed_count ) ?> / 4</span>
@@ -94,7 +102,7 @@ $tests = [
                     <div class="daw-recruitment__info-box-icon" aria-hidden="true">i</div>
                     <div>
                         <strong>Sebelum memulai</strong>
-                        <p>Gunakan perangkat yang nyaman, koneksi internet stabil, dan tempat yang tenang. Tes Pauli berlangsung 60 menit; DISC dan PAPI tidak dibatasi waktu dan hanya menampilkan pengingat.</p>
+                        <p>Gunakan perangkat yang nyaman, koneksi internet stabil, dan tempat yang tenang. Tes Pauli berdurasi <?= esc_html( $pauli_duration_label ) ?>; DISC dan PAPI tidak dibatasi waktu dan hanya menampilkan pengingat.</p>
                     </div>
                 </div>
             </section>

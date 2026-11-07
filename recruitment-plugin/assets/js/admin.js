@@ -852,40 +852,101 @@ document.documentElement.classList.add("js");
   const choices = form.querySelector("[data-question-choices]");
   const choicesLabel = form.querySelector("[data-question-choices-label]");
   const answerLabel = form.querySelector("[data-question-answer-label]");
+  const test = form.querySelector("[data-question-test]");
+  const subtest = form.querySelector("[data-question-subtest]");
+  const type = form.querySelector("[data-question-type]");
+  const promptHelp = form.querySelector("[data-question-prompt-help]");
+  const questionAction = form.querySelector("[data-question-action]");
+  const questionTestValue = form.querySelector("[data-question-test-value]");
+  const questionSubtestValue = form.querySelector(
+    "[data-question-subtest-value]",
+  );
+  const questionTypeValue = form.querySelector("[data-question-type-value]");
+  const updateQuestionFields = function updateQuestionFields() {
+    const isIq = "iq" === test.value;
+    const isPauli = "pauli" === test.value;
+    const isPersonality = ["disc", "papi"].includes(test.value);
+    form.querySelector("[data-question-subtest-label]").hidden = !isIq;
+    form.querySelector("[data-question-type-label]").hidden = !isIq;
+    choicesLabel.hidden = !isIq;
+    answerLabel.hidden = !isIq;
+    subtest.disabled = !isIq || Boolean(form.querySelector("[data-question-id]").value);
+    type.disabled = !isIq || Boolean(form.querySelector("[data-question-id]").value);
+    questionTestValue.value = test.value;
+    questionSubtestValue.value = subtest.value;
+    questionTypeValue.value = type.value;
+    if (isIq) {
+      promptHelp.textContent = "Masukkan satu pertanyaan IQ.";
+    } else if (isPauli) {
+      promptHelp.textContent =
+        "Membuat satu kolom Pauli berisi 100 angka acak dan 99 jawaban.";
+    } else if (isPersonality) {
+      promptHelp.textContent =
+        "Masukkan satu pernyataan per baris (DISC: 4; PAPI Kostick: 2).";
+    } else {
+      promptHelp.textContent = "";
+    }
+  };
+  const setQuestionTypeForTest = function setQuestionTypeForTest() {
+    if ("iq" === test.value) {
+      type.value = "multiple_choice";
+    } else if ("pauli" === test.value) {
+      type.value = "numeric";
+    } else {
+      type.value = "paired";
+    }
+    updateQuestionFields();
+  };
   const updateTypeFields = function updateTypeFields() {
-    const type = form.querySelector("[data-question-type]").value;
-    choicesLabel.hidden = "numeric" === type;
-    answerLabel.hidden = !["multiple_choice", "numeric"].includes(type);
+    const isIq = "iq" === test.value;
+    const questionType = type.value;
+    choicesLabel.hidden = !isIq || "numeric" === questionType;
+    answerLabel.hidden =
+      !isIq ||
+      !["multiple_choice", "multi_select", "numeric"].includes(questionType);
+    questionTypeValue.value = type.value;
   };
   const openDialog = function openDialog(question) {
     form.reset();
     form.querySelector("[data-question-id]").value = question
       ? question.dataset.id
       : "";
-    form.querySelector("[data-question-test]").value = question
+    questionAction.value = question ? "save_question" : "create_question";
+    test.value = question
       ? question.dataset.test
-      : "iq";
-    form.querySelector("[data-question-type]").value = question
+      : bank.dataset.filterTest || "iq";
+    subtest.value = question ? question.dataset.subtest || "" : "iq_numbers";
+    type.value = question
       ? question.dataset.type
-      : "multiple_choice";
-    form.querySelector("[data-question-status]").value = question
-      ? question.dataset.status
-      : "active";
-    prompt.value = question ? question.dataset.prompt : "";
-    choices.value = question ? question.dataset.choices : "";
+      : "iq" === test.value
+        ? "multiple_choice"
+        : "pauli" === test.value
+          ? "numeric"
+          : "paired";
+    test.disabled = Boolean(question);
+    prompt.value = question
+      ? question.dataset.prompt || ""
+      : "pauli" === test.value
+        ? "Kolom Pauli baru"
+        : "";
+    choices.value = question ? question.dataset.choices || "" : "";
     form.querySelector("[data-question-answer]").value = question
-      ? question.dataset.answer
+      ? question.dataset.answer || ""
       : "";
+    form.querySelector("[data-question-submit]").textContent = question
+      ? "Simpan Perubahan"
+      : "Tambah Soal";
     bank.querySelector("#question-dialog-title").textContent = question
       ? "Edit Soal"
       : "Tambah Soal";
+    updateQuestionFields();
     updateTypeFields();
     dialog.showModal();
     prompt.focus();
   };
 
   bank
-    .querySelector("[data-open-question-dialog]")
+    .querySelector("[data-new-question]")
     .addEventListener("click", function addQuestion() {
       openDialog(null);
     });
@@ -899,6 +960,10 @@ document.documentElement.classList.add("js");
   form
     .querySelector("[data-question-type]")
     .addEventListener("change", updateTypeFields);
+  test.addEventListener("change", setQuestionTypeForTest);
+  subtest.addEventListener("change", function syncQuestionSubtest() {
+    questionSubtestValue.value = subtest.value;
+  });
   dialog
     .querySelectorAll("[data-close-question-dialog]")
     .forEach(function bindClose(button) {

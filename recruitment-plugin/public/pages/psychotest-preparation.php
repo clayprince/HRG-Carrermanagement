@@ -2,6 +2,11 @@
 $back_url = recruitment_get_public_url( 'psychotest' );
 $test_key = sanitize_key( wp_unslash( $_GET['test'] ?? 'iq' ) );
 $test_key = in_array( $test_key, [ 'iq', 'pauli', 'disc', 'papi' ], true ) ? $test_key : 'iq';
+$global_settings = (array) get_option( 'recruitment_psychotest_settings', [] );
+$test_settings = (array) get_option( 'recruitment_psychotest_tests', [] );
+$camera_required = isset( $test_settings[ $test_key ]['camera_required'] )
+    ? ! empty( $test_settings[ $test_key ]['camera_required'] )
+    : ! empty( $global_settings['camera_required'] ?? true );
 $device_url = recruitment_get_public_url( 'psychotest-device', [ 'test' => $test_key ] );
 ?>
 <div class="daw-recruitment daw-recruitment--psychotest-preparation">
@@ -90,8 +95,8 @@ $device_url = recruitment_get_public_url( 'psychotest-device', [ 'test' => $test
                         <li>
                             <span class="daw-recruitment__prepare-icon">✓</span>
                             <div>
-                                <strong>Izinkan kamera</strong>
-                                <small>Pastikan kamera dan mikrofon Anda diizinkan agar proses pengecekan dan tes dapat berjalan normal.</small>
+                                <strong><?= $camera_required ? 'Izinkan kamera' : 'Kamera opsional' ?></strong>
+                                <small><?= $camera_required ? 'Izinkan akses kamera dan mikrofon sebelum melanjutkan.' : 'Pemeriksaan kamera dapat dilewati untuk tes ini.' ?></small>
                             </div>
                         </li>
                     </ul>

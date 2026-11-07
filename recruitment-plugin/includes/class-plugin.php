@@ -41,11 +41,24 @@ class Recruitment_Plugin {
         add_filter( 'wp_authenticate_user', [ $this, 'reject_direct_employee_login' ], 20 );
         add_action( 'template_redirect', [ $this, 'handle_applicant_account' ] );
         add_action( 'template_redirect', [ $this, 'handle_portal_login' ] );
+        add_action( 'template_redirect', [ $this, 'handle_psychotest_consent' ], 1 );
         add_action( 'admin_init', [ $this, 'validate_oracle_portal_session' ] );
         add_action( 'admin_post_daw_logout', [ $this, 'handle_logout' ] );
         add_action( 'admin_post_nopriv_daw_logout', [ $this, 'handle_logout' ] );
         add_action( 'admin_post_daw_applicant_logout', [ $this, 'handle_applicant_logout' ] );
         add_action( 'admin_post_nopriv_daw_applicant_logout', [ $this, 'handle_applicant_logout' ] );
+        $iq_assessment = new Recruitment_IQ_Assessment();
+        add_action( 'template_redirect', [ $iq_assessment, 'handle_public_request' ], 2 );
+        add_action( 'wp_ajax_recruitment_iq_save_answer', [ $iq_assessment, 'save_answer_ajax' ] );
+        add_action( 'wp_ajax_nopriv_recruitment_iq_save_answer', [ $iq_assessment, 'save_answer_ajax' ] );
+        $pauli_assessment = new Recruitment_Pauli_Assessment();
+        add_action( 'template_redirect', [ $pauli_assessment, 'handle_public_request' ], 2 );
+        add_action( 'wp_ajax_recruitment_pauli_save_column', [ $pauli_assessment, 'save_column_ajax' ] );
+        add_action( 'wp_ajax_nopriv_recruitment_pauli_save_column', [ $pauli_assessment, 'save_column_ajax' ] );
+        $personality_assessment = new Recruitment_Personality_Assessment();
+        add_action( 'template_redirect', [ $personality_assessment, 'handle_public_request' ], 2 );
+        add_action( 'wp_ajax_recruitment_personality_save_answer', [ $personality_assessment, 'save_answer_ajax' ] );
+        add_action( 'wp_ajax_nopriv_recruitment_personality_save_answer', [ $personality_assessment, 'save_answer_ajax' ] );
         add_action( 'admin_post_daw_update_hr_profile', [ $this, 'handle_hr_profile_update' ] );
         add_action( 'admin_post_daw_request_hr_email_change', [ $this, 'handle_hr_email_change_request' ] );
         add_action( 'admin_post_daw_confirm_hr_email_old', [ $this, 'handle_hr_email_old_confirmation' ] );
@@ -98,6 +111,44 @@ class Recruitment_Plugin {
         if ( ! get_role( 'daw_applicant' ) ) {
             add_role( 'daw_applicant', 'Applicant', [ 'read' => true ] );
         }
+    }
+
+    public function handle_psychotest_consent(): void {
+        if ( 'psychotest-consent' !== sanitize_key( wp_unslash( $_GET['recruitment_page'] ?? '' ) ) ) {
+            return;
+        }
+
+        if ( ! recruitment_is_applicant_user() ) {
+            wp_safe_redirect( recruitment_get_public_url( 'applicant-login' ) );
+            exit;
+        }
+
+        if ( 'POST' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
+            return;
+        }
+
+        check_admin_referer( 'recruitment_psychotest_consent' );
+        $test_key = sanitize_key( wp_unslash( $_POST['test'] ?? '' ) );
+        $test_routes = [
+            'iq' => 'psych-iq',
+            'pauli' => 'psych-pauli',
+            'disc' => 'psych-personality',
+            'papi' => 'psych-personality',
+        ];
+        if ( ! isset( $test_routes[ $test_key ] ) || empty( $_POST['consent'] ) ) {
+            wp_die( esc_html__( 'Persetujuan dan jenis tes harus dipilih sebelum tes dimulai.', 'recruitment-plugin' ), '', [ 'response' => 400 ] );
+        }
+
+        if ( ! recruitment_grant_psychotest_consent( $test_key ) ) {
+            wp_die( esc_html__( 'Persetujuan tes tidak dapat disimpan. Muat ulang halaman dan coba kembali.', 'recruitment-plugin' ), '', [ 'response' => 500 ] );
+        }
+
+        $arguments = [ 'start' => '1' ];
+        if ( 'psych-personality' === $test_routes[ $test_key ] ) {
+            $arguments['test'] = $test_key;
+        }
+        wp_safe_redirect( recruitment_get_public_url( $test_routes[ $test_key ], $arguments ) );
+        exit;
     }
 
     public function record_account_login( string $user_login, WP_User $user ): void {

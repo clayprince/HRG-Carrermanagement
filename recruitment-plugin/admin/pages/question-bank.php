@@ -35,7 +35,36 @@ if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) && isset( $_POST['questi
         : '';
     $result = [ 'success' => false, 'error' => 'Aksi bank soal tidak valid.' ];
 
-    if ( 'save_question' === $action && $question_id > 0 && '' !== trim( $prompt ) ) {
+    if ( 'create_question' === $action && '' !== trim( $prompt ) ) {
+        $type = isset( $posted['type'] ) && is_scalar( $posted['type'] )
+            ? sanitize_key( (string) $posted['type'] )
+            : '';
+        $choices_text = isset( $posted['choices'] ) && is_scalar( $posted['choices'] )
+            ? (string) $posted['choices']
+            : '';
+        $choices = preg_split( '/\r\n|\r|\n/', $choices_text ) ?: [];
+        $choices = array_values( array_map( 'sanitize_text_field', array_filter( $choices, static function ( $choice ): bool {
+            return is_scalar( $choice ) && '' !== trim( (string) $choice );
+        } ) ) );
+        $subtest = isset( $posted['subtest'] ) && is_scalar( $posted['subtest'] )
+            ? sanitize_key( (string) $posted['subtest'] )
+            : '';
+        $answer = isset( $posted['answer'] ) && is_scalar( $posted['answer'] )
+            ? sanitize_text_field( (string) $posted['answer'] )
+            : '';
+        $items = preg_split( '/\r\n|\r|\n/', $prompt ) ?: [];
+        $result = $database->create_psychotest_question(
+            [
+                'test' => $test,
+                'subtest' => $subtest,
+                'prompt' => $prompt,
+                'type' => $type,
+                'choices' => $choices,
+                'answer' => $answer,
+                'items' => array_values( array_map( 'sanitize_text_field', $items ) ),
+            ]
+        );
+    } elseif ( 'save_question' === $action && $question_id > 0 && '' !== trim( $prompt ) ) {
         if ( 'iq' === $test ) {
             $choices_text = isset( $posted['choices'] ) && is_scalar( $posted['choices'] )
                 ? (string) $posted['choices']
@@ -82,8 +111,13 @@ if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) && isset( $_POST['questi
         } else {
             $result = [ 'success' => false, 'error' => 'Jenis tes tidak valid.' ];
         }
-    } elseif ( 'save_question' === $action ) {
-        $result = [ 'success' => false, 'error' => 'Pilih soal yang akan diperbarui dan lengkapi isinya.' ];
+    } elseif ( 'save_question' === $action || 'create_question' === $action ) {
+        $result = [
+            'success' => false,
+            'error' => 'create_question' === $action
+                ? 'Lengkapi isi soal sebelum menambahkan ke bank.'
+                : 'Pilih soal yang akan diperbarui dan lengkapi isinya.',
+        ];
     }
 
     if ( ! empty( $result['success'] ) ) {
@@ -102,7 +136,7 @@ if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) && isset( $_POST['questi
 }
 
 if ( '1' === sanitize_text_field( wp_unslash( $_GET['saved'] ?? '' ) ) ) {
-    $notice = 'Soal berhasil diperbarui pada bank Oracle.';
+    $notice = 'Soal berhasil disimpan pada bank Oracle.';
 }
 $filter_test = sanitize_key( $_GET['test'] ?? '' );
 $filter_status = sanitize_key( $_GET['status'] ?? '' );
@@ -128,8 +162,8 @@ $test_filter_url = static function ( string $test ): string {
     return add_query_arg( [ 'page' => 'recruitment-question-bank', 'test' => $test ], admin_url( 'admin.php' ) );
 };
 ?>
-<div class="wrap daw-question-bank" data-question-bank>
-    <header class="daw-question-bank__header"><div><p class="daw-question-bank__breadcrumb"><a href="<?= esc_url( recruitment_get_admin_url( 'psychotest-settings' ) ) ?>">Setting Psikotes</a><span>/</span>Bank Soal</p><h1>Bank Soal Psikotes</h1><p>Perbarui isi soal IQ, Pauli, DISC, dan PAPI yang digunakan tes online.</p></div><span class="daw-question-bank__profile"><span>HR</span><span class="daw-question-bank__profile-copy"><strong><?= esc_html( $admin_user->display_name ) ?></strong><small><?= esc_html( $admin_user->user_email ) ?></small></span><?= $logout_form ?></span></header>
+<div class="wrap daw-question-bank" data-question-bank data-filter-test="<?= esc_attr( isset( $test_labels[ $filter_test ] ) ? $filter_test : '' ) ?>">
+    <header class="daw-question-bank__header"><div><p class="daw-question-bank__breadcrumb"><a href="<?= esc_url( recruitment_get_admin_url( 'psychotest-settings' ) ) ?>">Setting Psikotes</a><span>/</span>Bank Soal</p><h1>Bank Soal Psikotes</h1><p>Tambah atau perbarui soal IQ, Pauli, DISC, dan PAPI yang digunakan tes online.</p></div><span class="daw-question-bank__profile"><span>HR</span><span class="daw-question-bank__profile-copy"><strong><?= esc_html( $admin_user->display_name ) ?></strong><small><?= esc_html( $admin_user->user_email ) ?></small></span><?= $logout_form ?></span></header>
     <?php if ( '' !== $notice ) : ?><div class="notice notice-success is-dismissible"><p><?= esc_html( $notice ) ?></p></div><?php endif; ?>
     <?php if ( '' !== $error ) : ?><div class="notice notice-error"><p><?= esc_html( $error ) ?></p></div><?php endif; ?>
     <section class="daw-question-bank__stats" aria-label="Jumlah soal per tes">
@@ -140,8 +174,9 @@ $test_filter_url = static function ( string $test ): string {
         <?php foreach ( $test_labels as $test_key => $test_label ) : ?><a href="<?= esc_url( $test_filter_url( $test_key ) ) ?>" class="<?= $filter_test === $test_key ? 'is-active' : '' ?>"><?= esc_html( $test_label ) ?><b><?= esc_html( (string) $test_counts[ $test_key ] ) ?></b></a><?php endforeach; ?>
     </nav>
     <section class="daw-question-bank__panel">
-        <div class="daw-question-bank__panel-heading"><div><h2>Bank Soal Psikotes</h2><p><?= esc_html( (string) count( $filtered_questions ) ) ?> soal ditampilkan<?php if ( isset( $test_labels[ $filter_test ] ) ) : ?> untuk <?= esc_html( $test_labels[ $filter_test ] ) ?><?php endif; ?></p><small>Jumlah dan urutan soal dikunci sesuai format tes. Perubahan memperbarui soal yang sama agar sesi tes aktif tetap dapat dilanjutkan.</small></div><div class="daw-question-bank__panel-actions">
+        <div class="daw-question-bank__panel-heading"><div><h2>Bank Soal Psikotes</h2><p><?= esc_html( (string) count( $filtered_questions ) ) ?> soal ditampilkan<?php if ( isset( $test_labels[ $filter_test ] ) ) : ?> untuk <?= esc_html( $test_labels[ $filter_test ] ) ?><?php endif; ?></p><small>Soal baru ditambahkan setelah urutan terakhir. Sesi yang sedang berjalan tetap menggunakan soal yang sudah dibuka saat sesi dimulai.</small></div><div class="daw-question-bank__panel-actions">
             <form method="get" class="daw-question-bank__filters"><input type="hidden" name="page" value="recruitment-question-bank"><label class="screen-reader-text" for="question-test-filter">Filter tes</label><select id="question-test-filter" name="test"><option value="">Semua Tes</option><?php foreach ( $test_labels as $test_key => $test_label ) : ?><option value="<?= esc_attr( $test_key ) ?>" <?= selected( $filter_test, $test_key, false ) ?>><?= esc_html( $test_label ) ?></option><?php endforeach; ?></select><label class="screen-reader-text" for="question-status-filter">Filter status</label><select id="question-status-filter" name="status"><option value="">Semua Status</option><option value="active" <?= selected( $filter_status, 'active', false ) ?>>Aktif</option><option value="inactive" <?= selected( $filter_status, 'inactive', false ) ?>>Nonaktif</option></select><label class="screen-reader-text" for="question-search">Cari soal</label><input id="question-search" type="search" name="s" value="<?= esc_attr( $search ) ?>" placeholder="Cari soal..."><button type="submit" class="button">Filter</button></form>
+            <button type="button" class="button button-primary" data-new-question>Tambah Soal</button>
         </div></div>
         <div class="daw-question-bank__table-wrap"><table class="widefat striped daw-question-bank__table"><thead><tr><th>No</th><th>Pertanyaan / Soal</th><th>Tes</th><th>Tipe</th><th>Status</th><th>Diperbarui</th><th>Aksi</th></tr></thead><tbody>
             <?php if ( ! $filtered_questions ) : ?><tr><td colspan="7" class="daw-question-bank__empty"><?= '' !== $error ? 'Data bank soal belum tersedia karena Oracle tidak dapat dimuat.' : 'Belum ada soal yang sesuai dengan filter.' ?></td></tr><?php endif; ?>
@@ -166,13 +201,13 @@ $test_filter_url = static function ( string $test ): string {
     <dialog class="daw-question-bank__dialog" data-question-dialog aria-labelledby="question-dialog-title">
         <form method="post" data-question-form>
             <?php wp_nonce_field( 'recruitment_question_bank' ); ?>
-            <input type="hidden" name="question_bank_action" value="save_question"><input type="hidden" name="question_id" value="" data-question-id>
+            <input type="hidden" name="question_bank_action" value="save_question" data-question-action><input type="hidden" name="question_id" value="" data-question-id>
             <div class="daw-question-bank__dialog-heading"><h2 id="question-dialog-title">Edit Soal</h2><button type="button" class="button-link" aria-label="Tutup" data-close-question-dialog>&times;</button></div>
             <label data-question-prompt-label>Pertanyaan / Soal<textarea name="question[prompt]" rows="4" required data-question-prompt></textarea><small data-question-prompt-help></small></label>
-            <div class="daw-question-bank__dialog-grid"><label>Tes<select data-question-test disabled><?php foreach ( $test_labels as $test_key => $test_label ) : ?><option value="<?= esc_attr( $test_key ) ?>"><?= esc_html( $test_label ) ?></option><?php endforeach; ?></select><input type="hidden" name="question[test]" data-question-test-value></label><label data-question-subtest-label>Subtes IQ<select data-question-subtest disabled><?php foreach ( $subtest_labels as $subtest_key => $subtest_label ) : ?><option value="<?= esc_attr( $subtest_key ) ?>"><?= esc_html( $subtest_label ) ?></option><?php endforeach; ?></select><input type="hidden" name="question[subtest]" data-question-subtest-value></label><label>Tipe<select data-question-type disabled><?php foreach ( $type_labels as $type_key => $type_label ) : ?><option value="<?= esc_attr( $type_key ) ?>"><?= esc_html( $type_label ) ?></option><?php endforeach; ?><input type="hidden" name="question[type]" data-question-type-value></label></div>
+            <div class="daw-question-bank__dialog-grid"><label>Tes<select data-question-test disabled><?php foreach ( $test_labels as $test_key => $test_label ) : ?><option value="<?= esc_attr( $test_key ) ?>"><?= esc_html( $test_label ) ?></option><?php endforeach; ?></select><input type="hidden" name="question[test]" data-question-test-value></label><label data-question-subtest-label>Subtes IQ<select data-question-subtest disabled><?php foreach ( $subtest_labels as $subtest_key => $subtest_label ) : ?><option value="<?= esc_attr( $subtest_key ) ?>"><?= esc_html( $subtest_label ) ?></option><?php endforeach; ?></select><input type="hidden" name="question[subtest]" data-question-subtest-value></label><label data-question-type-label>Tipe<select data-question-type disabled><?php foreach ( $type_labels as $type_key => $type_label ) : ?><option value="<?= esc_attr( $type_key ) ?>"><?= esc_html( $type_label ) ?></option><?php endforeach; ?></select><input type="hidden" name="question[type]" data-question-type-value></label></div>
             <label data-question-choices-label>Opsi jawaban<textarea name="question[choices]" rows="4" data-question-choices></textarea><small>Satu opsi untuk setiap baris.</small></label>
-            <label data-question-answer-label>Jawaban benar<input name="question[answer]" data-question-answer></label>
-            <div class="daw-question-bank__dialog-actions"><button type="button" class="button" data-close-question-dialog>Batal</button><button type="submit" class="button button-primary">Simpan Perubahan</button></div>
+            <label data-question-answer-label>Jawaban benar<input name="question[answer]" data-question-answer><small>Gunakan nomor opsi atau teks opsi; pisahkan jawaban multi-select dengan tanda |.</small></label>
+            <div class="daw-question-bank__dialog-actions"><button type="button" class="button" data-close-question-dialog>Batal</button><button type="submit" class="button button-primary" data-question-submit>Simpan Perubahan</button></div>
         </form>
     </dialog>
 </div>

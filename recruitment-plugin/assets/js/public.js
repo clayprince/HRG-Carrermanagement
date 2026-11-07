@@ -900,7 +900,10 @@
       return;
     }
 
+    const cameraRequired = "1" === deviceCheck.dataset.cameraRequired;
     let stream = null;
+    let cameraReady = false;
+    let networkReady = Boolean(navigator.onLine);
 
     const updateStatus = function updateStatus(
       statusNode,
@@ -932,9 +935,10 @@
       }
     };
 
-    const setContinueState = function setContinueState(isReady) {
-      continueButton.disabled = !isReady;
-      continueButton.setAttribute("aria-disabled", String(!isReady));
+    const setContinueState = function setContinueState() {
+      const canContinue = networkReady && (!cameraRequired || cameraReady);
+      continueButton.disabled = !canContinue;
+      continueButton.setAttribute("aria-disabled", String(!canContinue));
     };
 
     const stopStream = function stopStream() {
@@ -946,6 +950,7 @@
         track.stop();
       });
       stream = null;
+      cameraReady = false;
       videoElement.srcObject = null;
       videoElement.pause();
       videoElement.hidden = true;
@@ -954,41 +959,49 @@
     };
 
     const handleUnsupportedBrowser = function handleUnsupportedBrowser() {
-      unsupportedBanner.hidden = false;
+      unsupportedBanner.hidden = !cameraRequired;
       updateStatus(
         browserStatus,
-        "error",
-        "Browser tidak mendukung",
-        "Gunakan browser modern seperti Chrome atau Edge untuk menjalankan tes.",
+        cameraRequired ? "error" : "warning",
+        cameraRequired ? "Browser tidak mendukung" : "Kamera opsional tidak tersedia",
+        cameraRequired
+          ? "Gunakan browser modern seperti Chrome atau Edge untuk menjalankan tes."
+          : "Tes ini dapat dilanjutkan tanpa akses kamera dan mikrofon.",
       );
       updateStatus(
         cameraStatus,
-        "error",
-        "Kamera tidak tersedia",
-        "Browser ini tidak mendukung akses kamera dan mikrofon.",
+        cameraRequired ? "error" : "warning",
+        cameraRequired ? "Kamera tidak tersedia" : "Kamera opsional tidak tersedia",
+        cameraRequired
+          ? "Browser ini tidak mendukung akses kamera dan mikrofon."
+          : "Tes dapat dilanjutkan tanpa kamera karena pengaturan tes tidak mewajibkannya.",
       );
       permissionButton.disabled = true;
       permissionButton.textContent = "Browser Tidak Didukung";
-      setContinueState(false);
+      setContinueState();
     };
 
     const setNetworkStatus = function setNetworkStatus() {
       if (navigator.onLine) {
+        networkReady = true;
         updateStatus(
           connectionStatus,
           "success",
           "Koneksi internet siap",
           "Koneksi internet terdeteksi dan stabil untuk melanjutkan tes.",
         );
+        setContinueState();
         return;
       }
 
+      networkReady = false;
       updateStatus(
         connectionStatus,
         "warning",
         "Jaringan tidak stabil",
         "Periksa koneksi internet Anda sebelum melanjutkan tes.",
       );
+      setContinueState();
     };
 
     const setBrowserStatus = function setBrowserStatus() {
@@ -1010,6 +1023,7 @@
       stream = mediaStream;
       videoElement.srcObject = mediaStream;
       videoElement.hidden = false;
+      cameraReady = true;
       cameraShell.classList.remove("is-empty");
       emptyState.hidden = true;
       updateStatus(
@@ -1032,7 +1046,7 @@
       );
       permissionButton.disabled = true;
       permissionButton.textContent = "Kamera Sudah Aktif";
-      setContinueState(true);
+      setContinueState();
     };
 
     const handleRequestError = function handleRequestError(error) {
@@ -1072,12 +1086,14 @@
       );
       permissionButton.disabled = false;
       permissionButton.textContent = "Izinkan Kamera";
-      setContinueState(false);
+      setContinueState();
     };
 
     setBrowserStatus();
     setNetworkStatus();
-    setContinueState(false);
+    setContinueState();
+    window.addEventListener("online", setNetworkStatus);
+    window.addEventListener("offline", setNetworkStatus);
 
     permissionButton.addEventListener("click", function requestCameraAccess() {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -1134,7 +1150,7 @@
       );
       permissionButton.disabled = false;
       permissionButton.textContent = "Izinkan Kamera";
-      setContinueState(false);
+      setContinueState();
     });
 
     continueButton.addEventListener("click", function continueToNextStep() {

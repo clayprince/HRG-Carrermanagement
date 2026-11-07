@@ -286,6 +286,9 @@ $interview_save_error = '';
 $interview_saved = '1' === sanitize_text_field( wp_unslash( $_GET['saved'] ?? '' ) );
 
 if ( 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) && 'save_user_interview' === sanitize_key( wp_unslash( $_POST['daw_ud_action'] ?? '' ) ) ) {
+	if ( ! current_user_can( 'manage_user_department' ) || ! $department_assigned ) {
+		wp_die( esc_html__( 'Anda tidak memiliki izin untuk menyimpan hasil wawancara.', 'recruitment-plugin' ) );
+	}
 	$nonce = sanitize_text_field( wp_unslash( $_POST['daw_user_interview_nonce'] ?? '' ) );
 	if ( ! wp_verify_nonce( $nonce, 'daw_save_user_interview' ) ) {
 		wp_die( esc_html__( 'Sesi penilaian tidak valid. Muat ulang halaman dan coba lagi.', 'recruitment-plugin' ) );

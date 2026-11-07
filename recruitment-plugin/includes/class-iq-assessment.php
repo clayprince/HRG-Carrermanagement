@@ -6,7 +6,6 @@
 class Recruitment_IQ_Assessment {
 
     private const USER_META_KEY = 'recruitment_iq_assessment';
-    private const SUBTEST_QUESTION_COUNTS = [ 40, 20, 40, 20 ];
     private const SUBTEST_DURATIONS = [ 7, 7, 5, 12 ];
 
     private Recruitment_Database $database;
@@ -20,19 +19,14 @@ class Recruitment_IQ_Assessment {
             return;
         }
 
-        if ( ! is_user_logged_in() ) {
-            wp_safe_redirect( recruitment_get_public_url( 'applicant-login' ) );
-            exit;
-        }
-
         $candidate_id = $this->get_current_candidate_id();
         if ( $candidate_id < 1 ) {
             wp_safe_redirect( add_query_arg( 'account_error', 'applicant_account_required', recruitment_get_public_url( 'applicant-login' ) ) );
             exit;
         }
 
-        $user_id = get_current_user_id();
-        $state = get_user_meta( $user_id, self::USER_META_KEY, true );
+        $user_id = recruitment_get_assessment_user_id();
+        $state = recruitment_get_assessment_state( $user_id, self::USER_META_KEY );
         if ( 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
             $this->handle_advance_request( $user_id, $candidate_id, is_array( $state ) ? $state : [] );
         }
@@ -67,8 +61,8 @@ class Recruitment_IQ_Assessment {
             );
         }
 
-        $user_id = get_current_user_id();
-        $state = get_user_meta( $user_id, self::USER_META_KEY, true );
+        $user_id = recruitment_get_assessment_user_id();
+        $state = recruitment_get_assessment_state( $user_id, self::USER_META_KEY );
         if ( ! is_array( $state ) || 'active' !== ( $state['status'] ?? '' ) || (int) ( $state['candidate_id'] ?? 0 ) !== $candidate_id ) {
             wp_send_json_error( [ 'message' => 'Sesi tes tidak aktif.' ], 409 );
         }
@@ -91,7 +85,7 @@ class Recruitment_IQ_Assessment {
             wp_send_json_error( [ 'message' => (string) ( $saved['error'] ?? 'Jawaban belum tersimpan.' ) ], 400 );
         }
 
-        update_user_meta( $user_id, self::USER_META_KEY, $state );
+        recruitment_update_assessment_state( $user_id, self::USER_META_KEY, $state );
         wp_send_json_success( [ 'saved' => true ] );
     }
 
@@ -99,15 +93,12 @@ class Recruitment_IQ_Assessment {
      * @return array<string, mixed>
      */
     public function get_page_view(): array {
-        if ( ! is_user_logged_in() ) {
+        $candidate_id = $this->get_current_candidate_id();
+        if ( $candidate_id < 1 ) {
             return [ 'login_required' => true ];
         }
-        $user_id = get_current_user_id();
-        $candidate_id = $this->get_current_candidate_id();
-        if ( $candidate_id < 1 && $this->database->has_error() ) {
-            return [ 'error' => 'Koneksi Oracle belum tersedia. Silakan coba kembali nanti.' ];
-        }
-        $state = get_user_meta( $user_id, self::USER_META_KEY, true );
+        $user_id = recruitment_get_assessment_user_id();
+        $state = recruitment_get_assessment_state( $user_id, self::USER_META_KEY );
         if ( $candidate_id < 1 || ! is_array( $state ) || (int) ( $state['candidate_id'] ?? 0 ) !== $candidate_id ) {
             return [ 'ready' => false ];
         }
@@ -121,6 +112,9 @@ class Recruitment_IQ_Assessment {
         $index = absint( $state['subtest_index'] ?? 0 );
         $test_state = $state['tests'][ $index ] ?? null;
         $catalog = $this->database->get_iq_assessment();
+        if ( $this->database->has_error() ) {
+            return [ 'error' => 'Koneksi Oracle belum tersedia. Silakan coba kembali nanti.' ];
+        }
         $test = $catalog[ $index ] ?? null;
         if ( ! is_array( $test_state ) || ! is_array( $test ) || (int) $test['ID'] !== (int) $test_state['id'] ) {
             return [ 'error' => 'Konfigurasi tes IQ tidak lengkap. Silakan hubungi tim HR.' ];
@@ -177,32 +171,36 @@ class Recruitment_IQ_Assessment {
     }
 
     private function get_current_candidate_id(): int {
-        if ( ! is_user_logged_in() ) {
-            return 0;
-        }
-        $user = wp_get_current_user();
-        if ( ! in_array( 'daw_applicant', (array) $user->roles, true ) ) {
-            return 0;
-        }
-        return absint( $user->ID );
+        return recruitment_get_assessment_user_id();
     }
 
     private function start_session( int $user_id, int $candidate_id ): void {
+        if ( ! recruitment_consume_psychotest_consent( 'iq' ) ) {
+            wp_die( esc_html__( 'Berikan persetujuan tes terlebih dahulu.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+        }
+        $global_settings = (array) get_option( 'recruitment_psychotest_settings', [] );
         $test_settings = (array) get_option( 'recruitment_psychotest_tests', [] );
+        if ( isset( $global_settings['status'] ) && 'active' !== $global_settings['status'] ) {
+            wp_die( esc_html__( 'Tes psikologi sedang dinonaktifkan oleh tim HR.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+        }
         if ( empty( $test_settings['iq']['active'] ) && isset( $test_settings['iq']['active'] ) ) {
             wp_die( esc_html__( 'Tes IQ sedang dinonaktifkan oleh tim HR.', 'recruitment-plugin' ) );
         }
         $catalog = $this->database->get_iq_assessment();
+        if ( $this->database->has_error() ) {
+            wp_die( esc_html__( 'Koneksi Oracle belum tersedia. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+        }
         if ( 4 !== count( $catalog ) ) {
             wp_die( esc_html__( 'Bank soal IQ belum tersedia atau belum lengkap. Silakan hubungi tim HR.', 'recruitment-plugin' ) );
         }
 
         $tests = [];
         foreach ( $catalog as $index => $test ) {
-            if ( (int) $test['DURATION'] !== self::SUBTEST_DURATIONS[ $index ]
-                || (int) $test['QUESTION_COUNT'] !== self::SUBTEST_QUESTION_COUNTS[ $index ]
-                || count( $test['questions'] ) !== self::SUBTEST_QUESTION_COUNTS[ $index ] ) {
-                wp_die( esc_html__( 'Bank soal IQ belum memenuhi jumlah soal atau durasi yang ditetapkan. Silakan hubungi tim HR.', 'recruitment-plugin' ) );
+            if ( ! isset( self::SUBTEST_DURATIONS[ $index ] )
+                || (int) $test['DURATION'] !== self::SUBTEST_DURATIONS[ $index ]
+                || empty( $test['questions'] )
+                || (int) $test['QUESTION_COUNT'] !== count( $test['questions'] ) ) {
+                wp_die( esc_html__( 'Setiap subtes IQ harus memiliki soal dan durasi yang valid. Silakan hubungi tim HR.', 'recruitment-plugin' ) );
             }
             $question_ids = [];
             $choice_order = [];
@@ -232,7 +230,7 @@ class Recruitment_IQ_Assessment {
         $now = time();
         $tests[0]['started_at'] = $now;
         $tests[0]['deadline'] = $now + ( $tests[0]['duration'] * MINUTE_IN_SECONDS );
-        update_user_meta(
+        recruitment_update_assessment_state(
             $user_id,
             self::USER_META_KEY,
             [
@@ -294,11 +292,11 @@ class Recruitment_IQ_Assessment {
             if ( empty( $saved['success'] ) ) {
                 wp_die( esc_html( $saved['error'] ?? 'Jawaban belum berhasil tersimpan.' ), '', [ 'response' => 500 ] );
             }
-            update_user_meta( $user_id, self::USER_META_KEY, $state );
+            recruitment_update_assessment_state( $user_id, self::USER_META_KEY, $state );
         }
 
         $this->advance_subtest( $user_id, $candidate_id, $state );
-        wp_safe_redirect( recruitment_get_public_url( 'psych-test' ) );
+        wp_safe_redirect( recruitment_get_public_url( 'psych-iq' ) );
         exit;
     }
 
@@ -316,7 +314,7 @@ class Recruitment_IQ_Assessment {
             return [ 'success' => false, 'error' => 'Subtes aktif tidak ditemukan.' ];
         }
         $response_id = absint( $test['response_ids'][ $question_id ] ?? 0 );
-        $result = $this->database->save_iq_response( $question_id, $selected_answers, $response_id );
+        $result = $this->database->save_iq_response( $state['candidate_id'], $question_id, $selected_answers, $response_id );
         if ( empty( $result['success'] ) || empty( $result['response_id'] ) ) {
             return [ 'success' => false, 'error' => (string) ( $result['error'] ?? 'Jawaban belum tersimpan.' ) ];
         }
@@ -335,6 +333,7 @@ class Recruitment_IQ_Assessment {
             wp_die( esc_html__( 'Sesi tes tidak dapat dilanjutkan.', 'recruitment-plugin' ), '', [ 'response' => 409 ] );
         }
         $result = $this->database->complete_iq_subtest(
+            $candidate_id,
             (int) $test['id'],
             gmdate( 'Y-m-d H:i:s', (int) $test['started_at'] ),
             array_values( array_map( 'absint', (array) $test['response_ids'] ) )
@@ -355,6 +354,6 @@ class Recruitment_IQ_Assessment {
             $state['tests'][ $next_index ]['started_at'] = $now;
             $state['tests'][ $next_index ]['deadline'] = $now + ( (int) $state['tests'][ $next_index ]['duration'] * MINUTE_IN_SECONDS );
         }
-        update_user_meta( $user_id, self::USER_META_KEY, $state );
+        recruitment_update_assessment_state( $user_id, self::USER_META_KEY, $state );
     }
 }

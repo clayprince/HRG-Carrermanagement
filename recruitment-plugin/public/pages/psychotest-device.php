@@ -1,10 +1,13 @@
 <?php
 $test_key = sanitize_key( wp_unslash( $_GET['test'] ?? 'iq' ) );
 $test_key = in_array( $test_key, [ 'iq', 'pauli', 'disc', 'papi' ], true ) ? $test_key : 'iq';
+$global_settings = (array) get_option( 'recruitment_psychotest_settings', [] );
+$test_settings = (array) get_option( 'recruitment_psychotest_tests', [] );
+$camera_required = isset( $test_settings[ $test_key ]['camera_required'] )
+    ? ! empty( $test_settings[ $test_key ]['camera_required'] )
+    : ! empty( $global_settings['camera_required'] ?? true );
 $back_url = recruitment_get_public_url( 'psychotest-preparation', [ 'test' => $test_key ] );
-$target_page = 'iq' === $test_key ? 'psych-iq' : ( 'pauli' === $test_key ? 'psych-pauli' : 'psych-personality' );
-$target_args = 'psych-personality' === $target_page ? [ 'test' => $test_key, 'start' => '1' ] : [ 'start' => '1' ];
-$next_url = recruitment_get_public_url( $target_page, $target_args );
+$next_url = recruitment_get_public_url( 'psychotest-consent', [ 'test' => $test_key ] );
 ?>
 <div class="daw-recruitment daw-recruitment--psychotest-device">
     <?php require recruitment_get_plugin_path( 'public/components/header.php' ); ?>
@@ -31,7 +34,7 @@ $next_url = recruitment_get_public_url( $target_page, $target_args );
                 </div>
             </div>
 
-            <section class="daw-recruitment__psychotest-card daw-recruitment__device-check-card" data-psychotest-device-check>
+            <section class="daw-recruitment__psychotest-card daw-recruitment__device-check-card" data-psychotest-device-check data-camera-required="<?= esc_attr( $camera_required ? '1' : '0' ) ?>">
                 <div class="daw-recruitment__device-layout">
                     <div class="daw-recruitment__device-preview">
                         <div class="daw-recruitment__device-camera is-empty" data-device-camera-shell>

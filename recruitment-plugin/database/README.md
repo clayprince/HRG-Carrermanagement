@@ -89,24 +89,29 @@ their SQL is compatible with the current Oracle database.
 - The account UI does not expose password hashes. Review and approve the
   required migrations against the target Oracle schema before execution; the
   plugin does not run them automatically.
-- Applicant login and registration remain disabled because the supplied ERD
-  does not define the `AKUN_PELAMAR` table queried by the legacy applicant
-  account methods.
+- Legacy applicant-account methods that query `AKUN_PELAMAR` are not used by
+  the current Oracle applicant portal. Applicant login and registration use
+  `HRS_PROFILE_KANDIDAT_LOGIN` and require migration
+  `009_candidate_account_auth.sql`.
 
 ## Psychometric assessment linking
 
-- Assessment sessions are associated with the authenticated WordPress
-  applicant ID in user meta. Oracle stores assessment questions, responses,
-  and result records through `Recruitment_Database`; no Oracle schema change
-  or assumed candidate foreign key is used for this bridge.
-- The HR personality-results screen follows those WordPress session records
-  to read the corresponding Oracle response and result IDs. This does not
-  establish a direct candidate-to-result relationship in Oracle.
-- The HR question bank reads and edits existing Oracle IQ, Pauli, DISC, and
-  PAPI questions. It preserves question IDs, order, active state, and the
-  assessment's fixed question/answer counts; adding or disabling questions is
-  not supported.
-- IQ, Pauli, DISC, and PAPI routes require the `daw_applicant` role.
+- Assessment sessions are associated with the authenticated Oracle candidate
+  profile ID. Progress is kept in a non-autoloaded WordPress option scoped to
+  that profile and assessment; answers and completed result records are
+  written to Oracle through `Recruitment_Database`.
+- Migration `012_psychotest_candidate_results.sql` adds the candidate and
+  completed-result links used by assessment writes and result review. It must
+  be reviewed and applied by the authorized Oracle owner; the plugin does not
+  run it automatically.
+- HR can add and edit IQ, Pauli, DISC, and PAPI questions. IQ remains divided
+  into four subtests with the existing fixed time limits; additional questions
+  use those same limits. Each Pauli column lasts three minutes, so adding a
+  column increases the total test time by three minutes. DISC questions
+  require four statements and PAPI questions require two.
+- Active assessment sessions keep their original question order when HR adds
+  questions; new questions are included in sessions started afterward.
+- Psychometric routes require an authenticated applicant portal session.
 
 ## Schema alignment and migrations
 
@@ -139,10 +144,52 @@ have dedicated columns in the supplied ERD. With the database owner's
 approval, it was applied and verified on the connected local Oracle schema on
 2026-11-04. This does not prove that the column exists in another target schema.
 
+## Reconciliation of supplied Oracle queries
+
+The supplied changes are represented by migrations in this directory. Match
+them to the target schema before applying anything; the migration filename
+prefixes are not unique, and the plugin does not execute these files.
+
+- Dynamic application forms: use
+  `migrations/008_dynamic_application_forms_hrs.sql` for a schema with
+  `HRS_BAGIAN_PENDAFTARAN`. `migrations/003_dynamic_application_forms.sql`
+  and `migrations/011_application_form_schema_compatibility.sql` instead use
+  `BAGIAN_PENDAFTARAN` without the `HRS_` prefix; migration 011 only adds
+  compatibility columns and checks for the tables created by migration 003.
+  Do not apply both form variants to the same target without confirming the
+  intended table relationships.
+- HR vacancy-form details and extended applicant-profile data are separate
+  changes: use `migrations/009_hr_vacancy_form_details.sql` for
+  `HRS_REQUEST_LOWONGAN.HR_FORM_DETAILS` and
+  `migrations/010_applicant_profile_details.sql` for
+  `HRS_PROFIL_KANDIDAT_DETAIL`.
+- Candidate login is handled by
+  `migrations/009_candidate_account_auth.sql`, which targets
+  `HRS_PROFILE_KANDIDAT_LOGIN`. It is not interchangeable with the legacy
+  `migrations/002_applicant_accounts.sql`, which creates `AKUN_PELAMAR`.
+- HR and department account changes are split across migrations:
+  `migrations/005_unified_portal_accounts.sql` adds `PERAN`, account status,
+  and the larger email/password columns. Use either
+  `migrations/007_department_account_management.sql` or
+  `migrations/008_full_account_management.sql` for department profile fields,
+  feature permissions, and default departments—not both. Migration 008 also
+  verifies/adds account status, but does not add `PERAN` or widen email and
+  password columns; it does not replace migration 005.
+- The applied-state notes above describe a previously connected local schema,
+  not the current state of another Oracle target. Verify target metadata and
+  data first, obtain the Oracle owner's approval, and account for Oracle DDL's
+  implicit commits before applying any migration.
+
 Public vacancy listings and the admin create/status controls use the Oracle
 vacancy tables. `STATUS_KOLOM` maps 0 to Draft and 1 to Published. Do not treat
 legacy `DAW_*` queries or WordPress vacancy posts as the active source for the
 public application flow.
+
+In the connected schema, `HRS_DETAIL_INFO_LOWONGAN` names the department
+column `NAMA_DEPARTEMEN` and does not contain a location column; the linked
+`HRS_KOLOM_LANDING_PENDAFTARAN.NAMA_DEALER` supplies the displayed location.
+Keep this mapping distinct from `NAMA_DEPARTEMENT` on
+`HRS_REKAPAN_KEPUTUSAN_HR`.
 
 When HR approves a User Department request, the plugin creates and publishes
 the Oracle vacancy immediately. HR supplies any missing location, Dealer/AHASS,

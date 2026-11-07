@@ -11,7 +11,7 @@ $psychotest_home_url = recruitment_get_public_url( 'psychotest' );
                 <section class="daw-psych-test-card daw-pauli-assessment__message">
                     <div class="daw-psych-test-icon daw-psych-test-icon--success" aria-hidden="true">&#10003;</div>
                     <h1>Tes Pauli Selesai</h1>
-                    <p>Seluruh 20 kolom telah ditutup dan hasil tes Anda tersimpan untuk ditinjau oleh tim HR.</p>
+                    <p>Seluruh <?= esc_html( (string) $view['column_count'] ) ?> kolom telah ditutup dan hasil tes Anda tersimpan untuk ditinjau oleh tim HR.</p>
                     <a class="daw-psych-test-button" href="<?= esc_url( $psychotest_home_url ) ?>">Kembali ke Daftar Tes</a>
                 </section>
             <?php elseif ( ! empty( $view['error'] ) ) : ?>
@@ -45,7 +45,7 @@ $psychotest_home_url = recruitment_get_public_url( 'psychotest' );
                         <div>
                             <span class="daw-recruitment__eyebrow daw-recruitment__eyebrow--red">TES PAULI · KOLOM <?= esc_html( (string) ( $test['segment'] + 1 ) ) ?> DARI <?= esc_html( (string) $test['segment_count'] ) ?></span>
                             <h1><?= esc_html( $test['title'] ) ?></h1>
-                            <p>Jumlahkan dua angka yang berurutan dari atas ke bawah. Masukkan hanya angka satuan hasil penjumlahan.</p>
+                            <p>Jumlahkan dua angka yang berurutan dari atas ke bawah. Masukkan hanya angka satuan hasil penjumlahan. Tes ini berlangsung <?= esc_html( (string) $test['duration_minutes'] ) ?> menit.</p>
                         </div>
                         <div class="daw-pauli-assessment__timers">
                             <div><span>GARIS DALAM</span><time data-pauli-segment-timer>--:--</time></div>

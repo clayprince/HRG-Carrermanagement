@@ -9,7 +9,6 @@ class Recruitment_Personality_Assessment {
     private const IQ_USER_META_KEY = 'recruitment_iq_assessment';
     private const PAULI_USER_META_KEY = 'recruitment_pauli_assessment';
     private const REMINDER_MINUTES = [ 'disc' => 20, 'papi' => 30 ];
-    private const QUESTION_COUNTS = [ 'disc' => 24, 'papi' => 90 ];
 
     private Recruitment_Database $database;
 
@@ -22,11 +21,6 @@ class Recruitment_Personality_Assessment {
             return;
         }
 
-        if ( ! is_user_logged_in() ) {
-            wp_safe_redirect( recruitment_get_public_url( 'applicant-login' ) );
-            exit;
-        }
-
         $candidate_id = $this->get_current_candidate_id();
         if ( $candidate_id < 1 ) {
             wp_safe_redirect( add_query_arg( 'account_error', 'applicant_account_required', recruitment_get_public_url( 'applicant-login' ) ) );
@@ -34,11 +28,12 @@ class Recruitment_Personality_Assessment {
         }
 
         $test_key = $this->get_requested_test_key();
+        $user_id = recruitment_get_assessment_user_id();
         if ( 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
-            $this->handle_complete_request( get_current_user_id(), $candidate_id, $test_key );
+            $this->handle_complete_request( $user_id, $candidate_id, $test_key );
         }
         if ( '1' === sanitize_text_field( wp_unslash( $_GET['start'] ?? '' ) ) ) {
-            $this->start_test( get_current_user_id(), $candidate_id, $test_key );
+            $this->start_test( $user_id, $candidate_id, $test_key );
             wp_safe_redirect( recruitment_get_public_url( 'psych-personality', [ 'test' => $test_key ] ) );
             exit;
         }
@@ -56,8 +51,8 @@ class Recruitment_Personality_Assessment {
         }
 
         $test_key = $this->get_requested_test_key();
-        $user_id = get_current_user_id();
-        $state = get_user_meta( $user_id, self::USER_META_KEY, true );
+        $user_id = recruitment_get_assessment_user_id();
+        $state = recruitment_get_assessment_state( $user_id, self::USER_META_KEY );
         if ( ! $this->is_valid_state( $state, $candidate_id )
             || 'active' !== ( $state['tests'][ $test_key ]['status'] ?? '' )
             || $test_key !== ( $state['active_test'] ?? '' ) ) {
@@ -78,7 +73,7 @@ class Recruitment_Personality_Assessment {
             wp_send_json_error( [ 'message' => (string) ( $saved['error'] ?? 'Jawaban belum tersimpan.' ) ], 500 );
         }
 
-        update_user_meta( $user_id, self::USER_META_KEY, $state );
+        recruitment_update_assessment_state( $user_id, self::USER_META_KEY, $state );
         wp_send_json_success( [ 'saved' => true ] );
     }
 
@@ -87,15 +82,12 @@ class Recruitment_Personality_Assessment {
      */
     public function get_page_view(): array {
         $test_key = $this->get_requested_test_key();
-        if ( ! is_user_logged_in() ) {
+        $candidate_id = $this->get_current_candidate_id();
+        if ( $candidate_id < 1 ) {
             return [ 'login_required' => true ];
         }
-        $user_id = get_current_user_id();
-        $candidate_id = $this->get_current_candidate_id();
-        if ( $candidate_id < 1 && $this->database->has_error() ) {
-            return [ 'error' => 'Koneksi Oracle belum tersedia. Silakan coba kembali nanti.' ];
-        }
-        $state = get_user_meta( $user_id, self::USER_META_KEY, true );
+        $user_id = recruitment_get_assessment_user_id();
+        $state = recruitment_get_assessment_state( $user_id, self::USER_META_KEY );
         if ( $candidate_id < 1 || ! $this->is_valid_state( $state, $candidate_id ) ) {
             return [ 'ready' => false, 'test_key' => $test_key ];
         }
@@ -115,10 +107,13 @@ class Recruitment_Personality_Assessment {
         }
 
         $catalog = $this->database->get_personality_assessments();
+        if ( $this->database->has_error() ) {
+            return [ 'error' => 'Koneksi Oracle belum tersedia. Silakan coba kembali nanti.' ];
+        }
         $test = $catalog[ $test_key ] ?? null;
         if ( ! is_array( $test ) || (int) $test['ID'] !== (int) $test_state['id']
-            || self::QUESTION_COUNTS[ $test_key ] !== (int) $test['QUESTION_COUNT']
-            || self::QUESTION_COUNTS[ $test_key ] !== count( $test['questions'] ) ) {
+            || empty( $test['questions'] )
+            || (int) $test['QUESTION_COUNT'] !== count( $test['questions'] ) ) {
             return [ 'error' => 'Bank soal tes kepribadian belum tersedia atau belum lengkap. Silakan hubungi tim HR.' ];
         }
 
@@ -133,6 +128,10 @@ class Recruitment_Personality_Assessment {
                 return [ 'error' => 'Soal pada sesi ini tidak lagi tersedia. Silakan hubungi tim HR.' ];
             }
             $question = $questions_by_id[ $question_id ];
+            $expected_items = 'disc' === $test_key ? 4 : 2;
+            if ( $expected_items !== count( (array) ( $question['items'] ?? [] ) ) ) {
+                return [ 'error' => 'Bank soal kepribadian tidak memiliki jumlah pernyataan yang valid. Silakan hubungi tim HR.' ];
+            }
             $question['answer'] = $test_state['answers'][ $question_id ] ?? [];
             $question['number'] = count( $questions ) + 1;
             $questions[] = $question;
@@ -147,7 +146,7 @@ class Recruitment_Personality_Assessment {
             'instructions' => (string) $test['INSTRUCTIONS'],
             'questions' => $questions,
             'answered_count' => count( $test_state['answers'] ),
-            'question_count' => self::QUESTION_COUNTS[ $test_key ],
+            'question_count' => count( $questions ),
             'nonce' => wp_create_nonce( 'recruitment_personality_save_answer' ),
             'complete_nonce' => wp_create_nonce( 'recruitment_personality_complete_' . $test_key ),
             'ajax_url' => admin_url( 'admin-ajax.php' ),
@@ -161,14 +160,7 @@ class Recruitment_Personality_Assessment {
     }
 
     private function get_current_candidate_id(): int {
-        if ( ! is_user_logged_in() ) {
-            return 0;
-        }
-        $user = wp_get_current_user();
-        if ( ! in_array( 'daw_applicant', (array) $user->roles, true ) ) {
-            return 0;
-        }
-        return absint( $user->ID );
+        return recruitment_get_assessment_user_id();
     }
 
     /**
@@ -183,13 +175,21 @@ class Recruitment_Personality_Assessment {
     }
 
     private function start_test( int $user_id, int $candidate_id, string $test_key ): void {
-        $state = get_user_meta( $user_id, self::USER_META_KEY, true );
+        $state = recruitment_get_assessment_state( $user_id, self::USER_META_KEY );
+        $test_already_started = $this->is_valid_state( $state, $candidate_id )
+            && in_array( $state['tests'][ $test_key ]['status'] ?? '', [ 'active', 'complete' ], true );
+        if ( ! $test_already_started && ! recruitment_consume_psychotest_consent( $test_key ) ) {
+            wp_die( esc_html__( 'Berikan persetujuan tes terlebih dahulu.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+        }
         if ( ! $this->is_valid_state( $state, $candidate_id ) ) {
             if ( 'disc' !== $test_key ) {
                 wp_die( esc_html__( 'Tes DISC harus diselesaikan sebelum PAPI Kostick dapat dimulai.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
             }
             $this->assert_previous_assessments_complete( $user_id, $candidate_id );
             $catalog = $this->database->get_personality_assessments();
+            if ( $this->database->has_error() ) {
+                wp_die( esc_html__( 'Koneksi Oracle belum tersedia. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+            }
             if ( ! $this->has_valid_catalog( $catalog ) ) {
                 wp_die( esc_html__( 'Bank soal DISC dan PAPI Kostick belum tersedia atau belum lengkap. Silakan hubungi tim HR.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
             }
@@ -233,12 +233,12 @@ class Recruitment_Personality_Assessment {
         if ( empty( $state['tests'][ $test_key ]['started_at'] ) ) {
             $state['tests'][ $test_key ]['started_at'] = time();
         }
-        update_user_meta( $user_id, self::USER_META_KEY, $state );
+        recruitment_update_assessment_state( $user_id, self::USER_META_KEY, $state );
     }
 
     private function assert_previous_assessments_complete( int $user_id, int $candidate_id ): void {
-        $iq_state = get_user_meta( $user_id, self::IQ_USER_META_KEY, true );
-        $pauli_state = get_user_meta( $user_id, self::PAULI_USER_META_KEY, true );
+        $iq_state = recruitment_get_assessment_state( $user_id, self::IQ_USER_META_KEY );
+        $pauli_state = recruitment_get_assessment_state( $user_id, self::PAULI_USER_META_KEY );
         if ( ! is_array( $iq_state ) || 'complete' !== ( $iq_state['status'] ?? '' )
             || (int) ( $iq_state['candidate_id'] ?? 0 ) !== $candidate_id
             || ! is_array( $pauli_state ) || 'complete' !== ( $pauli_state['status'] ?? '' )
@@ -253,10 +253,16 @@ class Recruitment_Personality_Assessment {
     private function has_valid_catalog( array $catalog ): bool {
         foreach ( [ 'disc', 'papi' ] as $key ) {
             if ( ! isset( $catalog[ $key ] )
-                || self::QUESTION_COUNTS[ $key ] !== (int) $catalog[ $key ]['QUESTION_COUNT']
                 || self::REMINDER_MINUTES[ $key ] !== (int) $catalog[ $key ]['DURATION']
-                || self::QUESTION_COUNTS[ $key ] !== count( $catalog[ $key ]['questions'] ) ) {
+                || empty( $catalog[ $key ]['questions'] )
+                || (int) $catalog[ $key ]['QUESTION_COUNT'] !== count( $catalog[ $key ]['questions'] ) ) {
                 return false;
+            }
+            $expected_items = 'disc' === $key ? 4 : 2;
+            foreach ( $catalog[ $key ]['questions'] as $question ) {
+                if ( $expected_items !== count( (array) ( $question['items'] ?? [] ) ) ) {
+                    return false;
+                }
             }
         }
         return true;
@@ -296,6 +302,7 @@ class Recruitment_Personality_Assessment {
         $test_state = $state['tests'][ $test_key ];
         $response_id = absint( $test_state['response_ids'][ $question_id ] ?? 0 );
         $saved = $this->database->save_personality_response(
+            $state['candidate_id'],
             (int) $test_state['id'],
             $question_id,
             $response_id,
@@ -317,7 +324,7 @@ class Recruitment_Personality_Assessment {
         if ( 'complete' !== sanitize_key( wp_unslash( $_POST['personality_action'] ?? '' ) ) ) {
             wp_die( esc_html__( 'Tindakan penyelesaian tes tidak valid.', 'recruitment-plugin' ), '', [ 'response' => 400 ] );
         }
-        $state = get_user_meta( $user_id, self::USER_META_KEY, true );
+        $state = recruitment_get_assessment_state( $user_id, self::USER_META_KEY );
         if ( ! $this->is_valid_state( $state, $candidate_id )
             || 'active' !== ( $state['tests'][ $test_key ]['status'] ?? '' )
             || $test_key !== ( $state['active_test'] ?? '' ) ) {
@@ -341,14 +348,15 @@ class Recruitment_Personality_Assessment {
                 if ( empty( $saved['success'] ) ) {
                     wp_die( esc_html( $saved['error'] ?? 'Jawaban tes gagal disimpan.' ), '', [ 'response' => 500 ] );
                 }
-                update_user_meta( $user_id, self::USER_META_KEY, $state );
+                recruitment_update_assessment_state( $user_id, self::USER_META_KEY, $state );
             }
         }
 
-        if ( self::QUESTION_COUNTS[ $test_key ] !== count( $state['tests'][ $test_key ]['response_ids'] ?? [] ) ) {
+        if ( count( $state['tests'][ $test_key ]['question_order'] ?? [] ) !== count( $state['tests'][ $test_key ]['response_ids'] ?? [] ) ) {
             wp_die( esc_html__( 'Semua soal harus tersimpan sebelum tes dapat diselesaikan.', 'recruitment-plugin' ), '', [ 'response' => 409 ] );
         }
         $result = $this->database->complete_personality_assessment(
+            $candidate_id,
             (int) $state['tests'][ $test_key ]['id'],
             (int) $state['tests'][ $test_key ]['started_at'],
             array_values( array_map( 'absint', (array) $state['tests'][ $test_key ]['response_ids'] ) )
@@ -366,7 +374,7 @@ class Recruitment_Personality_Assessment {
         } else {
             $state['completed_at'] = time();
         }
-        update_user_meta( $user_id, self::USER_META_KEY, $state );
+        recruitment_update_assessment_state( $user_id, self::USER_META_KEY, $state );
         wp_safe_redirect( recruitment_get_public_url( 'psych-personality', [ 'test' => $test_key ] ) );
         exit;
     }

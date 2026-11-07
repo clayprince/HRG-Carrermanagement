@@ -29,31 +29,31 @@ $tab_url = static function ( string $tab ) use ( $page_url, $page_base_args ): s
 $database = new Recruitment_Database();
 $applications = $database->get_applications();
 
-$decision_action = sanitize_key( $_GET['decision_action'] ?? '' );
 $decision_notice = '';
-if ( in_array( $decision_action, [ 'accept', 'reject' ], true ) && $selected_candidate_id > 0 ) {
-	$target_status = 'accept' === $decision_action ? 'DITERIMA' : 'DITOLAK';
-	$target_app_id = 0;
-	foreach ( $applications as $app ) {
-		if ( (int) $app['applicant_id'] === $selected_candidate_id || (int) $app['id'] === $selected_candidate_id ) {
-			$target_app_id = (int) $app['id'];
-			break;
-		}
+if ( '1' === sanitize_text_field( wp_unslash( $_GET['decision_saved'] ?? '' ) ) ) {
+	$decision_notice = 'Keputusan berhasil disimpan ke Oracle Database.';
+}
+if ( 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) && 'save_final_decision' === sanitize_key( wp_unslash( $_POST['daw_final_decision_action'] ?? '' ) ) ) {
+	if ( ! current_user_can( 'manage_recruitment' ) ) {
+		wp_die( esc_html__( 'Anda tidak memiliki izin untuk menyimpan keputusan akhir.', 'recruitment-plugin' ) );
 	}
-	if ( $target_app_id > 0 ) {
-		$update_res = $database->update_application_status(
-			(string) $target_app_id,
-			$target_status,
-			'FINAL',
-			'accept' === $decision_action ? 'Kandidat diterima pada tahap keputusan akhir.' : 'Kandidat tidak lolos pada tahap keputusan akhir.'
-		);
-		if ( ! empty( $update_res['success'] ) ) {
-			$decision_notice = 'Keputusan berhasil disimpan ke Oracle Database.';
-			$applications = $database->get_applications();
-		} else {
-			$decision_notice = 'Gagal menyimpan keputusan: ' . ( $update_res['error'] ?? 'Terjadi kesalahan' );
-		}
+	check_admin_referer( 'daw_save_final_decision' );
+	$application_id = absint( wp_unslash( $_POST['application_id'] ?? 0 ) );
+	$posted_decision = sanitize_key( wp_unslash( $_POST['decision'] ?? '' ) );
+	$decision = 'accept' === $posted_decision ? 'DITERIMA' : ( 'reject' === $posted_decision ? 'DITOLAK' : '' );
+	$role_access_id = absint( get_user_meta( get_current_user_id(), 'daw_oracle_account_id', true ) );
+	$save_result = '' !== $decision
+		? $database->save_final_decision(
+			(string) $application_id,
+			$decision,
+			$role_access_id > 0 ? $role_access_id : null
+		)
+		: [ 'success' => false, 'error' => 'Pilihan keputusan tidak valid.' ];
+	if ( ! empty( $save_result['success'] ) ) {
+		wp_safe_redirect( add_query_arg( [ 'page' => 'recruitment-final-decision', 'section' => 'decision', 'decision_saved' => '1' ], $page_url ) );
+		exit;
 	}
+	$decision_notice = 'Gagal menyimpan keputusan: ' . ( $save_result['error'] ?? 'Terjadi kesalahan.' );
 }
 
 $candidates = [];
@@ -65,12 +65,24 @@ foreach ( $applications as $app ) {
 	$batch = $created_at ? date( 'Y-m', strtotime( $created_at ) ) : date( 'Y-m' );
 	$raw_status = strtoupper( (string) ( $app['status'] ?? 'SUBMITTED' ) );
 
+	$final_decision = strtoupper( trim( (string) ( $app['hr_final_decision'] ?? '' ) ) );
+	if ( '' === $final_decision ) {
+		$final_decision = strtoupper( trim( (string) ( $app['final_status'] ?? '' ) ) );
+	}
+	if ( '' === $final_decision && in_array( $raw_status, [ 'DITERIMA', 'DITOLAK' ], true ) ) {
+		$final_decision = $raw_status;
+	}
 	$decision = 'Menunggu Keputusan';
-	if ( in_array( $raw_status, [ 'DITERIMA', 'ACCEPTED', 'LOLOS' ], true ) ) {
+	if ( in_array( $final_decision, [ 'DITERIMA', 'ACCEPTED', 'LOLOS', 'Diterima' ], true ) ) {
 		$decision = 'Diterima';
-	} elseif ( in_array( $raw_status, [ 'DITOLAK', 'REJECTED', 'TIDAK_LOLOS' ], true ) ) {
+	} elseif ( in_array( $final_decision, [ 'DITOLAK', 'REJECTED', 'TIDAK_LOLOS', 'Tidak Diterima' ], true ) ) {
 		$decision = 'Tidak Diterima';
 	}
+	$user_selection_status = trim( (string) ( $app['user_selection_status'] ?? '' ) );
+	$user_recommendation = trim( (string) ( $app['user_recommendation'] ?? '' ) );
+	$user_result = '' !== $user_selection_status
+		? $user_selection_status . ( '' !== $user_recommendation ? ' · ' . $user_recommendation : '' )
+		: 'Belum dinilai';
 
 	$candidates[] = [
 		'id'            => $cand_id,
@@ -82,12 +94,15 @@ foreach ( $applications as $app ) {
 		'department'    => (string) ( $app['department'] ?: '-' ),
 		'batch'         => $batch,
 		'year'          => $year,
-		'user_result'   => 'Baik',
+		'stage'          => (string) ( $app['stage'] ?? '' ),
+		'hr_result'      => (string) ( $app['hr_result'] ?? '—' ),
+		'user_result'   => $user_result,
 		'decision'      => $decision,
 		'decision_date' => $created_at ? date( 'Y-m-d', strtotime( $created_at ) ) : '',
 		'email_status'  => 'Belum Dikirim',
 		'email_date'    => '',
 		'email'         => (string) ( $app['applicant_email'] ?: '' ),
+		'user_interview_ready' => '' !== $user_selection_status,
 	];
 }
 
@@ -105,11 +120,11 @@ foreach ( $candidates as $cand ) {
 		'source'        => 'Website Karier DAW',
 		'stage'         => 'Final Decision',
 		'status'        => $cand['decision'],
-		'admin_pass'    => true,
-		'psych_active'  => true,
-		'psych_pass'    => true,
-		'hr_interview'  => true,
-		'user_interview'=> true,
+		'admin_pass'    => in_array( strtoupper( (string) ( $cand['stage'] ?? '' ) ), [ 'ADMINISTRASI', 'PSIKOTES', 'INTERVIEW_HR', 'INTERVIEW_USER', 'FINAL' ], true ),
+		'psych_active'  => in_array( strtoupper( (string) ( $cand['stage'] ?? '' ) ), [ 'PSIKOTES', 'INTERVIEW_HR', 'INTERVIEW_USER', 'FINAL' ], true ),
+		'psych_pass'    => in_array( strtoupper( (string) ( $cand['stage'] ?? '' ) ), [ 'INTERVIEW_HR', 'INTERVIEW_USER', 'FINAL' ], true ),
+		'hr_interview'  => in_array( strtoupper( (string) ( $cand['stage'] ?? '' ) ), [ 'INTERVIEW_USER', 'FINAL' ], true ),
+		'user_interview'=> $cand['user_interview_ready'],
 	];
 }
 
@@ -279,12 +294,21 @@ $filter_form = static function ( string $tab, array $fields, string $search_plac
 							<td><?= esc_html( $candidate['position'] ) ?></td>
 							<td><?= esc_html( $candidate['dealer'] ) ?></td>
 							<td><?= esc_html( $candidate['department'] ?: '-' ) ?></td>
-							<td><span class="daw-fd-badge is-green">Selesai</span></td>
-							<td><span class="daw-fd-badge is-green">Selesai</span></td>
+							<td><?= esc_html( $candidate['hr_result'] ?? '—' ) ?></td>
+							<td><span class="daw-fd-badge <?= $candidate['user_interview_ready'] ? 'is-green' : 'is-amber' ?>"><?= esc_html( $candidate['user_result'] ) ?></span></td>
 							<td><span class="daw-fd-badge <?= esc_attr( 'Diterima' === $candidate['decision'] ? 'is-green' : ( 'Tidak Diterima' === $candidate['decision'] ? 'is-red' : 'is-amber' ) ) ?>"><?= esc_html( $candidate['decision'] ) ?></span></td>
 							<td>
-								<a class="button button-small <?= 'Diterima' === $candidate['decision'] ? 'button-primary' : '' ?>" href="<?= esc_url( add_query_arg( [ 'page' => 'recruitment-final-decision', 'section' => 'decision', 'candidate_id' => $candidate['application_id'] ?: $candidate['id'], 'decision_action' => 'accept' ], $page_url ) ) ?>">Terima</a>
-								<a class="button button-small <?= 'Tidak Diterima' === $candidate['decision'] ? 'button-primary' : '' ?>" href="<?= esc_url( add_query_arg( [ 'page' => 'recruitment-final-decision', 'section' => 'decision', 'candidate_id' => $candidate['application_id'] ?: $candidate['id'], 'decision_action' => 'reject' ], $page_url ) ) ?>">Tolak</a>
+								<?php if ( $candidate['user_interview_ready'] ) : ?>
+									<form method="post" action="<?= esc_url( add_query_arg( [ 'page' => 'recruitment-final-decision', 'section' => 'decision' ], $page_url ) ) ?>" class="daw-fd-decision-actions">
+										<?php wp_nonce_field( 'daw_save_final_decision' ); ?>
+										<input type="hidden" name="daw_final_decision_action" value="save_final_decision" />
+										<input type="hidden" name="application_id" value="<?= esc_attr( (string) $candidate['application_id'] ) ?>" />
+										<button class="button button-small <?= 'Diterima' === $candidate['decision'] ? 'button-primary' : '' ?>" type="submit" name="decision" value="accept">Terima</button>
+										<button class="button button-small <?= 'Tidak Diterima' === $candidate['decision'] ? 'button-primary' : '' ?>" type="submit" name="decision" value="reject">Tolak</button>
+									</form>
+								<?php else : ?>
+									<span class="daw-fd-muted-link">Menunggu hasil Wawancara User</span>
+								<?php endif; ?>
 							</td>
 						</tr>
 					<?php endforeach; ?>

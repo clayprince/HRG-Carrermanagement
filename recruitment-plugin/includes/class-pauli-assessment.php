@@ -7,9 +7,7 @@ class Recruitment_Pauli_Assessment {
 
     private const USER_META_KEY = 'recruitment_pauli_assessment';
     private const IQ_USER_META_KEY = 'recruitment_iq_assessment';
-    private const COLUMN_COUNT = 20;
     private const COLUMN_DURATION = 180;
-    private const TOTAL_DURATION = 3600;
     private const NUMBER_COUNT = 100;
     private const ANSWER_COUNT = 99;
 
@@ -24,19 +22,14 @@ class Recruitment_Pauli_Assessment {
             return;
         }
 
-        if ( ! is_user_logged_in() ) {
-            wp_safe_redirect( recruitment_get_public_url( 'applicant-login' ) );
-            exit;
-        }
-
         $candidate_id = $this->get_current_candidate_id();
         if ( $candidate_id < 1 ) {
             wp_safe_redirect( add_query_arg( 'account_error', 'applicant_account_required', recruitment_get_public_url( 'applicant-login' ) ) );
             exit;
         }
 
-        $user_id = get_current_user_id();
-        $state = get_user_meta( $user_id, self::USER_META_KEY, true );
+        $user_id = recruitment_get_assessment_user_id();
+        $state = recruitment_get_assessment_state( $user_id, self::USER_META_KEY );
         if ( 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
             $this->handle_advance_request( $user_id, $candidate_id, is_array( $state ) ? $state : [] );
         }
@@ -67,8 +60,8 @@ class Recruitment_Pauli_Assessment {
             );
         }
 
-        $user_id = get_current_user_id();
-        $state = get_user_meta( $user_id, self::USER_META_KEY, true );
+        $user_id = recruitment_get_assessment_user_id();
+        $state = recruitment_get_assessment_state( $user_id, self::USER_META_KEY );
         if ( ! is_array( $state ) || 'active' !== ( $state['status'] ?? '' ) || (int) ( $state['candidate_id'] ?? 0 ) !== $candidate_id ) {
             wp_send_json_error( [ 'message' => 'Sesi tes Pauli tidak aktif.' ], 409 );
         }
@@ -76,7 +69,7 @@ class Recruitment_Pauli_Assessment {
         $segment = absint( wp_unslash( $_POST['segment'] ?? 0 ) );
         $current_segment = absint( $state['current_segment'] ?? 0 );
         $segment_deadline = absint( $state['started_at'] ?? 0 ) + ( ( $current_segment + 1 ) * self::COLUMN_DURATION );
-        if ( $segment !== $current_segment || time() >= $segment_deadline || $current_segment >= self::COLUMN_COUNT ) {
+        if ( $segment !== $current_segment || time() >= $segment_deadline || $current_segment >= count( (array) ( $state['columns'] ?? [] ) ) ) {
             wp_send_json_error( [ 'message' => 'Kolom ini sudah berakhir. Halaman akan beralih ke kolom berikutnya.' ], 409 );
         }
 
@@ -89,7 +82,7 @@ class Recruitment_Pauli_Assessment {
         if ( empty( $saved['success'] ) ) {
             wp_send_json_error( [ 'message' => (string) ( $saved['error'] ?? 'Jawaban belum tersimpan.' ) ], 500 );
         }
-        update_user_meta( $user_id, self::USER_META_KEY, $state );
+        recruitment_update_assessment_state( $user_id, self::USER_META_KEY, $state );
         wp_send_json_success( [ 'saved' => true ] );
     }
 
@@ -97,15 +90,12 @@ class Recruitment_Pauli_Assessment {
      * @return array<string, mixed>
      */
     public function get_page_view(): array {
-        if ( ! is_user_logged_in() ) {
+        $candidate_id = $this->get_current_candidate_id();
+        if ( $candidate_id < 1 ) {
             return [ 'login_required' => true ];
         }
-        $user_id = get_current_user_id();
-        $candidate_id = $this->get_current_candidate_id();
-        if ( $candidate_id < 1 && $this->database->has_error() ) {
-            return [ 'error' => 'Koneksi Oracle belum tersedia. Silakan coba kembali nanti.' ];
-        }
-        $state = get_user_meta( $user_id, self::USER_META_KEY, true );
+        $user_id = recruitment_get_assessment_user_id();
+        $state = recruitment_get_assessment_state( $user_id, self::USER_META_KEY );
         if ( $candidate_id < 1 || ! is_array( $state ) || (int) ( $state['candidate_id'] ?? 0 ) !== $candidate_id ) {
             return [ 'ready' => false ];
         }
@@ -113,6 +103,7 @@ class Recruitment_Pauli_Assessment {
             return [
                 'complete' => true,
                 'score' => absint( $state['score'] ?? 0 ),
+                'column_count' => count( (array) ( $state['columns'] ?? [] ) ),
             ];
         }
         if ( 'active' !== ( $state['status'] ?? '' ) ) {
@@ -122,10 +113,19 @@ class Recruitment_Pauli_Assessment {
         $segment = absint( $state['current_segment'] ?? 0 );
         $column = $state['columns'][ $segment ] ?? null;
         $catalog = $this->database->get_pauli_assessment();
+        if ( $this->database->has_error() ) {
+            return [ 'error' => 'Koneksi Oracle belum tersedia. Silakan coba kembali nanti.' ];
+        }
         $test = $catalog[0] ?? null;
+        $column_count = count( (array) ( $state['columns'] ?? [] ) );
+        $total_duration = absint( $state['deadline'] ?? 0 ) - absint( $state['started_at'] ?? 0 );
         if ( ! is_array( $test ) || (int) $test['ID'] !== (int) ( $state['test_id'] ?? 0 )
-            || 60 !== (int) $test['DURATION'] || self::COLUMN_COUNT !== count( $test['questions'] )
-            || ! is_array( $column ) || $segment >= self::COLUMN_COUNT ) {
+            || $column_count < 1 || absint( $state['column_count'] ?? $column_count ) !== $column_count
+            || count( $test['questions'] ) < $column_count
+            || (int) $test['DURATION'] < $column_count * 3
+            || (int) $test['QUESTION_COUNT'] < $column_count * self::ANSWER_COUNT
+            || $total_duration !== $column_count * self::COLUMN_DURATION
+            || ! is_array( $column ) || $segment >= $column_count ) {
             return [ 'error' => 'Konfigurasi tes Pauli tidak lengkap. Silakan hubungi tim HR.' ];
         }
 
@@ -139,7 +139,7 @@ class Recruitment_Pauli_Assessment {
         }
 
         $started_at = absint( $state['started_at'] ?? 0 );
-        $deadline = $started_at + self::TOTAL_DURATION;
+        $deadline = $started_at + $total_duration;
         $column_deadline = min( $started_at + ( ( $segment + 1 ) * self::COLUMN_DURATION ), $deadline );
         $answers = (string) ( $column['answers'] ?? str_repeat( '-', self::ANSWER_COUNT ) );
         if ( 1 !== preg_match( '/\A[0-9-]{99}\z/', $answers ) ) {
@@ -151,7 +151,8 @@ class Recruitment_Pauli_Assessment {
             'test' => [
                 'title' => (string) $test['TITLE'],
                 'segment' => $segment,
-                'segment_count' => self::COLUMN_COUNT,
+                'segment_count' => $column_count,
+                'duration_minutes' => $column_count * 3,
                 'segment_deadline' => $column_deadline,
                 'deadline' => $deadline,
                 'numbers' => array_map( 'absint', (array) $column['numbers'] ),
@@ -164,18 +165,14 @@ class Recruitment_Pauli_Assessment {
     }
 
     private function get_current_candidate_id(): int {
-        if ( ! is_user_logged_in() ) {
-            return 0;
-        }
-        $user = wp_get_current_user();
-        if ( ! in_array( 'daw_applicant', (array) $user->roles, true ) ) {
-            return 0;
-        }
-        return absint( $user->ID );
+        return recruitment_get_assessment_user_id();
     }
 
     private function start_session( int $user_id, int $candidate_id ): void {
-        $iq_state = get_user_meta( $user_id, self::IQ_USER_META_KEY, true );
+        if ( ! recruitment_consume_psychotest_consent( 'pauli' ) ) {
+            wp_die( esc_html__( 'Berikan persetujuan tes terlebih dahulu.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+        }
+        $iq_state = recruitment_get_assessment_state( $user_id, self::IQ_USER_META_KEY );
         if ( ! is_array( $iq_state ) || 'complete' !== ( $iq_state['status'] ?? '' )
             || (int) ( $iq_state['candidate_id'] ?? 0 ) !== $candidate_id ) {
             wp_die( esc_html__( 'Tes Pauli dapat dimulai setelah Tes IQ kandidat selesai.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
@@ -189,10 +186,14 @@ class Recruitment_Pauli_Assessment {
         }
 
         $catalog = $this->database->get_pauli_assessment();
+        if ( $this->database->has_error() ) {
+            wp_die( esc_html__( 'Koneksi Oracle belum tersedia. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+        }
         $test = $catalog[0] ?? null;
-        if ( ! is_array( $test ) || 60 !== (int) $test['DURATION'] || 1980 !== (int) $test['QUESTION_COUNT']
-            || self::COLUMN_COUNT !== count( $test['questions'] ) ) {
-            wp_die( esc_html__( 'Bank Pauli 60 menit belum tersedia atau belum lengkap. Silakan hubungi tim HR.', 'recruitment-plugin' ) );
+        if ( ! is_array( $test ) || empty( $test['questions'] )
+            || (int) $test['DURATION'] !== count( $test['questions'] ) * 3
+            || (int) $test['QUESTION_COUNT'] !== count( $test['questions'] ) * self::ANSWER_COUNT ) {
+            wp_die( esc_html__( 'Bank soal Pauli belum tersedia atau belum lengkap. Silakan hubungi tim HR.', 'recruitment-plugin' ) );
         }
 
         $columns = [];
@@ -210,7 +211,7 @@ class Recruitment_Pauli_Assessment {
         }
 
         $now = time();
-        update_user_meta(
+        recruitment_update_assessment_state(
             $user_id,
             self::USER_META_KEY,
             [
@@ -219,8 +220,9 @@ class Recruitment_Pauli_Assessment {
                 'test_id' => (int) $test['ID'],
                 'status' => 'active',
                 'started_at' => $now,
-                'deadline' => $now + self::TOTAL_DURATION,
+                'deadline' => $now + ( count( $columns ) * self::COLUMN_DURATION ),
                 'current_segment' => 0,
+                'column_count' => count( $columns ),
                 'columns' => $columns,
                 'result_id' => 0,
                 'score' => 0,
@@ -244,7 +246,7 @@ class Recruitment_Pauli_Assessment {
 
         $segment = absint( wp_unslash( $_POST['segment'] ?? 0 ) );
         $current_segment = absint( $state['current_segment'] ?? 0 );
-        if ( $segment !== $current_segment || $current_segment >= self::COLUMN_COUNT
+        if ( $segment !== $current_segment || $current_segment >= count( (array) ( $state['columns'] ?? [] ) )
             || time() < ( absint( $state['started_at'] ?? 0 ) + ( ( $current_segment + 1 ) * self::COLUMN_DURATION ) ) ) {
             wp_die( esc_html__( 'Kolom Pauli hanya dapat ditutup setelah aba-aba tiga menit.', 'recruitment-plugin' ), '', [ 'response' => 409 ] );
         }
@@ -259,7 +261,7 @@ class Recruitment_Pauli_Assessment {
         }
 
         $state['current_segment'] = $current_segment + 1;
-        update_user_meta( $user_id, self::USER_META_KEY, $state );
+        recruitment_update_assessment_state( $user_id, self::USER_META_KEY, $state );
         $this->sync_elapsed_columns( $user_id, $candidate_id, $state );
         wp_safe_redirect( recruitment_get_public_url( 'psych-pauli' ) );
         exit;
@@ -274,7 +276,8 @@ class Recruitment_Pauli_Assessment {
         }
 
         $started_at = absint( $state['started_at'] ?? 0 );
-        $target_segment = min( intdiv( max( 0, time() - $started_at ), self::COLUMN_DURATION ), self::COLUMN_COUNT );
+        $column_count = count( (array) ( $state['columns'] ?? [] ) );
+        $target_segment = min( intdiv( max( 0, time() - $started_at ), self::COLUMN_DURATION ), $column_count );
         while ( absint( $state['current_segment'] ?? 0 ) < $target_segment ) {
             $segment = absint( $state['current_segment'] );
             $column = $state['columns'][ $segment ] ?? [];
@@ -284,11 +287,11 @@ class Recruitment_Pauli_Assessment {
                 wp_die( esc_html( $saved['error'] ?? 'Jawaban kolom Pauli gagal disimpan.' ), '', [ 'response' => 500 ] );
             }
             $state['current_segment'] = $segment + 1;
-            update_user_meta( $user_id, self::USER_META_KEY, $state );
+            recruitment_update_assessment_state( $user_id, self::USER_META_KEY, $state );
         }
 
-        if ( absint( $state['current_segment'] ?? 0 ) >= self::COLUMN_COUNT && 'active' === ( $state['status'] ?? '' ) ) {
-            $this->complete_session( $user_id, $state );
+        if ( absint( $state['current_segment'] ?? 0 ) >= $column_count && 'active' === ( $state['status'] ?? '' ) ) {
+            $this->complete_session( $user_id, $candidate_id, $state );
         }
     }
 
@@ -306,6 +309,7 @@ class Recruitment_Pauli_Assessment {
         }
 
         $saved = $this->database->save_pauli_column_response(
+            $state['candidate_id'],
             absint( $state['test_id'] ?? 0 ),
             absint( $column['question_id'] ?? 0 ),
             absint( $column['response_id'] ?? 0 ),
@@ -323,8 +327,9 @@ class Recruitment_Pauli_Assessment {
     /**
      * @param array<string, mixed> $state
      */
-    private function complete_session( int $user_id, array &$state ): void {
+    private function complete_session( int $user_id, int $candidate_id, array &$state ): void {
         $result = $this->database->complete_pauli_assessment(
+            $candidate_id,
             absint( $state['test_id'] ?? 0 ),
             gmdate( 'Y-m-d H:i:s', absint( $state['started_at'] ?? 0 ) ),
             array_column( (array) ( $state['columns'] ?? [] ), 'response_id' )
@@ -336,6 +341,6 @@ class Recruitment_Pauli_Assessment {
         $state['result_id'] = (int) $result['result_id'];
         $state['score'] = (int) $result['score'];
         $state['completed_at'] = time();
-        update_user_meta( $user_id, self::USER_META_KEY, $state );
+        recruitment_update_assessment_state( $user_id, self::USER_META_KEY, $state );
     }
 }

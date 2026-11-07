@@ -408,6 +408,109 @@ function recruitment_start_applicant_session( array $account, bool $remember = f
     return true;
 }
 
+function recruitment_get_assessment_user_id(): int {
+    $applicant = recruitment_get_current_applicant();
+    if ( is_array( $applicant ) && ctype_digit( (string) ( $applicant['profile_id'] ?? '' ) ) ) {
+        return absint( $applicant['profile_id'] );
+    }
+
+    if ( is_user_logged_in() ) {
+        $user = wp_get_current_user();
+        if ( in_array( 'daw_applicant', (array) $user->roles, true ) ) {
+            return absint( $user->ID );
+        }
+    }
+
+    return 0;
+}
+
+/**
+ * Read assessment progress from the applicant's isolated session storage or legacy user meta.
+ *
+ * @return mixed
+ */
+function recruitment_get_assessment_state( int $user_id, string $key ) {
+    $applicant = recruitment_get_current_applicant();
+    if ( is_array( $applicant ) && $user_id === absint( $applicant['profile_id'] ?? 0 ) ) {
+        $option_name = recruitment_assessment_option_name( $user_id, $key );
+        return get_option( $option_name, null );
+    }
+
+    if ( is_user_logged_in() && $user_id === get_current_user_id() ) {
+        $user = wp_get_current_user();
+        if ( in_array( 'daw_applicant', (array) $user->roles, true ) ) {
+            return get_user_meta( $user_id, $key, true );
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Persist assessment progress without changing the applicant's isolated login cookie.
+ *
+ * @param mixed $value
+ */
+function recruitment_update_assessment_state( int $user_id, string $key, $value ): bool {
+    $applicant = recruitment_get_current_applicant();
+    if ( is_array( $applicant ) && $user_id === absint( $applicant['profile_id'] ?? 0 ) ) {
+        $option_name = recruitment_assessment_option_name( $user_id, $key );
+        $existing = get_option( $option_name, null );
+        $saved = null === $existing
+            ? add_option( $option_name, $value, '', false )
+            : update_option( $option_name, $value, false );
+        if ( $saved || get_option( $option_name, null ) === $value ) {
+            return true;
+        }
+        wp_die( esc_html__( 'Kemajuan tes gagal disimpan. Jawaban tidak akan dianggap tersimpan; silakan coba kembali.', 'recruitment-plugin' ), '', [ 'response' => 500 ] );
+        return false;
+    }
+
+    if ( is_user_logged_in() && $user_id === get_current_user_id() ) {
+        $user = wp_get_current_user();
+        if ( in_array( 'daw_applicant', (array) $user->roles, true ) ) {
+            $saved = update_user_meta( $user_id, $key, $value );
+            if ( $saved || get_user_meta( $user_id, $key, true ) === $value ) {
+                return true;
+            }
+            wp_die( esc_html__( 'Kemajuan tes gagal disimpan. Jawaban tidak akan dianggap tersimpan; silakan coba kembali.', 'recruitment-plugin' ), '', [ 'response' => 500 ] );
+            return false;
+        }
+    }
+
+    wp_die( esc_html__( 'Sesi pelamar tidak valid. Kemajuan tes tidak disimpan.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+    return false;
+}
+
+function recruitment_assessment_option_name( int $user_id, string $key ): string {
+    return 'daw_assessment_' . $user_id . '_' . substr( hash( 'sha256', $key ), 0, 20 );
+}
+
+function recruitment_psychotest_consent_key( string $test_key ): string {
+    $user_id = recruitment_get_assessment_user_id();
+    $applicant = recruitment_get_current_applicant();
+    $session_id = is_array( $applicant )
+        ? (string) ( $applicant['session_token'] ?? '' )
+        : (string) ( function_exists( 'wp_get_session_token' ) ? wp_get_session_token() : '' );
+    return 'daw_psychotest_consent_' . hash( 'sha256', $session_id . ':' . $user_id . ':' . $test_key );
+}
+
+function recruitment_grant_psychotest_consent( string $test_key ): bool {
+    if ( recruitment_get_assessment_user_id() < 1 ) {
+        return false;
+    }
+    return set_transient( recruitment_psychotest_consent_key( $test_key ), true, 10 * MINUTE_IN_SECONDS );
+}
+
+function recruitment_consume_psychotest_consent( string $test_key ): bool {
+    $consent_key = recruitment_psychotest_consent_key( $test_key );
+    if ( ! get_transient( $consent_key ) ) {
+        return false;
+    }
+    delete_transient( $consent_key );
+    return true;
+}
+
 function recruitment_clear_applicant_session_cookie(): void {
     if ( isset( $_COOKIE['daw_applicant_session'] ) && is_string( $_COOKIE['daw_applicant_session'] ) && preg_match( '/^[a-f0-9]{64}$/', $_COOKIE['daw_applicant_session'] ) ) {
         delete_transient( 'daw_applicant_session_' . hash( 'sha256', $_COOKIE['daw_applicant_session'] ) );
