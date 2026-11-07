@@ -20,6 +20,7 @@ define( 'RECRUITMENT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 // Load shared helpers and modular services.
 require_once __DIR__ . '/includes/helpers.php';
 require_once __DIR__ . '/database/class-database.php';
+require_once __DIR__ . '/includes/class-applicant-profile.php';
 require_once __DIR__ . '/includes/class-application.php';
 require_once __DIR__ . '/includes/class-auth.php';
 require_once __DIR__ . '/includes/class-iq-assessment.php';

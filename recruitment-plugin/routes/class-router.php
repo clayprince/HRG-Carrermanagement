@@ -13,20 +13,16 @@ class Recruitment_Router {
         'application-confirmation' => 'public/pages/application-confirmation.php',
         'applicant-login'    => 'public/pages/applicant-login.php',
         'applicant-register' => 'public/pages/applicant-register.php',
+        'applicant-dashboard' => 'public/pages/applicant-dashboard.php',
         'account-confirmation' => 'public/pages/account-confirmation.php',
         'account-profile'    => 'public/pages/account-profile.php',
-        'application-history' => 'public/pages/application-history.php',
-        'application-detail' => 'public/pages/application-detail.php',
+        'applicant-file'     => 'public/pages/account-profile.php',
         'application-process' => 'public/pages/application-process.php',
         'psych-test'         => 'public/pages/psychological-test.php',
         'interview-booking'  => 'public/pages/interview-booking.php',
         'psychotest'         => 'public/pages/psychotest-home.php',
         'psychotest-preparation' => 'public/pages/psychotest-preparation.php',
         'psychotest-device'  => 'public/pages/psychotest-device.php',
-        'psych-iq'           => 'public/pages/iq-assessment.php',
-        'psych-pauli'        => 'public/pages/pauli-assessment.php',
-        'psych-personality'  => 'public/pages/personality-assessment.php',
-        'application-status' => 'public/pages/application-history.php',
         'tracking-detail'    => 'public/pages/application-process.php',
         'login'              => 'admin/pages/login.php',
         'forgot-password'    => 'admin/pages/login.php',
@@ -42,9 +38,7 @@ class Recruitment_Router {
         'interview-schedule' => 'admin/pages/interview-schedule.php',
         'user-management'    => 'admin/pages/user-management-oracle.php',
         'hr-profile'         => 'admin/pages/hr-profile.php',
-        'application-form-builder' => 'admin/pages/application-form-builder.php',
         'psychotest-settings' => 'admin/pages/psychotest-settings.php',
-        'personality-results' => 'admin/pages/personality-results.php',
         'question-bank'      => 'admin/pages/question-bank.php',
         'settings'           => 'admin/pages/settings.php',
     ];
@@ -62,31 +56,26 @@ class Recruitment_Router {
         'interview-schedule',
         'user-management',
         'hr-profile',
-        'application-form-builder',
         'psychotest-settings',
-        'personality-results',
         'question-bank',
         'settings',
     ];
 
     /** @var string[] */
     private const APPLICANT_PROTECTED = [
+        'applicant-dashboard',
         'account-confirmation',
         'account-profile',
+        'applicant-file',
         'application-form',
         'application-confirmation',
-        'application-history',
-        'application-detail',
-        'application-status',
         'application-process',
+        'tracking-detail',
         'interview-booking',
         'psych-test',
         'psychotest',
         'psychotest-preparation',
         'psychotest-device',
-        'psych-iq',
-        'psych-pauli',
-        'psych-personality',
     ];
 
     /**
@@ -106,7 +95,7 @@ class Recruitment_Router {
             $is_logged_in = function_exists( 'is_user_logged_in' ) && is_user_logged_in();
             $redirect_args = [
                 'account_error' => $is_logged_in ? 'applicant_account_required' : '',
-                'redirect_to' => in_array( $slug, [ 'application-form', 'application-history', 'account-profile' ], true ) ? $slug : 'account-profile',
+                'redirect_to' => in_array( $slug, [ 'application-form', 'account-profile' ], true ) ? $slug : 'account-profile',
             ];
             if ( 'application-form' === $slug ) {
                 $redirect_args['job_id'] = absint( $_GET['job_id'] ?? 0 );

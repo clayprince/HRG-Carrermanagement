@@ -125,7 +125,6 @@ $pipeline_rows = [
                     <a href="<?= esc_url( recruitment_get_admin_url( 'applications' ) ) ?>"><span class="recruitment-dashboard__nav-label">Pengajuan Lowongan</span></a>
                 </div>
             </div>
-            <a href="<?= esc_url( admin_url( 'admin.php?page=recruitment-form-builder' ) ) ?>" title="Form Lamaran"><span class="dashicons dashicons-forms" aria-hidden="true"></span><span class="recruitment-dashboard__nav-label">Form Lamaran</span></a>
             <a href="#candidate-list-title" data-dashboard-stage="psychological_test" title="Psikotes"><span class="dashicons dashicons-lightbulb" aria-hidden="true"></span><span class="recruitment-dashboard__nav-label">Psikotes</span></a>
             <a href="<?= esc_url( admin_url( 'admin.php?page=recruitment-interview-schedule' ) ) ?>" title="Jadwal Wawancara"><span class="dashicons dashicons-calendar-alt" aria-hidden="true"></span><span class="recruitment-dashboard__nav-label">Jadwal Wawancara</span></a>
             <a href="<?= esc_url( recruitment_get_admin_url( 'settings' ) ) ?>" title="Email Recruitment"><span class="dashicons dashicons-email" aria-hidden="true"></span><span class="recruitment-dashboard__nav-label">Email Recruitment</span></a>

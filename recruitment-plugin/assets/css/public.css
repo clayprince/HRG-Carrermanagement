@@ -214,6 +214,32 @@
 .daw-account-menu__logout:hover {
   background: #fef2f2;
 }
+.daw-account-menu form.daw-account-menu__logout-form {
+  border-top: 1px solid #e5e7eb;
+  margin: 0;
+  padding: 8px;
+}
+.daw-account-menu form.daw-account-menu__logout-form button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  color: #b91c1c;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  justify-content: flex-start;
+  padding: 11px 10px;
+  text-align: left;
+  width: 100%;
+}
+.daw-account-menu form.daw-account-menu__logout-form button:hover,
+.daw-account-menu form.daw-account-menu__logout-form button:focus-visible {
+  background: #fef2f2;
+  color: #991b1b;
+}
 .daw-recruitment__hero {
   background: var(--daw-charcoal);
   color: #fff;
@@ -1104,6 +1130,460 @@
 .daw-account__field--full {
   grid-column: 1 / -1;
 }
+.daw-account__main--profile {
+  box-sizing: border-box;
+  margin: 0 auto;
+  max-width: 960px;
+  min-height: 0;
+  padding: 28px 24px 56px;
+  width: 100%;
+}
+.daw-account__main--profile > .daw-profile__heading,
+.daw-account__main--profile > .daw-profile__notice,
+.daw-account__main--profile > .daw-profile__identity,
+.daw-account__main--profile > .daw-profile__section,
+.daw-account__main--profile > .daw-profile__password,
+.daw-account__main--profile > .daw-account__success,
+.daw-account__main--profile > .daw-account__alert,
+.daw-account__main--profile > .daw-account__preview-note {
+  max-width: 900px;
+}
+.daw-profile__heading {
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.daw-profile__heading h1 {
+  font-size: 25px;
+}
+.daw-profile__heading .daw-recruitment__eyebrow {
+  color: var(--daw-red);
+  font-size: 10px;
+  font-weight: 700;
+}
+.daw-profile__edit-link {
+  flex: 0 0 auto;
+  font-size: 13px;
+  line-height: 1.2;
+  min-height: 0;
+  padding: 10px 16px;
+}
+.daw-profile__password > summary::-webkit-details-marker {
+  display: none;
+}
+.daw-profile__form {
+  margin: 0 auto;
+  max-width: 900px;
+}
+.daw-profile__section-note {
+  color: var(--daw-gray);
+  font-size: 12px;
+  margin: -4px 0 12px;
+}
+.daw-profile__notice {
+  align-items: flex-start;
+  background: #e6f0ff;
+  border: 1px solid #b9d4ff;
+  border-radius: 6px;
+  color: #24549a;
+  display: flex;
+  gap: 9px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+}
+.daw-profile__notice > span {
+  font-size: 15px;
+  line-height: 1.3;
+}
+.daw-profile__notice p {
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+}
+.daw-profile__identity {
+  margin-bottom: 14px;
+  padding: 16px;
+}
+.daw-profile__identity .daw-account__avatar {
+  flex: 0 0 54px;
+  font-size: 14px;
+  height: 54px;
+  width: 54px;
+}
+.daw-profile__identity-copy {
+  display: grid;
+  gap: 4px;
+}
+.daw-profile__identity-copy > strong {
+  color: var(--daw-charcoal);
+  font-size: 15px;
+}
+.daw-profile__identity-copy > span {
+  color: var(--daw-gray);
+  font-size: 12px;
+}
+.daw-profile__completion {
+  background: #dcfce7;
+  border-radius: 4px;
+  color: #166534 !important;
+  font-size: 10px !important;
+  justify-self: start;
+  margin-top: 2px;
+  padding: 3px 6px;
+}
+.daw-profile__section {
+  margin-bottom: 14px;
+  padding: 18px 20px;
+}
+.daw-profile__section h2 {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  padding-bottom: 9px;
+}
+.daw-profile__accordion {
+  margin-bottom: 14px;
+  padding: 16px 20px;
+}
+.daw-profile__accordion-summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  list-style: none;
+  padding: 0;
+  user-select: none;
+}
+.daw-profile__accordion-summary::-webkit-details-marker {
+  display: none;
+}
+.daw-profile__accordion-summary h2 {
+  border-bottom: 0 !important;
+  color: var(--daw-dark);
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.daw-profile__accordion-chevron {
+  color: var(--daw-red);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  transition: transform 160ms ease;
+}
+.daw-profile__accordion[open] > .daw-profile__accordion-summary .daw-profile__accordion-chevron {
+  transform: rotate(180deg);
+}
+.daw-profile__accordion-body {
+  border-top: 1px solid var(--daw-border);
+  margin-top: 14px;
+  padding-top: 14px;
+}
+.daw-profile__qa-table {
+  border-collapse: collapse;
+  min-width: 600px;
+  width: 100%;
+}
+.daw-profile__qa-table th[scope="row"] {
+  background: #fbfbfc;
+  border: 1px solid var(--daw-border);
+  color: var(--daw-dark);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+  width: 38%;
+}
+.daw-profile__qa-table td {
+  border: 1px solid var(--daw-border);
+  padding: 8px 12px;
+  vertical-align: top;
+  width: 62%;
+}
+.daw-profile__qa-table input,
+.daw-profile__qa-table select,
+.daw-profile__qa-table textarea {
+  background: var(--daw-light);
+  border: 0;
+  border-radius: 3px;
+  box-sizing: border-box;
+  color: var(--daw-charcoal);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  min-height: 34px;
+  padding: 7px 8px;
+  width: 100%;
+}
+.daw-profile__qa-table textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+.daw-profile__qa-table input:focus,
+.daw-profile__qa-table select:focus,
+.daw-profile__qa-table textarea:focus {
+  background: #fff;
+  border-color: var(--daw-red);
+  outline: 2px solid rgba(200, 16, 46, 0.12);
+}
+.daw-profile__work-table {
+  border-collapse: collapse;
+  min-width: 600px;
+  width: 100%;
+}
+.daw-profile__work-table th {
+  background: #f7f7f9;
+  border: 1px solid var(--daw-border);
+  color: var(--daw-dark);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 9px 10px;
+  text-align: left;
+}
+.daw-profile__work-table td {
+  border: 1px solid var(--daw-border);
+  padding: 7px 9px;
+  vertical-align: middle;
+}
+.daw-profile__work-table input {
+  background: var(--daw-light);
+  border: 0;
+  border-radius: 3px;
+  box-sizing: border-box;
+  color: var(--daw-charcoal);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  height: 32px;
+  padding: 6px 8px;
+  width: 100%;
+}
+.daw-profile__work-table input:focus {
+  background: #fff;
+  border-color: var(--daw-red);
+  outline: 2px solid rgba(200, 16, 46, 0.12);
+}
+.daw-profile__grid {
+  display: grid;
+  gap: 10px 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.daw-profile__value {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.daw-profile__value > span {
+  color: var(--daw-gray);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.025em;
+}
+.daw-profile__value > strong {
+  color: var(--daw-charcoal);
+  font-size: 12px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.daw-profile__value input {
+  background: var(--daw-light);
+  border: 0;
+  border-radius: 3px;
+  box-sizing: border-box;
+  color: var(--daw-charcoal);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  height: 34px;
+  min-width: 0;
+  padding: 7px 8px;
+  width: 100%;
+}
+.daw-profile__value select,
+.daw-profile__value textarea {
+  background: var(--daw-light);
+  border: 0;
+  border-radius: 3px;
+  box-sizing: border-box;
+  color: var(--daw-charcoal);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  min-height: 34px;
+  min-width: 0;
+  padding: 7px 8px;
+  width: 100%;
+}
+.daw-profile__value textarea {
+  min-height: 78px;
+  resize: vertical;
+}
+.daw-profile__value input[type="file"] {
+  background: #fff;
+  border: 1px solid var(--daw-border);
+  height: auto;
+  min-height: 40px;
+}
+.daw-profile__value input:focus,
+.daw-profile__value select:focus,
+.daw-profile__value textarea:focus {
+  background: #fff;
+  border-color: var(--daw-red);
+  outline: 2px solid rgba(200, 16, 46, 0.12);
+}
+.daw-profile__value small,
+.daw-profile__section-note {
+  color: var(--daw-gray);
+  font-size: 11px;
+  font-weight: 400;
+}
+.daw-profile__value--full {
+  grid-column: 1 / -1;
+}
+.daw-profile__photo-preview {
+  border-radius: 8px;
+  height: 96px;
+  object-fit: cover;
+  width: 96px;
+}
+.daw-profile__identity-photo {
+  border-radius: 50%;
+  flex: 0 0 54px;
+  height: 54px;
+  object-fit: cover;
+  width: 54px;
+}
+.daw-profile__document-link {
+  color: var(--daw-red);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.daw-profile__repeatable {
+  background: #fafafa;
+  border: 1px solid var(--daw-border);
+  border-radius: 6px;
+  margin: 0 0 10px;
+  padding: 12px;
+}
+.daw-profile__repeatable-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.daw-profile__repeatable-heading strong,
+.daw-profile__subheading {
+  color: var(--daw-charcoal);
+  font-size: 12px;
+}
+.daw-profile__remove-row,
+.daw-profile__add-row {
+  background: transparent;
+  border: 1px solid var(--daw-border);
+  border-radius: 4px;
+  color: var(--daw-charcoal);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  padding: 7px 10px;
+}
+.daw-profile__add-row {
+  border-color: var(--daw-red);
+  color: var(--daw-red);
+  font-weight: 700;
+}
+.daw-profile__marital-status {
+  max-width: 320px;
+}
+.daw-profile__subheading {
+  margin: 16px 0 8px;
+}
+.daw-profile__family-head,
+.daw-profile__family-row {
+  align-items: end;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.2fr) minmax(70px, 0.6fr) minmax(0, 1.4fr) auto;
+}
+.daw-profile__family-head {
+  color: var(--daw-gray);
+  font-size: 9px;
+  font-weight: 700;
+  margin: 10px 0 6px;
+}
+.daw-profile__family-row {
+  margin-bottom: 8px;
+}
+.daw-profile__family-row .daw-profile__remove-row {
+  margin-bottom: 2px;
+}
+.daw-account-auth__main--registration {
+  align-items: flex-start;
+  max-width: 1160px;
+  min-height: 0;
+}
+.daw-account-auth__card--registration {
+  max-width: 840px;
+}
+.daw-registration__password {
+  margin-top: 0;
+}
+.daw-profile-fields--registration .daw-profile__grid,
+.daw-registration__password .daw-profile__grid,
+.daw-profile-fields--registration .daw-profile__family-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+.daw-profile-fields--registration .daw-profile__family-head {
+  display: none;
+}
+.daw-profile__value input:focus {
+  background: #fff;
+  border-color: var(--daw-red);
+  outline: 2px solid rgba(200, 16, 46, 0.12);
+}
+.daw-profile__value input:disabled {
+  color: var(--daw-charcoal);
+  cursor: not-allowed;
+  opacity: 1;
+}
+.daw-profile__form .daw-account__actions {
+  margin: 16px 0 0;
+  max-width: none;
+}
+.daw-profile__empty {
+  color: var(--daw-gray);
+  font-size: 12px;
+  margin: 0;
+}
+.daw-profile__password {
+  margin: 18px auto 0;
+  max-width: 900px;
+  padding: 14px 16px;
+}
+.daw-profile__password > summary {
+  color: var(--daw-charcoal);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  list-style: none;
+}
+.daw-profile__password > summary::after {
+  color: var(--daw-gray);
+  content: "+";
+  float: right;
+  font-size: 18px;
+  line-height: 1;
+}
+.daw-profile__password[open] > summary::after {
+  content: "−";
+}
+.daw-profile__password > p {
+  margin: 12px 0;
+}
+.daw-profile__password form {
+  margin-top: 16px;
+}
 .daw-account__actions {
   display: flex;
   justify-content: flex-end;
@@ -1820,6 +2300,228 @@
   .daw-recruitment--tracking .daw-recruitment__cta {
     font-size: 11px;
     padding: 9px 10px;
+  }
+}
+@media (max-width: 600px) {
+  .daw-account__main--profile {
+    padding: 22px 14px 40px;
+  }
+  .daw-profile__heading {
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .daw-profile__heading h1 {
+    font-size: 21px;
+  }
+  .daw-profile__heading p {
+    font-size: 12px;
+  }
+  .daw-profile__heading > div {
+    min-width: 0;
+  }
+  .daw-profile__heading .daw-recruitment__button {
+    font-size: 11px;
+    padding: 9px 11px;
+    white-space: nowrap;
+  }
+  .daw-profile__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .daw-profile__family-head {
+    display: none;
+  }
+  .daw-profile__family-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .daw-profile__family-row .daw-profile__remove-row {
+    justify-self: start;
+  }
+}
+@media (max-width: 380px) {
+  .daw-profile__heading {
+    flex-direction: column;
+  }
+  .daw-profile__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.daw-profile-fields--unified {
+  background: #fff;
+  border: 1px solid #dfe1e6;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(20, 25, 38, 0.06);
+  overflow: hidden;
+}
+.daw-profile-fields--unified > .daw-profile__section {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid #e8eaf0;
+  border-radius: 0;
+  box-shadow: none;
+  margin: 0;
+  padding: 24px;
+}
+.daw-profile-fields--unified > .daw-profile__section:last-child {
+  border-bottom: 0;
+}
+.daw-profile__form .daw-profile-fields--unified .daw-profile__grid,
+.daw-profile-fields--unified .daw-profile__social-list,
+.daw-profile__form .daw-profile-fields--unified .daw-profile__social-row .daw-profile__grid,
+.daw-profile-fields--unified .daw-profile__application-grid,
+.daw-profile-fields--unified .daw-profile__family-row,
+.daw-profile-fields--unified .daw-profile-fields--readonly .daw-profile__family-row--readonly {
+  grid-template-columns: minmax(0, 1fr);
+}
+.daw-profile-fields--unified .daw-profile__family-head {
+  display: none;
+}
+.daw-profile-fields--unified .daw-profile__value--full,
+.daw-profile-fields--unified .daw-profile__application-field--full,
+.daw-profile-fields--unified .daw-profile__application-choice,
+.daw-profile-fields--unified .daw-profile__application-file {
+  grid-column: auto;
+}
+.daw-profile-fields--unified .daw-profile__application-section {
+  background: #fff;
+}
+.daw-profile-fields--unified .daw-profile__add-row:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.daw-profile__details-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.daw-profile__details-grid .daw-profile__details-item {
+  min-width: 0;
+}
+@media (max-width: 600px) {
+  .daw-profile-fields--unified > .daw-profile__section {
+    padding: 18px 14px;
+  }
+  .daw-profile__details-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.daw-profile-fields--unified .daw-profile__add-row {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  margin-top: 10px;
+  max-width: 100%;
+  min-height: 36px;
+  padding: 7px 12px;
+  white-space: nowrap;
+  width: auto;
+}
+.daw-profile-fields--unified .daw-profile__remove-row {
+  font-size: 11px;
+  min-height: 30px;
+  padding: 5px 9px;
+  white-space: nowrap;
+}
+.daw-profile-fields--unified .daw-application__table,
+.daw-profile-fields--readonly .daw-application__table {
+  border-collapse: collapse;
+  border-spacing: 0;
+  margin: 0;
+}
+.daw-profile-fields--unified .daw-application__table {
+  min-width: 900px;
+  table-layout: auto;
+}
+.daw-profile-fields--unified .daw-application__table th,
+.daw-profile-fields--unified .daw-application__table td,
+.daw-profile-fields--readonly .daw-application__table th,
+.daw-profile-fields--readonly .daw-application__table td {
+  padding: 9px 10px;
+}
+.daw-profile-fields--unified .daw-application__table thead th,
+.daw-profile-fields--readonly .daw-application__table thead th {
+  background: #f5f6f8;
+  color: var(--daw-dark);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+}
+.daw-profile-fields--unified .daw-application__table tbody th {
+  color: var(--daw-gray);
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 34px;
+  text-align: center;
+}
+.daw-profile-fields--unified .daw-application__table input,
+.daw-profile-fields--unified .daw-application__table select,
+.daw-profile-fields--unified .daw-application__table textarea {
+  box-sizing: border-box;
+  font-size: 12px;
+  margin: 0;
+  min-height: 38px;
+  min-width: 132px;
+  padding: 7px 8px;
+  width: 100%;
+}
+.daw-profile-fields--unified .daw-application__table textarea {
+  min-height: 68px;
+  min-width: 190px;
+}
+.daw-profile-fields--unified .daw-profile__family-table {
+  min-width: 800px;
+}
+.daw-profile-fields--unified .daw-profile__family-table > thead th:first-child,
+.daw-profile-fields--unified .daw-profile__family-table > tbody th {
+  min-width: 40px;
+  width: 40px;
+}
+.daw-profile-fields--unified .daw-profile__family-table .daw-profile__family-row {
+  display: table-row;
+}
+.daw-profile-fields--unified .daw-profile__family-table td:last-child {
+  text-align: center;
+  width: 72px;
+}
+.daw-profile-fields--unified .daw-profile__family-table td:last-child .daw-profile__remove-row {
+  margin: 0;
+}
+.daw-profile-fields--unified .daw-profile__work-table {
+  min-width: 820px;
+}
+.daw-profile-fields--unified .daw-profile__qa-table {
+  min-width: 560px;
+  table-layout: fixed;
+}
+.daw-profile-fields--unified .daw-profile__qa-table th:first-child,
+.daw-profile-fields--readonly .daw-profile__qa-table th:first-child {
+  width: 62%;
+}
+.daw-profile-fields--unified .daw-profile__qa-table td,
+.daw-profile-fields--readonly .daw-profile__qa-table td {
+  width: 38%;
+}
+.daw-profile-fields--unified .daw-profile__qa-table select {
+  min-width: 0;
+}
+.daw-profile__related-answers {
+  margin-top: 12px;
+}
+.daw-profile-fields--readonly .daw-profile__family-table {
+  min-width: 700px;
+}
+@media (max-width: 600px) {
+  .daw-profile-fields--unified .daw-profile__add-row {
+    font-size: 11px;
+    min-height: 34px;
+    padding: 7px 10px;
+  }
+  .daw-profile-fields--unified .daw-application__table th,
+  .daw-profile-fields--unified .daw-application__table td,
+  .daw-profile-fields--readonly .daw-application__table th,
+  .daw-profile-fields--readonly .daw-application__table td {
+    padding: 7px;
   }
 }
 @media (max-width: 600px) {
@@ -3699,6 +4401,98 @@ body:has(.daw-account-auth) .daw-account-auth__main {
   gap: 13px 10px;
   grid-template-columns: 1fr 1fr;
 }
+.daw-application__optional,
+.daw-application__table-group {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.daw-application__optional {
+  border: 1px solid #e1e2e7;
+  border-radius: 6px;
+  padding: 12px;
+}
+.daw-application__optional > summary {
+  align-items: center;
+  background: #f7f7f9;
+  border-radius: 5px;
+  color: var(--daw-dark);
+  cursor: pointer;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 12px;
+  gap: 6px 12px;
+  justify-content: space-between;
+  list-style: none;
+  margin: -4px;
+  padding: 10px;
+}
+.daw-application__optional > summary strong {
+  font-weight: 800;
+}
+.daw-application__optional > summary::-webkit-details-marker {
+  display: none;
+}
+.daw-application__optional > summary span {
+  color: var(--daw-gray);
+  font-size: 10px;
+  font-weight: 700;
+}
+.daw-application__optional > summary .daw-application__optional-chevron {
+  color: var(--daw-red);
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 160ms ease;
+}
+.daw-application__optional[open] > summary {
+  border-bottom: 1px solid var(--daw-border);
+  border-radius: 5px 5px 0 0;
+  margin: 0;
+  padding-bottom: 10px;
+}
+.daw-application__optional[open] > summary .daw-application__optional-chevron {
+  transform: rotate(180deg);
+}
+.daw-application__optional-content {
+  display: grid;
+  gap: 14px 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 12px;
+}
+.daw-application__table-group h3 {
+  color: var(--daw-dark);
+  font-size: 12px;
+  margin: 0 0 8px;
+}
+.daw-application__table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+.daw-application__table {
+  border-collapse: collapse;
+  font-size: 10px;
+  min-width: 680px;
+  width: 100%;
+}
+.daw-application__table th,
+.daw-application__table td {
+  border: 1px solid var(--daw-border);
+  padding: 7px;
+  text-align: left;
+  vertical-align: top;
+}
+.daw-application__table thead th,
+.daw-application__table tbody th {
+  background: #f7f7f9;
+  font-weight: 700;
+}
+.daw-application__table td > label {
+  min-width: 115px;
+}
+.daw-application__table textarea {
+  min-height: 60px;
+  min-width: 160px;
+}
 .daw-recruitment__form-fields label,
 .daw-recruitment__form-fields legend {
   color: var(--daw-dark);
@@ -3752,6 +4546,18 @@ body:has(.daw-account-auth) .daw-account-auth__main {
 .daw-recruitment__upload small {
   color: var(--daw-gray);
   font-weight: 400;
+}
+.daw-application__saved-document {
+  color: var(--daw-gray);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.daw-application__saved-document a {
+  color: var(--daw-red);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .daw-recruitment__social-input > span {
   display: block;
@@ -3879,6 +4685,9 @@ body:has(.daw-account-auth) .daw-account-auth__main {
   .daw-recruitment__form-fields {
     grid-template-columns: 1fr;
   }
+  .daw-application__optional-content {
+    grid-template-columns: 1fr;
+  }
   .daw-recruitment__field--full {
     grid-column: auto;
   }
@@ -3893,5 +4702,562 @@ body:has(.daw-account-auth) .daw-account-auth__main {
     font-size: 11px;
     padding-left: 8px;
     padding-right: 8px;
+  }
+}
+
+.daw-profile__form .daw-profile__grid,
+.daw-profile-fields--registration .daw-profile__grid,
+.daw-registration__password .daw-profile__grid {
+  gap: 16px 20px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.daw-profile__form .daw-profile__value {
+  gap: 7px;
+}
+.daw-profile__form .daw-profile__value > span {
+  font-size: 10px;
+}
+.daw-profile__form .daw-profile__value input,
+.daw-profile__form .daw-profile__value select,
+.daw-profile__form .daw-profile__value textarea {
+  border: 1px solid #dfe1e6;
+  border-radius: 6px;
+  font-size: 13px;
+  min-height: 42px;
+  padding: 9px 11px;
+}
+.daw-profile__form .daw-profile__value textarea {
+  min-height: 92px;
+}
+.daw-profile__social-list {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.daw-profile__social-row .daw-profile__grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.daw-profile__application-section {
+  border: 1px solid #dfe1e6;
+  border-radius: 8px;
+  margin-top: 12px;
+  padding: 12px;
+}
+.daw-profile__application-grid {
+  display: grid;
+  gap: 13px 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 14px;
+}
+.daw-profile__application-grid > label,
+.daw-profile__application-choice legend,
+.daw-profile__application-file > span {
+  color: var(--daw-dark);
+  display: grid;
+  font-size: 11px;
+  font-weight: 700;
+  gap: 6px;
+  min-width: 0;
+}
+.daw-profile__application-grid input,
+.daw-profile__application-grid select,
+.daw-profile__application-grid textarea {
+  background: #fff;
+  border: 1px solid #dfe1e6;
+  border-radius: 6px;
+  box-sizing: border-box;
+  color: var(--daw-charcoal);
+  font: inherit;
+  font-size: 13px;
+  min-height: 42px;
+  padding: 9px 11px;
+  width: 100%;
+}
+.daw-profile__application-grid textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+.daw-profile__application-field--full,
+.daw-profile__application-choice,
+.daw-profile__application-file {
+  grid-column: 1 / -1;
+}
+.daw-profile__application-choice {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.daw-profile__application-choice legend {
+  margin-bottom: 7px;
+}
+.daw-profile__application-choice > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.daw-profile__application-choice label {
+  align-items: center;
+  border: 1px solid #dfe1e6;
+  border-radius: 6px;
+  display: flex;
+  font-size: 12px;
+  gap: 7px;
+  padding: 9px 11px;
+}
+.daw-profile__application-file small {
+  color: var(--daw-gray);
+  font-size: 11px;
+}
+.daw-profile__application-file .daw-profile__document-link {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.daw-profile-fields--readonly .daw-profile__value > strong {
+  background: var(--daw-light);
+  border: 1px solid #dfe1e6;
+  border-radius: 6px;
+  box-sizing: border-box;
+  color: var(--daw-charcoal);
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  min-height: 42px;
+  overflow-wrap: anywhere;
+  padding: 9px 11px;
+}
+.daw-profile-fields--readonly .daw-profile__complete-link {
+  color: var(--daw-red);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.daw-profile-fields--readonly .daw-profile__complete-link:hover,
+.daw-profile-fields--readonly .daw-profile__complete-link:focus-visible {
+  color: var(--daw-red-dark);
+}
+.daw-profile-fields--readonly .daw-profile__value > .daw-profile__readonly-text {
+  min-height: 72px;
+  white-space: pre-line;
+}
+.daw-profile-fields--readonly .daw-profile__value > .daw-profile__document-link {
+  background: var(--daw-light);
+  border: 1px solid #dfe1e6;
+  border-radius: 6px;
+  display: block;
+  font-size: 12px;
+  min-height: 42px;
+  padding: 10px 11px;
+}
+.daw-profile-fields--readonly .daw-profile__family-head,
+.daw-profile-fields--readonly .daw-profile__family-row--readonly {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.daw-profile-fields--readonly .daw-profile__marital-status {
+  max-width: 100%;
+  width: min(100%, 420px);
+}
+.daw-profile-fields--readonly .daw-profile__family-row--readonly {
+  align-items: start;
+}
+.daw-profile__identity--overview {
+  align-items: center;
+  flex-wrap: wrap;
+}
+.daw-profile__overview-details {
+  margin-bottom: 14px;
+  padding: 16px;
+}
+.daw-profile__overview-details > summary {
+  align-items: center;
+  color: var(--daw-red);
+  cursor: pointer;
+  display: flex;
+  font-size: 13px;
+  font-weight: 700;
+  justify-content: space-between;
+  list-style: none;
+}
+.daw-profile__overview-details > summary::-webkit-details-marker {
+  display: none;
+}
+.daw-profile__overview-details[open] > summary {
+  border-bottom: 1px solid #e8e8ed;
+  padding-bottom: 12px;
+}
+.daw-profile__overview-details[open] > .daw-profile__details-content {
+  margin-top: 16px;
+}
+.daw-profile__overview-details .daw-profile-fields--readonly > .daw-profile__section:last-child {
+  margin-bottom: 0;
+}
+.daw-profile__overview-details .daw-profile-fields--readonly .daw-profile__section h2 {
+  color: var(--daw-charcoal);
+}
+.daw-profile__identity--overview .daw-profile__identity-copy {
+  flex: 1 1 220px;
+}
+.daw-account__identity.daw-profile__identity--overview > .daw-profile__identity-actions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 100%;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 6px;
+  width: 100%;
+}
+.daw-profile__details {
+  flex: 1 1 0;
+  min-width: 0;
+  width: 0;
+}
+.daw-profile__details > summary {
+  align-items: center;
+  color: var(--daw-red);
+  cursor: pointer;
+  display: flex;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 8px;
+  justify-content: flex-end;
+  list-style: none;
+  padding: 8px 0;
+}
+.daw-profile__details > summary::-webkit-details-marker {
+  display: none;
+}
+.daw-profile__details-chevron {
+  color: var(--daw-gray);
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 160ms ease;
+}
+.daw-profile__details[open] .daw-profile__details-chevron {
+  transform: rotate(180deg);
+}
+.daw-profile__details-content {
+  border-top: 1px solid #e8e8ed;
+  display: grid;
+  gap: 22px;
+  margin-top: 8px;
+  padding-top: 18px;
+  width: 100%;
+}
+.daw-profile__details-content section {
+  min-width: 0;
+}
+.daw-profile__details-content h2 {
+  border: 0;
+  font-size: 13px;
+  margin: 0 0 10px;
+  padding: 0;
+}
+.daw-profile__details-grid {
+  display: grid;
+  gap: 12px 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+.daw-profile__details-grid > div {
+  min-width: 0;
+}
+.daw-profile__details-grid dt,
+.daw-profile__details-marital strong {
+  color: var(--daw-gray);
+  font-size: 10px;
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+.daw-profile__details-grid dd,
+.daw-profile__details-marital span {
+  color: var(--daw-charcoal);
+  font-size: 12px;
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+.daw-profile__details-grid dd a {
+  color: var(--daw-red);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.daw-profile__details-item--full {
+  grid-column: 1 / -1;
+}
+.daw-profile__details-list {
+  display: grid;
+  gap: 8px;
+}
+.daw-profile__details-list article {
+  background: #f7f7f9;
+  border-radius: 7px;
+  display: grid;
+  gap: 3px;
+  padding: 11px 12px;
+}
+.daw-profile__details-list strong {
+  font-size: 12px;
+}
+.daw-profile__details-list span,
+.daw-profile__details-list small,
+.daw-profile__details-text,
+.daw-profile__details-marital span,
+.daw-profile__empty {
+  color: var(--daw-gray);
+  font-size: 11px;
+  margin: 0;
+}
+.daw-profile__details-marital {
+  display: grid;
+  gap: 2px;
+  margin: 0 0 10px;
+}
+.daw-profile__details-text {
+  line-height: 1.65;
+  white-space: pre-line;
+}
+.daw-profile__next-step {
+  align-items: center;
+  background: #fff;
+  border: 1px solid var(--daw-border);
+  border-left: 4px solid var(--daw-red);
+  border-radius: 9px;
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+  margin: 18px auto 0;
+  max-width: 900px;
+  padding: 20px 22px;
+}
+.daw-profile__next-step-label {
+  color: var(--daw-red);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+.daw-profile__next-step h2 {
+  font-size: 17px;
+  margin: 4px 0;
+}
+.daw-profile__next-step p {
+  color: var(--daw-gray);
+  font-size: 12px;
+  margin: 0;
+}
+.daw-profile__next-step .daw-recruitment__button {
+  flex: 0 0 auto;
+  font-size: 12px;
+  text-align: center;
+}
+@media (max-width: 760px) {
+  .daw-profile__form .daw-profile__grid,
+  .daw-profile-fields--registration .daw-profile__grid,
+  .daw-registration__password .daw-profile__grid {
+    grid-template-columns: 1fr;
+  }
+  .daw-profile__social-list,
+  .daw-profile__social-row .daw-profile__grid,
+  .daw-profile__application-grid {
+    grid-template-columns: 1fr;
+  }
+  .daw-profile__next-step {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+@media (max-width: 600px) {
+  .daw-account__identity.daw-profile__identity--overview > .daw-profile__identity-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .daw-profile__details {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+  .daw-profile__details > summary {
+    justify-content: space-between;
+  }
+  .daw-profile__details-grid {
+    grid-template-columns: 1fr;
+  }
+  .daw-profile__details-item--full {
+    grid-column: auto;
+  }
+  .daw-profile__next-step .daw-recruitment__button {
+    width: 100%;
+  }
+}
+
+.daw-account__main--profile,
+.daw-account__main--profile > *,
+.daw-profile__form,
+.daw-profile__section,
+.daw-profile__overview-details,
+.daw-profile__details-content,
+.daw-profile-fields,
+.daw-profile__grid,
+.daw-profile__family-row,
+.daw-profile__repeatable {
+  min-width: 0;
+}
+.daw-account__main--profile {
+  max-width: none;
+}
+.daw-account__main--profile > .daw-profile__overview-details,
+.daw-account__main--profile > .daw-profile__next-step {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 1320px;
+  width: 100%;
+}
+.daw-account__main--profile > .daw-profile__heading,
+.daw-account__main--profile > .daw-profile__notice,
+.daw-account__main--profile > .daw-profile__identity,
+.daw-account__main--profile > .daw-profile__section,
+.daw-account__main--profile > .daw-profile__password,
+.daw-account__main--profile > .daw-account__success,
+.daw-account__main--profile > .daw-account__alert,
+.daw-account__main--profile > .daw-account__preview-note,
+.daw-profile__form {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 1320px;
+  width: 100%;
+}
+.daw-profile__password {
+  max-width: 1320px;
+}
+.daw-profile__value,
+.daw-profile__value input,
+.daw-profile__value select,
+.daw-profile__value textarea,
+.daw-profile__value input[type="file"] {
+  max-width: 100%;
+}
+.daw-profile__identity-copy,
+.daw-profile__identity-copy > strong,
+.daw-profile__identity-copy > span,
+.daw-profile__document-link {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .daw-account__main--profile {
+    padding: 26px 20px 44px;
+  }
+  .daw-profile__heading {
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .daw-profile__family-head {
+    display: none;
+  }
+  .daw-profile__family-row,
+  .daw-profile-fields--readonly .daw-profile__family-row--readonly {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .daw-account__main--profile {
+    padding: 20px 14px 36px;
+  }
+  .daw-profile__heading {
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .daw-profile__heading > div {
+    flex: 1 1 100%;
+  }
+  .daw-profile__heading .daw-profile__edit-link {
+    align-self: flex-start;
+  }
+  .daw-profile__identity,
+  .daw-profile__overview-details,
+  .daw-profile__section,
+  .daw-profile__password {
+    padding: 14px;
+  }
+  .daw-profile__grid,
+  .daw-profile__form .daw-profile__grid,
+  .daw-profile-fields--registration .daw-profile__grid,
+  .daw-registration__password .daw-profile__grid {
+    gap: 12px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .daw-profile__family-row,
+  .daw-profile-fields--readonly .daw-profile__family-row--readonly {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .daw-profile__form .daw-account__actions {
+    justify-content: stretch;
+  }
+  .daw-profile__form .daw-account__actions .daw-recruitment__button {
+    width: 100%;
+  }
+  .daw-profile__overview-details > summary {
+    min-height: 36px;
+  }
+  .daw-profile__next-step {
+    gap: 14px;
+    padding: 16px;
+  }
+  .daw-profile__next-step h2 {
+    font-size: 15px;
+  }
+  .daw-profile__next-step .daw-recruitment__button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 380px) {
+  .daw-account__main--profile {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+  .daw-profile__section,
+  .daw-profile__identity,
+  .daw-profile__overview-details,
+  .daw-profile__password {
+    padding: 12px;
+  }
+  .daw-profile__identity {
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .daw-profile__identity-copy > strong {
+    font-size: 14px;
+  }
+  .daw-profile__edit-link,
+  .daw-profile__add-row,
+  .daw-profile__remove-row {
+    max-width: 100%;
+    white-space: normal;
+  }
+  .daw-profile__photo-preview {
+    height: 80px;
+    width: 80px;
+  }
+  .daw-recruitment__footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .daw-recruitment__footer-grid {
+    gap: 18px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .daw-recruitment__footer-grid > *,
+  .daw-recruitment__footer-bottom > * {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .daw-recruitment__footer-bottom {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
   }
 }

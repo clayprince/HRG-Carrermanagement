@@ -1,60 +1,18 @@
-<?php
-if ( ! function_exists( 'recruitment_demo_candidates' ) ) {
-    function recruitment_demo_candidates(): array {
-        $candidates = [
-            [ 'id' => 1, 'name' => 'Rafi Kurniawan', 'email' => 'rafi.kurniawan@example.com', 'phone' => '081234560001', 'created_at' => '2026-01-15 09:00:00', 'position' => 'Sales Consultant', 'dealer' => 'DAW Bandung', 'region' => 'Jawa Barat', 'status' => 'diterima', 'year' => '2026' ],
-            [ 'id' => 2, 'name' => 'Sari Dewi Lestari', 'email' => 'sari.dewi@example.com', 'phone' => '081234560002', 'created_at' => '2026-01-21 10:30:00', 'position' => 'Staff Administrasi', 'dealer' => 'DAW Jakarta Selatan', 'region' => 'DKI Jakarta', 'status' => 'dalam_proses', 'year' => '2026' ],
-            [ 'id' => 3, 'name' => 'Budi Santoso', 'email' => 'budi.santoso@example.com', 'phone' => '081234560003', 'created_at' => '2026-02-03 08:15:00', 'position' => 'Mekanik / Teknisi', 'dealer' => 'DAW Surabaya', 'region' => 'Jawa Timur', 'status' => 'tidak_diterima', 'year' => '2026' ],
-            [ 'id' => 4, 'name' => 'Anisa Putri Rahma', 'email' => 'anisa.putri@example.com', 'phone' => '081234560004', 'created_at' => '2026-02-12 14:10:00', 'position' => 'Marketing Coordinator', 'dealer' => 'DAW Medan', 'region' => 'Sumatera Utara', 'status' => 'dipertimbangkan_kembali', 'year' => '2026' ],
-            [ 'id' => 5, 'name' => 'Kevin Alexander', 'email' => 'kevin.alexander@example.com', 'phone' => '081234560005', 'created_at' => '2026-02-18 11:00:00', 'position' => 'Sales Executive', 'dealer' => 'DAW Airmadidi', 'region' => 'Sulawesi Utara', 'status' => 'dalam_proses', 'year' => '2026' ],
-            [ 'id' => 6, 'name' => 'Maria Natalia', 'email' => 'maria.natalia@example.com', 'phone' => '081234560006', 'created_at' => '2026-03-02 15:45:00', 'position' => 'Finance & Accounting Staff', 'dealer' => 'DAW Manado', 'region' => 'Sulawesi Utara', 'status' => 'diterima', 'year' => '2026' ],
-            [ 'id' => 7, 'name' => 'Daniel Pratama', 'email' => 'daniel.pratama@example.com', 'phone' => '081234560007', 'created_at' => '2026-03-11 09:35:00', 'position' => 'Service Advisor', 'dealer' => 'DAW Bitung', 'region' => 'Sulawesi Utara', 'status' => 'dalam_proses', 'year' => '2026' ],
-            [ 'id' => 8, 'name' => 'Jessica Amanda', 'email' => 'jessica.amanda@example.com', 'phone' => '081234560008', 'created_at' => '2025-01-16 10:15:00', 'position' => 'Staff Administrasi', 'dealer' => 'DAW Ternate', 'region' => 'Maluku Utara', 'status' => 'diterima', 'year' => '2025' ],
-            [ 'id' => 9, 'name' => 'Michael Christian', 'email' => 'michael.christian@example.com', 'phone' => '081234560009', 'created_at' => '2025-01-27 12:00:00', 'position' => 'Sales Executive', 'dealer' => 'DAW Bandung', 'region' => 'Jawa Barat', 'status' => 'tidak_diterima', 'year' => '2025' ],
-            [ 'id' => 10, 'name' => 'Grace Olivia', 'email' => 'grace.olivia@example.com', 'phone' => '081234560010', 'created_at' => '2025-02-09 13:25:00', 'position' => 'Marketing Coordinator', 'dealer' => 'DAW Manado', 'region' => 'Sulawesi Utara', 'status' => 'dalam_proses', 'year' => '2025' ],
-            [ 'id' => 11, 'name' => 'Jonathan Wijaya', 'email' => 'jonathan.wijaya@example.com', 'phone' => '081234560011', 'created_at' => '2025-02-20 08:50:00', 'position' => 'Mekanik / Teknisi', 'dealer' => 'DAW Surabaya', 'region' => 'Jawa Timur', 'status' => 'dalam_proses', 'year' => '2025' ],
-            [ 'id' => 12, 'name' => 'Felicia Putri', 'email' => 'felicia.putri@example.com', 'phone' => '081234560012', 'created_at' => '2025-03-10 11:05:00', 'position' => 'Sales Consultant', 'dealer' => 'DAW Airmadidi', 'region' => 'Sulawesi Utara', 'status' => 'diterima', 'year' => '2025' ],
-            [ 'id' => 13, 'name' => 'Andreas Samuel', 'email' => 'andreas.samuel@example.com', 'phone' => '081234560013', 'created_at' => '2024-02-01 09:30:00', 'position' => 'Service Advisor', 'dealer' => 'DAW Bitung', 'region' => 'Sulawesi Utara', 'status' => 'tidak_diterima', 'year' => '2024' ],
-            [ 'id' => 14, 'name' => 'Claudia Angelica', 'email' => 'claudia.angelica@example.com', 'phone' => '081234560014', 'created_at' => '2024-02-12 14:00:00', 'position' => 'Staff Administrasi', 'dealer' => 'DAW Ternate', 'region' => 'Maluku Utara', 'status' => 'diterima', 'year' => '2024' ],
-            [ 'id' => 15, 'name' => 'Reza Mahendra', 'email' => 'reza.mahendra@example.com', 'phone' => '081234560015', 'created_at' => '2024-03-08 07:45:00', 'position' => 'Sales Executive', 'dealer' => 'DAW Jakarta Selatan', 'region' => 'DKI Jakarta', 'status' => 'dalam_proses', 'year' => '2024' ],
-            [ 'id' => 16, 'name' => 'Nathania Grace', 'email' => 'nathania.grace@example.com', 'phone' => '081234560016', 'created_at' => '2024-03-19 16:10:00', 'position' => 'Finance & Accounting Staff', 'dealer' => 'DAW Bandung', 'region' => 'Jawa Barat', 'status' => 'dipertimbangkan_kembali', 'year' => '2024' ],
-        ];
-
-        $vacancies = [
-            [ 'id' => 1, 'title' => 'Sales Executive', 'location' => 'DAW Airmadidi', 'dealer' => 'DAW Airmadidi', 'region' => 'Sulawesi Utara' ],
-            [ 'id' => 2, 'title' => 'Sales Consultant', 'location' => 'DAW Bandung', 'dealer' => 'DAW Bandung', 'region' => 'Jawa Barat' ],
-            [ 'id' => 3, 'title' => 'Marketing Coordinator', 'location' => 'DAW Medan', 'dealer' => 'DAW Medan', 'region' => 'Sumatera Utara' ],
-            [ 'id' => 4, 'title' => 'Staff Administrasi', 'location' => 'DAW Jakarta Selatan', 'dealer' => 'DAW Jakarta Selatan', 'region' => 'DKI Jakarta' ],
-            [ 'id' => 5, 'title' => 'Finance & Accounting Staff', 'location' => 'DAW Manado', 'dealer' => 'DAW Manado', 'region' => 'Sulawesi Utara' ],
-            [ 'id' => 6, 'title' => 'Mekanik / Teknisi', 'location' => 'DAW Surabaya', 'dealer' => 'DAW Surabaya', 'region' => 'Jawa Timur' ],
-            [ 'id' => 7, 'title' => 'Service Advisor', 'location' => 'DAW Bitung', 'dealer' => 'DAW Bitung', 'region' => 'Sulawesi Utara' ],
-        ];
-
-        $applications = [];
-        foreach ( $candidates as $index => $candidate ) {
-            $applications[] = [
-                'id' => $index + 1,
-                'applicant_id' => $candidate['id'],
-                'vacancy_id' => ( $index % 7 ) + 1,
-                'status' => $candidate['status'],
-                'created_at' => $candidate['created_at'],
-            ];
-        }
-
-        return [ 'applicants' => $candidates, 'applications' => $applications, 'vacancies' => $vacancies ];
-    }
-}
-
 $database = new Recruitment_Database();
 $applications = $database->get_applications();
 $applicants = $database->get_applicants();
 $vacancies = $database->get_vacancies();
-
-if ( empty( $applications ) && empty( $applicants ) ) {
-    $demo_data = recruitment_demo_candidates();
-    $applications = $demo_data['applications'];
-    $applicants = $demo_data['applicants'];
-    $vacancies = $demo_data['vacancies'];
+if ( function_exists( 'get_posts' ) ) {
+    $wp_vacancies = get_posts( [ 'post_type' => 'daw_vacancy', 'post_status' => 'any', 'numberposts' => -1 ] );
+    foreach ( $wp_vacancies as $wp_v ) {
+        $vacancies[] = [
+            'id'       => $wp_v->ID,
+            'title'    => get_the_title( $wp_v ),
+            'dealer'   => (string) get_post_meta( $wp_v->ID, '_daw_dealer', true ),
+            'location' => (string) get_post_meta( $wp_v->ID, '_daw_location', true ),
+            'region'   => (string) get_post_meta( $wp_v->ID, '_daw_region', true ),
+        ];
+    }
 }
 
 $search = trim( (string) ( $_GET['search'] ?? '' ) );
@@ -63,6 +21,7 @@ $position_filter = sanitize_text_field( (string) ( $_GET['position'] ?? '' ) );
 $dealer_filter = sanitize_text_field( (string) ( $_GET['dealer'] ?? '' ) );
 $status_filter = sanitize_text_field( (string) ( $_GET['status'] ?? '' ) );
 $selected_candidate_id = absint( $_GET['candidate_id'] ?? 0 );
+$selected_application_id = absint( $_GET['application_id'] ?? 0 );
 
 $all_statuses = [
     'all' => 'Semua Status',
@@ -81,7 +40,7 @@ $normalize_stage = static function ( $raw_status ): string {
         return 'final';
     }
 
-    if ( in_array( $status_key, [ 'rejected', 'tidak_diterima', 'tidak_lolos', 'tolak' ], true ) ) {
+    if ( in_array( $status_key, [ 'rejected', 'ditolak', 'tidak_diterima', 'tidak_lolos', 'tolak' ], true ) ) {
         return 'final';
     }
 
@@ -143,15 +102,15 @@ foreach ( $applications as $application ) {
     $candidate = $applicant_map[ (string) $applicant_id ] ?? [];
     $vacancy = $vacancy_map[ (string) ( $application['vacancy_id'] ?? 0 ) ] ?? [];
 
-    if ( empty( $candidate ) ) {
+    if ( empty( $candidate ) && empty( $application['title'] ) ) {
         continue;
     }
 
-    $created_at = (string) ( $application['created_at'] ?? $candidate['created_at'] ?? current_time( 'mysql' ) );
+    $created_at = (string) ( $application['created_at'] ?? $candidate['created_at'] ?? '' );
     $year = (string) date_i18n( 'Y', strtotime( $created_at ) );
-    $position = (string) ( $vacancy['title'] ?? $vacancy['job_title'] ?? $candidate['position'] ?? 'Posisi belum ditentukan' );
-    $dealer = (string) ( $vacancy['dealer'] ?? $vacancy['location'] ?? $candidate['dealer'] ?? '-' );
-    $region = (string) ( $vacancy['region'] ?? $vacancy['location'] ?? $candidate['region'] ?? '' );
+    $position = (string) ( $application['title'] ?? $vacancy['title'] ?? $vacancy['job_title'] ?? $candidate['position'] ?? 'Posisi belum ditentukan' );
+    $dealer = (string) ( $vacancy['dealer'] ?? $vacancy['location'] ?? $application['location'] ?? $candidate['dealer'] ?? '-' );
+    $region = (string) ( $vacancy['region'] ?? $vacancy['location'] ?? $application['province'] ?? $candidate['region'] ?? '' );
     $status_bucket = $normalize_status_bucket( $application['status'] ?? $candidate['status'] ?? 'submitted' );
     $stage_key = $normalize_stage( $application['status'] ?? $candidate['status'] ?? 'submitted' );
     $stage_label = [
@@ -163,23 +122,28 @@ foreach ( $applications as $application ) {
     ][ $stage_key ] ?? 'Seleksi Administrasi';
 
     $code = 'DAW-' . $year . '-' . str_pad( (string) $applicant_id, 3, '0', STR_PAD_LEFT );
-    $search_text = strtolower( trim( (string) ( $candidate['name'] ?? '' ) . ' ' . $code . ' ' . $position . ' ' . $dealer . ' ' . ( $candidate['email'] ?? '' ) ) );
-    $latest_candidates[ (string) $applicant_id ] = [
+    $applicant_name = (string) ( $candidate['name'] ?? $application['applicant_name'] ?? 'Pelamar #' . $applicant_id );
+    $applicant_email = (string) ( $candidate['email'] ?? $application['applicant_email'] ?? '' );
+    $search_text = strtolower( trim( $applicant_name . ' ' . $code . ' ' . $position . ' ' . $dealer . ' ' . $applicant_email ) );
+    $application_key = (string) ( $application['id'] ?? $applicant_id );
+    $latest_candidates[ $application_key ] = [
         'id' => $applicant_id,
-        'name' => (string) ( $candidate['name'] ?? 'Pelamar #' . $applicant_id ),
+        'application_id' => (int) ( $application['id'] ?? 0 ),
+        'name' => $applicant_name,
         'code' => $code,
-        'email' => (string) ( $candidate['email'] ?? '' ),
-        'phone' => (string) ( $candidate['phone'] ?? '' ),
+        'email' => $applicant_email,
+        'phone' => (string) ( $candidate['phone'] ?? $application['applicant_phone'] ?? '' ),
         'position' => $position,
         'dealer' => $dealer,
         'region' => $region,
         'year' => $year,
         'stage' => $stage_label,
+        'raw_status' => strtoupper( (string) ( $application['status'] ?? 'SUBMITTED' ) ),
         'status_key' => $status_bucket,
         'status_label' => $all_statuses[ $status_bucket ] ?? 'Dalam Proses',
         'created_at' => $created_at,
         'search' => $search_text,
-        'notes' => 'Kandidat memiliki komunikasi yang baik dan pengalaman kerja yang relevan.',
+        'notes' => '',
         'social' => [
             'instagram' => '',
             'linkedin' => '',
@@ -241,12 +205,30 @@ $summary_total = count( $all_candidates );
 $selected_candidate = null;
 if ( $selected_candidate_id > 0 ) {
     foreach ( $all_candidates as $candidate ) {
-        if ( (int) $candidate['id'] === $selected_candidate_id ) {
+        if ( ( $selected_application_id > 0 && (int) $candidate['application_id'] === $selected_application_id )
+            || ( 0 === $selected_application_id && (int) $candidate['id'] === $selected_candidate_id ) ) {
             $selected_candidate = $candidate;
             break;
         }
+
     }
 }
+
+$selected_profile = $selected_candidate ? $database->get_admin_applicant( (string) $selected_candidate['id'] ) : null;
+$selected_answers = $selected_candidate ? $database->get_admin_application_answers( (string) ( $selected_candidate['application_id'] ?? 0 ) ) : [];
+if ( is_array( $selected_profile ) ) {
+    $selected_candidate['name'] = (string) ( $selected_profile['name'] ?? $selected_candidate['name'] );
+    $selected_candidate['email'] = (string) ( $selected_profile['email'] ?? $selected_candidate['email'] );
+    $selected_candidate['phone'] = (string) ( $selected_profile['phone'] ?? $selected_candidate['phone'] );
+}
+
+$answers_map = [];
+foreach ( $selected_answers as $ans_item ) {
+    $k = (string) ( $ans_item['field_key'] ?? '' );
+    $answers_map[ $k ] = trim( (string) ( $ans_item['answer_value'] ?? $ans_item['file_name'] ?? '' ) );
+}
+$profile_answers = is_array( $selected_profile['profile_details']['application_answers'] ?? null ) ? $selected_profile['profile_details']['application_answers'] : [];
+$merged_answers = array_merge( $profile_answers, $answers_map );
 
 $filter_query = array_filter(
     [
@@ -266,22 +248,30 @@ $detail_tabs = [
     [ 'id' => 'pendidikan', 'label' => 'Pendidikan' ],
     [ 'id' => 'pengalaman', 'label' => 'Pengalaman' ],
     [ 'id' => 'dokumen', 'label' => 'Dokumen' ],
+    [ 'id' => 'administrasi', 'label' => 'Form Administrasi' ],
     [ 'id' => 'riwayat-seleksi', 'label' => 'Riwayat Seleksi' ],
 ];
 
 $detail_fields = [
     [ 'label' => 'Nama Lengkap', 'value' => $selected_candidate['name'] ?? 'Belum diisi' ],
-    [ 'label' => 'NIK', 'value' => 'Belum diisi' ],
-    [ 'label' => 'Tempat Lahir', 'value' => 'Belum diisi' ],
-    [ 'label' => 'Tanggal Lahir', 'value' => 'Belum diisi' ],
-    [ 'label' => 'Jenis Kelamin', 'value' => 'Belum diisi' ],
-    [ 'label' => 'Provinsi', 'value' => $selected_candidate['region'] ?? 'Belum diisi' ],
-    [ 'label' => 'Kota', 'value' => 'Belum diisi' ],
-    [ 'label' => 'Alamat', 'value' => 'Belum diisi' ],
+    [ 'label' => 'NIK', 'value' => (string) ( $merged_answers['nomor_ktp'] ?? $merged_answers['nik'] ?? 'Belum diisi' ) ],
+    [ 'label' => 'Tempat Lahir', 'value' => (string) ( $selected_profile['birth_place'] ?? 'Belum diisi' ) ],
+    [ 'label' => 'Tanggal Lahir', 'value' => (string) ( $selected_profile['birth_date'] ?? 'Belum diisi' ) ],
+    [ 'label' => 'Jenis Kelamin', 'value' => (string) ( $selected_profile['gender'] ?? 'Belum diisi' ) ],
+    [ 'label' => 'Agama', 'value' => (string) ( $merged_answers['agama'] ?? 'Belum diisi' ) ],
+    [ 'label' => 'Status Pernikahan', 'value' => (string) ( $selected_profile['profile_details']['marital_status'] ?? $merged_answers['status_pernikahan'] ?? 'Belum diisi' ) ],
+    [ 'label' => 'Kewarganegaraan', 'value' => (string) ( $merged_answers['kewarganegaraan'] ?? 'WNI' ) ],
+    [ 'label' => 'Alamat Domisili', 'value' => (string) ( $selected_profile['address'] ?? $merged_answers['alamat_domisili'] ?? 'Belum diisi' ) ],
+    [ 'label' => 'Kota', 'value' => (string) ( $selected_profile['city'] ?? 'Belum diisi' ) ],
+    [ 'label' => 'Provinsi', 'value' => (string) ( $selected_profile['province'] ?? $selected_candidate['region'] ?? 'Belum diisi' ) ],
     [ 'label' => 'Email', 'value' => $selected_candidate['email'] ?? 'Belum diisi' ],
-    [ 'label' => 'Nomor Telepon', 'value' => $selected_candidate['phone'] ?? 'Belum diisi' ],
-    [ 'label' => 'Status Pernikahan', 'value' => 'Belum diisi' ],
+    [ 'label' => 'Nomor Telepon / HP', 'value' => $selected_candidate['phone'] ?? 'Belum diisi' ],
 ];
+
+$actual_history = [];
+if ( ! empty( $selected_candidate['application_id'] ) ) {
+    $actual_history = $database->get_selection_history( (string) $selected_candidate['application_id'] );
+}
 
 $timeline_steps = [
     [ 'key' => 'lamaran_diterima', 'label' => 'Lamaran Diterima', 'status' => 'Selesai' ],
@@ -364,6 +354,43 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
             </div>
         </section>
 
+        <?php if ( ! empty( $selected_candidate['application_id'] ) ) : ?>
+            <?php if ( '1' === (string) ( $_GET['status_updated'] ?? '' ) ) : ?><div class="notice notice-success inline"><p>Status lamaran berhasil diperbarui. Tracker kandidat akan membaca status terbaru dari Oracle.</p></div><?php endif; ?>
+            <section class="daw-documents-panel">
+                <h2>Perbarui Status Lamaran</h2>
+                <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>">
+                    <input type="hidden" name="action" value="daw_update_application_status">
+                    <input type="hidden" name="application_id" value="<?= esc_attr( (int) $selected_candidate['application_id'] ) ?>">
+                    <input type="hidden" name="candidate_id" value="<?= esc_attr( (int) $selected_candidate['id'] ) ?>">
+                    <?php wp_nonce_field( 'daw_update_application_status_' . (int) $selected_candidate['application_id'] ); ?>
+                    <p><label>Status<br><select name="status" required>
+                        <?php foreach ( [ 'SUBMITTED' => 'Lamaran Diterima', 'SCREENING' => 'Seleksi Administrasi', 'PSIKOTES' => 'Psikotes', 'INTERVIEW_HR' => 'Wawancara HR', 'INTERVIEW_USER' => 'Wawancara User', 'DITERIMA' => 'Diterima', 'DITOLAK' => 'Tidak Lolos' ] as $status_value => $status_label ) : ?>
+                            <option value="<?= esc_attr( $status_value ) ?>" <?= selected( strtoupper( (string) ( $selected_candidate['raw_status'] ?? '' ) ), $status_value, false ) ?>><?= esc_html( $status_label ) ?></option>
+                        <?php endforeach; ?>
+                    </select></label></p>
+                    <p><label>Tahap Seleksi<br><input type="text" name="stage" value="ADMINISTRASI" required></label></p>
+                    <p><label>Catatan untuk pelamar<br><textarea name="note" rows="3"></textarea></label></p>
+                    <button type="submit" class="button button-primary">Simpan Status</button>
+                </form>
+            </section>
+            <section class="daw-documents-panel">
+                <h2>Data Administrasi Lamaran</h2>
+                <?php if ( $selected_answers ) : ?>
+                    <div class="daw-detail-grid">
+                        <?php foreach ( $selected_answers as $answer ) : ?>
+                            <?php $answer_value = trim( (string) ( $answer['answer_value'] ?? '' ) ); ?>
+                            <div class="daw-detail-field">
+                                <span><?= esc_html( $answer['field_title'] ?? $answer['field_key'] ?? 'Field' ) ?></span>
+                                <strong><?= esc_html( '' !== $answer_value ? $answer_value : ( $answer['file_name'] ?? 'File terlampir' ) ) ?></strong>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php else : ?>
+                    <p class="daw-documents-panel__hint">Jawaban administrasi belum tersedia untuk lamaran ini.</p>
+                <?php endif; ?>
+            </section>
+        <?php endif; ?>
+
         <section class="daw-documents-panel">
             <h2>Unduh Dokumen</h2>
             <div class="daw-documents-panel__actions">
@@ -401,31 +428,189 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
                 </div>
 
                 <div class="daw-applicant-detail-panel" data-applicant-panel="pendidikan" role="tabpanel" hidden>
-                    <div class="daw-empty-state">Data pendidikan belum tersedia untuk kandidat ini.</div>
+                    <?php
+                    $edu_level = (string) ( $selected_profile['profile_details']['education_level'] ?? $selected_profile['education'] ?? $merged_answers['pendidikan_formal_1_tingkat'] ?? '' );
+                    $institution = (string) ( $selected_profile['profile_details']['institution'] ?? $merged_answers['pendidikan_formal_1_nama_sekolah'] ?? '' );
+                    $major = (string) ( $selected_profile['profile_details']['major'] ?? $merged_answers['pendidikan_formal_1_program_studi'] ?? '' );
+                    $gpa = (string) ( $selected_profile['profile_details']['gpa'] ?? $merged_answers['pendidikan_formal_1_ipk'] ?? '' );
+                    $grad_year = (string) ( $selected_profile['profile_details']['graduation_year'] ?? $merged_answers['pendidikan_formal_1_tahun_lulus'] ?? '' );
+                    $has_edu = '' !== $edu_level || '' !== $institution || '' !== $major;
+                    ?>
+                    <?php if ( $has_edu ) : ?>
+                        <div class="daw-profile__table-wrap" style="margin-bottom:24px;">
+                            <h3 style="font-size:16px; margin:0 0 12px; font-weight:600;">Pendidikan Formal</h3>
+                            <table class="daw-profile__work-table">
+                                <thead>
+                                    <tr>
+                                        <th>Jenjang</th>
+                                        <th>Nama Institusi / Sekolah</th>
+                                        <th>Jurusan / Program Studi</th>
+                                        <th>IPK / Nilai</th>
+                                        <th>Tahun Lulus</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><?= esc_html( $edu_level ?: '—' ) ?></td>
+                                        <td><?= esc_html( $institution ?: '—' ) ?></td>
+                                        <td><?= esc_html( $major ?: '—' ) ?></td>
+                                        <td><?= esc_html( $gpa ?: '—' ) ?></td>
+                                        <td><?= esc_html( $grad_year ?: '—' ) ?></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php else : ?>
+                        <div class="daw-empty-state">Data pendidikan formal belum tersedia untuk kandidat ini.</div>
+                    <?php endif; ?>
                 </div>
 
                 <div class="daw-applicant-detail-panel" data-applicant-panel="pengalaman" role="tabpanel" hidden>
-                    <div class="daw-empty-state">Riwayat pengalaman belum diisi oleh kandidat.</div>
+                    <?php
+                    $work_experiences = is_array( $selected_profile['profile_details']['work_experiences'] ?? null ) ? $selected_profile['profile_details']['work_experiences'] : [];
+                    ?>
+                    <?php if ( ! empty( $work_experiences ) ) : ?>
+                        <div class="daw-profile__table-wrap" style="margin-bottom:24px;">
+                            <h3 style="font-size:16px; margin:0 0 12px; font-weight:600;">Pengalaman Kerja</h3>
+                            <table class="daw-profile__work-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nama Perusahaan</th>
+                                        <th>Posisi / Jabatan</th>
+                                        <th>Periode</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ( $work_experiences as $exp ) : ?>
+                                        <tr>
+                                            <td><?= esc_html( $exp['company'] ?? '—' ) ?></td>
+                                            <td><?= esc_html( $exp['position'] ?? '—' ) ?></td>
+                                            <td><?= esc_html( $exp['period'] ?? '—' ) ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php else : ?>
+                        <div class="daw-empty-state">Riwayat pengalaman kerja belum diisi oleh kandidat.</div>
+                    <?php endif; ?>
                 </div>
 
                 <div class="daw-applicant-detail-panel" data-applicant-panel="dokumen" role="tabpanel" hidden>
-                    <div class="daw-empty-state">Belum ada dokumen yang diunggah untuk kandidat ini.</div>
+                    <?php
+                    $documents = is_array( $selected_profile['profile_details']['documents'] ?? null ) ? $selected_profile['profile_details']['documents'] : [];
+                    $doc_labels = [
+                        'profile_photo' => 'Foto Profil / Foto Terkini',
+                        'resume'        => 'Curriculum Vitae (CV) / Resume',
+                        'portfolio'     => 'Portofolio',
+                        'ktp'           => 'Kartu Tanda Penduduk (KTP)',
+                        'ijazah'        => 'Ijazah Terakhir',
+                        'transkrip'     => 'Transkrip Nilai',
+                    ];
+                    ?>
+                    <?php if ( ! empty( $documents ) ) : ?>
+                        <div class="daw-profile__table-wrap">
+                            <table class="daw-profile__work-table">
+                                <thead>
+                                    <tr>
+                                        <th>Jenis Dokumen</th>
+                                        <th>Nama File</th>
+                                        <th>Aksi</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ( $documents as $doc_key => $doc_item ) : ?>
+                                        <?php if ( is_array( $doc_item ) && ! empty( $doc_item['name'] ) ) : ?>
+                                            <tr>
+                                                <td><strong><?= esc_html( $doc_labels[ $doc_key ] ?? ucwords( str_replace( '_', ' ', (string) $doc_key ) ) ) ?></strong></td>
+                                                <td><?= esc_html( $doc_item['name'] ) ?></td>
+                                                <td>
+                                                    <a class="button button-small" href="<?= esc_url( recruitment_get_public_url( 'applicant-file', [ 'candidate_id' => $selected_candidate['id'], 'document' => $doc_key ] ) ) ?>" target="_blank" rel="noopener">
+                                                        Lihat / Unduh Dokumen
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php else : ?>
+                        <div class="daw-empty-state">Belum ada dokumen yang diunggah untuk kandidat ini.</div>
+                    <?php endif; ?>
+                </div>
+
+                <div class="daw-applicant-detail-panel" data-applicant-panel="administrasi" role="tabpanel" hidden>
+                    <?php if ( ! empty( $selected_answers ) || ! empty( $merged_answers ) ) : ?>
+                        <div class="daw-profile__table-wrap">
+                            <table class="daw-profile__qa-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width:40%;">Pertanyaan / Field Administrasi</th>
+                                        <th style="width:60%;">Jawaban Pelamar</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if ( ! empty( $selected_answers ) ) : ?>
+                                        <?php foreach ( $selected_answers as $ans ) : ?>
+                                            <?php
+                                            $val = trim( (string) ( $ans['answer_value'] ?? '' ) );
+                                            if ( '' === $val && ! empty( $ans['file_name'] ) ) {
+                                                $val = 'File: ' . $ans['file_name'];
+                                            }
+                                            ?>
+                                            <tr>
+                                                <td><strong><?= esc_html( $ans['field_title'] ?? $ans['field_key'] ?? 'Pertanyaan' ) ?></strong></td>
+                                                <td><?= esc_html( '' !== $val ? $val : '—' ) ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php else : ?>
+                                        <?php foreach ( $merged_answers as $key => $val ) : ?>
+                                            <?php if ( is_scalar( $val ) && '' !== trim( (string) $val ) ) : ?>
+                                                <tr>
+                                                    <td><strong><?= esc_html( ucwords( str_replace( '_', ' ', (string) $key ) ) ) ?></strong></td>
+                                                    <td><?= esc_html( (string) $val ) ?></td>
+                                                </tr>
+                                            <?php endif; ?>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php else : ?>
+                        <div class="daw-empty-state">Data administrasi lamaran belum tersedia untuk kandidat ini.</div>
+                    <?php endif; ?>
                 </div>
 
                 <div class="daw-applicant-detail-panel" data-applicant-panel="riwayat-seleksi" role="tabpanel" hidden>
                     <div class="daw-selection-history">
-                        <?php foreach ( $timeline_steps as $step ) : ?>
-                            <div class="daw-selection-history__item">
-                                <span class="daw-selection-history__marker daw-selection-history__marker--<?= esc_attr( strtolower( str_replace( ' ', '-', $step['status'] ) ) ) ?>"></span>
-                                <div class="daw-selection-history__content">
-                                    <div class="daw-selection-history__header">
-                                        <strong><?= esc_html( $step['label'] ) ?></strong>
-                                        <span class="daw-status-badge daw-status-badge--<?= esc_attr( strtolower( str_replace( ' ', '-', $step['status'] ) ) ) ?>"><?= esc_html( $step['status'] ) ?></span>
+                        <?php if ( ! empty( $actual_history ) ) : ?>
+                            <?php foreach ( $actual_history as $hist ) : ?>
+                                <div class="daw-selection-history__item">
+                                    <span class="daw-selection-history__marker daw-selection-history__marker--selesai"></span>
+                                    <div class="daw-selection-history__content">
+                                        <div class="daw-selection-history__header">
+                                            <strong><?= esc_html( $hist['stage'] ?: 'Tahap Seleksi' ) ?></strong>
+                                            <span class="daw-status-badge daw-status-badge--selesai"><?= esc_html( $hist['status'] ?: 'Tercatat' ) ?></span>
+                                        </div>
+                                        <p><?= esc_html( $hist['note'] ?: 'Status lamaran dicatat di Oracle Database.' ) ?> <small style="display:block; color:#6b7280;"><?= esc_html( $hist['date'] ) ?></small></p>
                                     </div>
-                                    <p><?= esc_html( 'Tanggal proses belum tersedia untuk tahap ini.' ) ?></p>
                                 </div>
-                            </div>
-                        <?php endforeach; ?>
+                            <?php endforeach; ?>
+                        <?php else : ?>
+                            <?php foreach ( $timeline_steps as $step ) : ?>
+                                <div class="daw-selection-history__item">
+                                    <span class="daw-selection-history__marker daw-selection-history__marker--<?= esc_attr( strtolower( str_replace( ' ', '-', $step['status'] ) ) ) ?>"></span>
+                                    <div class="daw-selection-history__content">
+                                        <div class="daw-selection-history__header">
+                                            <strong><?= esc_html( $step['label'] ) ?></strong>
+                                            <span class="daw-status-badge daw-status-badge--<?= esc_attr( strtolower( str_replace( ' ', '-', $step['status'] ) ) ) ?>"><?= esc_html( $step['status'] ) ?></span>
+                                        </div>
+                                        <p><?= esc_html( 'Tanggal proses belum tersedia untuk tahap ini.' ) ?></p>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -559,7 +744,7 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <a class="daw-detail-button" href="<?= esc_url( add_query_arg( array_merge( $filter_query, [ 'candidate_id' => (int) $candidate['id'] ] ), admin_url( 'admin.php' ) ) ) ?>">Detail</a>
+                                        <a class="daw-detail-button" href="<?= esc_url( add_query_arg( array_merge( $filter_query, [ 'candidate_id' => (int) $candidate['id'], 'application_id' => (int) $candidate['application_id'] ] ), admin_url( 'admin.php' ) ) ) ?>">Detail</a>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>

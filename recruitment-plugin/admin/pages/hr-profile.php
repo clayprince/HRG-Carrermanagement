@@ -16,6 +16,9 @@ $notice = sanitize_key( wp_unslash( $_GET['profile_notice'] ?? $_GET['password_n
 $messages = [
     'profile_updated' => [ 'Profil berhasil diperbarui.', 'success' ],
     'email_sent' => [ 'Link konfirmasi perubahan email telah dikirim ke alamat baru.', 'success' ],
+    'old_code_sent' => [ 'Kode 5 angka telah dikirim ke email lama.', 'success' ],
+    'new_code_sent' => [ 'Kode 5 angka telah dikirim ke email baru.', 'success' ],
+    'code_invalid' => [ 'Kode tidak valid atau sudah kedaluwarsa.', 'error' ],
     'email_updated' => [ 'Email berhasil diperbarui setelah konfirmasi token.', 'success' ],
     'duplicate' => [ 'Username atau email sudah digunakan akun lain.', 'error' ],
     'profile_failed' => [ 'Profil tidak dapat diperbarui. Silakan coba lagi.', 'error' ],
@@ -55,7 +58,7 @@ $username = (string) get_user_meta( $current_user->ID, 'daw_oracle_username', tr
     </section>
 
     <section class="daw-account-settings__panel" aria-label="Konfirmasi perubahan email">
-        <header><h2>Ganti Email dengan Verifikasi</h2><p>Masukkan password saat ini. Link konfirmasi akan dikirim ke email baru.</p></header>
+        <header><h2>Ganti Email dengan Verifikasi</h2><p>Password saat ini diperlukan. Kode 5 angka akan dikirim ke email lama lalu email baru.</p></header>
         <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>">
             <input type="hidden" name="action" value="daw_request_hr_email_change">
             <?php wp_nonce_field( 'daw_request_hr_email_change' ); ?>
@@ -63,12 +66,28 @@ $username = (string) get_user_meta( $current_user->ID, 'daw_oracle_username', tr
                 <label>Email baru<input type="email" name="new_email" maxlength="254" required></label>
                 <label>Password saat ini<input type="password" name="current_password" autocomplete="current-password" required></label>
             </div>
-            <footer><button type="submit" class="daw-account-settings__save">Kirim Link Verifikasi</button></footer>
+            <footer><button type="submit" class="daw-account-settings__save">Kirim Kode ke Email Lama</button></footer>
         </form>
+        <?php if ( in_array( $notice, [ 'old_code_sent', 'new_code_sent' ], true ) ) : ?>
+            <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" style="padding: 0 18px 18px">
+                <input type="hidden" name="action" value="<?= esc_attr( 'old_code_sent' === $notice ? 'daw_confirm_hr_email_old' : 'daw_confirm_hr_email_new' ) ?>">
+                <?php wp_nonce_field( 'old_code_sent' === $notice ? 'daw_confirm_hr_email_old' : 'daw_confirm_hr_email_new' ); ?>
+                <label>Kode verifikasi 5 angka<input type="text" name="verification_code" inputmode="numeric" pattern="[0-9]{5}" maxlength="5" required></label>
+                <button type="submit" class="daw-account-settings__save">Konfirmasi Kode</button>
+            </form>
+        <?php endif; ?>
     </section>
 
     <section class="daw-account-settings__panel" aria-label="Ubah password Admin HR">
-        <header><h2>Ganti Password</h2><p>Untuk keamanan, gunakan link reset password yang dikirim ke email akun.</p></header>
-        <p style="padding: 0 18px 14px"><a href="<?= esc_url( recruitment_get_public_url( 'login', [ 'target' => 'hr', 'forgot' => '1' ] ) ) ?>">Kirim link reset password ke <?= esc_html( $email ) ?></a></p>
+        <header><h2>Ganti Password</h2><p>Masukkan password saat ini dan password baru.</p></header>
+        <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" style="padding: 0 18px 18px">
+            <input type="hidden" name="action" value="daw_change_hr_password">
+            <?php wp_nonce_field( 'daw_change_hr_password' ); ?>
+            <label>Password saat ini<input type="password" name="current_password" required></label>
+            <label>Password baru<input type="password" name="new_password" minlength="8" required></label>
+            <label>Konfirmasi password baru<input type="password" name="password_confirmation" minlength="8" required></label>
+            <button type="submit" class="daw-account-settings__save">Ubah Password</button>
+        </form>
+        <p style="padding: 0 18px 14px"><a href="<?= esc_url( recruitment_get_public_url( 'login', [ 'target' => 'hr', 'forgot' => '1' ] ) ) ?>">Lupa password? Kirim reset ke <?= esc_html( $email ) ?></a></p>
     </section>
 </div>

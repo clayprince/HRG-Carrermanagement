@@ -4,22 +4,23 @@ class Recruitment_Admin {
 
 	public function init(): void {
 		add_action( 'admin_menu', [ $this, 'register_admin_menu' ], 9 );
-		add_action( 'admin_post_daw_create_vacancy', [ $this, 'handle_vacancy_creation' ] );
-		add_action( 'admin_post_daw_set_vacancy_status', [ $this, 'handle_vacancy_status_change' ] );
-		add_action( 'admin_post_daw_save_application_form', [ $this, 'handle_application_form_save' ] );
-		add_action( 'admin_post_daw_save_final_decision', [ $this, 'handle_final_decision_save' ] );
 		add_action( 'admin_post_daw_save_department_request', [ $this, 'handle_department_request_post' ] );
 		add_action( 'admin_post_daw_review_department_request', [ $this, 'handle_department_request_review' ] );
 		add_action( 'admin_post_daw_create_department_account', [ $this, 'handle_department_account_creation' ] );
 		add_action( 'admin_post_daw_set_department_account_status', [ $this, 'handle_department_account_status' ] );
 		add_action( 'admin_post_daw_update_department_account', [ $this, 'handle_department_account_update' ] );
 		add_action( 'admin_post_daw_delete_department_account', [ $this, 'handle_department_account_delete' ] );
+		add_action( 'admin_post_daw_delete_hr_account', [ $this, 'handle_hr_account_delete' ] );
 		add_action( 'admin_post_daw_create_hr_account', [ $this, 'handle_hr_account_creation' ] );
 		add_action( 'admin_post_daw_change_hr_password', [ $this, 'handle_hr_password_change' ] );
 		add_action( 'admin_post_daw_change_department_password', [ $this, 'handle_department_password_change' ] );
+		add_action( 'admin_post_daw_save_vacancy', [ $this, 'handle_vacancy_save' ] );
+		add_action( 'admin_post_daw_set_vacancy_status', [ $this, 'handle_vacancy_status' ] );
+		add_action( 'admin_post_daw_update_application_status', [ $this, 'handle_application_status' ] );
 		add_action( 'admin_menu', [ $this, 'remove_vacancy_post_type_submenu' ], 99 );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
 		add_action( 'in_admin_header', [ $this, 'render_admin_sidebar' ] );
+		add_action( 'admin_notices', [ $this, 'render_vacancy_overview' ] );
 		add_action( 'admin_footer', [ $this, 'render_screen_explorer' ] );
 		add_filter( 'admin_body_class', [ $this, 'add_admin_body_class' ] );
 	}
@@ -42,6 +43,37 @@ class Recruitment_Admin {
 		}
 
 		require recruitment_get_plugin_path( 'admin/components/sidebar.php' );
+	}
+
+	public function render_vacancy_overview(): void {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || 'edit' !== $screen->base || 'daw_vacancy' !== $screen->post_type || ! current_user_can( 'manage_recruitment' ) ) {
+			return;
+		}
+
+		$counts = wp_count_posts( 'daw_vacancy' );
+		$published = (int) ( $counts->publish ?? 0 );
+		$draft = (int) ( $counts->draft ?? 0 ) + (int) ( $counts->pending ?? 0 ) + (int) ( $counts->future ?? 0 );
+		$archived = (int) ( $counts->trash ?? 0 );
+		$total = $published + $draft + (int) ( $counts->private ?? 0 );
+		?>
+		<section class="daw-vacancy-overview" aria-labelledby="daw-vacancy-overview-title">
+			<div class="daw-vacancy-overview__heading">
+				<div>
+					<p class="daw-vacancy-overview__breadcrumb">DAW Admin <span>/</span> Recruitment</p>
+					<h1 id="daw-vacancy-overview-title">Lowongan</h1>
+					<p class="daw-vacancy-overview__description">Kelola posisi dan publikasi lowongan kerja.</p>
+				</div>
+				<a class="daw-vacancy-overview__create" href="<?= esc_url( admin_url( 'post-new.php?post_type=daw_vacancy' ) ) ?>"><span aria-hidden="true">+</span> Buat Lowongan</a>
+			</div>
+			<div class="daw-vacancy-overview__stats" aria-label="Ringkasan lowongan">
+				<div class="daw-vacancy-overview__stat daw-vacancy-overview__stat--total"><span>Total Lowongan</span><strong><?= esc_html( number_format_i18n( $total ) ) ?></strong></div>
+				<div class="daw-vacancy-overview__stat daw-vacancy-overview__stat--published"><span>Dipublikasikan</span><strong><?= esc_html( number_format_i18n( $published ) ) ?></strong></div>
+				<div class="daw-vacancy-overview__stat daw-vacancy-overview__stat--draft"><span>Draft / Terjadwal</span><strong><?= esc_html( number_format_i18n( $draft ) ) ?></strong></div>
+				<div class="daw-vacancy-overview__stat daw-vacancy-overview__stat--archived"><span>Arsip</span><strong><?= esc_html( number_format_i18n( $archived ) ) ?></strong></div>
+			</div>
+		</section>
+		<?php
 	}
 
 	public function register_admin_menu(): void {
@@ -76,11 +108,13 @@ class Recruitment_Admin {
 		add_submenu_page( 'recruitment-dashboard', 'Jadwal Wawancara', 'Jadwal Wawancara', 'manage_recruitment', 'recruitment-interview-schedule', [ $this, 'render_interview_schedule' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Pengelolaan Akun User', 'Pengelolaan Akun User', 'manage_recruitment', 'recruitment-user-management', [ $this, 'render_user_management' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Profil Admin HR', 'Profil Admin HR', 'manage_recruitment', 'recruitment-hr-profile', [ $this, 'render_hr_profile' ] );
-		add_submenu_page( 'recruitment-dashboard', 'Form Lamaran', 'Form Lamaran', 'manage_recruitment', 'recruitment-form-builder', [ $this, 'render_form_builder' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Setting Psikotes', 'Setting Psikotes', 'manage_recruitment', 'recruitment-psychotest-settings', [ $this, 'render_psychotest_settings' ] );
-		add_submenu_page( 'recruitment-dashboard', 'Hasil Kepribadian', 'Hasil Kepribadian', 'manage_recruitment', 'recruitment-personality-results', [ $this, 'render_personality_results' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Bank Soal', 'Bank Soal', 'manage_recruitment', 'recruitment-question-bank', [ $this, 'render_question_bank' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Pengaturan', 'Pengaturan', 'manage_recruitment', 'recruitment-settings', [ $this, 'render_settings' ] );
+	}
+
+	public function remove_vacancy_post_type_submenu(): void {
+		remove_submenu_page( 'recruitment-dashboard', 'edit.php?post_type=daw_vacancy' );
 	}
 
 	public function enqueue_admin_assets(): void {
@@ -123,6 +157,103 @@ class Recruitment_Admin {
 		$this->render_page( 'vacancies' );
 	}
 
+	public function handle_vacancy_save(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengelola lowongan.', 'recruitment-plugin' ) );
+		}
+		check_admin_referer( 'daw_save_vacancy' );
+
+		$vacancy_id = absint( $_POST['vacancy_id'] ?? 0 );
+		$title = sanitize_text_field( wp_unslash( $_POST['title'] ?? '' ) );
+		$description = sanitize_textarea_field( wp_unslash( $_POST['description'] ?? '' ) );
+		$responsibilities = sanitize_textarea_field( wp_unslash( $_POST['responsibilities'] ?? '' ) );
+		$requirements = sanitize_textarea_field( wp_unslash( $_POST['requirements'] ?? '' ) );
+		$type = sanitize_text_field( wp_unslash( $_POST['type'] ?? '' ) );
+		$region = sanitize_text_field( wp_unslash( $_POST['region'] ?? '' ) );
+		$dealer = sanitize_text_field( wp_unslash( $_POST['dealer'] ?? '' ) );
+		$location = sanitize_text_field( wp_unslash( $_POST['location'] ?? '' ) );
+		$deadline = sanitize_text_field( wp_unslash( $_POST['deadline'] ?? '' ) );
+		$status = sanitize_key( wp_unslash( $_POST['status'] ?? 'draft' ) );
+		$valid_date = DateTimeImmutable::createFromFormat( '!Y-m-d', $deadline );
+		$date_errors = DateTimeImmutable::getLastErrors();
+		$is_valid_date = $valid_date && ( false === $date_errors || ( 0 === $date_errors['warning_count'] && 0 === $date_errors['error_count'] ) )
+			&& $valid_date->format( 'Y-m-d' ) === $deadline
+			&& $deadline >= current_time( 'Y-m-d' );
+
+		if ( '' === $title || '' === $dealer || ! $is_valid_date || ! in_array( $status, [ 'draft', 'published' ], true ) ) {
+			$this->redirect_to_vacancies( 'invalid_data', $vacancy_id );
+		}
+		if ( $vacancy_id && ( 'daw_vacancy' !== get_post_type( $vacancy_id ) || ! current_user_can( 'edit_post', $vacancy_id ) ) ) {
+			wp_die( esc_html__( 'Lowongan yang akan diubah tidak ditemukan atau tidak dapat diakses.', 'recruitment-plugin' ) );
+		}
+
+		$post_data = [
+			'post_type' => 'daw_vacancy',
+			'post_status' => 'published' === $status ? 'publish' : 'draft',
+			'post_title' => $title,
+			'post_content' => $description,
+			'post_excerpt' => wp_trim_words( $description, 24 ),
+		];
+		if ( $vacancy_id ) {
+			$post_data['ID'] = $vacancy_id;
+		}
+		$post_id = wp_insert_post( $post_data, true );
+		if ( is_wp_error( $post_id ) ) {
+			error_log( 'Recruitment vacancy could not be saved: ' . $post_id->get_error_message() );
+			$this->redirect_to_vacancies( 'save_failed', $vacancy_id );
+		}
+
+		foreach (
+			[
+				'_daw_responsibilities' => $responsibilities,
+				'_daw_requirements' => $requirements,
+				'_daw_type' => $type,
+				'_daw_region' => $region,
+				'_daw_dealer' => $dealer,
+				'_daw_location' => $location,
+				'_daw_deadline' => $deadline,
+				'_daw_vacancy_status' => $status,
+			] as $meta_key => $meta_value
+		) {
+			update_post_meta( $post_id, $meta_key, $meta_value );
+		}
+
+		$this->redirect_to_vacancies( 'saved' );
+	}
+
+	public function handle_vacancy_status(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengelola lowongan.', 'recruitment-plugin' ) );
+		}
+
+		$vacancy_id = absint( $_POST['vacancy_id'] ?? 0 );
+		$status = sanitize_key( wp_unslash( $_POST['status'] ?? '' ) );
+		check_admin_referer( 'daw_set_vacancy_status_' . $vacancy_id );
+		if ( ! $vacancy_id || 'daw_vacancy' !== get_post_type( $vacancy_id ) || ! current_user_can( 'edit_post', $vacancy_id ) || ! in_array( $status, [ 'published', 'draft', 'closed', 'archived' ], true ) ) {
+			wp_die( esc_html__( 'Data status lowongan tidak valid.', 'recruitment-plugin' ) );
+		}
+
+		$post_status = in_array( $status, [ 'published', 'draft' ], true ) ? ( 'published' === $status ? 'publish' : 'draft' ) : 'private';
+		$updated = wp_update_post( [ 'ID' => $vacancy_id, 'post_status' => $post_status ], true );
+		if ( is_wp_error( $updated ) || ! $updated ) {
+			$error = is_wp_error( $updated ) ? $updated->get_error_message() : 'WordPress did not update the post.';
+			error_log( 'Recruitment vacancy status could not be updated: ' . $error );
+			$this->redirect_to_vacancies( 'save_failed' );
+		}
+		update_post_meta( $vacancy_id, '_daw_vacancy_status', $status );
+		$this->redirect_to_vacancies( 'status_updated' );
+	}
+
+	private function redirect_to_vacancies( string $notice, int $edit_id = 0 ): void {
+		$args = [ 'page' => 'recruitment-vacancies', 'vacancy_notice' => $notice ];
+		if ( $edit_id ) {
+			$args['view'] = 'create';
+			$args['edit_vacancy'] = $edit_id;
+		}
+		wp_safe_redirect( add_query_arg( $args, admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
 	public function render_applicants(): void {
 		$this->render_page( 'applicants' );
 	}
@@ -143,170 +274,6 @@ class Recruitment_Admin {
 		$this->render_page( 'user-department' );
 	}
 
-	public function handle_vacancy_creation(): void {
-		if ( ! current_user_can( 'manage_recruitment' ) ) {
-			wp_die( esc_html__( 'Anda tidak memiliki izin untuk membuat lowongan.', 'recruitment-plugin' ) );
-		}
-
-		check_admin_referer( 'daw_create_vacancy' );
-		$length = static function ( string $value ): int {
-			return function_exists( 'mb_strlen' ) ? mb_strlen( $value, 'UTF-8' ) : strlen( $value );
-		};
-		$submitted = isset( $_POST['vacancy'] ) && is_array( $_POST['vacancy'] ) ? wp_unslash( $_POST['vacancy'] ) : [];
-		$fields = [];
-		foreach ( $submitted as $key => $value ) {
-			$key = sanitize_key( (string) $key );
-			if ( 'sourcing_channels' === $key ) {
-				$fields[ $key ] = array_values(
-					array_filter(
-						array_map( 'sanitize_text_field', is_array( $value ) ? $value : [] )
-					)
-				);
-			} elseif ( ! is_array( $value ) ) {
-				$fields[ $key ] = in_array( $key, [ 'reason', 'role_summary', 'kpi', 'strategic_contribution', 'main_challenges', 'required_skills', 'preferred_skills', 'salary_range', 'priority_competencies', 'validation_notes', 'sourcing_timeline', 'special_notes' ], true )
-					? sanitize_textarea_field( $value )
-					: sanitize_text_field( $value );
-			}
-		}
-		$title = (string) ( $fields['position'] ?? '' );
-		$description = (string) ( $fields['role_summary'] ?? '' );
-		$responsibilities = implode(
-			"\n",
-			array_filter(
-				[
-					(string) ( $fields['kpi'] ?? '' ),
-					(string) ( $fields['strategic_contribution'] ?? '' ),
-					(string) ( $fields['main_challenges'] ?? '' ),
-				],
-				static function ( string $value ): bool {
-					return '' !== trim( $value );
-				}
-			)
-		);
-		$education = (string) ( $fields['minimum_education'] ?? '' );
-		$experience = (string) ( $fields['minimum_experience'] ?? '' );
-		$certification = (string) ( $fields['certifications'] ?? '' );
-		$type_map = [ 'Pegawai Tetap' => 'Full-time', 'Kontrak' => 'Kontrak', 'Magang' => 'Magang' ];
-		$type = $type_map[ (string) ( $fields['employment_type'] ?? '' ) ] ?? '';
-		$location = (string) ( $fields['location'] ?? '' );
-		$dealer = (string) ( $fields['dealer'] ?? '' );
-		$deadline = (string) ( $fields['deadline'] ?? '' );
-		$target_date = (string) ( $fields['target_date'] ?? '' );
-		$status = sanitize_key( wp_unslash( $_POST['submit_status'] ?? '' ) );
-		$deadline_date = DateTimeImmutable::createFromFormat( '!Y-m-d', $deadline );
-		$valid_deadline = $deadline_date instanceof DateTimeImmutable && $deadline_date->format( 'Y-m-d' ) === $deadline;
-		$target_date_value = '' === $target_date ? null : DateTimeImmutable::createFromFormat( '!Y-m-d', $target_date );
-		$valid_target_date = null === $target_date_value || ( $target_date_value instanceof DateTimeImmutable && $target_date_value->format( 'Y-m-d' ) === $target_date );
-		$allowed_types = [ 'Full-time', 'Part-time', 'Kontrak', 'Magang' ];
-		$allowed_priorities = [ 'Tinggi', 'Sedang', 'Rendah', 'Urgent' ];
-		$allowed_education = [ 'SMA/SMK', 'D3', 'S1', 'S2' ];
-		$allowed_recruitment_budgets = [ 'Tersedia', 'Menunggu Persetujuan', 'Belum Tersedia' ];
-		$allowed_headcount_confirmations = [ 'Sesuai Rencana', 'Perlu Persetujuan' ];
-		$allowed_selection_stages = [
-			'Standar (Administrasi → Psikotes → Wawancara HR → Wawancara User)',
-			'Administrasi → Wawancara HR → Wawancara User',
-			'Administrasi → Tes Teknis → Wawancara User',
-		];
-		$headcount = absint( $fields['headcount'] ?? 0 );
-		$is_valid = '' !== $title
-			&& $length( $title ) <= 100
-			&& '' !== trim( (string) ( $fields['hiring_user'] ?? '' ) )
-			&& $length( (string) ( $fields['hiring_user'] ?? '' ) ) <= 255
-			&& '' !== $dealer
-			&& $length( $dealer ) <= 100
-			&& in_array( $type, $allowed_types, true )
-			&& in_array( (string) ( $fields['priority'] ?? '' ), $allowed_priorities, true )
-			&& in_array( $education, $allowed_education, true )
-			&& in_array( (string) ( $fields['recruitment_budget'] ?? '' ), $allowed_recruitment_budgets, true )
-			&& in_array( (string) ( $fields['headcount_confirmation'] ?? '' ), $allowed_headcount_confirmations, true )
-			&& in_array( (string) ( $fields['selection_stages'] ?? '' ), $allowed_selection_stages, true )
-			&& $headcount >= 1
-			&& $headcount <= 1000
-			&& '' !== $location
-			&& $length( $location ) <= 100
-			&& '' !== (string) ( $fields['department'] ?? '' )
-			&& $length( (string) ( $fields['department'] ?? '' ) ) <= 100
-			&& '' !== trim( $description )
-			&& $length( $description ) <= 5000
-			&& $length( $responsibilities ) <= 10000
-			&& '' !== trim( (string) ( $fields['required_skills'] ?? '' ) )
-			&& $length( (string) ( $fields['required_skills'] ?? '' ) ) <= 5000
-			&& $length( $experience ) <= 500
-			&& $length( $certification ) <= 500
-			&& '' !== trim( (string) ( $fields['salary_range'] ?? '' ) )
-			&& $length( (string) ( $fields['salary_range'] ?? '' ) ) <= 100
-			&& '' !== trim( (string) ( $fields['sourcing_timeline'] ?? '' ) )
-			&& $length( (string) ( $fields['sourcing_timeline'] ?? '' ) ) <= 100
-			&& $valid_deadline
-			&& $valid_target_date
-			&& 'draft' === $status
-			&& ! empty( $fields['approval'] )
-			&& '' !== trim( (string) ( $fields['signature'] ?? '' ) )
-			&& $length( (string) ( $fields['signature'] ?? '' ) ) <= 255;
-		$notice = 'invalid';
-		$result = [];
-
-		if ( $is_valid ) {
-			$result = ( new Recruitment_Database() )->create_vacancy(
-				[
-					'title' => $title,
-					'description' => $description,
-					'responsibilities' => $responsibilities,
-					'education_requirement' => $education,
-					'experience_requirement' => $experience,
-					'certification_requirement' => $certification,
-					'type' => $type,
-					'location' => $location,
-					'dealer' => $dealer,
-					'deadline' => $deadline,
-					'status' => $status,
-					'target_date' => $target_date,
-					'request_details' => $fields,
-				]
-			);
-			$notice = ! empty( $result['success'] ) ? 'created' : 'unavailable';
-		}
-
-		wp_safe_redirect(
-			add_query_arg(
-				[
-					'view' => ! empty( $result['success'] ) ? 'list' : 'create',
-					'notice' => $notice,
-				],
-				recruitment_get_admin_url( 'vacancies' )
-			)
-		);
-		exit;
-	}
-
-	public function handle_vacancy_status_change(): void {
-		if ( ! current_user_can( 'manage_recruitment' ) ) {
-			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengubah status lowongan.', 'recruitment-plugin' ) );
-		}
-
-		$vacancy_id = absint( $_POST['vacancy_id'] ?? 0 );
-		check_admin_referer( 'daw_set_vacancy_status_' . $vacancy_id );
-		$status = sanitize_key( wp_unslash( $_POST['status'] ?? '' ) );
-		$notice = 'invalid';
-
-		if ( $vacancy_id > 0 && in_array( $status, [ 'draft', 'published' ], true ) ) {
-			$result = ( new Recruitment_Database() )->set_vacancy_status( $vacancy_id, $status );
-			$notice = ! empty( $result['success'] )
-				? 'status_updated'
-				: ( 'vacancy_not_found' === ( $result['error'] ?? '' ) ? 'not_found' : 'unavailable' );
-		}
-
-		wp_safe_redirect(
-			add_query_arg(
-				[
-					'notice' => $notice,
-				],
-				recruitment_get_admin_url( 'vacancies' )
-			)
-		);
-		exit;
-	}
-
 	public function handle_department_request_post(): void {
 		if ( ! current_user_can( 'manage_user_department' ) || 'daw-user-department' !== sanitize_key( $_GET['page'] ?? '' ) ) {
 			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengirim request ini.', 'recruitment-plugin' ) );
@@ -323,17 +290,15 @@ class Recruitment_Admin {
 		check_admin_referer( 'daw_review_department_request' );
 		$request_code = sanitize_text_field( wp_unslash( $_POST['request_code'] ?? '' ) );
 		$owner_id = absint( $_POST['owner_id'] ?? 0 );
-		if ( ! $owner_id ) {
-			wp_die( esc_html__( 'Pengajuan tidak ditemukan.', 'recruitment-plugin' ) );
-		}
 		$decision = sanitize_key( wp_unslash( $_POST['decision'] ?? '' ) );
 		$note = sanitize_textarea_field( wp_unslash( $_POST['hr_note'] ?? '' ) );
 		$decisions = [
+			'approve' => 'Disetujui',
 			'revise' => 'Perlu Revisi',
 			'reject' => 'Ditolak',
 		];
 
-		if ( '' === $request_code || ( 'approve' !== $decision && ! isset( $decisions[ $decision ] ) ) ) {
+		if ( '' === $request_code || ! isset( $decisions[ $decision ] ) ) {
 			wp_die( esc_html__( 'Data keputusan pengajuan tidak valid.', 'recruitment-plugin' ) );
 		}
 
@@ -351,153 +316,82 @@ class Recruitment_Admin {
 			exit;
 		}
 
-		$requests = get_user_meta( $owner_id, 'daw_department_job_requests', true );
-		if ( ! is_array( $requests ) || ! isset( $requests[ $request_code ] ) ) {
-			wp_die( esc_html__( 'Pengajuan tidak ditemukan.', 'recruitment-plugin' ) );
-		}
+		$status = $decisions[ $decision ];
+		if ( $owner_id ) {
+			$requests = get_user_meta( $owner_id, 'daw_department_job_requests', true );
+			if ( ! is_array( $requests ) || ! isset( $requests[ $request_code ] ) ) {
+				wp_die( esc_html__( 'Pengajuan tidak ditemukan.', 'recruitment-plugin' ) );
+			}
 
-		$request = $requests[ $request_code ];
-		$request_status = (string) ( $request['status'] ?? '' );
-		$is_reviewable = in_array( $request_status, [ 'Review HR', 'Menunggu Review HR' ], true );
-		$is_approved_but_unpublished = 'Disetujui' === $request_status && empty( $request['vacancy_id'] );
-		if (
-			( 'approve' === $decision && ! $is_reviewable && ! $is_approved_but_unpublished )
-			|| ( 'approve' !== $decision && ! $is_reviewable )
-		) {
-			wp_die( esc_html__( 'Pengajuan ini sudah tidak menunggu review.', 'recruitment-plugin' ) );
-		}
-
-		if ( 'approve' === $decision ) {
+			$request = $requests[ $request_code ];
+			if ( ! in_array( $request['status'] ?? '', [ 'Review HR', 'Menunggu Review HR' ], true ) ) {
+				wp_die( esc_html__( 'Pengajuan ini sudah tidak menunggu review.', 'recruitment-plugin' ) );
+			}
 			$fields = is_array( $request['fields'] ?? null ) ? $request['fields'] : [];
-			$title = trim( (string) ( $fields['position'] ?? '' ) );
-			$location = sanitize_text_field( wp_unslash( $_POST['location'] ?? ( $request['publication_location'] ?? ( $fields['location'] ?? '' ) ) ) );
-			$dealer = sanitize_text_field( wp_unslash( $_POST['dealer'] ?? '' ) );
-			$deadline = sanitize_text_field( wp_unslash( $_POST['deadline'] ?? '' ) );
-			$deadline_date = DateTimeImmutable::createFromFormat( '!Y-m-d', $deadline );
-			$employment_types = [
-				'Pegawai Tetap' => 'Full-time',
-				'Kontrak' => 'Kontrak',
-				'Magang' => 'Magang',
-			];
-			$type = $employment_types[ (string) ( $fields['employment_type'] ?? '' ) ] ?? '';
-			$length = static function ( string $value ): int {
-				return function_exists( 'mb_strlen' ) ? mb_strlen( $value, 'UTF-8' ) : strlen( $value );
-			};
-			if (
-				'' === $title
-				|| $length( $title ) > 100
-				|| '' === $location
-				|| $length( $location ) > 100
-				|| '' === $dealer
-				|| $length( $dealer ) > 100
-				|| '' === $type
-				|| ! $deadline_date instanceof DateTimeImmutable
-				|| $deadline_date->format( 'Y-m-d' ) !== $deadline
-			) {
-				wp_safe_redirect(
-					add_query_arg(
-						[
-							'page' => 'recruitment-applications',
-							'request_code' => $request_code,
-							'owner_id' => $owner_id,
-							'review_error' => 'publication_details',
-						],
-						admin_url( 'admin.php' )
-					)
-				);
-				exit;
-			}
-
-			$responsibilities = implode(
-				"\n",
-				array_filter(
+			if ( 'approve' === $decision && empty( $request['vacancy_id'] ) ) {
+				$vacancy_id = wp_insert_post(
 					[
-						(string) ( $fields['kpi'] ?? '' ),
-						(string) ( $fields['strategic_contribution'] ?? '' ),
-						(string) ( $fields['main_challenges'] ?? '' ),
-					],
-					static function ( string $value ): bool {
-						return '' !== trim( $value );
-					}
-				)
-			);
-			$vacancy_result = ( new Recruitment_Database() )->create_vacancy(
-				[
-					'title' => $title,
-					'description' => (string) ( $fields['role_summary'] ?? '' ),
-					'responsibilities' => $responsibilities,
-					'education_requirement' => (string) ( $fields['minimum_education'] ?? '' ),
-					'experience_requirement' => (string) ( $fields['minimum_experience'] ?? '' ),
-					'certification_requirement' => (string) ( $fields['certifications'] ?? '' ),
-					'type' => $type,
-					'location' => $location,
-					'dealer' => $dealer,
-					'deadline' => $deadline,
-					'target_date' => (string) ( $fields['target_date'] ?? '' ),
-					'status' => 'published',
-					'request_code' => $request_code,
-					'request_details' => array_merge( $fields, [
-						'approved_by' => wp_get_current_user()->display_name,
-						'approved_at' => current_time( 'mysql' ),
-						'location' => $location,
-						'dealer' => $dealer,
-						'deadline' => $deadline,
-					] ),
-				]
-			);
-			if ( empty( $vacancy_result['success'] ) || empty( $vacancy_result['vacancy_id'] ) ) {
-				wp_safe_redirect(
-					add_query_arg(
-						[
-							'page' => 'recruitment-applications',
-							'request_code' => $request_code,
-							'owner_id' => $owner_id,
-							'review_error' => 'publication_failed',
+						'post_type' => 'daw_vacancy',
+						'post_status' => 'draft',
+						'post_title' => sanitize_text_field( $fields['position'] ?? $request_code ),
+						'post_content' => sanitize_textarea_field( $fields['role_summary'] ?? '' ),
+						'meta_input' => [
+							'_daw_dealer' => sanitize_text_field( $fields['dealer'] ?? '' ),
+							'_daw_region' => sanitize_text_field( $fields['region'] ?? '' ),
+							'_daw_type' => sanitize_text_field( $fields['employment_type'] ?? '' ),
+							'_daw_location' => sanitize_text_field( $fields['location'] ?? '' ),
+							'_daw_fptk_code' => $request_code,
 						],
-						admin_url( 'admin.php' )
-					)
+					],
+					true
 				);
-				exit;
+				if ( is_wp_error( $vacancy_id ) ) {
+					wp_die( esc_html__( 'Lowongan belum dapat dibuat: ', 'recruitment-plugin' ) . esc_html( $vacancy_id->get_error_message() ) );
+				}
+				$request['vacancy_id'] = $vacancy_id;
 			}
 
-			$request['status'] = 'Lowongan Dibuka';
+			$request['status'] = $status;
 			$request['hr_note'] = $note;
-			$request['publication_location'] = $location;
-			$request['dealer'] = $dealer;
-			$request['deadline'] = $deadline;
-			$request['fields'] = $fields;
-			$request['fields']['location'] = $location;
-			$request['vacancy_id'] = absint( $vacancy_result['vacancy_id'] );
-			$request['vacancy_status'] = 'published';
 			$request['updated_at'] = current_time( 'mysql' );
 			$requests[ $request_code ] = $request;
 			update_user_meta( $owner_id, 'daw_department_job_requests', $requests );
-			$saved_requests = get_user_meta( $owner_id, 'daw_department_job_requests', true );
-			if (
-				! is_array( $saved_requests )
-				|| 'Lowongan Dibuka' !== ( $saved_requests[ $request_code ]['status'] ?? '' )
-				|| absint( $saved_requests[ $request_code ]['vacancy_id'] ?? 0 ) !== absint( $vacancy_result['vacancy_id'] )
-			) {
-				error_log( 'Published vacancy could not be linked to its approved department request.' );
-				wp_safe_redirect(
-					add_query_arg(
-						[
-							'page' => 'recruitment-applications',
-							'request_code' => $request_code,
-							'owner_id' => $owner_id,
-							'review_error' => 'link_failed',
-						],
-						admin_url( 'admin.php' )
-					)
-				);
-				exit;
-			}
 		} else {
-			$request['status'] = $decisions[ $decision ];
-			$request['hr_note'] = $note;
-			$request['updated_at'] = current_time( 'mysql' );
-			$requests[ $request_code ] = $request;
-			update_user_meta( $owner_id, 'daw_department_job_requests', $requests );
+			$demo_statuses = get_option( 'daw_demo_department_request_statuses', [] );
+			$demo_statuses = is_array( $demo_statuses ) ? $demo_statuses : [];
+			$demo_status = $demo_statuses[ $request_code ] ?? [];
+			$demo_status = is_array( $demo_status ) ? $demo_status : [];
+			$demo_pending_codes = [ 'FPTK-2026-032', 'FPTK-2026-030' ];
+			if ( ! in_array( $request_code, $demo_pending_codes, true ) || ( isset( $demo_status['status'] ) && ! in_array( $demo_status['status'], [ 'Review HR', 'Menunggu Review HR' ], true ) ) ) {
+				wp_die( esc_html__( 'Pengajuan contoh ini sudah tidak menunggu review.', 'recruitment-plugin' ) );
+			}
+			if ( 'approve' === $decision && empty( $demo_status['vacancy_id'] ) ) {
+				$vacancy_id = wp_insert_post(
+					[
+						'post_type' => 'daw_vacancy',
+						'post_status' => 'draft',
+						'post_title' => sanitize_text_field( wp_unslash( $_POST['vacancy_title'] ?? '' ) ),
+						'post_content' => sanitize_textarea_field( wp_unslash( $_POST['vacancy_content'] ?? '' ) ),
+						'meta_input' => [
+							'_daw_location' => sanitize_text_field( wp_unslash( $_POST['vacancy_location'] ?? '' ) ),
+							'_daw_type' => sanitize_text_field( wp_unslash( $_POST['vacancy_type'] ?? '' ) ),
+							'_daw_fptk_code' => $request_code,
+						],
+					],
+					true
+				);
+				if ( is_wp_error( $vacancy_id ) ) {
+					wp_die( esc_html__( 'Lowongan belum dapat dibuat: ', 'recruitment-plugin' ) . esc_html( $vacancy_id->get_error_message() ) );
+				}
+				$demo_status['vacancy_id'] = $vacancy_id;
+			}
+			$demo_statuses[ $request_code ] = [
+				'status' => $status,
+				'hr_note' => $note,
+				'updated_at' => current_time( 'mysql' ),
+				'vacancy_id' => absint( $demo_status['vacancy_id'] ?? 0 ),
+			];
+			update_option( 'daw_demo_department_request_statuses', $demo_statuses, false );
 		}
 
 		wp_safe_redirect(
@@ -515,6 +409,34 @@ class Recruitment_Admin {
 
 	public function render_user_interview(): void {
 		$this->render_page( 'user-interview' );
+	}
+
+	public function handle_application_status(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk memperbarui status lamaran.', 'recruitment-plugin' ) );
+		}
+
+		$application_id = absint( $_POST['application_id'] ?? 0 );
+		check_admin_referer( 'daw_update_application_status_' . $application_id );
+		$status = sanitize_text_field( wp_unslash( $_POST['status'] ?? '' ) );
+		$stage = sanitize_text_field( wp_unslash( $_POST['stage'] ?? '' ) );
+		$note = sanitize_textarea_field( wp_unslash( $_POST['note'] ?? '' ) );
+		$result = ( new Recruitment_Database() )->update_application_status( (string) $application_id, $status, $stage, $note );
+		if ( empty( $result['success'] ) ) {
+			wp_die( esc_html( $result['error'] ?? 'Status lamaran gagal disimpan.' ) );
+		}
+
+		wp_safe_redirect(
+			add_query_arg(
+				[
+					'page' => 'recruitment-applicants',
+					'candidate_id' => absint( $_POST['candidate_id'] ?? 0 ),
+					'status_updated' => '1',
+				],
+				admin_url( 'admin.php' )
+			)
+		);
+		exit;
 	}
 
 	public function render_interview_schedule(): void {
@@ -638,18 +560,21 @@ class Recruitment_Admin {
 	}
 
 	public function handle_hr_account_creation(): void {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'Hanya administrator WordPress yang dapat membuat akun HR awal.', 'recruitment-plugin' ) );
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Hanya Admin HR yang dapat membuat akun HR.', 'recruitment-plugin' ) );
 		}
 
 		check_admin_referer( 'daw_create_hr_account' );
+		$username = sanitize_user( wp_unslash( $_POST['username'] ?? '' ), true );
+		$full_name = sanitize_text_field( wp_unslash( $_POST['display_name'] ?? '' ) );
 		$email = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
+		$department = sanitize_text_field( wp_unslash( $_POST['hr_department'] ?? '' ) );
 		$password = (string) wp_unslash( $_POST['password'] ?? '' );
 		$password_confirmation = (string) wp_unslash( $_POST['password_confirmation'] ?? '' );
 		$notice = 'invalid';
 
-		if ( is_email( $email ) && strlen( $password ) >= 8 && $password === $password_confirmation ) {
-			$result = ( new Recruitment_Database() )->create_hr_account( $email, $password );
+		if ( '' !== $username && '' !== $full_name && is_email( $email ) && '' !== $department && strlen( $password ) >= 8 && $password === $password_confirmation ) {
+			$result = ( new Recruitment_Database() )->create_hr_account( $username, $full_name, $email, $department, $password );
 			if ( ! empty( $result['success'] ) ) {
 				$notice = 'created';
 			} else {
@@ -662,6 +587,17 @@ class Recruitment_Admin {
 		}
 
 		wp_safe_redirect( add_query_arg( 'hr_account_notice', $notice, admin_url( 'admin.php?page=recruitment-user-management' ) ) );
+		exit;
+	}
+
+	public function handle_hr_account_delete(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Hanya Admin HR yang dapat menghapus akun HR.', 'recruitment-plugin' ) );
+		}
+		$account_id = absint( $_POST['account_id'] ?? 0 );
+		check_admin_referer( 'daw_delete_hr_account_' . $account_id );
+		$result = ( new Recruitment_Database() )->delete_hr_account( $account_id );
+		wp_safe_redirect( add_query_arg( 'notice', ! empty( $result['success'] ) ? 'deleted_hr' : 'not_found', admin_url( 'admin.php?page=recruitment-user-management' ) ) );
 		exit;
 	}
 
@@ -733,63 +669,8 @@ class Recruitment_Admin {
 		exit;
 	}
 
-	public function render_form_builder(): void {
-		$this->render_page( 'application-form-builder' );
-	}
-
-	public function handle_application_form_save(): void {
-		if ( ! current_user_can( 'manage_recruitment' ) ) {
-			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengubah form lamaran.', 'recruitment-plugin' ) );
-		}
-
-		check_admin_referer( 'daw_save_application_form' );
-		$submitted = isset( $_POST['form_sections'] ) && is_array( $_POST['form_sections'] )
-			? wp_unslash( $_POST['form_sections'] )
-			: null;
-		$normalized = ( new Recruitment_Application() )->normalize_form_configuration( $submitted );
-		if ( $normalized['errors'] ) {
-			wp_die(
-				esc_html( implode( ' ', $normalized['errors'] ) ),
-				esc_html__( 'Form lamaran tidak valid', 'recruitment-plugin' ),
-				[ 'response' => 400 ]
-			);
-		}
-
-		$result = ( new Recruitment_Database() )->save_application_form( $normalized['sections'] );
-		$notice = ! empty( $result['success'] ) ? 'saved' : 'save_failed';
-		wp_safe_redirect( add_query_arg( 'form_notice', $notice, admin_url( 'admin.php?page=recruitment-form-builder' ) ) );
-		exit;
-	}
-
-	public function handle_final_decision_save(): void {
-		if ( ! current_user_can( 'manage_recruitment' ) ) {
-			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengubah keputusan akhir.', 'recruitment-plugin' ) );
-		}
-
-		$candidate_id = isset( $_POST['candidate_id'] ) && is_scalar( $_POST['candidate_id'] )
-			? absint( wp_unslash( (string) $_POST['candidate_id'] ) )
-			: 0;
-		check_admin_referer( 'daw_save_final_decision_' . $candidate_id );
-		$decision = isset( $_POST['decision'] ) && is_scalar( $_POST['decision'] )
-			? sanitize_text_field( wp_unslash( (string) $_POST['decision'] ) )
-			: '';
-		$result = ( new Recruitment_Database() )->save_final_decision( $candidate_id, $decision );
-		$notice = ! empty( $result['success'] ) ? 'saved' : 'failed';
-		wp_safe_redirect(
-			add_query_arg(
-				[ 'page' => 'recruitment-final-decision', 'section' => 'decision', 'decision_notice' => $notice ],
-				admin_url( 'admin.php' )
-			)
-		);
-		exit;
-	}
-
 	public function render_psychotest_settings(): void {
 		$this->render_page( 'psychotest-settings' );
-	}
-
-	public function render_personality_results(): void {
-		$this->render_page( 'personality-results' );
 	}
 
 	public function render_question_bank(): void {
@@ -822,9 +703,7 @@ class Recruitment_Admin {
 			'recruitment-interview-schedule',
 			'recruitment-user-management',
 			'recruitment-hr-profile',
-			'recruitment-form-builder',
 			'recruitment-psychotest-settings',
-			'recruitment-personality-results',
 			'recruitment-question-bank',
 			'recruitment-settings',
 			'daw-user-department',

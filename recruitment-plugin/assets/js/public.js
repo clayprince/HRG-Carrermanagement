@@ -12,6 +12,7 @@
   setupScreenExplorer();
   setupApplicantAccountMenu();
   setupAccountConfirmationRedirect();
+  setupApplicantProfileRepeater();
   setupPsychologicalTestProcessing();
   setupPsychotestDeviceCheck();
   setupPsychometricAssessments();
@@ -236,7 +237,7 @@
       rows.forEach((row) => {
         const matchesFilter = "all" === activeFilter
           || activeFilter === row.dataset.applicationState
-          || ("finished" === activeFilter && "rejected" === row.dataset.applicationState);
+          || ("finished" === activeFilter && ["accepted", "rejected"].includes(row.dataset.applicationState));
         const matchesSearch = (row.dataset.applicationSearch || "").includes(query);
         row.hidden = !matchesFilter || !matchesSearch;
       });
@@ -348,6 +349,118 @@
     window.setTimeout(function redirectToApplicantProfile() {
       window.location.assign(notice.dataset.accountConfirmationRedirect);
     }, 1400);
+  }
+
+  function setupApplicantProfileRepeater() {
+    document.querySelectorAll("[data-profile-collection]").forEach(syncProfileRowRequirements);
+    document.addEventListener("input", function validateProfileRow(event) {
+      const section = event.target.closest("[data-profile-collection]");
+      if (section) {
+        syncProfileRowRequirements(section);
+      }
+    });
+    document.addEventListener("change", function validateProfileRow(event) {
+      const section = event.target.closest("[data-profile-collection]");
+      if (section) {
+        syncProfileRowRequirements(section);
+      }
+    });
+
+    document.addEventListener("click", function handleProfileRepeaterClick(event) {
+      const addTableRowButton = event.target.closest("[data-add-application-table-row]");
+      if (addTableRowButton) {
+        const tableId = addTableRowButton.dataset.addApplicationTableRow;
+        const tableBody = document.querySelector(`[data-application-table-body="${tableId}"]`);
+        const nextRow = tableBody?.querySelector("[data-application-table-row][hidden]");
+        if (!nextRow) {
+          addTableRowButton.disabled = true;
+          return;
+        }
+
+        nextRow.hidden = false;
+        nextRow.querySelectorAll("input, select, textarea").forEach(function enableApplicationTableField(field) {
+          field.disabled = false;
+        });
+        if (!tableBody.querySelector("[data-application-table-row][hidden]")) {
+          addTableRowButton.disabled = true;
+        }
+        return;
+      }
+
+      const addButton = event.target.closest("[data-add-profile-row]");
+      if (addButton) {
+        const collection = addButton.dataset.addProfileRow;
+        const section = document.querySelector(`[data-profile-collection="${collection}"]`);
+        const template = section?.querySelector(`[data-profile-template="${collection}"]`);
+        if (!section || !template) {
+          return;
+        }
+
+        const rowCount = section.querySelectorAll("[data-profile-row]").length;
+        const maximum = Number(addButton.dataset.maxProfileRows || 0);
+        if (maximum && rowCount >= maximum) {
+          addButton.disabled = true;
+          return;
+        }
+
+        const indices = [...section.querySelectorAll("[data-profile-row] [name]")]
+          .map(function getProfileRowIndex(field) {
+            const match = field.name.match(/\[(\d+)\]/);
+            return match ? Number(match[1]) : -1;
+          })
+          .filter((index) => index >= 0);
+        const index = indices.length ? Math.max(...indices) + 1 : 0;
+        const fragment = template.content.cloneNode(true);
+        fragment.querySelectorAll("[name]").forEach(function assignProfileRowIndex(field) {
+          field.name = field.name.replace(/__INDEX__/g, String(index));
+        });
+        const targetContainer = section.querySelector("[data-profile-tbody]") || template.parentElement || section;
+        targetContainer.insertBefore(fragment, template);
+        updateProfileRowNumbers(section);
+        return;
+      }
+
+      const removeButton = event.target.closest("[data-remove-profile-row]");
+      if (!removeButton) {
+        return;
+      }
+      const row = removeButton.closest("[data-profile-row]");
+      const section = removeButton.closest("[data-profile-collection]");
+      if (row && section) {
+        row.remove();
+        updateProfileRowNumbers(section);
+      }
+    });
+
+    document.querySelectorAll("[data-profile-collection]").forEach(updateProfileRowNumbers);
+  }
+
+  function syncProfileRowRequirements(section) {
+    section.querySelectorAll("[data-profile-row]").forEach(function validateProfileRow(row) {
+      const fields = [...row.querySelectorAll("[name]")];
+      const hasValue = fields.some((field) => field.value.trim() !== "");
+      fields.forEach(function requireCompletedProfileRow(field) {
+        field.required = hasValue;
+      });
+    });
+  }
+
+  function updateProfileRowNumbers(section) {
+    const rows = section.querySelectorAll("[data-profile-row]");
+    const collection = section.dataset.profileCollection;
+    const isTable = Boolean(section.querySelector("table"));
+    const label = "social_media" === collection ? "Media Sosial" : (isTable ? "" : "Pengalaman");
+    rows.forEach(function numberProfileRow(row, index) {
+      const number = row.querySelector("[data-row-number]");
+      if (number) {
+        number.textContent = label ? `${label} ${index + 1}` : String(index + 1);
+      }
+    });
+    const addButton = section.querySelector("[data-add-profile-row]");
+    if (addButton && "1" !== addButton.dataset.profileReadonly) {
+      const maximum = Number(addButton.dataset.maxProfileRows || 0);
+      addButton.disabled = maximum > 0 && rows.length >= maximum;
+    }
   }
 
   function setupApplicantAccountMenu() {

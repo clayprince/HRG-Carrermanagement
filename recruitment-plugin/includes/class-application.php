@@ -114,6 +114,365 @@ class Recruitment_Application {
     }
 
     /**
+     * Build the application fields shown while the configurable Oracle form is unavailable.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_reference_form_sections(): array {
+        $question = static function ( string $key, string $title, string $type = 'short', bool $required = false, array $options = [] ): array {
+            return [
+                'id' => '',
+                'key' => $key,
+                'title' => $title,
+                'type' => $type,
+                'required' => $required,
+                'options' => array_map( static fn ( string $option ): array => [ 'value' => $option, 'label' => $option ], $options ),
+            ];
+        };
+        $repeated_questions = static function ( string $prefix, int $rows, array $fields ) use ( $question ): array {
+            $questions = [];
+            for ( $row = 1; $row <= $rows; $row++ ) {
+                foreach ( $fields as $field ) {
+                    [ $suffix, $title, $type, $required, $options ] = $field;
+                    $questions[] = $question( $prefix . '_' . $row . '_' . $suffix, $title . ' — ' . $row, $type, $required, $options );
+                }
+            }
+            return $questions;
+        };
+        $family_questions = static function ( string $prefix, array $rows ) use ( $question ): array {
+            $questions = [];
+            foreach ( $rows as $row_key => $row_title ) {
+                foreach (
+                    [
+                        [ 'nama', 'Nama', 'short', [] ],
+                        [ 'jenis_kelamin', 'Jenis Kelamin', 'dropdown', [ 'Laki-laki', 'Perempuan' ] ],
+                        [ 'tempat_tanggal_lahir', 'Tempat dan Tanggal Lahir', 'short', [] ],
+                        [ 'pendidikan', 'Pendidikan', 'short', [] ],
+                        [ 'pekerjaan', 'Pekerjaan', 'short', [] ],
+                    ] as $field
+                ) {
+                    [ $suffix, $title, $type, $options ] = $field;
+                    $questions[] = $question( $prefix . '_' . $row_key . '_' . $suffix, $row_title . ' — ' . $title, $type, false, $options );
+                }
+            }
+            return $questions;
+        };
+
+        return [
+            [
+                'id' => '',
+                'title' => 'A. Identitas',
+                'description' => 'Identitas pelamar sesuai Form Lamaran Kerja DAW.',
+                'questions' => [
+                    $question( 'foto_terkini', 'Foto Terkini', 'file' ),
+                    $question( 'cv_resume', 'CV / Resume', 'file' ),
+                    $question( 'portofolio', 'Portofolio', 'file' ),
+                    $question( 'nama_lengkap', 'Nama Lengkap', 'short', true ),
+                    $question( 'tempat_lahir', 'Tempat Lahir', 'short', true ),
+                    $question( 'tanggal_lahir', 'Tanggal Lahir', 'date', true ),
+                    $question( 'jenis_kelamin', 'Jenis Kelamin', 'single_choice', true, [ 'Laki-laki', 'Perempuan' ] ),
+                    $question( 'alamat_saat_ini', 'Alamat Saat Ini', 'paragraph', true ),
+                    $question( 'alamat_ktp', 'Alamat Sesuai KTP', 'paragraph' ),
+                    $question( 'nomor_telepon', 'Nomor Telepon', 'phone' ),
+                    $question( 'nomor_hp', 'Nomor HP / WhatsApp', 'phone', true ),
+                    $question( 'email_aktif', 'Email Aktif', 'email', true ),
+                    $question( 'agama_kepercayaan', 'Agama / Kepercayaan' ),
+                    $question( 'kewarganegaraan', 'Kewarganegaraan' ),
+                    $question( 'nomor_ktp', 'Nomor KTP' ),
+                    $question( 'jenis_sim', 'SIM yang Dimiliki', 'dropdown', false, [ 'Tidak ada', 'A', 'B', 'C', 'A dan C', 'B dan C', 'A, B, dan C' ] ),
+                    $question( 'sumber_informasi_lowongan', 'Sumber Informasi Lowongan' ),
+                    ...$repeated_questions(
+                        'media_sosial',
+                        10,
+                        [
+                            [ 'platform', 'Platform Media Sosial', 'dropdown', false, [ 'Instagram', 'Facebook', 'TikTok', 'X / Twitter', 'YouTube', 'LinkedIn', 'Lainnya' ] ],
+                            [ 'username', 'Username / URL Profil', 'short', false, [] ],
+                        ]
+                    ),
+                ],
+            ],
+            [
+                'id' => '',
+                'title' => 'B. Pendidikan',
+                'description' => 'Pendidikan formal, kursus, dan kemampuan bahasa.',
+                'questions' => array_merge(
+                    $repeated_questions(
+                        'pendidikan_formal',
+                        5,
+                        [
+                            [ 'tingkat', 'Tingkat Pendidikan', 'dropdown', false, [ 'SD', 'SMP', 'SMA/SMK', 'D1', 'D2', 'D3', 'D4/S1', 'S2', 'S3' ] ],
+                            [ 'nama_sekolah', 'Nama Sekolah / Institusi', 'short', false, [] ],
+                            [ 'fakultas', 'Fakultas', 'short', false, [] ],
+                            [ 'program_studi', 'Program Studi', 'short', false, [] ],
+                            [ 'ipk', 'IPK / Nilai', 'number', false, [] ],
+                            [ 'tahun_lulus', 'Tahun Lulus', 'number', false, [] ],
+                        ]
+                    ),
+                    $repeated_questions(
+                        'pendidikan_nonformal',
+                        3,
+                        [
+                            [ 'jenis_kursus', 'Jenis Kursus', 'short', false, [] ],
+                            [ 'nama_lembaga', 'Nama Lembaga', 'short', false, [] ],
+                            [ 'program_studi', 'Program Studi', 'short', false, [] ],
+                            [ 'lama_kursus', 'Lama Kursus', 'short', false, [] ],
+                            [ 'tahun_kursus', 'Tahun Kursus', 'number', false, [] ],
+                        ]
+                    ),
+                    $repeated_questions(
+                        'bahasa',
+                        3,
+                        [
+                            [ 'nama', 'Nama Bahasa', 'short', false, [] ],
+                            [ 'tertulis', 'Kemampuan Tertulis', 'dropdown', false, [ 'Sedang', 'Cukup Baik', 'Baik' ] ],
+                            [ 'lisan', 'Kemampuan Lisan', 'dropdown', false, [ 'Sedang', 'Cukup Baik', 'Baik' ] ],
+                            [ 'keterangan', 'Keterangan', 'short', false, [] ],
+                        ]
+                    )
+                ),
+            ],
+            [
+                'id' => '',
+                'title' => 'C. Riwayat dan Evaluasi Pekerjaan',
+                'description' => 'Riwayat pekerjaan, atasan, dan pengalaman kerja.',
+                'questions' => array_merge(
+                    $repeated_questions(
+                        'riwayat_pekerjaan',
+                        5,
+                        [
+                            [ 'nama_perusahaan', 'Nama Perusahaan', 'short', false, [] ],
+                            [ 'periode_kerja', 'Tahun Kerja (Dari–Sampai)', 'short', false, [] ],
+                            [ 'jabatan', 'Jabatan', 'short', false, [] ],
+                            [ 'gaji_pokok', 'Gaji Pokok', 'number', false, [] ],
+                            [ 'alasan_pindah', 'Alasan Pindah', 'paragraph', false, [] ],
+                        ]
+                    ),
+                    $repeated_questions(
+                        'atasan_dan_bawahan',
+                        5,
+                        [
+                            [ 'nama_perusahaan', 'Perusahaan', 'short', false, [] ],
+                            [ 'jumlah_bawahan', 'Jumlah Bawahan', 'number', false, [] ],
+                            [ 'nama_atasan', 'Nama Atasan Langsung', 'short', false, [] ],
+                            [ 'jabatan_atasan', 'Jabatan Atasan', 'short', false, [] ],
+                            [ 'telepon_atasan', 'Nomor Telepon Atasan', 'phone', false, [] ],
+                        ]
+                    ),
+                    [
+                        $question( 'perubahan_di_perusahaan_terdahulu', 'Perubahan yang Pernah Dilakukan dan Hasilnya', 'paragraph' ),
+                        $question( 'pengalaman_perubahan_positif', 'Pengalaman Perubahan Positif', 'paragraph' ),
+                        $question( 'kesediaan_kontak_atasan', 'Bersedia Dihubungi Atasan Sebelumnya?', 'single_choice', false, [ 'Ya', 'Tidak' ] ),
+                    ]
+                ),
+            ],
+            [
+                'id' => '',
+                'title' => 'D. Keluarga dan Lingkungan',
+                'description' => 'Status keluarga, tempat tinggal, dan informasi kesehatan.',
+                'questions' => array_merge(
+                    [
+                    $question( 'status_pernikahan', 'Status Pernikahan', 'single_choice', true, [ 'Belum menikah', 'Bertunangan', 'Menikah', 'Janda / Duda' ] ),
+                    $question( 'tanggal_pertunangan_atau_pernikahan', 'Tanggal Pertunangan / Pernikahan (jika ada)', 'date' ),
+                    $question( 'hubungan_keluarga_karyawan_daw', 'Memiliki Hubungan Keluarga dengan Karyawan DAW / Daya Group?', 'single_choice', false, [ 'Ya', 'Tidak' ] ),
+                    $question( 'nama_keluarga_karyawan_daw', 'Nama dan Jabatan Karyawan Terkait', 'paragraph' ),
+                    $question( 'hubungan_pribadi_karyawan_daw', 'Memiliki Hubungan Pribadi dengan Karyawan DAW / Daya Group?', 'single_choice', false, [ 'Ya', 'Tidak' ] ),
+                    $question( 'nama_hubungan_pribadi_karyawan_daw', 'Nama dan Jabatan Karyawan Terkait', 'paragraph' ),
+                    $question( 'susunan_keluarga_inti', 'Susunan Keluarga Inti (Pasangan dan Anak)', 'paragraph' ),
+                    $question( 'urutan_dalam_saudara', 'Urutan Anda dan Jumlah Saudara', 'short' ),
+                    $question( 'susunan_keluarga_asal', 'Susunan Keluarga (Orang Tua dan Saudara Kandung)', 'paragraph' ),
+                    $question( 'status_tempat_tinggal', 'Status Rumah yang Ditempati', 'dropdown', false, [ 'Rumah Pribadi', 'Rumah Keluarga Suami / Istri', 'Rumah Kost', 'Rumah Orang Tua', 'Rumah Kontrak', 'Lainnya' ] ),
+                    $question( 'lama_kost_atau_kontrak', 'Lama Kost / Kontrak', 'short' ),
+                    $question( 'riwayat_diabetes', 'Pernah Menderita Diabetes?', 'single_choice', false, [ 'Ya', 'Tidak' ] ),
+                    $question( 'riwayat_darah_tinggi', 'Pernah Menderita Darah Tinggi?', 'single_choice', false, [ 'Ya', 'Tidak' ] ),
+                    $question( 'riwayat_buta_warna', 'Pernah Mengalami Buta Warna?', 'single_choice', false, [ 'Ya', 'Tidak' ] ),
+                    $question( 'riwayat_wasir', 'Pernah Menderita Ambeien / Wasir?', 'single_choice', false, [ 'Ya', 'Tidak' ] ),
+                    $question( 'riwayat_alergi', 'Memiliki Alergi? Jika ya, sebutkan.', 'paragraph' ),
+                    $question( 'riwayat_tbc', 'Pernah Menderita TBC?', 'single_choice', false, [ 'Ya', 'Tidak' ] ),
+                    $question( 'riwayat_sakit_lain', 'Riwayat Sakit Lain dan Kapan Dialami', 'paragraph' ),
+                    $question( 'riwayat_penyakit_keluarga', 'Riwayat Penyakit Keluarga', 'paragraph' ),
+                    ],
+                    $family_questions(
+                        'keluarga_inti',
+                        [ 'pasangan' => 'Pasangan', 'anak_1' => 'Anak ke-1', 'anak_2' => 'Anak ke-2', 'anak_3' => 'Anak ke-3', 'anak_4' => 'Anak ke-4', 'anak_5' => 'Anak ke-5' ]
+                    ),
+                    $family_questions(
+                        'keluarga_asal',
+                        [ 'ayah' => 'Ayah', 'ibu' => 'Ibu', 'saudara_1' => 'Saudara kandung ke-1', 'saudara_2' => 'Saudara kandung ke-2', 'saudara_3' => 'Saudara kandung ke-3', 'saudara_4' => 'Saudara kandung ke-4', 'saudara_5' => 'Saudara kandung ke-5', 'saudara_6' => 'Saudara kandung ke-6', 'saudara_7' => 'Saudara kandung ke-7' ]
+                    )
+                ),
+            ],
+            [
+                'id' => '',
+                'title' => 'E. Minat dan Konsep Pribadi',
+                'description' => 'Motivasi, ekspektasi, dan preferensi kerja.',
+                'questions' => [
+                    $question( 'motivasi_bergabung', 'Mengapa Anda Ingin Bekerja di Perusahaan Kami?', 'paragraph', true ),
+                    $question( 'pengetahuan_perusahaan', 'Apa yang Anda Ketahui Mengenai Perusahaan Kami?', 'paragraph' ),
+                    $question( 'harapan_bekerja', 'Apa yang Anda Harapkan dari Bekerja di Perusahaan Kami?', 'paragraph' ),
+                    $question( 'tunjangan_transportasi_saat_ini', 'Tunjangan Transportasi Saat Ini' ),
+                    $question( 'tunjangan_makan_saat_ini', 'Tunjangan Makan Saat Ini' ),
+                    $question( 'tunjangan_komunikasi_saat_ini', 'Tunjangan Komunikasi Saat Ini' ),
+                    $question( 'tunjangan_kehadiran_saat_ini', 'Tunjangan Kehadiran Saat Ini' ),
+                    $question( 'car_ownership_program_saat_ini', 'Car Ownership Program Saat Ini' ),
+                    $question( 'house_ownership_program_saat_ini', 'House Ownership Program Saat Ini' ),
+                    $question( 'asuransi_rawat_jalan_saat_ini', 'Asuransi Rawat Jalan (siapa yang di-cover)' ),
+                    $question( 'asuransi_rawat_inap_saat_ini', 'Asuransi Rawat Inap (siapa yang di-cover)' ),
+                    $question( 'insentif_saat_ini', 'Insentif Saat Ini' ),
+                    $question( 'bonus_tahunan_saat_ini', 'Bonus Tahunan Saat Ini' ),
+                    $question( 'laptop_ownership_program_saat_ini', 'Laptop Ownership Program Saat Ini' ),
+                    $question( 'fasilitas_lain_saat_ini', 'Fasilitas Lain Saat Ini' ),
+                    $question( 'gaji_yang_diharapkan', 'Berapa Gaji yang Anda Inginkan?', 'short' ),
+                    $question( 'fasilitas_yang_diharapkan', 'Fasilitas yang Diinginkan Selain Gaji', 'paragraph' ),
+                    $question( 'bersedia_background_check', 'Bersedia Menjalani Background Checking?', 'single_choice', false, [ 'Ya', 'Tidak' ] ),
+                    $question( 'kapan_mulai_bekerja', 'Kapan Anda Dapat Mulai Bekerja?' ),
+                    $question( 'minat_jenis_pekerjaan_1', 'Prioritas 1 — Jenis Pekerjaan' ),
+                    $question( 'minat_jenis_pekerjaan_2', 'Prioritas 2 — Jenis Pekerjaan' ),
+                    $question( 'minat_jenis_pekerjaan_3', 'Prioritas 3 — Jenis Pekerjaan' ),
+                    $question( 'minat_bidang_industri_1', 'Prioritas 1 — Bidang Industri' ),
+                    $question( 'minat_bidang_industri_2', 'Prioritas 2 — Bidang Industri' ),
+                    $question( 'minat_bidang_industri_3', 'Prioritas 3 — Bidang Industri' ),
+                    $question( 'jabatan_cita_cita', 'Jabatan / Posisi yang Dicita-citakan', 'paragraph' ),
+                    $question( 'upaya_mencapai_jabatan', 'Upaya untuk Mencapai Posisi Tersebut', 'paragraph' ),
+                    $question( 'bersedia_penempatan_luar_kota', 'Bersedia Ditempatkan di Luar Kota?', 'single_choice', false, [ 'Ya', 'Tidak' ] ),
+                    $question( 'lingkungan_kerja_disukai', 'Lingkungan Kerja yang Disenangi dan Alasannya', 'paragraph' ),
+                    $question( 'lingkungan_kerja_tidak_disukai', 'Lingkungan Kerja yang Tidak Disenangi dan Alasannya', 'paragraph' ),
+                    $question( 'tipe_orang_disukai', 'Tipe Orang yang Paling Disenangi dan Alasannya', 'paragraph' ),
+                    $question( 'tipe_orang_tidak_disukai', 'Tipe Orang yang Tidak Disenangi dan Alasannya', 'paragraph' ),
+                    $question( 'kelebihan_diri', 'Tiga Kelebihan Diri', 'paragraph' ),
+                    $question( 'kelemahan_diri', 'Tiga Kelemahan Diri', 'paragraph' ),
+                    $question( 'kesulitan_mengambil_keputusan', 'Hal yang Paling Sulit Anda Putuskan', 'paragraph' ),
+                    $question( 'mengenal_karyawan_daw', 'Mengenal Karyawan DAW? Cantumkan Nama, Hubungan, Telepon, dan Jabatan.', 'paragraph' ),
+                ],
+            ],
+            [
+                'id' => '',
+                'title' => 'F. Aktivitas Sosial dan Kegiatan Lain',
+                'description' => 'Hobi, kegiatan waktu luang, dan pengalaman organisasi.',
+                'questions' => [
+                    $question( 'hobi', 'Apa Hobi Anda?', 'paragraph' ),
+                    $question( 'keahlian_bahasa_sertifikasi_skill', 'Keahlian Bahasa, Sertifikasi, Skill, dan Minat Lainnya', 'paragraph' ),
+                    $question( 'kegiatan_waktu_luang', 'Bagaimana Cara Anda Mengisi Waktu Luang?', 'paragraph' ),
+                    $question( 'pengalaman_organisasi', 'Organisasi yang Pernah Diikuti, Jabatan, dan Lama Keanggotaan', 'paragraph' ),
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * Map saved applicant profile fields to matching application question keys.
+     *
+     * @param array<string, mixed> $applicant
+     * @return array<string, string>
+     */
+    public function prefill_profile_answers( array $applicant ): array {
+        $details = is_array( $applicant['profile_details'] ?? null ) ? $applicant['profile_details'] : [];
+        $education_level = (string) ( $details['education_level'] ?? '' );
+        $profile_answers = [
+            'nama_lengkap' => (string) ( $applicant['full_name'] ?? '' ),
+            'jenis_kelamin' => (string) ( $applicant['gender'] ?? '' ),
+            'tempat_lahir' => (string) ( $applicant['birth_place'] ?? '' ),
+            'tanggal_lahir' => (string) ( $applicant['birth_date'] ?? '' ),
+            'alamat_saat_ini' => (string) ( $applicant['address'] ?? '' ),
+            'alamat' => (string) ( $applicant['address'] ?? '' ),
+            'nomor_telepon' => (string) ( $applicant['phone'] ?? '' ),
+            'nomor_hp' => (string) ( $applicant['phone'] ?? '' ),
+            'email_aktif' => (string) ( $applicant['email'] ?? '' ),
+            'pendidikan_formal_1_tingkat' => $education_level,
+            'education_level' => $education_level,
+            'pendidikan_formal_1_nama_sekolah' => (string) ( $details['institution'] ?? '' ),
+            'pendidikan_formal_1_program_studi' => (string) ( $details['major'] ?? '' ),
+            'pendidikan_formal_1_ipk' => (string) ( $details['gpa'] ?? '' ),
+            'pendidikan_formal_1_tahun_lulus' => (string) ( $details['graduation_year'] ?? '' ),
+            'pendidikan_terakhir' => [
+                'SMA/SMK' => 'SMA / SMK',
+                'D1' => 'Diploma (D1/D2/D3)',
+                'D2' => 'Diploma (D1/D2/D3)',
+                'D3' => 'Diploma (D1/D2/D3)',
+                'D4/S1' => 'S1 (Sarjana)',
+                'S2' => 'S2 (Magister)',
+            ][ $education_level ] ?? $education_level,
+            'nama_institusi' => (string) ( $details['institution'] ?? '' ),
+            'institution' => (string) ( $details['institution'] ?? '' ),
+            'jurusan_program_studi' => (string) ( $details['major'] ?? '' ),
+            'major' => (string) ( $details['major'] ?? '' ),
+            'ipk' => (string) ( $details['gpa'] ?? '' ),
+            'gpa' => (string) ( $details['gpa'] ?? '' ),
+            'tahun_lulus' => (string) ( $details['graduation_year'] ?? '' ),
+            'graduation_year' => (string) ( $details['graduation_year'] ?? '' ),
+            'keahlian_bahasa_sertifikasi_skill' => (string) ( $details['interests'] ?? '' ),
+            'minat_bakat' => (string) ( $details['interests'] ?? '' ),
+            'interests' => (string) ( $details['interests'] ?? '' ),
+        ];
+
+        foreach ( array_slice( (array) ( $details['social_media'] ?? [] ), 0, 10 ) as $index => $social_entry ) {
+            if ( ! is_array( $social_entry ) ) {
+                continue;
+            }
+            $row = $index + 1;
+            $profile_answers[ 'media_sosial_' . $row . '_platform' ] = (string) ( $social_entry['platform'] ?? '' );
+            $profile_answers[ 'media_sosial_' . $row . '_username' ] = (string) ( $social_entry['username'] ?? '' );
+        }
+
+        $marital_status = (string) ( $details['marital_status'] ?? '' );
+        if ( '' !== $marital_status ) {
+            $profile_answers['status_pernikahan'] = 'Cerai' === $marital_status ? 'Janda / Duda' : $marital_status;
+            $profile_answers['marital_status'] = $marital_status;
+        }
+
+        $work_experiences = array_slice( (array) ( $details['work_experiences'] ?? [] ), 0, 5 );
+        foreach ( $work_experiences as $index => $experience ) {
+            if ( ! is_array( $experience ) ) {
+                continue;
+            }
+            $row = $index + 1;
+            $company = (string) ( $experience['company'] ?? '' );
+            $position = (string) ( $experience['position'] ?? '' );
+            $period = (string) ( $experience['period'] ?? '' );
+            $profile_answers[ 'riwayat_pekerjaan_' . $row . '_nama_perusahaan' ] = $company;
+            $profile_answers[ 'riwayat_pekerjaan_' . $row . '_jabatan' ] = $position;
+            $profile_answers[ 'riwayat_pekerjaan_' . $row . '_periode_kerja' ] = $period;
+            if ( 0 === $index ) {
+                $profile_answers['nama_perusahaan'] = $company;
+                $profile_answers['jabatan_posisi'] = $position;
+                $profile_answers['periode_kerja'] = $period;
+            }
+        }
+
+        $family_lines = [];
+        foreach ( (array) ( $details['family_members'] ?? [] ) as $family_member ) {
+            if ( ! is_array( $family_member ) ) {
+                continue;
+            }
+            $family_line = implode(
+                ' · ',
+                array_filter(
+                    [
+                        (string) ( $family_member['relationship'] ?? '' ),
+                        (string) ( $family_member['name'] ?? '' ),
+                        '' !== (string) ( $family_member['age'] ?? '' ) ? (string) $family_member['age'] . ' tahun' : '',
+                        (string) ( $family_member['education'] ?? '' ),
+                    ],
+                    static fn ( string $value ): bool => '' !== trim( $value )
+                )
+            );
+            if ( '' !== $family_line ) {
+                $family_lines[] = $family_line;
+            }
+        }
+        if ( $family_lines ) {
+            $profile_answers['susunan_keluarga_inti'] = implode( "\n", $family_lines );
+        }
+
+        $saved_application_answers = is_array( $details['application_answers'] ?? null ) ? $details['application_answers'] : [];
+        $saved_application_answers = array_filter(
+            $saved_application_answers,
+            static fn ( $value, $key ): bool => is_string( $key ) && is_scalar( $value ),
+            ARRAY_FILTER_USE_BOTH
+        );
+        return array_merge( array_map( 'strval', $saved_application_answers ), $profile_answers );
+    }
+
+    /**
      * @param mixed $submitted
      * @return array{sections: array<int, array<string, mixed>>, errors: array<int, string>}
      */
@@ -436,12 +795,28 @@ class Recruitment_Application {
         array $sections,
         string $account_name,
         string $account_email,
-        array $vacancy
+        array $vacancy,
+        string $candidate_login_id
     ): array {
         $prepared = $this->prepare_submission( $request, $files, $sections, $account_name, $account_email, $vacancy );
         if ( $prepared['errors'] ) {
             return [ 'errors' => $prepared['errors'], 'payload' => $prepared['payload'], 'success' => false ];
         }
+
+        if ( ! ctype_digit( $candidate_login_id ) || '0' === $candidate_login_id ) {
+            return [ 'errors' => [ 'Silakan masuk dengan akun pelamar untuk mengirim lamaran.' ], 'payload' => $prepared['payload'], 'success' => false ];
+        }
+        $prepared['payload']['candidate_login_id'] = $candidate_login_id;
+        $prepared['payload']['applicant_name'] = $account_name;
+        $prepared['payload']['applicant_email'] = $account_email;
+        foreach ( $prepared['payload']['answers'] as &$answer ) {
+            if ( 'nama_lengkap' === $answer['field_key'] ) {
+                $answer['value'] = $account_name;
+            } elseif ( 'email_aktif' === $answer['field_key'] ) {
+                $answer['value'] = $account_email;
+            }
+        }
+        unset( $answer );
 
         $saved = ( new Recruitment_Database() )->save_application_submission( $prepared['payload'] );
         if ( empty( $saved['success'] ) ) {

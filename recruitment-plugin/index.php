@@ -1,6 +1,11 @@
 <?php
 declare(strict_types=1);
 
+$wordpress_bootstrap = dirname( __DIR__, 4 ) . DIRECTORY_SEPARATOR . 'wp-load.php';
+if ( ! defined( 'ABSPATH' ) && is_file( $wordpress_bootstrap ) ) {
+    require_once $wordpress_bootstrap;
+}
+
 if ( ! defined( 'ABSPATH' ) ) {
     define( 'ABSPATH', __DIR__ . '/' );
 }
@@ -15,26 +20,45 @@ if ( ! defined( 'RECRUITMENT_PLUGIN_URL' ) ) {
     $base_path = '/' === $base_path ? '' : $base_path;
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
     $base_url = 'http://' . $host . $base_path;
-    define( 'RECRUITMENT_PLUGIN_URL', rtrim( $base_url, '/' ) . '/wp-content/plugins/HRG-Carrermanagement/recruitment-plugin/' );
+    define( 'RECRUITMENT_PLUGIN_URL', rtrim( $base_url, '/' ) . '/' );
+}
+
+if ( defined( 'WPINC' ) && ! defined( 'RECRUITMENT_STANDALONE_FRONT_CONTROLLER' ) ) {
+    $script_path = parse_url( $_SERVER['SCRIPT_NAME'] ?? $_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH );
+    $plugin_path = rtrim( str_replace( '\\', '/', dirname( (string) $script_path ) ), '/' ) . '/';
+    $scheme = ! empty( $_SERVER['HTTPS'] ) && 'off' !== strtolower( (string) $_SERVER['HTTPS'] ) ? 'https' : 'http';
+    $host = (string) ( $_SERVER['HTTP_HOST'] ?? 'localhost' );
+    define( 'RECRUITMENT_STANDALONE_PLUGIN_URL', $scheme . '://' . $host . $plugin_path );
+    define( 'RECRUITMENT_STANDALONE_FRONT_CONTROLLER', RECRUITMENT_STANDALONE_PLUGIN_URL . 'index.php' );
 }
 
 if ( ! defined( 'RECRUITMENT_SANDBOX' ) ) {
     define( 'RECRUITMENT_SANDBOX', '1' === getenv( 'RECRUITMENT_SANDBOX' ) );
 }
 
-ob_start();
-session_start();
-if ( empty( $_SESSION['recruitment_logout_nonce'] ) ) {
-    $_SESSION['recruitment_logout_nonce'] = bin2hex( random_bytes( 32 ) );
+if ( ! defined( 'WPINC' ) ) {
+    ob_start();
+    session_start();
+    if ( empty( $_SESSION['recruitment_logout_nonce'] ) ) {
+        $_SESSION['recruitment_logout_nonce'] = bin2hex( random_bytes( 32 ) );
+    }
 }
 
 // Load core dependencies.
 require_once __DIR__ . '/includes/helpers.php';
 require_once __DIR__ . '/includes/class-database.php';
+require_once __DIR__ . '/includes/class-applicant-profile.php';
 require_once __DIR__ . '/includes/class-application.php';
 require_once __DIR__ . '/includes/class-auth.php';
 require_once __DIR__ . '/includes/class-router.php';
 require_once __DIR__ . '/includes/class-plugin.php';
+
+if ( defined( 'WPINC' )
+    && 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) )
+    && in_array( sanitize_key( wp_unslash( $_GET['recruitment_page'] ?? $_GET['page'] ?? '' ) ), [ 'applicant-login', 'applicant-register', 'account-profile' ], true )
+) {
+    ( new Recruitment_Plugin() )->handle_applicant_account();
+}
 
 $auth   = new Recruitment_Auth();
 $requested_page = sanitize_key( $_GET['page'] ?? $_GET['recruitment_page'] ?? 'careers' );
@@ -44,7 +68,7 @@ if ( '/interview-booking' === rtrim( (string) $requested_path, '/' ) ) {
 }
 $page = [
     'application' => 'application-form',
-    'tracking' => 'application-history',
+    'tracking' => 'application-process',
 ][ $requested_page ] ?? $requested_page;
 
 if (

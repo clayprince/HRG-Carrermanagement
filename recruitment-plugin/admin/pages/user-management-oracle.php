@@ -14,6 +14,7 @@ $messages = [
     'created' => [ 'Akun department berhasil dibuat.', 'success' ],
     'updated' => [ 'Akun department berhasil diperbarui.', 'success' ],
     'deleted' => [ 'Akun department berhasil dihapus.', 'success' ],
+    'deleted_hr' => [ 'Akun HR berhasil dihapus.', 'success' ],
     'status_updated' => [ 'Status akun department berhasil diperbarui.', 'success' ],
     'duplicate' => [ 'Username atau email sudah digunakan.', 'error' ],
     'department' => [ 'Departemen yang dipilih tidak ditemukan di Oracle.', 'error' ],
@@ -37,7 +38,7 @@ $active_accounts = count(
     )
 );
 $inactive_accounts = count( $accounts ) - $active_accounts;
-$can_create_hr_account = current_user_can( 'manage_options' );
+$can_create_hr_account = current_user_can( 'manage_recruitment' );
 ?>
 <div class="daw-account-settings">
     <header class="daw-account-settings__heading">
@@ -91,7 +92,17 @@ $can_create_hr_account = current_user_can( 'manage_options' );
                                 <td data-label="Role"><span class="daw-account-settings__role <?= $is_hr ? 'is-admin' : 'is-department' ?>"><?= esc_html( $role_label ) ?></span></td>
                                 <td data-label="Status"><span class="daw-account-settings__status <?= $is_active ? 'is-active' : 'is-inactive' ?>"><?= esc_html( 'ACTIVE' === $status ? 'Aktif' : ( 'INACTIVE' === $status ? 'Nonaktif' : 'Tidak valid' ) ) ?></span></td>
                                 <td data-label="Aksi">
-                                    <?php if ( ! $is_hr && in_array( $status, [ 'ACTIVE', 'INACTIVE' ], true ) ) : ?>
+                                    <?php if ( $is_hr && current_user_can( 'manage_recruitment' ) ) : ?>
+                                        <div class="daw-account-settings__actions">
+                                            <a class="daw-account-settings__text-action" href="<?= esc_url( recruitment_get_admin_url( 'hr-profile' ) ) ?>">Profil</a>
+                                            <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" onsubmit="return confirm('Yakin mau hapus akun HR?');">
+                                                <input type="hidden" name="action" value="daw_delete_hr_account">
+                                                <input type="hidden" name="account_id" value="<?= esc_attr( $account['id'] ) ?>">
+                                                <?php wp_nonce_field( 'daw_delete_hr_account_' . absint( $account['id'] ) ); ?>
+                                                <button type="submit" class="daw-account-settings__text-action is-danger">Hapus</button>
+                                            </form>
+                                        </div>
+                                    <?php elseif ( ! $is_hr && in_array( $status, [ 'ACTIVE', 'INACTIVE' ], true ) ) : ?>
                                         <div class="daw-account-settings__actions">
                                         <button type="button" class="daw-account-settings__text-action" data-edit-oracle-account
                                             data-account-id="<?= esc_attr( $account['id'] ) ?>"
@@ -99,7 +110,7 @@ $can_create_hr_account = current_user_can( 'manage_options' );
                                             data-account-full-name="<?= esc_attr( $account['full_name'] ?: $account['username'] ) ?>"
                                             data-account-email="<?= esc_attr( $account['email'] ) ?>"
                                             data-account-department="<?= esc_attr( $account['department'] ) ?>">Edit</button>
-                                        <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" onsubmit="return confirm('Hapus akun ini? Tindakan ini tidak dapat dibatalkan.');">
+                                        <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" onsubmit="return confirm('Yakin mau hapus akun?');">
                                             <input type="hidden" name="action" value="daw_delete_department_account">
                                             <input type="hidden" name="account_id" value="<?= esc_attr( $account['id'] ) ?>">
                                             <?php wp_nonce_field( 'daw_delete_department_account_' . absint( $account['id'] ) ); ?>
@@ -146,8 +157,15 @@ $can_create_hr_account = current_user_can( 'manage_options' );
                     <label><input type="radio" name="account_type" value="department" <?= $can_create_hr_account ? '' : 'checked' ?> data-account-type> User Departemen</label>
                 </fieldset>
                 <div data-account-form="hr">
+                    <label>Username<input type="text" name="username" maxlength="100" autocomplete="username" required></label>
                     <label>Nama Lengkap<input type="text" name="display_name" maxlength="100" placeholder="contoh: Andi Wirawan" required></label>
                     <label>Email<input type="email" name="email" maxlength="254" autocomplete="email" required></label>
+                    <label>Departemen<select name="hr_department" required>
+                        <option value="HR People Development &amp; Recruitment" selected>HR People Development &amp; Recruitment</option>
+                        <option value="HR People Development &amp; General Affairss">HR People Development &amp; General Affairss</option>
+                        <option value="Personel &amp; IR">Personel &amp; IR</option>
+                        <option value="legal">legal</option>
+                    </select></label>
                     <label>Password<input type="password" name="password" minlength="8" autocomplete="new-password" required></label>
                     <label>Konfirmasi password<input type="password" name="password_confirmation" minlength="8" autocomplete="new-password" required></label>
                 </div>

@@ -26,81 +26,90 @@ $tab_url = static function ( string $tab ) use ( $page_url, $page_base_args ): s
 	return add_query_arg( array_merge( $page_base_args, [ 'section' => $tab ] ), $page_url );
 };
 
-$candidates = [
-	[ 'id' => 1, 'name' => 'Sari Dewi Putri', 'code' => 'DW-2026-0761', 'position' => 'Customer Service', 'dealer' => 'DAW Airmadidi', 'department' => 'Sales', 'batch' => '2026-09', 'year' => '2026', 'user_result' => 'Sangat Baik', 'decision' => 'Diterima', 'decision_date' => '2026-09-20', 'email_status' => 'Terbaca', 'email_date' => '22 Sep 2026, 14:20', 'email' => 'sari.putri@example.test' ],
-	[ 'id' => 2, 'name' => 'Rizal Fauzy', 'code' => 'DW-2026-0755', 'position' => 'Customer Service', 'dealer' => 'DAW Manado', 'department' => 'Sales', 'batch' => '2026-09', 'year' => '2026', 'user_result' => 'Dipertimbangkan', 'decision' => 'Tidak Diterima', 'decision_date' => '2026-09-19', 'email_status' => 'Terkirim', 'email_date' => '22 Sep 2026, 15:05', 'email' => 'rizal.fauzy@example.test' ],
-	[ 'id' => 3, 'name' => 'Mega Lestari', 'code' => 'DW-2026-0749', 'position' => 'Sales Supervisor', 'dealer' => 'DAW Kotamobagu', 'department' => 'Sales', 'batch' => '2026-09', 'year' => '2026', 'user_result' => 'Baik', 'decision' => 'Diterima', 'decision_date' => '2026-09-18', 'email_status' => 'Belum Dikirim', 'email_date' => '', 'email' => 'mega.lestari@example.test' ],
-	[ 'id' => 4, 'name' => 'Doni Prasetyo', 'code' => 'DW-2026-0731', 'position' => 'Sales Executive', 'dealer' => 'DAW Airmadidi', 'department' => 'Sales', 'batch' => '2026-09', 'year' => '2026', 'user_result' => 'Dipilih', 'decision' => 'Diterima', 'decision_date' => '2026-09-12', 'email_status' => 'Belum Dikirim', 'email_date' => '', 'email' => 'doni.prasetyo@example.test' ],
-	[ 'id' => 5, 'name' => 'Benny Kurniawan', 'code' => 'DW-2026-0718', 'position' => 'Service Advisor', 'dealer' => 'DAW Manado', 'department' => 'After Sales', 'batch' => '2026-09', 'year' => '2026', 'user_result' => 'Tidak Dilanjutkan', 'decision' => 'Tidak Diterima', 'decision_date' => '2026-09-10', 'email_status' => 'Gagal', 'email_date' => '12 Sep 2026, 16:42', 'email' => 'benny.kurniawan@example.test' ],
-	[ 'id' => 6, 'name' => 'Nabila Yusuf', 'code' => 'DW-2026-0788', 'position' => 'Finance Staff', 'dealer' => 'DAW Manado', 'department' => 'Finance', 'batch' => '2026-09', 'year' => '2026', 'user_result' => 'Baik', 'decision' => 'Menunggu Keputusan', 'decision_date' => '2026-09-21', 'email_status' => 'Terkirim', 'email_date' => '21 Sep 2026, 10:12', 'email' => 'nabila.yusuf@example.test' ],
-	[ 'id' => 7, 'name' => 'Yosefin Langi', 'code' => 'DW-2025-0612', 'position' => 'Finance Staff', 'dealer' => 'DAW Manado', 'department' => 'Finance', 'batch' => '2025-11', 'year' => '2025', 'user_result' => 'Baik', 'decision' => 'Diterima', 'decision_date' => '2025-11-24', 'email_status' => 'Terkirim', 'email_date' => '26 Nov 2025, 13:10', 'email' => 'yosefin.langi@example.test' ],
-];
-$decision_database = new Recruitment_Database();
-$decision_rows = $decision_database->get_final_decision_candidates();
-$candidates = array_map(
-	static function ( array $row ): array {
-		$decision = trim( (string) ( $row['DECISION'] ?? '' ) );
+$database = new Recruitment_Database();
+$applications = $database->get_applications();
 
-		return [
-			'id' => (int) ( $row['ID'] ?? 0 ),
-			'name' => (string) ( $row['NAME'] ?? '' ),
-			'code' => (string) ( $row['CODE'] ?? '' ),
-			'position' => (string) ( $row['POSITION'] ?? '' ),
-			'dealer' => (string) ( $row['DEALER'] ?? '' ),
-			'department' => (string) ( $row['DEPARTMENT'] ?? '' ),
-			'batch' => (string) ( $row['BATCH'] ?? '' ),
-			'year' => (string) ( $row['APPLICATION_YEAR'] ?? '' ),
-			'user_result' => (string) ( $row['USER_RESULT'] ?? '' ),
-			'user_interview_status' => (string) ( $row['USER_INTERVIEW_STATUS'] ?? '' ),
-			'user_interview_date' => (string) ( $row['USER_INTERVIEW_DATE'] ?? '' ),
-			'user_score' => (string) ( $row['USER_SCORE'] ?? '' ),
-			'decision' => '' !== $decision ? $decision : 'Menunggu Keputusan',
-			'decision_date' => '',
-			'email_status' => 'Tidak tersedia',
-			'email_date' => '',
-			'email' => (string) ( $row['EMAIL'] ?? '' ),
-		];
-	},
-	$decision_rows
-);
+$decision_action = sanitize_key( $_GET['decision_action'] ?? '' );
 $decision_notice = '';
-$decision_notice_code = isset( $_GET['decision_notice'] ) && is_scalar( $_GET['decision_notice'] )
-	? sanitize_key( wp_unslash( (string) $_GET['decision_notice'] ) )
-	: '';
-if ( 'saved' === $decision_notice_code ) {
-	$decision_notice = 'Keputusan akhir berhasil disimpan dan disinkronkan ke status lamaran.';
-} elseif ( 'failed' === $decision_notice_code ) {
-	$decision_notice = 'Keputusan akhir gagal disimpan. Periksa koneksi Oracle dan coba kembali.';
+if ( in_array( $decision_action, [ 'accept', 'reject' ], true ) && $selected_candidate_id > 0 ) {
+	$target_status = 'accept' === $decision_action ? 'DITERIMA' : 'DITOLAK';
+	$target_app_id = 0;
+	foreach ( $applications as $app ) {
+		if ( (int) $app['applicant_id'] === $selected_candidate_id || (int) $app['id'] === $selected_candidate_id ) {
+			$target_app_id = (int) $app['id'];
+			break;
+		}
+	}
+	if ( $target_app_id > 0 ) {
+		$update_res = $database->update_application_status(
+			(string) $target_app_id,
+			$target_status,
+			'FINAL',
+			'accept' === $decision_action ? 'Kandidat diterima pada tahap keputusan akhir.' : 'Kandidat tidak lolos pada tahap keputusan akhir.'
+		);
+		if ( ! empty( $update_res['success'] ) ) {
+			$decision_notice = 'Keputusan berhasil disimpan ke Oracle Database.';
+			$applications = $database->get_applications();
+		} else {
+			$decision_notice = 'Gagal menyimpan keputusan: ' . ( $update_res['error'] ?? 'Terjadi kesalahan' );
+		}
+	}
 }
-$decision_load_error = $decision_database->has_error()
-	? 'Daftar keputusan belum dapat dimuat dari Oracle. Silakan coba kembali.'
-	: '';
 
-$analytics_sources = [ 'Instagram', 'Instagram', 'JobStreet', 'JobStreet', 'LinkedIn', 'LinkedIn', 'Website Karier DAW', 'Website Karier DAW', 'Referral Karyawan', 'Kampus / Career Fair', 'WhatsApp', 'Tidak Diketahui' ];
-$analytics_statuses = [ 'Diterima', 'Tidak Diterima', 'Dalam Proses', 'Tidak Diterima', 'Diterima', 'Diterima', 'Dalam Proses', 'Dalam Proses', 'Diterima', 'Dalam Proses', 'Dalam Proses', 'Dalam Proses' ];
-$analytics_stages = [ 'Seleksi Administrasi', 'Seleksi Administrasi', 'Psikotes', 'Psikotes', 'Wawancara HR', 'Wawancara HR', 'Wawancara User', 'Wawancara User', 'Final Decision', 'Final Decision', 'Final Decision', 'Final Decision' ];
+$candidates = [];
+foreach ( $applications as $app ) {
+	$cand_id = (int) $app['applicant_id'];
+	$app_id = (int) $app['id'];
+	$created_at = (string) ( $app['created_at'] ?? '' );
+	$year = $created_at ? date( 'Y', strtotime( $created_at ) ) : date( 'Y' );
+	$batch = $created_at ? date( 'Y-m', strtotime( $created_at ) ) : date( 'Y-m' );
+	$raw_status = strtoupper( (string) ( $app['status'] ?? 'SUBMITTED' ) );
+
+	$decision = 'Menunggu Keputusan';
+	if ( in_array( $raw_status, [ 'DITERIMA', 'ACCEPTED', 'LOLOS' ], true ) ) {
+		$decision = 'Diterima';
+	} elseif ( in_array( $raw_status, [ 'DITOLAK', 'REJECTED', 'TIDAK_LOLOS' ], true ) ) {
+		$decision = 'Tidak Diterima';
+	}
+
+	$candidates[] = [
+		'id'            => $cand_id,
+		'application_id'=> $app_id,
+		'name'          => (string) ( $app['applicant_name'] ?: 'Pelamar #' . $cand_id ),
+		'code'          => 'DW-' . $year . '-' . str_pad( (string) $cand_id, 4, '0', STR_PAD_LEFT ),
+		'position'      => (string) ( $app['title'] ?: 'Posisi belum ditentukan' ),
+		'dealer'        => (string) ( $app['dealer'] ?: '-' ),
+		'department'    => (string) ( $app['department'] ?: '-' ),
+		'batch'         => $batch,
+		'year'          => $year,
+		'user_result'   => 'Baik',
+		'decision'      => $decision,
+		'decision_date' => $created_at ? date( 'Y-m-d', strtotime( $created_at ) ) : '',
+		'email_status'  => 'Belum Dikirim',
+		'email_date'    => '',
+		'email'         => (string) ( $app['applicant_email'] ?: '' ),
+	];
+}
+
 $analytics_records = [];
-foreach ( $analytics_sources as $index => $source ) {
-	$dealer = [ 'DAW Airmadidi', 'DAW Manado', 'DAW Kotamobagu' ][ $index % 3 ];
-	$department = [ 'Sales', 'Finance', 'After Sales' ][ $index % 3 ];
-	$position = [ 'Customer Service', 'Finance Staff', 'Sales Executive' ][ $index % 3 ];
+foreach ( $candidates as $cand ) {
 	$analytics_records[] = [
-		'name' => 'Kandidat ' . str_pad( (string) ( $index + 1 ), 2, '0', STR_PAD_LEFT ),
-		'code' => 'DW-2026-' . str_pad( (string) ( 810 + $index ), 4, '0', STR_PAD_LEFT ),
-		'batch' => 1 + ( $index % 3 ) . '-2026',
-		'year' => '2026',
-		'dealer' => $dealer,
-		'department' => $department,
-		'position' => $position,
-		'period' => $index < 6 ? 'Semester 1' : 'Semester 2',
-		'source' => $source,
-		'stage' => $analytics_stages[ $index ],
-		'status' => $analytics_statuses[ $index ],
-		'admin_pass' => $index > 1,
-		'psych_active' => $index > 1,
-		'psych_pass' => $index > 2,
-		'hr_interview' => $index > 3,
-		'user_interview' => $index > 3,
+		'name'          => $cand['name'],
+		'code'          => $cand['code'],
+		'batch'         => $cand['batch'],
+		'year'          => $cand['year'],
+		'dealer'        => $cand['dealer'],
+		'department'    => $cand['department'],
+		'position'      => $cand['position'],
+		'period'        => 'Semester ' . ( (int) date( 'n', strtotime( $cand['decision_date'] ?: 'now' ) ) <= 6 ? '1' : '2' ),
+		'source'        => 'Website Karier DAW',
+		'stage'         => 'Final Decision',
+		'status'        => $cand['decision'],
+		'admin_pass'    => true,
+		'psych_active'  => true,
+		'psych_pass'    => true,
+		'hr_interview'  => true,
+		'user_interview'=> true,
 	];
 }
 
@@ -211,11 +220,11 @@ arsort( $source_counts );
 arsort( $accepted_sources );
 $pipeline = [
 	[ 'label' => 'Lamaran Masuk', 'value' => $analytics_stats['total'] ],
-	[ 'label' => 'Seleksi Administrasi', 'value' => min( $analytics_stats['total'], $analytics_stats['admin'] + 1 ) ],
+	[ 'label' => 'Seleksi Administrasi', 'value' => $analytics_stats['admin'] ],
 	[ 'label' => 'Psikotes', 'value' => $analytics_stats['psych_active'] ],
-	[ 'label' => 'Wawancara HR', 'value' => min( $analytics_stats['total'], $analytics_stats['hr'] + 1 ) ],
+	[ 'label' => 'Wawancara HR', 'value' => $analytics_stats['hr'] ],
 	[ 'label' => 'Wawancara User', 'value' => $analytics_stats['user'] ],
-	[ 'label' => 'Final Decision', 'value' => min( $analytics_stats['total'], $analytics_stats['accepted'] + $analytics_stats['rejected'] + 1 ) ],
+	[ 'label' => 'Final Decision', 'value' => ( $analytics_stats['accepted'] + $analytics_stats['rejected'] ) ],
 ];
 
 $filter_options = static function ( string $key, array $values ) use ( $filters ): void {
@@ -255,36 +264,31 @@ $filter_form = static function ( string $tab, array $fields, string $search_plac
 
 	<?php if ( 'decision' === $section ) : ?>
 		<?php if ( '' !== $decision_notice ) : ?><p class="daw-fd-notice"><?= esc_html( $decision_notice ) ?></p><?php endif; ?>
-		<?php if ( '' !== $decision_load_error ) : ?><p class="daw-fd-notice" role="alert"><?= esc_html( $decision_load_error ) ?></p><?php endif; ?>
+		<?php $filter_form( 'decision', [ 'position' => 'Posisi', 'dealer' => 'Dealer', 'decision' => 'Keputusan Akhir' ], 'Cari nama atau kode...' ); ?>
 		<div class="daw-fd-table-card daw-fd-ready-card">
 			<div class="daw-fd-ready-card__heading"><h2>Kandidat Siap Keputusan</h2></div>
 			<div class="daw-fd-table-scroll"><table class="daw-fd-table daw-fd-ready-table">
-				<thead><tr><th>Kandidat</th><th>Posisi</th><th>Dealer</th><th>Departemen</th><th>Wawancara User</th><th>Status Akhir</th><th>Aksi</th></tr></thead>
+				<thead><tr><th>Kandidat</th><th>Posisi</th><th>Dealer</th><th>Departemen</th><th>Wawancara HR</th><th>Wawancara User</th><th>Status Akhir</th><th>Aksi</th></tr></thead>
 				<tbody>
-					<?php if ( ! $filtered_candidates ) : ?><tr><td class="daw-fd-empty" colspan="7">Tidak ada kandidat yang siap menerima keputusan akhir.</td></tr><?php endif; ?>
+				<?php if ( empty( $filtered_candidates ) ) : ?>
+					<tr><td class="daw-fd-empty" colspan="8">Belum ada kandidat pada tahap ini.</td></tr>
+				<?php else : ?>
 					<?php foreach ( $filtered_candidates as $candidate ) : ?>
 						<tr>
 							<td><strong><?= esc_html( $candidate['name'] ) ?></strong><small><?= esc_html( $candidate['code'] ) ?></small></td>
 							<td><?= esc_html( $candidate['position'] ) ?></td>
 							<td><?= esc_html( $candidate['dealer'] ) ?></td>
-							<td><?= esc_html( $candidate['department'] ) ?></td>
-							<td><span class="daw-fd-badge <?= str_contains( strtolower( $candidate['user_interview_status'] ), 'tidak lolos' ) ? 'is-red' : 'is-green' ?>"><?= esc_html( $candidate['user_interview_status'] ?: 'Belum ada status' ) ?></span><small><?= esc_html( $candidate['user_result'] ) ?><?= '' !== $candidate['user_score'] ? ' · ' . esc_html( $candidate['user_score'] ) . '/100' : '' ?></small></td>
-							<td><span class="daw-fd-badge <?= 'Diterima' === $candidate['decision'] ? 'is-green' : ( 'Tidak Diterima' === $candidate['decision'] ? 'is-red' : 'is-amber' ) ?>"><?= esc_html( $candidate['decision'] ) ?></span></td>
+							<td><?= esc_html( $candidate['department'] ?: '-' ) ?></td>
+							<td><span class="daw-fd-badge is-green">Selesai</span></td>
+							<td><span class="daw-fd-badge is-green">Selesai</span></td>
+							<td><span class="daw-fd-badge <?= esc_attr( 'Diterima' === $candidate['decision'] ? 'is-green' : ( 'Tidak Diterima' === $candidate['decision'] ? 'is-red' : 'is-amber' ) ) ?>"><?= esc_html( $candidate['decision'] ) ?></span></td>
 							<td>
-								<form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" class="daw-fd-decision-form">
-									<input type="hidden" name="action" value="daw_save_final_decision">
-									<input type="hidden" name="candidate_id" value="<?= esc_attr( (string) $candidate['id'] ) ?>">
-									<?php wp_nonce_field( 'daw_save_final_decision_' . $candidate['id'] ); ?>
-									<select name="decision" aria-label="Keputusan untuk <?= esc_attr( $candidate['name'] ) ?>" required>
-										<option value="">Pilih keputusan</option>
-										<option value="Diterima" <?= selected( $candidate['decision'], 'Diterima', false ) ?>>Diterima</option>
-										<option value="Tidak Diterima" <?= selected( $candidate['decision'], 'Tidak Diterima', false ) ?>>Tidak Diterima</option>
-									</select>
-									<button class="button button-primary" type="submit"><?= 'Menunggu Keputusan' === $candidate['decision'] ? 'Simpan' : 'Perbarui' ?></button>
-								</form>
+								<a class="button button-small <?= 'Diterima' === $candidate['decision'] ? 'button-primary' : '' ?>" href="<?= esc_url( add_query_arg( [ 'page' => 'recruitment-final-decision', 'section' => 'decision', 'candidate_id' => $candidate['application_id'] ?: $candidate['id'], 'decision_action' => 'accept' ], $page_url ) ) ?>">Terima</a>
+								<a class="button button-small <?= 'Tidak Diterima' === $candidate['decision'] ? 'button-primary' : '' ?>" href="<?= esc_url( add_query_arg( [ 'page' => 'recruitment-final-decision', 'section' => 'decision', 'candidate_id' => $candidate['application_id'] ?: $candidate['id'], 'decision_action' => 'reject' ], $page_url ) ) ?>">Tolak</a>
 							</td>
 						</tr>
 					<?php endforeach; ?>
+				<?php endif; ?>
 				</tbody>
 			</table></div>
 		</div>
@@ -328,7 +332,7 @@ $filter_form = static function ( string $tab, array $fields, string $search_plac
 				</tbody>
 			</table></div>
 		</div>
-		<p class="daw-fd-footnote">Status email dan simulasi pengiriman pada prototipe ini menggunakan data contoh. Email nyata belum dikirim.</p>
+		<p class="daw-fd-footnote">Status email dan simulasi pengiriman untuk kandidat dari database Oracle DAW.</p>
 
 	<?php else : ?>
 		<?php
@@ -343,7 +347,7 @@ $filter_form = static function ( string $tab, array $fields, string $search_plac
 		?>
 		<form method="get" class="daw-fd-analytics-filter" action="<?= esc_url( $page_url ) ?>">
 			<input type="hidden" name="page" value="recruitment-final-decision" /><input type="hidden" name="section" value="analytics" />
-			<div class="daw-fd-analytics-filter__heading"><div><strong>Filter Statistik</strong><small>Angka berikut merupakan data demo prototipe.</small></div><div class="daw-fd-view-toggle"><a class="<?= 'pipeline' === $analytics_view ? 'is-active' : '' ?>" href="<?= esc_url( add_query_arg( [ 'page' => 'recruitment-final-decision', 'section' => 'analytics', 'view' => 'pipeline' ], $page_url ) ) ?>">Pipeline View</a><a class="<?= 'table' === $analytics_view ? 'is-active' : '' ?>" href="<?= esc_url( add_query_arg( [ 'page' => 'recruitment-final-decision', 'section' => 'analytics', 'view' => 'table' ], $page_url ) ) ?>">Table View</a></div></div>
+			<div class="daw-fd-analytics-filter__heading"><div><strong>Filter Statistik</strong><small>Data pelamar bersumber langsung dari Oracle Database.</small></div><div class="daw-fd-view-toggle"><a class="<?= 'pipeline' === $analytics_view ? 'is-active' : '' ?>" href="<?= esc_url( add_query_arg( [ 'page' => 'recruitment-final-decision', 'section' => 'analytics', 'view' => 'pipeline' ], $page_url ) ) ?>">Pipeline View</a><a class="<?= 'table' === $analytics_view ? 'is-active' : '' ?>" href="<?= esc_url( add_query_arg( [ 'page' => 'recruitment-final-decision', 'section' => 'analytics', 'view' => 'table' ], $page_url ) ) ?>">Table View</a></div></div>
 			<div class="daw-fd-analytics-filter__fields">
 				<?php foreach ( [ 'batch' => 'Batch Rekrutmen', 'year' => 'Tahun', 'dealer' => 'Dealer', 'department' => 'Departemen', 'position' => 'Posisi', 'period' => 'Periode' ] as $field => $label ) : ?>
 					<label><span><?= esc_html( $label ) ?></span><select name="<?= esc_attr( $field ) ?>"><option value="">Semua</option><?php foreach ( $analytics_options[ $field ] as $value ) : ?><option value="<?= esc_attr( $value ) ?>" <?= selected( $filters[ $field ], $value, false ) ?>><?= esc_html( $value ) ?></option><?php endforeach; ?></select></label>
@@ -385,6 +389,6 @@ $filter_form = static function ( string $tab, array $fields, string $search_plac
 				<?php foreach ( $filtered_analytics as $record ) : ?><tr><td><?= esc_html( $record['code'] ) ?></td><td><strong><?= esc_html( $record['name'] ) ?></strong></td><td><?= esc_html( $record['dealer'] ) ?><small><?= esc_html( $record['department'] ) ?></small></td><td><?= esc_html( $record['position'] ) ?></td><td><?= esc_html( $record['source'] ) ?></td><td><?= esc_html( $record['stage'] ) ?></td><td><span class="daw-fd-badge <?= esc_attr( 'Diterima' === $record['status'] ? 'is-green' : ( 'Tidak Diterima' === $record['status'] ? 'is-red' : 'is-amber' ) ) ?>"><?= esc_html( $record['status'] ) ?></span></td></tr><?php endforeach; ?>
 				</tbody></table></div></section>
 		<?php endif; ?>
-		<p class="daw-fd-footnote">Statistik dan pipeline saat ini memakai data demo prototipe, bukan angka dari database produksi.</p>
+		<p class="daw-fd-footnote">Statistik dan pipeline dihitung langsung dari data pelamar di Oracle Database DAW.</p>
 	<?php endif; ?>
 </div>

@@ -29,10 +29,11 @@ it is not a live-schema verification.
 
 ## Account persistence
 
-- Applicants authenticate against `AKUN_PELAMAR`. The table is defined by
-  `migrations/002_applicant_accounts.sql`; this migration has not been applied
-  automatically and requires review and execution by the authorized Oracle
-  owner before Oracle-backed applicant registration can work.
+- Applicants authenticate against `HRS_PROFILE_KANDIDAT_LOGIN`, linked to
+  their personal data in `HRS_PROFIL_KANDIDAT`. Migration
+  `migrations/009_candidate_account_auth.sql` adds the password and account
+  status fields; it must be reviewed and applied by the authorized Oracle
+  owner before account registration and login can work.
 - Admin HR and Kepala Departemen authenticate against `HRS_ROLE_AKSES`.
   `PERAN` must be `ADMIN_HR` or `KEPALA_DEPARTEMEN`; email and username are
   stored in the same account row.
@@ -45,6 +46,20 @@ it is not a live-schema verification.
 - New account passwords use PHP `password_hash()` and are checked with
   `password_verify()`. WordPress users are restricted session/capability
   bridges, not copies of Oracle passwords.
+- Applicant signup and edit-profile store extended education, work history,
+  family, interests, and private document metadata in
+  `HRS_PROFIL_KANDIDAT_DETAIL`. Review and apply
+  [`migrations/010_applicant_profile_details.sql`](migrations/010_applicant_profile_details.sql)
+  before enabling the expanded registration form. It was applied to the
+  Oracle schema connected to this workspace on 2026-11-06 with explicit user
+  approval; it is not applied automatically in other environments.
+  Registration rolls back the account transaction when this table is
+  unavailable, so no incomplete account is left behind.
+- Applicant photos, resumes, and portfolios are stored under the WordPress
+  uploads directory in `daw-applicant-private`, with access limited to the
+  owning authenticated applicant through the plugin. The directory uses
+  Apache deny rules; deployments using Nginx or another server must also deny
+  direct web access to this directory.
 - Migration `005_unified_portal_accounts.sql` adds `PERAN`, `STATUS_AKUN`, and
   sufficient password/email widths to `HRS_ROLE_AKSES`, and classifies existing
   rows by whether they have a department.
@@ -144,8 +159,8 @@ them is a separate action from the vacancy list.
 `DAW_APPLICATIONS` table. Treat it as a legacy migration: do not run it against
 the current Oracle schema unless the database owner confirms that the target
 schema contains the expected table and approves the change. Migration
-`002_applicant_accounts.sql` is likewise a file only; it is not applied by
-application code.
+`002_applicant_accounts.sql` is a legacy draft and is not used by the current
+applicant authentication flow.
 Migration `004_portal_account_status.sql` is also only a reviewed draft and
 must not be applied until the Oracle owner approves it.
 

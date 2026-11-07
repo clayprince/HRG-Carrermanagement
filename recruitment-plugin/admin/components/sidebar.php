@@ -25,7 +25,6 @@ $root_links = [
         [ 'label' => 'Tambah Lowongan', 'view' => 'create', 'url' => add_query_arg( 'view', 'create', recruitment_get_admin_url( 'vacancies' ) ) ],
         [ 'label' => 'Pengajuan Lowongan', 'view' => 'requests', 'url' => recruitment_get_admin_url( 'applications' ) ],
     ] ],
-    [ 'label' => 'Form Lamaran', 'icon' => 'dashicons-forms', 'page' => 'recruitment-form-builder', 'url' => admin_url( 'admin.php?page=recruitment-form-builder' ) ],
 ];
 ?>
 <aside class="recruitment-dashboard__sidebar daw-recruitment-sidebar" data-recruitment-sidebar aria-label="Navigasi Recruitment">
