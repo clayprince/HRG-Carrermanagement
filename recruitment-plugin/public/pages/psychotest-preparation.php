@@ -1,6 +1,8 @@
 <?php
 $back_url = recruitment_get_public_url( 'psychotest' );
-$device_url = recruitment_get_public_url( 'psychotest-device' );
+$test_key = sanitize_key( wp_unslash( $_GET['test'] ?? 'iq' ) );
+$test_key = in_array( $test_key, [ 'iq', 'pauli', 'disc', 'papi' ], true ) ? $test_key : 'iq';
+$device_url = recruitment_get_public_url( 'psychotest-device', [ 'test' => $test_key ] );
 ?>
 <div class="daw-recruitment daw-recruitment--psychotest-preparation">
     <?php require recruitment_get_plugin_path( 'public/components/header.php' ); ?>
@@ -29,7 +31,7 @@ $device_url = recruitment_get_public_url( 'psychotest-device' );
 
             <div class="daw-recruitment__psychotest-prep-card">
                 <div class="daw-recruitment__prepare-intro">
-                    <h1>Persiapan Tes</h1>
+                    <h1>Persiapan Tes <?= esc_html( strtoupper( 'papi' === $test_key ? 'PAPI Kostick' : $test_key ) ) ?></h1>
                     <p>Baca dan penuhi seluruh persyaratan di bawah ini agar proses assessment berjalan lancar, konsisten, dan sesuai jadwal.</p>
                 </div>
 

@@ -1,8 +1,9 @@
 <?php
 $current_user = wp_get_current_user();
 $display_name = ! empty( $current_user->display_name ) ? $current_user->display_name : 'User Department';
-$department = (string) get_user_meta( $current_user->ID, 'daw_department', true );
-$department = '' !== $department ? $department : 'Department';
+$department = trim( (string) get_user_meta( $current_user->ID, 'daw_department', true ) );
+$department_assigned = '' !== $department;
+$department = $department_assigned ? $department : 'Belum diatur';
 $view = sanitize_key( wp_unslash( $_GET['view'] ?? 'dashboard' ) );
 $views = [ 'dashboard', 'requests', 'request-form', 'request-detail', 'interviews', 'interview-detail', 'profile', 'applicants', 'results', 'account-settings' ];
 if ( ! in_array( $view, $views, true ) ) {
@@ -28,15 +29,7 @@ $request_filter = sanitize_text_field( wp_unslash( $_GET['status'] ?? '' ) );
 $interview_filter = sanitize_text_field( wp_unslash( $_GET['interview_status'] ?? '' ) );
 $search = sanitize_text_field( wp_unslash( $_GET['search'] ?? '' ) );
 
-$requests = [
-	[ 'code' => 'FPTK-2026-031', 'position' => 'Sales Executive', 'count' => 2, 'priority' => 'Tinggi', 'date' => '20 Sep 2026', 'status' => 'Disetujui' ],
-	[ 'code' => 'FPTK-2026-029', 'position' => 'Sales Admin', 'count' => 1, 'priority' => 'Sedang', 'date' => '17 Sep 2026', 'status' => 'Perlu Revisi' ],
-	[ 'code' => 'FPTK-2026-025', 'position' => 'Customer Service', 'count' => 3, 'priority' => 'Urgent', 'date' => '10 Sep 2026', 'status' => 'Lowongan Dibuka' ],
-	[ 'code' => 'FPTK-2026-023', 'position' => 'After Sales Technician', 'count' => 2, 'priority' => 'Tinggi', 'date' => '5 Sep 2026', 'status' => 'Ready for Recruitment' ],
-	[ 'code' => 'FPTK-2026-020', 'position' => 'Sales Supervisor', 'count' => 1, 'priority' => 'Sedang', 'date' => '28 Agu 2026', 'status' => 'Review HR' ],
-	[ 'code' => 'FPTK-2026-018', 'position' => 'Body Repair Advisor', 'count' => 1, 'priority' => 'Rendah', 'date' => '20 Agu 2026', 'status' => 'Draft' ],
-	[ 'code' => 'FPTK-2026-015', 'position' => 'Finance Staff', 'count' => 2, 'priority' => 'Sedang', 'date' => '15 Agu 2026', 'status' => 'Draft' ],
-];
+$requests = [];
 $request_sections = [
 	1 => [ 'title' => 'Informasi Permintaan', 'description' => 'Isi data dasar kebutuhan rekrutmen.', 'fields' => [
 		[ 'key' => 'department', 'label' => 'Departemen', 'type' => 'text', 'required' => true, 'default' => $department ],
@@ -101,16 +94,6 @@ $request_form_notice = '';
 $request_form_values = [];
 $selected_request = null;
 
-$demo_request_statuses = get_option( 'daw_demo_department_request_statuses', [] );
-$demo_request_statuses = is_array( $demo_request_statuses ) ? $demo_request_statuses : [];
-foreach ( $requests as &$demo_request ) {
-	if ( isset( $demo_request_statuses[ $demo_request['code'] ] ) && is_array( $demo_request_statuses[ $demo_request['code'] ] ) ) {
-		$demo_request['status'] = (string) ( $demo_request_statuses[ $demo_request['code'] ]['status'] ?? $demo_request['status'] );
-		$demo_request['hr_note'] = (string) ( $demo_request_statuses[ $demo_request['code'] ]['hr_note'] ?? '' );
-	}
-}
-unset( $demo_request );
-
 foreach ( $stored_department_requests as $saved_code => $saved_request ) {
 	$fields = is_array( $saved_request['fields'] ?? null ) ? $saved_request['fields'] : [];
 	$request_summary = [
@@ -119,16 +102,12 @@ foreach ( $stored_department_requests as $saved_code => $saved_request ) {
 		'count' => (int) ( $fields['headcount'] ?? 1 ),
 		'priority' => (string) ( $fields['priority'] ?? 'Sedang' ),
 		'date' => ! empty( $saved_request['updated_at'] ) ? date_i18n( 'd M Y', strtotime( $saved_request['updated_at'] ) ) : '—',
+		'updated_at' => (string) ( $saved_request['updated_at'] ?? '' ),
 		'status' => (string) ( $saved_request['status'] ?? 'Draft' ),
 		'fields' => $fields,
 		'hr_note' => (string) ( $saved_request['hr_note'] ?? '' ),
 	];
-	$existing_index = array_search( $saved_code, array_column( $requests, 'code' ), true );
-	if ( false === $existing_index ) {
-		$requests[] = $request_summary;
-	} else {
-		$requests[ $existing_index ] = $request_summary;
-	}
+	$requests[] = $request_summary;
 }
 
 if ( 'request-form' === $view ) {
@@ -245,14 +224,49 @@ if ( 'request-detail' === $view ) {
 		}
 	}
 }
-$interviews = [
-	[ 'name' => 'Budi Santoso', 'code' => 'DW-2026-0781', 'position' => 'Sales Executive', 'dealer' => 'DAW Airmadidi', 'status' => 'Terjadwal', 'hr_result' => 'Sangat Direkomendasikan', 'date' => '24 Sep 2026 · 10:00', 'score' => '' ],
-	[ 'name' => 'Aiko Hanako', 'code' => 'DW-2026-0774', 'position' => 'Sales Executive', 'dealer' => 'DAW Kotamobagu', 'status' => 'Terjadwal', 'hr_result' => 'Direkomendasikan', 'date' => '25 Sep 2026 · 14:00', 'score' => '' ],
-	[ 'name' => 'Christian Vieri', 'code' => 'DW-2026-0768', 'position' => 'Sales Admin', 'dealer' => 'DAW Manado', 'status' => 'Menunggu Jadwal', 'hr_result' => 'Direkomendasikan', 'date' => '—', 'score' => '' ],
-	[ 'name' => 'Sari Dewi Putri', 'code' => 'DW-2026-0761', 'position' => 'Customer Service', 'dealer' => 'DAW Airmadidi', 'status' => 'Sudah Dinilai', 'hr_result' => 'Sangat Direkomendasikan', 'date' => '20 Sep 2026 · 09:00', 'score' => '87', 'recommendation' => 'Sangat Baik', 'notes' => 'Komunikasi sangat baik dan pengalaman relevan.', 'scores' => [ 'presentation' => 4, 'communication' => 5, 'motivation' => 4, 'experience' => 4, 'knowledge' => 4, 'teamwork' => 4, 'problem_solving' => 5, 'adaptability' => 5 ], 'interviewer' => 'Andi Wirawan', 'saved_at' => '20 Sep 2026 · 10:15' ],
-	[ 'name' => 'Rizal Fauzy', 'code' => 'DW-2026-0755', 'position' => 'Customer Service', 'dealer' => 'DAW Manado', 'status' => 'Sudah Dinilai', 'hr_result' => 'Perlu Pertimbangan', 'date' => '19 Sep 2026 · 13:00', 'score' => '62', 'recommendation' => 'Dipertimbangkan', 'notes' => 'Perlu pengembangan pada komunikasi dan tindak lanjut pelanggan.', 'scores' => [ 'presentation' => 3, 'communication' => 3, 'motivation' => 3, 'experience' => 3, 'knowledge' => 3, 'teamwork' => 3, 'problem_solving' => 4, 'adaptability' => 3 ], 'interviewer' => 'Andi Wirawan', 'saved_at' => '19 Sep 2026 · 14:00' ],
-	[ 'name' => 'Mega Lestari', 'code' => 'DW-2026-0749', 'position' => 'Sales Supervisor', 'dealer' => 'DAW Kotamobagu', 'status' => 'Sudah Dinilai', 'hr_result' => 'Direkomendasikan', 'date' => '18 Sep 2026 · 11:00', 'score' => '79', 'recommendation' => 'Baik', 'notes' => 'Pengalaman memimpin tim sesuai kebutuhan posisi.', 'scores' => [ 'presentation' => 4, 'communication' => 4, 'motivation' => 4, 'experience' => 4, 'knowledge' => 4, 'teamwork' => 4, 'problem_solving' => 4, 'adaptability' => 4 ], 'interviewer' => 'Andi Wirawan', 'saved_at' => '18 Sep 2026 · 12:00' ],
-];
+$interview_database = new Recruitment_Database();
+$interview_rows = $department_assigned ? $interview_database->get_user_interview_candidates( $department ) : [];
+$interview_load_error = ! $department_assigned
+	? 'Akun ini belum ditautkan ke departemen.'
+	: ( $interview_database->has_error() ? 'Data wawancara belum dapat dimuat dari Oracle. Silakan coba kembali.' : '' );
+$interviews = [];
+foreach ( $interview_rows as $row ) {
+	$candidate_id = (int) ( $row['CANDIDATE_ID'] ?? 0 );
+	if ( $candidate_id < 1 ) {
+		continue;
+	}
+	$scheduled = ! empty( $row['INTERVIEW_DATE'] );
+	$has_result = '' !== trim( (string) ( $row['INTERVIEW_STATUS'] ?? '' ) );
+	$interviews[] = [
+		'id' => $candidate_id,
+		'name' => (string) ( $row['CANDIDATE_NAME'] ?? '' ),
+		'code' => (string) $candidate_id,
+		'position' => (string) ( $row['POSITION'] ?? '' ),
+		'dealer' => (string) ( $row['DEALER'] ?? '' ),
+		'status' => $has_result ? 'Sudah Dinilai' : ( $scheduled ? 'Terjadwal' : 'Menunggu Jadwal' ),
+		'selection_status' => (string) ( $row['INTERVIEW_STATUS'] ?? '' ),
+		'final_decision' => (string) ( $row['FINAL_DECISION'] ?? '' ),
+		'hr_result' => (string) ( $row['HR_RESULT'] ?? 'Belum tersedia' ),
+		'date' => trim( (string) ( $row['INTERVIEW_DATE'] ?? '' ) . ' ' . (string) ( $row['INTERVIEW_TIME'] ?? '' ) ),
+		'method' => (string) ( $row['INTERVIEW_METHOD'] ?? 'Belum ditentukan' ),
+		'location' => (string) ( $row['INTERVIEW_LOCATION'] ?? 'Belum ditentukan' ),
+		'score' => (string) ( $row['SCORE'] ?? '' ),
+		'recommendation' => (string) ( $row['REKOMENDASI'] ?? '' ),
+		'notes' => (string) ( $row['INTERVIEW_NOTES'] ?? '' ),
+		'interviewer' => (string) ( $row['INTERVIEWER'] ?? '' ),
+		'saved_at' => (string) ( $row['RESULT_DATE'] ?? '' ),
+		'scores' => [
+			'presentation' => (int) ( $row['SCORE_PRESENTATION'] ?? 0 ),
+			'communication' => (int) ( $row['SCORE_COMMUNICATION'] ?? 0 ),
+			'motivation' => (int) ( $row['SCORE_MOTIVATION'] ?? 0 ),
+			'experience' => (int) ( $row['SCORE_EXPERIENCE'] ?? 0 ),
+			'knowledge' => (int) ( $row['SCORE_KNOWLEDGE'] ?? 0 ),
+			'teamwork' => (int) ( $row['SCORE_TEAMWORK'] ?? 0 ),
+			'problem_solving' => (int) ( $row['SCORE_PROBLEM_SOLVING'] ?? 0 ),
+			'adaptability' => (int) ( $row['SCORE_ADAPTABILITY'] ?? 0 ),
+		],
+	];
+}
 $rating_criteria = [
 	'presentation' => 'Penampilan & Kerapian',
 	'communication' => 'Kemampuan Komunikasi',
@@ -263,10 +277,10 @@ $rating_criteria = [
 	'problem_solving' => 'Problem Solving',
 	'adaptability' => 'Kemampuan Adaptasi',
 ];
-$stored_interview_results = get_user_meta( $current_user->ID, 'daw_user_interview_results', true );
-$stored_interview_results = is_array( $stored_interview_results ) ? $stored_interview_results : [];
+$stored_interview_results = [];
 $posted_scores = [];
 $posted_recommendation = '';
+$posted_selection_status = '';
 $posted_notes = '';
 $interview_save_error = '';
 $interview_saved = '1' === sanitize_text_field( wp_unslash( $_GET['saved'] ?? '' ) );
@@ -279,11 +293,16 @@ if ( 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) &
 	$posted_code = sanitize_text_field( wp_unslash( $_POST['candidate_code'] ?? '' ) );
 	$posted_scores = isset( $_POST['scores'] ) && is_array( $_POST['scores'] ) ? wp_unslash( $_POST['scores'] ) : [];
 	foreach ( $rating_criteria as $key => $label ) {
-		$posted_scores[ $key ] = isset( $posted_scores[ $key ] ) ? min( 5, max( 1, absint( $posted_scores[ $key ] ) ) ) : 0;
+		$raw_score = $posted_scores[ $key ] ?? '';
+		$posted_scores[ $key ] = is_scalar( $raw_score ) && 1 === preg_match( '/\A[1-5]\z/', (string) $raw_score )
+			? (int) $raw_score
+			: 0;
 	}
 	$posted_recommendation = sanitize_text_field( wp_unslash( $_POST['recommendation'] ?? '' ) );
+	$posted_selection_status = sanitize_text_field( wp_unslash( $_POST['selection_status'] ?? '' ) );
 	$posted_notes = sanitize_textarea_field( wp_unslash( $_POST['interview_notes'] ?? '' ) );
 	$valid_recommendations = [ 'Sangat Baik', 'Baik', 'Dipertimbangkan', 'Tidak Dilanjutkan' ];
+	$valid_selection_statuses = [ 'Lolos Wawancara User', 'Tidak Lolos Wawancara User' ];
 	$valid_candidate = false;
 	foreach ( $interviews as $interview ) {
 		if ( $interview['code'] === $posted_code && in_array( $interview['status'], [ 'Terjadwal', 'Sudah Dinilai' ], true ) ) {
@@ -293,36 +312,30 @@ if ( 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) &
 	}
 	if ( ! $valid_candidate ) {
 		$interview_save_error = 'Kandidat ini tidak sedang dalam status wawancara terjadwal.';
-	} elseif ( in_array( 0, $posted_scores, true ) || ! in_array( $posted_recommendation, $valid_recommendations, true ) ) {
-		$interview_save_error = 'Lengkapi seluruh penilaian dan pilih rekomendasi sebelum menyimpan.';
+	} elseif ( in_array( 0, $posted_scores, true ) || ! in_array( $posted_recommendation, $valid_recommendations, true ) || ! in_array( $posted_selection_status, $valid_selection_statuses, true ) ) {
+		$interview_save_error = 'Lengkapi seluruh penilaian, rekomendasi, dan status hasil wawancara sebelum menyimpan.';
 	} else {
 		$score_total = (int) floor( array_sum( $posted_scores ) / ( count( $rating_criteria ) * 5 ) * 100 );
-		$stored_interview_results[ $posted_code ] = [
-			'scores' => $posted_scores,
-			'total' => $score_total,
-			'recommendation' => $posted_recommendation,
-			'notes' => $posted_notes,
-			'interviewer' => $display_name,
-			'saved_at' => current_time( 'mysql' ),
-		];
-		update_user_meta( $current_user->ID, 'daw_user_interview_results', $stored_interview_results );
-		wp_safe_redirect( add_query_arg( [ 'view' => 'interview-detail', 'candidate_code' => $posted_code, 'saved' => '1' ], $page_url ) );
-		exit;
+		$save_result = $interview_database->save_user_interview_result(
+			(int) $posted_code,
+			[
+				'scores' => $posted_scores,
+				'score' => $score_total,
+				'recommendation' => $posted_recommendation,
+				'selection_status' => $posted_selection_status,
+				'notes' => $posted_notes,
+				'interviewer' => $display_name,
+				'department' => $department,
+			]
+		);
+		if ( empty( $save_result['success'] ) ) {
+			$interview_save_error = (string) ( $save_result['error'] ?? 'Hasil wawancara gagal disimpan. Silakan coba lagi.' );
+		} else {
+			wp_safe_redirect( add_query_arg( [ 'view' => 'interview-detail', 'candidate_code' => $posted_code, 'saved' => '1' ], $page_url ) );
+			exit;
+		}
 	}
 }
-
-foreach ( $interviews as &$interview ) {
-	if ( isset( $stored_interview_results[ $interview['code'] ] ) ) {
-		$saved_result = $stored_interview_results[ $interview['code'] ];
-		$interview['status'] = 'Sudah Dinilai';
-		$interview['score'] = (string) ( $saved_result['total'] ?? 0 );
-		$interview['recommendation'] = (string) ( $saved_result['recommendation'] ?? '' );
-		$interview['notes'] = (string) ( $saved_result['notes'] ?? '' );
-		$interview['saved_at'] = (string) ( $saved_result['saved_at'] ?? '' );
-		$interview['scores'] = is_array( $saved_result['scores'] ?? null ) ? $saved_result['scores'] : [];
-	}
-}
-unset( $interview );
 
 $candidate_profiles = [
 	'DW-2026-0781' => [
@@ -368,6 +381,24 @@ $applicants = [
 	[ 'name' => 'Budi Santoso', 'code' => 'DW-2026-0781', 'position' => 'Sales Executive', 'dealer' => 'DAW Manado', 'date' => '22 Sep 2026', 'hr_result' => 'Baik', 'user_result' => 'Belum dinilai', 'status' => 'Proses' ],
 	[ 'name' => 'Aiko Hanako', 'code' => 'DW-2026-0774', 'position' => 'Sales Executive', 'dealer' => 'DAW Kotamobagu', 'date' => '22 Sep 2026', 'hr_result' => 'Sangat Baik', 'user_result' => 'Belum dinilai', 'status' => 'Proses' ],
 ];
+$applicants = array_map(
+	static function ( array $interview ): array {
+		$status = (string) ( $interview['selection_status'] ?? '' );
+		$final_decision = (string) ( $interview['final_decision'] ?? '' );
+
+		return [
+			'name' => $interview['name'],
+			'code' => $interview['code'],
+			'position' => $interview['position'],
+			'dealer' => $interview['dealer'],
+			'date' => $interview['date'],
+			'hr_result' => $interview['hr_result'],
+			'user_result' => $interview['recommendation'] ?: 'Belum dinilai',
+			'status' => '' !== $final_decision ? $final_decision : ( '' !== $status ? $status : 'Dalam proses' ),
+		];
+	},
+	$interviews
+);
 if ( 'profile' === $view && ! $selected_interview ) {
 	foreach ( $applicants as $applicant ) {
 		if ( $applicant['code'] === $selected_interview_code ) {
@@ -392,35 +423,39 @@ $results = [
 	[ 'name' => 'Doni Prasetyo', 'code' => 'DW-2026-0731', 'position' => 'Sales Executive', 'date' => '12 Sep 2026', 'score' => 91, 'recommendation' => 'Terima', 'decision' => 'Diterima' ],
 	[ 'name' => 'Fitri Handayani', 'code' => 'DW-2026-0720', 'position' => 'Sales Executive', 'date' => '8 Sep 2026', 'score' => 55, 'recommendation' => 'Tolak', 'decision' => 'Ditolak' ],
 ];
-foreach ( $interviews as $interview ) {
-	if ( 'Sudah Dinilai' !== $interview['status'] || ! isset( $stored_interview_results[ $interview['code'] ] ) ) {
-		continue;
-	}
-	$has_result = false;
-	foreach ( $results as &$result ) {
-		if ( $result['code'] === $interview['code'] ) {
-			$result['score'] = (int) $interview['score'];
-			$result['recommendation'] = $interview['recommendation'] ?? 'Pertimbangkan';
-			$result['decision'] = 'Pending';
-			$has_result = true;
-			break;
-		}
-	}
-	unset( $result );
-	if ( ! $has_result ) {
-		$results[] = [
-			'name' => $interview['name'],
-			'code' => $interview['code'],
-			'position' => $interview['position'],
-			'date' => current_time( 'd M Y' ),
-			'score' => (int) $interview['score'],
-			'recommendation' => $interview['recommendation'],
-			'decision' => 'Pending',
+$interview_result_rows = $department_assigned ? $interview_database->get_user_interview_results( $department ) : [];
+if ( $interview_database->has_error() ) {
+	$interview_load_error = 'Data hasil wawancara belum dapat dimuat dari Oracle. Silakan coba kembali.';
+}
+$results = array_map(
+	static function ( array $row ): array {
+		return [
+			'name' => (string) ( $row['CANDIDATE_NAME'] ?? '' ),
+			'code' => (string) ( $row['CANDIDATE_ID'] ?? '' ),
+			'position' => (string) ( $row['POSITION'] ?? '' ),
+			'date' => (string) ( $row['INTERVIEW_DATE'] ?? '' ),
+			'score' => (int) ( $row['SCORE'] ?? 0 ),
+			'recommendation' => (string) ( $row['RECOMMENDATION'] ?? '' ),
+			'decision' => (string) ( $row['FINAL_DECISION'] ?? '' ) ?: 'Pending',
 		];
+	},
+	$interview_result_rows
+);
+
+$request_statuses = array_fill_keys( [ 'Draft', 'Menunggu Review HR', 'Perlu Revisi', 'Disetujui', 'Lowongan Dibuka' ], 0 );
+foreach ( $requests as $request ) {
+	if ( isset( $request_statuses[ $request['status'] ] ) ) {
+		++$request_statuses[ $request['status'] ];
 	}
 }
-
-$request_statuses = [ 'Draft' => 2, 'Menunggu Review HR' => 3, 'Perlu Revisi' => 1, 'Disetujui' => 5, 'Lowongan Dibuka' => 2 ];
+$recent_requests = $requests;
+usort(
+	$recent_requests,
+	static function ( array $left, array $right ): int {
+		return strtotime( $right['updated_at'] ?? '' ) <=> strtotime( $left['updated_at'] ?? '' );
+	}
+);
+$recent_requests = array_slice( $recent_requests, 0, 4 );
 $filtered_requests = [];
 foreach ( $requests as $request ) {
 	$matches_status = '' === $request_filter || $request['status'] === $request_filter || ( 'Review HR' === $request_filter && 'Menunggu Review HR' === $request['status'] );
@@ -490,7 +525,8 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 	<div class="daw-ud-workspace">
 		<header class="daw-ud-topbar"><h1><?= esc_html( $view_titles[ $view ] ) ?></h1><div class="daw-ud-topbar__account"><div class="daw-ud-topbar__identity"><span class="daw-ud-user-avatar"><?= esc_html( strtoupper( substr( $greeting_name, 0, 1 ) ) ) ?></span><span><strong><?= esc_html( $display_name ) ?></strong><small><?= esc_html( $department ) ?> Department</small></span></div><?= recruitment_logout_form( 'Logout', recruitment_get_public_url( 'login', [ 'target' => 'hr' ] ), 'daw-ud-topbar__logout' ) ?></div></header>
 		<main class="daw-ud-main">
-			<p class="daw-ud-demo-note" role="note">Prototipe: data kandidat, hasil wawancara, statistik, dan contoh request di halaman ini bukan data produksi Oracle. Request dan penilaian yang disimpan saat ini hanya tersimpan di WordPress.</p>
+			<p class="daw-ud-demo-note" role="note">Daftar kandidat dan hasil wawancara User Department menggunakan data Oracle. Form request lowongan pada halaman ini masih berupa prototipe.</p>
+			<?php if ( '' !== $interview_load_error ) : ?><p class="daw-ud-alert" role="alert"><?= esc_html( $interview_load_error ) ?></p><?php endif; ?>
 			<?php if ( 'account-settings' === $view ) : ?>
 				<?php
 				$password_notice = sanitize_key( wp_unslash( $_GET['password_notice'] ?? '' ) );
@@ -573,7 +609,7 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 				<section class="daw-ud-welcome"><p>Selamat datang, <strong><?= esc_html( $display_name ) ?></strong></p><span>Departemen <?= esc_html( $department ) ?> — <?= esc_html( date_i18n( 'l, j F Y' ) ) ?></span></section>
 				<section class="daw-ud-section"><div class="daw-ud-section__heading"><h2>Permintaan Lowongan</h2><a href="<?= esc_url( $view_url( 'requests' ) ) ?>">Lihat Semua</a></div><div class="daw-ud-stats daw-ud-stats--four"><article><span>Draft</span><strong><?= esc_html( (string) $request_statuses['Draft'] ) ?></strong></article><article><span>Menunggu Review HR</span><strong class="is-orange"><?= esc_html( (string) $request_statuses['Menunggu Review HR'] ) ?></strong></article><article><span>Perlu Revisi</span><strong class="is-red"><?= esc_html( (string) $request_statuses['Perlu Revisi'] ) ?></strong><small>Perlu tindakan</small></article><article><span>Disetujui</span><strong class="is-green"><?= esc_html( (string) $request_statuses['Disetujui'] ) ?></strong></article></div></section>
 				<section class="daw-ud-section"><div class="daw-ud-section__heading"><h2>Kandidat User Interview</h2><a href="<?= esc_url( $view_url( 'interviews' ) ) ?>">Lihat Semua</a></div><div class="daw-ud-stats daw-ud-stats--three"><article><span>Menunggu Jadwal</span><strong class="is-orange"><?= esc_html( (string) $interview_stats['waiting'] ) ?></strong></article><article><span>Terjadwal</span><strong><?= esc_html( (string) $interview_stats['scheduled'] ) ?></strong></article><article><span>Sudah Dinilai</span><strong class="is-green"><?= esc_html( (string) $interview_stats['done'] ) ?></strong></article></div></section>
-				<section class="daw-ud-section daw-ud-activity-section"><h2>Aktivitas Terkini</h2><div class="daw-ud-activity"><div><i class="is-green"></i><span>Request FPTK-2026-031 disetujui HR<small>22 Sep 2026</small></span></div><div><i class="is-blue"></i><span>Kandidat Budi Santoso terjadwal wawancara user — 24 Sep 2026<small>20 Sep 2026</small></span></div><div><i class="is-orange"></i><span>Request FPTK-2026-029 perlu revisi — lihat catatan HR<small>18 Sep 2026</small></span></div><div><i class="is-green"></i><span>Hasil wawancara Aiko Hanako berhasil dikirim<small>15 Sep 2026</small></span></div></div></section>
+				<section class="daw-ud-section daw-ud-activity-section"><h2>Aktivitas Request Lowongan</h2><div class="daw-ud-activity"><?php if ( empty( $recent_requests ) ) : ?><p class="daw-ud-empty">Belum ada aktivitas request lowongan.</p><?php else : ?><?php foreach ( $recent_requests as $request ) : ?><div><i class="<?= in_array( $request['status'], [ 'Disetujui', 'Lowongan Dibuka' ], true ) ? 'is-green' : ( 'Perlu Revisi' === $request['status'] ? 'is-orange' : 'is-blue' ) ?>"></i><span><?= esc_html( $request['code'] . ' — ' . $request['position'] . ': ' . $request['status'] ) ?><small><?= esc_html( $request['date'] ) ?></small></span></div><?php endforeach; ?><?php endif; ?></div></section>
 
 			<?php elseif ( 'request-form' === $view ) : ?>
 				<?php
@@ -617,9 +653,9 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 					<section class="daw-ud-request-detail-heading"><div><p>Pengajuan Tenaga Kerja</p><h2><?= esc_html( $selected_request['position'] ) ?></h2><span><?= esc_html( $selected_request['code'] ) ?> · <?= esc_html( $request_fields['department'] ?? $department ) ?></span></div><span class="daw-ud-status <?= esc_attr( sanitize_title( $selected_request['status'] ) ) ?>"><?= esc_html( $selected_request['status'] ) ?></span></section>
 					<section class="daw-ud-request-detail-grid">
 						<article class="daw-ud-request-detail-card"><h3>Ringkasan Permintaan</h3><dl><?php foreach ( [ 'Departemen' => $request_fields['department'] ?? $department, 'Hiring User' => $request_fields['hiring_user'] ?? $display_name, 'Jumlah Kebutuhan' => $selected_request['count'], 'Level Jabatan' => $request_fields['job_level'] ?? '—', 'Kategori Karyawan' => $request_fields['employment_type'] ?? '—', 'Status Karyawan' => $request_fields['employee_status'] ?? '—', 'Prioritas' => $selected_request['priority'], 'Target Pemenuhan' => $request_fields['target_date'] ?? '—', 'Tanggal Pengajuan' => $selected_request['date'] ] as $label => $value ) : ?><div><dt><?= esc_html( $label ) ?></dt><dd><?= esc_html( (string) $value ) ?></dd></div><?php endforeach; ?></dl></article>
-						<article class="daw-ud-request-detail-card"><h3>Tujuan Posisi</h3><div class="daw-ud-request-detail-copy"><strong>Ringkasan Peran</strong><p><?= esc_html( $request_fields['role_summary'] ?? ( 'FPTK-2026-029' === $selected_request['code'] ? 'Pemenuhan kebutuhan posisi Sales Admin pada departemen.' : 'Detail peran belum dicatat pada data contoh ini.' ) ) ?></p><strong>KPI / Target Utama</strong><p><?= esc_html( $request_fields['kpi'] ?? 'Belum tersedia' ) ?></p><strong>Alasan Kebutuhan</strong><p><?= esc_html( $request_fields['reason'] ?? ( 'FPTK-2026-029' === $selected_request['code'] ? 'Mohon lengkapi profil kandidat minimum pendidikan.' : 'Belum tersedia' ) ) ?></p></div></article>
+						<article class="daw-ud-request-detail-card"><h3>Tujuan Posisi</h3><div class="daw-ud-request-detail-copy"><strong>Ringkasan Peran</strong><p><?= esc_html( $request_fields['role_summary'] ?? 'Belum tersedia' ) ?></p><strong>KPI / Target Utama</strong><p><?= esc_html( $request_fields['kpi'] ?? 'Belum tersedia' ) ?></p><strong>Alasan Kebutuhan</strong><p><?= esc_html( $request_fields['reason'] ?? 'Belum tersedia' ) ?></p></div></article>
 						<article class="daw-ud-request-detail-card"><h3>Profil Kandidat</h3><dl><?php foreach ( [ 'Pendidikan Minimum' => $request_fields['minimum_education'] ?? '—', 'Jurusan' => $request_fields['major'] ?? '—', 'Pengalaman Minimum' => $request_fields['minimum_experience'] ?? '—', 'Keahlian Wajib' => $request_fields['required_skills'] ?? '—', 'Rentang Gaji' => $request_fields['salary_range'] ?? '—' ] as $label => $value ) : ?><div><dt><?= esc_html( $label ) ?></dt><dd><?= esc_html( (string) $value ) ?></dd></div><?php endforeach; ?></dl></article>
-						<article class="daw-ud-request-detail-card"><h3>Proses & Catatan</h3><div class="daw-ud-request-timeline"><div><i></i><span>Draft dibuat<small><?= esc_html( $selected_request['date'] ) ?></small></span></div><div><i></i><span><?= esc_html( $selected_request['status'] ) ?><small><?= esc_html( $selected_request['date'] ) ?></small></span></div></div><p class="daw-ud-request-hr-note"><strong>Catatan HR</strong><br><?= esc_html( ( $selected_request['hr_note'] ?? '' ) ?: ( 'FPTK-2026-029' === $selected_request['code'] ? 'Mohon lengkapi profil kandidat minimum pendidikan.' : 'Belum ada catatan dari HR.' ) ) ?></p></article>
+						<article class="daw-ud-request-detail-card"><h3>Proses & Catatan</h3><div class="daw-ud-request-timeline"><div><i></i><span>Draft dibuat<small><?= esc_html( $selected_request['date'] ) ?></small></span></div><div><i></i><span><?= esc_html( $selected_request['status'] ) ?><small><?= esc_html( $selected_request['date'] ) ?></small></span></div></div><p class="daw-ud-request-hr-note"><strong>Catatan HR</strong><br><?= esc_html( ( $selected_request['hr_note'] ?? '' ) ?: 'Belum ada catatan dari HR.' ) ?></p></article>
 					</section>
 					<div class="daw-ud-request-detail-actions"><a class="button" href="<?= esc_url( $view_url( 'requests' ) ) ?>">Tutup</a><?php if ( isset( $stored_department_requests[ $selected_request['code'] ] ) && in_array( $selected_request['status'], [ 'Draft', 'Perlu Revisi' ], true ) ) : ?><a class="daw-ud-primary-button" href="<?= esc_url( add_query_arg( [ 'view' => 'request-form', 'request_code' => $selected_request['code'], 'step' => '1' ], $page_url ) ) ?>">Edit Pengajuan</a><?php endif; ?></div>
 				<?php endif; ?>
@@ -627,7 +663,8 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 			<?php elseif ( 'requests' === $view ) : ?>
 				<div class="daw-ud-page-heading"><p>Total <?= esc_html( (string) count( $requests ) ) ?> permintaan</p><a class="daw-ud-primary-button" href="<?= esc_url( add_query_arg( [ 'view' => 'request-form', 'request_code' => 'new', 'step' => '1' ], $page_url ) ) ?>"><span class="dashicons dashicons-plus-alt2" aria-hidden="true"></span>Buat Request Baru</a></div>
 				<nav class="daw-ud-pills" aria-label="Filter status request"><?php foreach ( [ 'Semua' => '', 'Draft' => 'Draft', 'Perlu Revisi' => 'Perlu Revisi', 'Review HR' => 'Review HR', 'Disetujui' => 'Disetujui', 'Lowongan Dibuka' => 'Lowongan Dibuka' ] as $label => $value ) : ?><a class="<?= $request_filter === $value ? 'is-active' : '' ?>" href="<?= esc_url( add_query_arg( [ 'status' => $value ], $view_url( 'requests' ) ) ) ?>"><?= esc_html( $label ) ?></a><?php endforeach; ?></nav>
-				<?php if ( '' === $request_filter || 'Perlu Revisi' === $request_filter ) : ?><div class="daw-ud-alert"><span class="dashicons dashicons-warning" aria-hidden="true"></span><span><strong>Ada permintaan yang perlu direvisi</strong><small>FPTK-2026-029: Mohon lengkapi profil kandidat minimum pendidikan.</small></span></div><?php endif; ?>
+				<?php $revision_requests = array_values( array_filter( $requests, static fn( array $request ): bool => 'Perlu Revisi' === $request['status'] ) ); ?>
+				<?php if ( $revision_requests && ( '' === $request_filter || 'Perlu Revisi' === $request_filter ) ) : ?><div class="daw-ud-alert"><span class="dashicons dashicons-warning" aria-hidden="true"></span><span><strong><?= esc_html( (string) count( $revision_requests ) ) ?> permintaan perlu direvisi</strong><small><?= esc_html( $revision_requests[0]['code'] . ': ' . ( $revision_requests[0]['hr_note'] ?: 'Silakan periksa catatan HR.' ) ) ?></small></span></div><?php endif; ?>
 				<form class="daw-ud-search" method="get" action="<?= esc_url( admin_url( 'admin.php' ) ) ?>"><input type="hidden" name="page" value="daw-user-department" /><input type="hidden" name="view" value="requests" /><input type="hidden" name="status" value="<?= esc_attr( $request_filter ) ?>" /><label><span class="screen-reader-text">Cari request</span><input type="search" name="search" value="<?= esc_attr( $search ) ?>" placeholder="Cari nomor FPTK atau posisi..." /></label><button class="button" type="submit">Cari</button></form>
 				<div class="daw-ud-table-wrap"><table class="daw-ud-table"><thead><tr><th>No. FPTK</th><th>Posisi</th><th>Jml</th><th>Prioritas</th><th>Tgl Pengajuan</th><th>Status</th><th>Aksi</th></tr></thead><tbody><?php if ( empty( $filtered_requests ) ) : ?><tr><td colspan="7" class="daw-ud-empty">Tidak ada request yang cocok.</td></tr><?php endif; ?><?php foreach ( $filtered_requests as $request ) : ?><tr><td><strong><?= esc_html( $request['code'] ) ?></strong></td><td><?= esc_html( $request['position'] ) ?></td><td><?= esc_html( (string) $request['count'] ) ?></td><td class="priority-<?= esc_attr( strtolower( $request['priority'] ) ) ?>"><?= esc_html( $request['priority'] ) ?></td><td><?= esc_html( $request['date'] ) ?></td><td><span class="daw-ud-status <?= esc_attr( sanitize_title( $request['status'] ) ) ?>"><?= esc_html( $request['status'] ) ?></span></td><td class="daw-ud-request-row-actions"><a class="daw-ud-link" href="<?= esc_url( add_query_arg( [ 'view' => 'request-detail', 'request_code' => $request['code'] ], $page_url ) ) ?>">Lihat</a><?php if ( isset( $stored_department_requests[ $request['code'] ] ) && in_array( $request['status'], [ 'Draft', 'Perlu Revisi' ], true ) ) : ?><a href="<?= esc_url( add_query_arg( [ 'view' => 'request-form', 'request_code' => $request['code'], 'step' => '1' ], $page_url ) ) ?>">Edit</a><?php endif; ?></td></tr><?php endforeach; ?></tbody></table></div>
 
@@ -648,8 +685,9 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 						'experience' => [ [ 'Pengalaman kerja', 'Belum tersedia', '—', 'Informasi pengalaman kerja belum tersedia.' ] ],
 					];
 					$is_saved = 'Sudah Dinilai' === $selected_interview['status'];
-					$is_editing_result = $is_saved && '1' === sanitize_text_field( wp_unslash( $_GET['edit'] ?? '' ) );
-					$show_rating_form = 'Terjadwal' === $selected_interview['status'] || $is_editing_result;
+					$decision_locked = '' !== (string) ( $selected_interview['final_decision'] ?? '' );
+					$is_editing_result = $is_saved && ! $decision_locked && '1' === sanitize_text_field( wp_unslash( $_GET['edit'] ?? '' ) );
+					$show_rating_form = ! $decision_locked && ( 'Terjadwal' === $selected_interview['status'] || $is_editing_result );
 					$detail_scores = $posted_scores ?: ( $selected_interview['scores'] ?? [] );
 					$detail_score_total = ! empty( $detail_scores ) ? (int) round( array_sum( array_map( 'absint', $detail_scores ) ) / ( count( $rating_criteria ) * 5 ) * 100 ) : 0;
 					?>
@@ -659,9 +697,9 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 					<?php if ( '' !== $interview_save_error ) : ?><p class="daw-ud-alert" role="alert"><?= esc_html( $interview_save_error ) ?></p><?php endif; ?>
 					<div class="daw-ud-detail-layout">
 						<section class="daw-ud-detail-main">
-							<div class="daw-ud-interview-summary"><div><small>Jadwal</small><strong><?= esc_html( $selected_interview['date'] ) ?></strong></div><div><small>Metode</small><strong>Tatap Muka</strong></div><div><small>Lokasi</small><strong>Ruang Meeting 2, Lt. 3</strong></div><div><small>Hasil HR</small><strong><?= esc_html( $selected_interview['hr_result'] ) ?></strong></div></div>
+							<div class="daw-ud-interview-summary"><div><small>Jadwal</small><strong><?= esc_html( $selected_interview['date'] ) ?></strong></div><div><small>Metode</small><strong><?= esc_html( $selected_interview['method'] ) ?></strong></div><div><small>Lokasi</small><strong><?= esc_html( $selected_interview['location'] ) ?></strong></div><div><small>Hasil HR</small><strong><?= esc_html( $selected_interview['hr_result'] ) ?></strong></div></div>
 							<?php if ( 'Menunggu Jadwal' === $selected_interview['status'] ) : ?>
-								<div class="daw-ud-detail-panel"><div class="daw-ud-alert"><span class="dashicons dashicons-clock" aria-hidden="true"></span><span><strong>Menunggu Jadwal Wawancara</strong><small>Jadwal wawancara user belum ditentukan. Hubungi HR untuk konfirmasi jadwal.</small></span></div><div class="daw-ud-summary-grid"><div><small>Hasil HR Interview</small><strong><?= esc_html( $selected_interview['hr_result'] ) ?></strong></div><div><small>Skor Psikotes</small><strong>82/100</strong></div><div><small>Rekomendasi HR</small><strong><?= esc_html( $department ) ?> — <?= esc_html( $display_name ) ?></strong></div><div><small>Tgl Masuk Dept</small><strong>22 Sep 2026</strong></div></div><p class="daw-ud-muted-panel">Form penilaian wawancara akan tersedia setelah jadwal wawancara user dikonfirmasi.</p></div>
+								<div class="daw-ud-detail-panel"><div class="daw-ud-alert"><span class="dashicons dashicons-clock" aria-hidden="true"></span><span><strong>Menunggu Jadwal Wawancara</strong><small>Jadwal wawancara user belum ditentukan. Hubungi HR untuk konfirmasi jadwal.</small></span></div><div class="daw-ud-summary-grid"><div><small>Hasil HR Interview</small><strong><?= esc_html( $selected_interview['hr_result'] ) ?></strong></div><div><small>Departemen</small><strong><?= esc_html( $department ) ?></strong></div></div><p class="daw-ud-muted-panel">Form penilaian wawancara akan tersedia setelah jadwal wawancara user dikonfirmasi.</p></div>
 							<?php elseif ( $show_rating_form ) : ?>
 								<form class="daw-ud-detail-panel daw-ud-rating-form" method="post" action="<?= esc_url( add_query_arg( [ 'page' => 'daw-user-department', 'view' => 'interview-detail', 'candidate_code' => $selected_interview['code'], 'edit' => $is_editing_result ? '1' : '' ], admin_url( 'admin.php' ) ) ) ?>" data-interview-rating>
 									<div class="daw-ud-panel-heading"><div><h2>Penilaian Wawancara User</h2><p>Nilai 1–5 untuk setiap aspek. 5 = Sangat Baik.</p></div><?php if ( $is_editing_result ) : ?><span class="daw-ud-status terjadwal">Edit Hasil</span><?php endif; ?></div>
@@ -672,12 +710,13 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 										<?php endforeach; ?>
 									</div>
 									<div class="daw-ud-score-total"><span>Skor Total</span><strong><span data-score-total><?= esc_html( (string) $detail_score_total ) ?></span><small>/100</small></strong></div>
+									<fieldset class="daw-ud-recommendation"><legend>Status Hasil Wawancara <b>*</b></legend><div><?php foreach ( [ 'Lolos Wawancara User', 'Tidak Lolos Wawancara User' ] as $selection_status ) : ?><label class="<?= $posted_selection_status === $selection_status || ( '' === $posted_selection_status && ( $selected_interview['selection_status'] ?? '' ) === $selection_status ) ? 'is-selected' : '' ?>"><input type="radio" name="selection_status" value="<?= esc_attr( $selection_status ) ?>" <?= checked( $posted_selection_status ?: ( $selected_interview['selection_status'] ?? '' ), $selection_status, false ) ?> required /><span><?= esc_html( $selection_status ) ?></span></label><?php endforeach; ?></div></fieldset>
 									<fieldset class="daw-ud-recommendation"><legend>Rekomendasi <b>*</b></legend><div><?php foreach ( [ 'Sangat Baik', 'Baik', 'Dipertimbangkan', 'Tidak Dilanjutkan' ] as $recommendation ) : ?><label class="<?= $posted_recommendation === $recommendation || ( '' === $posted_recommendation && ( $selected_interview['recommendation'] ?? '' ) === $recommendation ) ? 'is-selected' : '' ?>"><input type="radio" name="recommendation" value="<?= esc_attr( $recommendation ) ?>" <?= checked( $posted_recommendation ?: ( $selected_interview['recommendation'] ?? '' ), $recommendation, false ) ?> required /><span><?= esc_html( $recommendation ) ?></span></label><?php endforeach; ?></div></fieldset>
 									<label class="daw-ud-notes-field"><span>Catatan Wawancara</span><textarea name="interview_notes" rows="4" placeholder="Catat observasi dan kesan umum dari proses wawancara..."><?= esc_textarea( $posted_notes ?: ( $selected_interview['notes'] ?? '' ) ) ?></textarea></label>
 									<div class="daw-ud-form-actions"><a class="button" href="<?= esc_url( $view_url( 'interviews' ) ) ?>">Batal</a><button class="daw-ud-primary-button" type="submit">Simpan Hasil Wawancara</button></div>
 								</form>
 							<?php else : ?>
-								<section class="daw-ud-detail-panel daw-ud-result-panel"><div class="daw-ud-panel-heading"><div><h2>Hasil Wawancara User</h2><p>Penilaian telah disimpan · Hanya baca</p></div><a class="daw-ud-link" href="<?= esc_url( add_query_arg( [ 'view' => 'interview-detail', 'candidate_code' => $selected_interview['code'], 'edit' => '1' ], $page_url ) ) ?>">Edit Hasil</a></div><div class="daw-ud-saved-result"><div><small>Skor Total</small><strong><?= esc_html( $selected_interview['score'] ) ?><small>/100</small></strong></div><div class="daw-ud-result-meta"><div><small>Rekomendasi</small><strong><?= esc_html( $selected_interview['recommendation'] ?? '' ) ?></strong></div><div><small>Interviewer</small><strong><?= esc_html( $stored_interview_results[ $selected_interview['code'] ]['interviewer'] ?? $display_name ) ?></strong></div><div><small>Tgl Wawancara</small><strong><?= esc_html( $selected_interview['date'] ) ?></strong></div><div><small>Disimpan</small><strong><?= esc_html( $selected_interview['saved_at'] ?? '' ) ?></strong></div></div></div><h3>Penilaian per Aspek</h3><div class="daw-ud-readonly-ratings"><?php foreach ( $rating_criteria as $key => $criterion ) : $score = (int) ( $selected_interview['scores'][ $key ] ?? 0 ); ?><div><span><?= esc_html( $criterion ) ?></span><strong><?= esc_html( (string) $score ) ?>/5</strong></div><?php endforeach; ?></div><section class="daw-ud-saved-notes"><h3>Catatan Wawancara</h3><p><?= '' !== ( $selected_interview['notes'] ?? '' ) ? nl2br( esc_html( $selected_interview['notes'] ) ) : 'Tidak ada catatan.' ?></p></section></section>
+								<section class="daw-ud-detail-panel daw-ud-result-panel"><div class="daw-ud-panel-heading"><div><h2>Hasil Wawancara User</h2><p>Penilaian telah disimpan<?php if ( $decision_locked ) : ?> · Terkunci oleh keputusan HR<?php else : ?> · Hanya baca<?php endif; ?></p></div><?php if ( ! $decision_locked ) : ?><a class="daw-ud-link" href="<?= esc_url( add_query_arg( [ 'view' => 'interview-detail', 'candidate_code' => $selected_interview['code'], 'edit' => '1' ], $page_url ) ) ?>">Edit Hasil</a><?php endif; ?></div><div class="daw-ud-saved-result"><div><small>Skor Total</small><strong><?= esc_html( $selected_interview['score'] ) ?><small>/100</small></strong></div><div class="daw-ud-result-meta"><div><small>Status</small><strong><?= esc_html( $selected_interview['selection_status'] ) ?></strong></div><div><small>Rekomendasi</small><strong><?= esc_html( $selected_interview['recommendation'] ?? '' ) ?></strong></div><div><small>Interviewer</small><strong><?= esc_html( $selected_interview['interviewer'] ?: $display_name ) ?></strong></div><div><small>Tgl Wawancara</small><strong><?= esc_html( $selected_interview['date'] ) ?></strong></div><div><small>Disimpan</small><strong><?= esc_html( $selected_interview['saved_at'] ?? '' ) ?></strong></div></div></div><h3>Penilaian per Aspek</h3><div class="daw-ud-readonly-ratings"><?php foreach ( $rating_criteria as $key => $criterion ) : $score = (int) ( $selected_interview['scores'][ $key ] ?? 0 ); ?><div><span><?= esc_html( $criterion ) ?></span><strong><?= esc_html( (string) $score ) ?>/5</strong></div><?php endforeach; ?></div><section class="daw-ud-saved-notes"><h3>Catatan Wawancara</h3><p><?= '' !== ( $selected_interview['notes'] ?? '' ) ? nl2br( esc_html( $selected_interview['notes'] ) ) : 'Tidak ada catatan.' ?></p></section></section>
 							<?php endif; ?>
 						</section>
 						<aside class="daw-ud-profile-panel"><div class="daw-ud-profile-title"><span class="daw-ud-candidate-avatar"><?= esc_html( strtoupper( substr( preg_replace( '/[^A-Za-z]/', '', $selected_interview['name'] ), 0, 2 ) ) ) ?></span><div><strong><?= esc_html( $selected_interview['name'] ) ?></strong><small><?= esc_html( $selected_interview['code'] ) ?><br><?= esc_html( $selected_interview['position'] ) ?> · <?= esc_html( $selected_interview['dealer'] ) ?></small></div></div>

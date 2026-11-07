@@ -35,18 +35,46 @@ $candidates = [
 	[ 'id' => 6, 'name' => 'Nabila Yusuf', 'code' => 'DW-2026-0788', 'position' => 'Finance Staff', 'dealer' => 'DAW Manado', 'department' => 'Finance', 'batch' => '2026-09', 'year' => '2026', 'user_result' => 'Baik', 'decision' => 'Menunggu Keputusan', 'decision_date' => '2026-09-21', 'email_status' => 'Terkirim', 'email_date' => '21 Sep 2026, 10:12', 'email' => 'nabila.yusuf@example.test' ],
 	[ 'id' => 7, 'name' => 'Yosefin Langi', 'code' => 'DW-2025-0612', 'position' => 'Finance Staff', 'dealer' => 'DAW Manado', 'department' => 'Finance', 'batch' => '2025-11', 'year' => '2025', 'user_result' => 'Baik', 'decision' => 'Diterima', 'decision_date' => '2025-11-24', 'email_status' => 'Terkirim', 'email_date' => '26 Nov 2025, 13:10', 'email' => 'yosefin.langi@example.test' ],
 ];
-$decision_action = sanitize_key( $_GET['decision_action'] ?? '' );
+$decision_database = new Recruitment_Database();
+$decision_rows = $decision_database->get_final_decision_candidates();
+$candidates = array_map(
+	static function ( array $row ): array {
+		$decision = trim( (string) ( $row['DECISION'] ?? '' ) );
+
+		return [
+			'id' => (int) ( $row['ID'] ?? 0 ),
+			'name' => (string) ( $row['NAME'] ?? '' ),
+			'code' => (string) ( $row['CODE'] ?? '' ),
+			'position' => (string) ( $row['POSITION'] ?? '' ),
+			'dealer' => (string) ( $row['DEALER'] ?? '' ),
+			'department' => (string) ( $row['DEPARTMENT'] ?? '' ),
+			'batch' => (string) ( $row['BATCH'] ?? '' ),
+			'year' => (string) ( $row['APPLICATION_YEAR'] ?? '' ),
+			'user_result' => (string) ( $row['USER_RESULT'] ?? '' ),
+			'user_interview_status' => (string) ( $row['USER_INTERVIEW_STATUS'] ?? '' ),
+			'user_interview_date' => (string) ( $row['USER_INTERVIEW_DATE'] ?? '' ),
+			'user_score' => (string) ( $row['USER_SCORE'] ?? '' ),
+			'decision' => '' !== $decision ? $decision : 'Menunggu Keputusan',
+			'decision_date' => '',
+			'email_status' => 'Tidak tersedia',
+			'email_date' => '',
+			'email' => (string) ( $row['EMAIL'] ?? '' ),
+		];
+	},
+	$decision_rows
+);
 $decision_notice = '';
-if ( in_array( $decision_action, [ 'accept', 'reject' ], true ) ) {
-	foreach ( $candidates as &$candidate ) {
-		if ( (int) $candidate['id'] === $selected_candidate_id && 'Menunggu Keputusan' === $candidate['decision'] ) {
-			$candidate['decision'] = 'accept' === $decision_action ? 'Diterima' : 'Tidak Diterima';
-			$decision_notice = 'Keputusan diperbarui pada tampilan demo. Perubahan ini belum disimpan ke database.';
-			break;
-		}
-	}
-	unset( $candidate );
+$decision_notice_code = isset( $_GET['decision_notice'] ) && is_scalar( $_GET['decision_notice'] )
+	? sanitize_key( wp_unslash( (string) $_GET['decision_notice'] ) )
+	: '';
+if ( 'saved' === $decision_notice_code ) {
+	$decision_notice = 'Keputusan akhir berhasil disimpan dan disinkronkan ke status lamaran.';
+} elseif ( 'failed' === $decision_notice_code ) {
+	$decision_notice = 'Keputusan akhir gagal disimpan. Periksa koneksi Oracle dan coba kembali.';
 }
+$decision_load_error = $decision_database->has_error()
+	? 'Daftar keputusan belum dapat dimuat dari Oracle. Silakan coba kembali.'
+	: '';
 
 $analytics_sources = [ 'Instagram', 'Instagram', 'JobStreet', 'JobStreet', 'LinkedIn', 'LinkedIn', 'Website Karier DAW', 'Website Karier DAW', 'Referral Karyawan', 'Kampus / Career Fair', 'WhatsApp', 'Tidak Diketahui' ];
 $analytics_statuses = [ 'Diterima', 'Tidak Diterima', 'Dalam Proses', 'Tidak Diterima', 'Diterima', 'Diterima', 'Dalam Proses', 'Dalam Proses', 'Diterima', 'Dalam Proses', 'Dalam Proses', 'Dalam Proses' ];
@@ -227,18 +255,37 @@ $filter_form = static function ( string $tab, array $fields, string $search_plac
 
 	<?php if ( 'decision' === $section ) : ?>
 		<?php if ( '' !== $decision_notice ) : ?><p class="daw-fd-notice"><?= esc_html( $decision_notice ) ?></p><?php endif; ?>
+		<?php if ( '' !== $decision_load_error ) : ?><p class="daw-fd-notice" role="alert"><?= esc_html( $decision_load_error ) ?></p><?php endif; ?>
 		<div class="daw-fd-table-card daw-fd-ready-card">
 			<div class="daw-fd-ready-card__heading"><h2>Kandidat Siap Keputusan</h2></div>
 			<div class="daw-fd-table-scroll"><table class="daw-fd-table daw-fd-ready-table">
-				<thead><tr><th>Kandidat</th><th>Posisi</th><th>Dealer</th><th>Wilayah</th><th>Wawancara HR</th><th>Wawancara User</th><th>Status Akhir</th><th>Aksi</th></tr></thead>
-				<tbody><tr>
-					<td><strong>Rizky Firmansyah</strong><small>DAW-2026-001190</small></td>
-					<td>Teknisi</td><td>AHASS Gorontalo Utara</td><td>Gorontalo</td>
-					<td><span class="daw-fd-badge is-green">Lolos</span><small>Baik</small></td>
-					<td><span class="daw-fd-badge is-green">Lolos</span><small>Sangat Baik</small></td>
-					<td><span class="daw-fd-badge is-amber">Menunggu</span></td>
-					<td><button class="button button-primary daw-fd-create-decision" type="button">Buat Keputusan</button></td>
-				</tr></tbody>
+				<thead><tr><th>Kandidat</th><th>Posisi</th><th>Dealer</th><th>Departemen</th><th>Wawancara User</th><th>Status Akhir</th><th>Aksi</th></tr></thead>
+				<tbody>
+					<?php if ( ! $filtered_candidates ) : ?><tr><td class="daw-fd-empty" colspan="7">Tidak ada kandidat yang siap menerima keputusan akhir.</td></tr><?php endif; ?>
+					<?php foreach ( $filtered_candidates as $candidate ) : ?>
+						<tr>
+							<td><strong><?= esc_html( $candidate['name'] ) ?></strong><small><?= esc_html( $candidate['code'] ) ?></small></td>
+							<td><?= esc_html( $candidate['position'] ) ?></td>
+							<td><?= esc_html( $candidate['dealer'] ) ?></td>
+							<td><?= esc_html( $candidate['department'] ) ?></td>
+							<td><span class="daw-fd-badge <?= str_contains( strtolower( $candidate['user_interview_status'] ), 'tidak lolos' ) ? 'is-red' : 'is-green' ?>"><?= esc_html( $candidate['user_interview_status'] ?: 'Belum ada status' ) ?></span><small><?= esc_html( $candidate['user_result'] ) ?><?= '' !== $candidate['user_score'] ? ' · ' . esc_html( $candidate['user_score'] ) . '/100' : '' ?></small></td>
+							<td><span class="daw-fd-badge <?= 'Diterima' === $candidate['decision'] ? 'is-green' : ( 'Tidak Diterima' === $candidate['decision'] ? 'is-red' : 'is-amber' ) ?>"><?= esc_html( $candidate['decision'] ) ?></span></td>
+							<td>
+								<form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" class="daw-fd-decision-form">
+									<input type="hidden" name="action" value="daw_save_final_decision">
+									<input type="hidden" name="candidate_id" value="<?= esc_attr( (string) $candidate['id'] ) ?>">
+									<?php wp_nonce_field( 'daw_save_final_decision_' . $candidate['id'] ); ?>
+									<select name="decision" aria-label="Keputusan untuk <?= esc_attr( $candidate['name'] ) ?>" required>
+										<option value="">Pilih keputusan</option>
+										<option value="Diterima" <?= selected( $candidate['decision'], 'Diterima', false ) ?>>Diterima</option>
+										<option value="Tidak Diterima" <?= selected( $candidate['decision'], 'Tidak Diterima', false ) ?>>Tidak Diterima</option>
+									</select>
+									<button class="button button-primary" type="submit"><?= 'Menunggu Keputusan' === $candidate['decision'] ? 'Simpan' : 'Perbarui' ?></button>
+								</form>
+							</td>
+						</tr>
+					<?php endforeach; ?>
+				</tbody>
 			</table></div>
 		</div>
 

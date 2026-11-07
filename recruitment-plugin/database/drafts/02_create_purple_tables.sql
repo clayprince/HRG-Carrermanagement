@@ -1,0 +1,314 @@
+-- ORACLE XE 21C DRAFT TEMPLATE - NOT EXECUTABLE
+-- Every line in this file is a SQL line comment. No statement is active.
+-- Do not remove the line-comment prefix or copy statements into a SQL client.
+-- Obtain team approval for all decisions in 04_design_decisions.md before drafting executable DDL.
+-- Resolve duplicate names, Oracle types/sizes/nullability, PK strategy, FK targets,
+-- identifier naming policy, and ENUM domains before preparing final DDL.
+-- This file does not connect to Oracle and must not be used as a migration.
+-- The commented CREATE TABLE outlines preserve the ERD names and column occurrences.
+-- Text after NEEDS CONFIRMATION labels is intentionally not a complete SQL datatype.
+
+-- DRAFT INERT | CREATE TABLE "hr_user" (
+-- DRAFT INERT |     "hr_id" NUMBER NOT NULL,
+-- DRAFT INERT |     "nama_pengguna"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "password"  NEEDS CONFIRMATION: hash storage/type; never plaintext ,
+-- DRAFT INERT |     CONSTRAINT "PK_HR_USER" PRIMARY KEY ("hr_id")
+-- DRAFT INERT | );
+-- DRAFT INERT |
+-- DRAFT INERT | CREATE TABLE "bagian_pendaftaran" (
+-- DRAFT INERT |     "bagian_pendaftaran_id" NUMBER NOT NULL,
+-- DRAFT INERT |     "nama_Section"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "deskripsi"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     "display_order" NUMBER,
+-- DRAFT INERT |     "created_at" NUMBER,
+-- DRAFT INERT |     "update_at" NUMBER,
+-- DRAFT INERT |     "hr_id" NUMBER,
+-- DRAFT INERT |     CONSTRAINT "PK_BAGIAN_PENDAFTARAN" PRIMARY KEY ("bagian_pendaftaran_id")
+-- DRAFT INERT |     -- NEEDS CONFIRMATION: possible FK "hr_id" -> "hr_user"."hr_id".
+-- DRAFT INERT | );
+-- DRAFT INERT |
+-- DRAFT INERT | CREATE TABLE "tes_psikologi" (
+-- DRAFT INERT |     "tes_psikologi_id"  NEEDS CONFIRMATION: PK type  NOT NULL,
+-- DRAFT INERT |     "judul"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "petunjuk_pengerjaan"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     "durasi_pengerjaan" NUMBER,
+-- DRAFT INERT |     "updated_at" TIMESTAMP,
+-- DRAFT INERT |     "jumlah soal" NUMBER,
+-- DRAFT INERT |     "nilai_kelulusan" NUMBER  NEEDS CONFIRMATION: precision/scale ,
+-- DRAFT INERT |     "kamera_wajib_aktif"  NEEDS CONFIRMATION: Oracle 21c boolean representation ,
+-- DRAFT INERT |     "is_active"  NEEDS CONFIRMATION: Oracle 21c boolean representation ,
+-- DRAFT INERT |     "urutan_tampilan" NUMBER,
+-- DRAFT INERT |     "created_at" TIMESTAMP
+-- DRAFT INERT |     -- NEEDS CONFIRMATION: primary-key constraint cannot be completed before
+-- DRAFT INERT |     -- the type of "tes_psikologi_id" is decided.
+-- DRAFT INERT | );
+-- DRAFT INERT |
+-- DRAFT INERT | CREATE TABLE "kolom_landing_pendaftaran" (
+-- DRAFT INERT |     "kolom_pendaftaran_id" NUMBER NOT NULL,
+-- DRAFT INERT |     "judul_pekerjaan"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "departemen_id" NUMBER,
+-- DRAFT INERT |     "nama_departemen"  NEEDS CONFIRMATION: ENUM domain and storage ,
+-- DRAFT INERT |     "nama_dealer"  NEEDS CONFIRMATION: ENUM domain and storage ,
+-- DRAFT INERT |     "kategori_kj"  NEEDS CONFIRMATION: ENUM domain and storage ,
+-- DRAFT INERT |     "deskripsi_pekerjaan"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     "persyaratan_utama"  NEEDS CONFIRMATION: ENUM domain and storage ,
+-- DRAFT INERT |     "batas_lamaran" DATE,
+-- DRAFT INERT |     "diposting_pada" DATE,
+-- DRAFT INERT |     "status_kolom"  NEEDS CONFIRMATION: Oracle 21c boolean representation ,
+-- DRAFT INERT |     "urutan_tampil" NUMBER,
+-- DRAFT INERT |     CONSTRAINT "PK_KOLOM_LANDING_PENDAFTARAN"
+-- DRAFT INERT |         PRIMARY KEY ("kolom_pendaftaran_id")
+-- DRAFT INERT |     -- NEEDS CONFIRMATION: FK "departemen_id" points to excluded pink table.
+-- DRAFT INERT | );
+-- DRAFT INERT |
+-- DRAFT INERT | CREATE TABLE "konfiguasi_global_psikotes" (
+-- DRAFT INERT |     "konfigurasi_pisikotes"  NEEDS CONFIRMATION: PK type/e spelling  NOT NULL,
+-- DRAFT INERT |     "kamera_wajib_global"  NEEDS CONFIRMATION: Oracle 21c boolean representation ,
+-- DRAFT INERT |     "acak_soal"  NEEDS CONFIRMATION: Oracle 21c boolean representation ,
+-- DRAFT INERT |     "status_tes"  NEEDS CONFIRMATION: Oracle 21c boolean representation ,
+-- DRAFT INERT |     "updated_by"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "updated_at" TIMESTAMP,
+-- DRAFT INERT |     "hr_id" NUMBER
+-- DRAFT INERT |     -- NEEDS CONFIRMATION: PK type/constraint and relationship with hr_user.
+-- DRAFT INERT | );
+-- DRAFT INERT |
+-- DRAFT INERT | CREATE TABLE "request_lowongan" (
+-- DRAFT INERT |     "request_lowongan_id" NUMBER NOT NULL,
+-- DRAFT INERT |     "judul_pekerjaan"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "deskripsi_pekerjaan"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     "tanggung_jawab"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     "Hiring_user_id" NUMBER,
+-- DRAFT INERT |     "Hiring_user pic"  NEEDS CONFIRMATION: string length/type; duplicate ,
+-- DRAFT INERT |     "Hiring_user pic"  NEEDS CONFIRMATION: duplicate ERD label ,
+-- DRAFT INERT |     "no_fptk" VARCHAR2(15),
+-- DRAFT INERT |     "request_at" TIMESTAMP,
+-- DRAFT INERT |     "departement_id" NUMBER,
+-- DRAFT INERT |     "nama_departement"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "kebutuhan_posisi"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "level_jabatan"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "kategori_KJ"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "jumlah_kebutuhan" NUMBER,
+-- DRAFT INERT |     "status_karyawan"  NEEDS CONFIRMATION: string length/type; duplicate ,
+-- DRAFT INERT |     "status_karyawan"  NEEDS CONFIRMATION: duplicate ERD label ,
+-- DRAFT INERT |     "prioritas"  NEEDS CONFIRMATION: ENUM domain and storage ,
+-- DRAFT INERT |     "batas_lamaran" DATE,
+-- DRAFT INERT |     "lokasi_penempatan"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "alasan_kebutuhan"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     "tujuan_utama_posisi"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     "tanggung_jawab_utama"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     "output_harapan"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     "dampak_kekosongan"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     "pendidikan_minimum"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "pengalaman_minimum"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     "sertifikasi_wajib"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     "hr_id" NUMBER,
+-- DRAFT INERT |     CONSTRAINT "PK_REQUEST_LOWONGAN" PRIMARY KEY ("request_lowongan_id")
+-- DRAFT INERT |     -- NEEDS CONFIRMATION: target/column for "departement_id" and "hr_id".
+-- DRAFT INERT | );
+-- DRAFT INERT |
+-- DRAFT INERT | CREATE TABLE "Persyaratan_Lowongan" (
+-- DRAFT INERT |     "persyaratan_lowongan_id"  NEEDS CONFIRMATION: PK type  NOT NULL,
+-- DRAFT INERT |     "judul_pekerjaan"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "nama_Persyaratan"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "jenis_Persyaratan"  NEEDS CONFIRMATION: ENUM domain and storage ,
+-- DRAFT INERT |     "created_at" TIMESTAMP,
+-- DRAFT INERT |     "- updated_at" TIMESTAMP  NEEDS CONFIRMATION: is '-' part of identifier? ,
+-- DRAFT INERT |     "kategori_Persyaratan"  NEEDS CONFIRMATION: ENUM domain and storage ,
+-- DRAFT INERT |     "jenis_Persyaratan"  NEEDS CONFIRMATION: duplicate ERD label ,
+-- DRAFT INERT |     "hr_id" NUMBER
+-- DRAFT INERT |     -- NEEDS CONFIRMATION: PK type/constraint; possible FK "hr_id".
+-- DRAFT INERT | );
+-- DRAFT INERT |
+-- DRAFT INERT | CREATE TABLE "status_request_lowongan" (
+-- DRAFT INERT |     "status_lowongan_id"  NEEDS CONFIRMATION: PK type  NOT NULL,
+-- DRAFT INERT |     "status_id" NUMBER,
+-- DRAFT INERT |     "permintaan_id" NUMBER,
+-- DRAFT INERT |     "status_pengajuan"  NEEDS CONFIRMATION: ENUM domain and storage ,
+-- DRAFT INERT |     "catatan_review"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     "tanggal_dibuat" TIMESTAMP,
+-- DRAFT INERT |     "hr_id" NUMBER
+-- DRAFT INERT |     -- NEEDS CONFIRMATION: PK type/constraint and FK targets.
+-- DRAFT INERT | );
+-- DRAFT INERT |
+-- DRAFT INERT | CREATE TABLE "jadwal_psikotes" (
+-- DRAFT INERT |     "jadwal_psikotes_id"  NEEDS CONFIRMATION: PK type  NOT NULL,
+-- DRAFT INERT |     "metode_psikotes"  NEEDS CONFIRMATION: ENUM domain and storage ,
+-- DRAFT INERT |     "tanggal" DATE,
+-- DRAFT INERT |     "lokasi"  NEEDS CONFIRMATION: string length/type; duplicate ,
+-- DRAFT INERT |     "waktu"  NEEDS CONFIRMATION: time-only storage convention ,
+-- DRAFT INERT |     "lokasi"  NEEDS CONFIRMATION: duplicate ERD label ,
+-- DRAFT INERT |     "alamat_lengkap"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "kontak_perorang"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "dress_code"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "maks_peserta"  NEEDS CONFIRMATION: ERD says string ,
+-- DRAFT INERT |     "perlu_konfirmasi_kehadiran"  NEEDS CONFIRMATION: boolean representation ,
+-- DRAFT INERT |     "dokumen_yang_dibawa"  NEEDS CONFIRMATION: ERD says boolean/string ,
+-- DRAFT INERT |     "informasi_tambah"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     "create_by"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "created_at"  NEEDS CONFIRMATION: ERD says string ,
+-- DRAFT INERT |     "update_at"  NEEDS CONFIRMATION: ERD says string ,
+-- DRAFT INERT |     "hr_id" NUMBER
+-- DRAFT INERT |     -- NEEDS CONFIRMATION: PK type/constraint; possible FK "hr_id".
+-- DRAFT INERT | );
+-- DRAFT INERT |
+-- DRAFT INERT | CREATE TABLE "template_email_rekrutment" (
+-- DRAFT INERT |     "template_email_id"  NEEDS CONFIRMATION: PK type  NOT NULL,
+-- DRAFT INERT |     "email_rekruitmen_id"  NEEDS CONFIRMATION: FK type/name/target ,
+-- DRAFT INERT |     "kategori_template"  NEEDS CONFIRMATION: ENUM domain and storage ,
+-- DRAFT INERT |     "subjek_email" VARCHAR2(50),
+-- DRAFT INERT |     "isi_email"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     "is_active"  NEEDS CONFIRMATION: boolean representation ,
+-- DRAFT INERT |     "created_by"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "created_at" TIMESTAMP,
+-- DRAFT INERT |     "updated_at" TIMESTAMP
+-- DRAFT INERT |     -- NEEDS CONFIRMATION: PK/FK and relationship direction.
+-- DRAFT INERT | );
+-- DRAFT INERT |
+-- DRAFT INERT | CREATE TABLE "email_rekrutment" (
+-- DRAFT INERT |     "email_rekrutmen_id"  NEEDS CONFIRMATION: PK type  NOT NULL,
+-- DRAFT INERT |     "template_email_id"  NEEDS CONFIRMATION: FK type/target ,
+-- DRAFT INERT |     "kandidat_id" NUMBER,
+-- DRAFT INERT |     "lamaran_id" NUMBER,
+-- DRAFT INERT |     "email_penerima" VARCHAR2(50),
+-- DRAFT INERT |     "subject_email" VARCHAR2(50),
+-- DRAFT INERT |     "isi_email"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     "status_pengiriman"  NEEDS CONFIRMATION: ENUM domain and storage ,
+-- DRAFT INERT |     "terkirim_pada" TIMESTAMP,
+-- DRAFT INERT |     "dibaca_pada" TIMESTAMP,
+-- DRAFT INERT |     "created_by"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "hr_id" NUMBER
+-- DRAFT INERT |     -- NEEDS CONFIRMATION: PK/FK targets, including excluded pink candidate table.
+-- DRAFT INERT | );
+-- DRAFT INERT |
+-- DRAFT INERT | CREATE TABLE "rekapan_keputusan" (
+-- DRAFT INERT |     "rekapan_keputusan_id"  NEEDS CONFIRMATION: PK type  NOT NULL,
+-- DRAFT INERT |     "kandidat_id" NUMBER,
+-- DRAFT INERT |     "nama_kandidat"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "nama_departement"  NEEDS CONFIRMATION: ENUM domain and storage ,
+-- DRAFT INERT |     "tanggal_wawancara" DATE,
+-- DRAFT INERT |     "total_nilai" NUMBER,
+-- DRAFT INERT |     "rekomendasi_user"  NEEDS CONFIRMATION: ENUM domain and storage ,
+-- DRAFT INERT |     "keputusan_akhir"  NEEDS CONFIRMATION: ENUM domain and storage ,
+-- DRAFT INERT |     "total_status_rekomterima" NUMBER,
+-- DRAFT INERT |     "diterima_hr" NUMBER,
+-- DRAFT INERT |     "menunggu_keputusan" NUMBER,
+-- DRAFT INERT |     "hr_id" NUMBER
+-- DRAFT INERT |     -- NEEDS CONFIRMATION: PK type/constraint and FK targets.
+-- DRAFT INERT | );
+-- DRAFT INERT |
+-- DRAFT INERT | CREATE TABLE "Hasil_wawancara_user" (
+-- DRAFT INERT |     "hasil_wawancara_user_id" NUMBER NOT NULL,
+-- DRAFT INERT |     "kandidat_id" NUMBER,
+-- DRAFT INERT |     "nama_kandidat"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "nama_pewawancara"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "departemen_id" NUMBER,
+-- DRAFT INERT |     "nama_departemen"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "nilai_penampilan" NUMBER,
+-- DRAFT INERT |     "nilai_komunikasi" NUMBER,
+-- DRAFT INERT |     "nilai_motivasi" NUMBER,
+-- DRAFT INERT |     "nilai_pengalaman" NUMBER,
+-- DRAFT INERT |     "nilai_keterampilan" NUMBER,
+-- DRAFT INERT |     "nilai_kerjasama" NUMBER,
+-- DRAFT INERT |     "nilai_problemsolving" NUMBER,
+-- DRAFT INERT |     "nilai_adaptasi" NUMBER,
+-- DRAFT INERT |     "nilai_total" NUMBER,
+-- DRAFT INERT |     "rekomendasi"  NEEDS CONFIRMATION: ENUM domain and storage ,
+-- DRAFT INERT |     "catatan_wawancara" VARCHAR2(250),
+-- DRAFT INERT |     "tanggal_wawancara" NUMBER,
+-- DRAFT INERT |     "dikumpulkan_pada" NUMBER,
+-- DRAFT INERT |     "status_kandidat_id" NUMBER,
+-- DRAFT INERT |     "status_kandidat"  NEEDS CONFIRMATION: ENUM domain and storage ,
+-- DRAFT INERT |     CONSTRAINT "PK_HASIL_WAWANCARA_USER"
+-- DRAFT INERT |         PRIMARY KEY ("hasil_wawancara_user_id")
+-- DRAFT INERT |     -- NEEDS CONFIRMATION: all three FK targets are outside the purple set.
+-- DRAFT INERT | );
+-- DRAFT INERT |
+-- DRAFT INERT | CREATE TABLE "jadwal_kandidat" (
+-- DRAFT INERT |     "jadwal_kandidat_id"  NEEDS CONFIRMATION: PK type  NOT NULL,
+-- DRAFT INERT |     "jadwal_psikotes_id" NUMBER,
+-- DRAFT INERT |     "nama_kandidat"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "tanggal_wawancara" DATE,
+-- DRAFT INERT |     "lokasi_wawancara"  NEEDS CONFIRMATION: ERD says time ,
+-- DRAFT INERT |     "metode_wawancara" VARCHAR2(50),
+-- DRAFT INERT |     "hasil_hr"  NEEDS CONFIRMATION: ENUM domain and storage ,
+-- DRAFT INERT |     "status_wawancara"  NEEDS CONFIRMATION: ENUM domain and storage
+-- DRAFT INERT |     -- NEEDS CONFIRMATION: PK type/constraint and FK to jadwal_psikotes.
+-- DRAFT INERT | );
+-- DRAFT INERT |
+-- DRAFT INERT | CREATE TABLE "pertanyaan_psikotes" (
+-- DRAFT INERT |     "peertanyaan_psikotes_id"  NEEDS CONFIRMATION: PK type/e spelling  NOT NULL,
+-- DRAFT INERT |     "tes_psikologi_id"  NEEDS CONFIRMATION: type and FK decision ,
+-- DRAFT INERT |     "teks_pertanyaan"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     "jenis_pertanyaan"  NEEDS CONFIRMATION: ENUM domain and storage ,
+-- DRAFT INERT |     "nilai_pertanyaan" NUMBER  NEEDS CONFIRMATION: precision/scale ,
+-- DRAFT INERT |     "display_order" NUMBER
+-- DRAFT INERT |     -- NEEDS CONFIRMATION: PK type/constraint and FK to tes_psikologi.
+-- DRAFT INERT | );
+-- DRAFT INERT |
+-- DRAFT INERT | CREATE TABLE "jawaban_psikotes" (
+-- DRAFT INERT |     "jawaban_psikotes_id"  NEEDS CONFIRMATION: PK type  NOT NULL,
+-- DRAFT INERT |     "pertanyaan_psikotes_id"  NEEDS CONFIRMATION: FK type/target name ,
+-- DRAFT INERT |     "apakah_benar"  NEEDS CONFIRMATION: Oracle 21c boolean representation ,
+-- DRAFT INERT |     "urutan_tampilan" NUMBER,
+-- DRAFT INERT |     "jawaban_teks"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     "nilai" NUMBER  NEEDS CONFIRMATION: float precision ,
+-- DRAFT INERT |     "dijawab_pada" TIMESTAMP
+-- DRAFT INERT |     -- NEEDS CONFIRMATION: PK/FK; target PK spelling differs in ERD.
+-- DRAFT INERT | );
+-- DRAFT INERT |
+-- DRAFT INERT | CREATE TABLE "detail_info_lowongan" (
+-- DRAFT INERT |     "detail_lowongan_id" NUMBER NOT NULL,
+-- DRAFT INERT |     "request_lowongan_id" NUMBER,
+-- DRAFT INERT |     "kolom_pendaftaran_id" NUMBER,
+-- DRAFT INERT |     "judul_pekerjaan"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "deskripsi_pekerjaan"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     "tanggung_jawab"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     "no_fptk" VARCHAR2(15),
+-- DRAFT INERT |     "request_at" TIMESTAMP,
+-- DRAFT INERT |     "departement_id" NUMBER,
+-- DRAFT INERT |     "nama_departement"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "level_jabatan"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "kategori_KJ"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "jumlah_kebutuhan" NUMBER,
+-- DRAFT INERT |     "prioritas"  NEEDS CONFIRMATION: ENUM domain and storage ,
+-- DRAFT INERT |     "batas_lamaran" DATE,
+-- DRAFT INERT |     "lokasi_penempatan"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "pendidikan_minimum"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "pengalaman_minimum"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     "sertifikasi_wajib"  NEEDS CONFIRMATION: text storage/type ,
+-- DRAFT INERT |     CONSTRAINT "PK_DETAIL_INFO_LOWONGAN" PRIMARY KEY ("detail_lowongan_id")
+-- DRAFT INERT |     -- Candidate only; confirm direction/cardinality before enabling:
+-- DRAFT INERT |     -- CONSTRAINT "FK_DETAIL_KOLOM" FOREIGN KEY ("kolom_pendaftaran_id")
+-- DRAFT INERT |     --     REFERENCES "kolom_landing_pendaftaran" ("kolom_pendaftaran_id")
+-- DRAFT INERT |     -- Other request/departement FKs are not enabled pending confirmation.
+-- DRAFT INERT | );
+-- DRAFT INERT |
+-- DRAFT INERT | CREATE TABLE "slot_wawancara" (
+-- DRAFT INERT |     "slot_wawancara_id"  NEEDS CONFIRMATION: PK type  NOT NULL,
+-- DRAFT INERT |     "lowongan_id" NUMBER,
+-- DRAFT INERT |     "start_at" TIMESTAMP,
+-- DRAFT INERT |     "ends_at" TIMESTAMP,
+-- DRAFT INERT |     "zona_waktu"  NEEDS CONFIRMATION: VARCHAR length ,
+-- DRAFT INERT |     "metode_wawancara"  NEEDS CONFIRMATION: ENUM domain and storage ,
+-- DRAFT INERT |     "lokasi"  NEEDS CONFIRMATION: VARCHAR length ,
+-- DRAFT INERT |     "kapasitas" NUMBER,
+-- DRAFT INERT |     "nama_pewawancara"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "kandidat_id" NUMBER,
+-- DRAFT INERT |     "nama_kandidat"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "meeting_url"  NEEDS CONFIRMATION: VARCHAR length
+-- DRAFT INERT |     -- NEEDS CONFIRMATION: PK type/constraint and both FK targets.
+-- DRAFT INERT | );
+-- DRAFT INERT |
+-- DRAFT INERT | CREATE TABLE "pilihan_fields_pendaftaran" (
+-- DRAFT INERT |     "pilihan_pendaftaran_id" NUMBER NOT NULL,
+-- DRAFT INERT |     "field_id" NUMBER,
+-- DRAFT INERT |     "nilai"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "label"  NEEDS CONFIRMATION: string length/type ,
+-- DRAFT INERT |     "urutan_tampilan" NUMBER,
+-- DRAFT INERT |     "bagian_pendaftaran_id" NUMBER,
+-- DRAFT INERT |     CONSTRAINT "PK_PILIHAN_FIELDS_PENDAFTARAN"
+-- DRAFT INERT |         PRIMARY KEY ("pilihan_pendaftaran_id")
+-- DRAFT INERT |     -- NEEDS CONFIRMATION: whether bagian_pendaftaran_id is an FK and target
+-- DRAFT INERT |     -- for field_id.
+-- DRAFT INERT | );
+-- DRAFT INERT |

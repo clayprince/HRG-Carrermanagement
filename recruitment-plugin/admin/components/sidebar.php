@@ -84,6 +84,7 @@ $root_links = [
             </button>
             <div class="recruitment-dashboard__nav-group-items" id="recruitment-psychotest-links" data-nav-group-panel>
                 <a href="<?= esc_url( recruitment_get_admin_url( 'psychotest-settings' ) ) ?>" class="<?= 'recruitment-psychotest-settings' === $current_page ? 'is-active' : '' ?>" <?= 'recruitment-psychotest-settings' === $current_page ? 'aria-current="page"' : '' ?>><span class="recruitment-dashboard__nav-label">Setting Psikotes</span></a>
+                <a href="<?= esc_url( recruitment_get_admin_url( 'personality-results' ) ) ?>" class="<?= 'recruitment-personality-results' === $current_page ? 'is-active' : '' ?>" <?= 'recruitment-personality-results' === $current_page ? 'aria-current="page"' : '' ?>><span class="recruitment-dashboard__nav-label">Hasil Kepribadian</span></a>
                 <a href="<?= esc_url( recruitment_get_admin_url( 'question-bank' ) ) ?>" class="<?= 'recruitment-question-bank' === $current_page ? 'is-active' : '' ?>" <?= 'recruitment-question-bank' === $current_page ? 'aria-current="page"' : '' ?>><span class="recruitment-dashboard__nav-label">Bank Soal</span></a>
             </div>
         </div>

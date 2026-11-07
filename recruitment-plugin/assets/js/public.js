@@ -14,6 +14,7 @@
   setupAccountConfirmationRedirect();
   setupPsychologicalTestProcessing();
   setupPsychotestDeviceCheck();
+  setupPsychometricAssessments();
 
   document.addEventListener("click", function handleRecruitmentClick(event) {
     const removeButton = event.target.closest("[data-remove-section]");
@@ -418,6 +419,327 @@
     };
 
     updateProgress();
+  }
+
+  function setupPsychometricAssessments() {
+    setupIqAssessment();
+    setupPauliAssessment();
+    setupPersonalityAssessment();
+  }
+
+  function setupIqAssessment() {
+    const root = document.querySelector("[data-iq-assessment]");
+    if (!root) {
+      return;
+    }
+
+    const form = root.querySelector("[data-iq-form]");
+    const status = root.querySelector("[data-iq-save-status]");
+    const timer = root.querySelector("[data-iq-timer]");
+    if (!form || !status || !timer) {
+      return;
+    }
+
+    const pendingTimers = new Map();
+    let saveQueue = Promise.resolve();
+    const saveQuestion = function saveQuestion(question) {
+      const inputs = question.querySelectorAll("[data-iq-answer]:checked");
+      const values = new URLSearchParams();
+      values.set("action", "recruitment_iq_save_answer");
+      values.set("nonce", root.dataset.saveNonce || "");
+      values.set("question_id", question.dataset.iqQuestion || "");
+      inputs.forEach(function appendAnswer(input, index) {
+        values.set(`selected_answers[${index}]`, input.value);
+      });
+      status.textContent = "Menyimpan jawaban...";
+      saveQueue = saveQueue
+        .catch(function continueAfterPreviousSaveFailure() {})
+        .then(function sendAnswer() {
+          return postAssessment(root.dataset.ajaxUrl, values);
+        })
+        .then(function savedAnswer() {
+          status.textContent = "Jawaban tersimpan.";
+        })
+        .catch(function reportSaveError(error) {
+          status.textContent = error.message;
+          status.setAttribute("data-save-error", "true");
+          throw error;
+        });
+      return saveQueue;
+    };
+
+    root.addEventListener("change", function saveIqAnswer(event) {
+      if (!event.target.matches("[data-iq-answer]")) {
+        return;
+      }
+      const question = event.target.closest("[data-iq-question]");
+      if (!question) {
+        return;
+      }
+      if (
+        event.target.checked &&
+        question.querySelectorAll("[data-iq-answer]:checked").length >
+          Number(question.dataset.maxSelect || 1)
+      ) {
+        event.target.checked = false;
+        status.textContent = `Pilih paling banyak ${question.dataset.maxSelect || 1} jawaban untuk soal ini.`;
+        return;
+      }
+      window.clearTimeout(pendingTimers.get(question));
+      pendingTimers.set(
+        question,
+        window.setTimeout(function enqueueAnswer() {
+          pendingTimers.delete(question);
+          saveQuestion(question).catch(function keepFailureVisible() {});
+        }, 250),
+      );
+    });
+
+    form.addEventListener("submit", function waitForIqSaves(event) {
+      event.preventDefault();
+      pendingTimers.forEach(function flushTimer(timerId, question) {
+        window.clearTimeout(timerId);
+        saveQuestion(question);
+      });
+      pendingTimers.clear();
+      saveQueue
+        .catch(function allowServerToRetryIqAnswers() {})
+        .then(function submitIqForm() {
+          HTMLFormElement.prototype.submit.call(form);
+        })
+        .catch(function preventIncompleteSubmit() {});
+    });
+
+    const deadline = Number(root.dataset.deadline || 0);
+    const updateTimer = function updateIqTimer() {
+      const remaining = Math.max(0, deadline - Math.floor(Date.now() / 1000));
+      const minutes = Math.floor(remaining / 60);
+      const seconds = remaining % 60;
+      timer.textContent = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+      if (remaining === 0) {
+        form.requestSubmit();
+      } else {
+        window.setTimeout(updateTimer, 1000);
+      }
+    };
+    updateTimer();
+  }
+
+  function setupPauliAssessment() {
+    const root = document.querySelector("[data-pauli-assessment]");
+    if (!root) {
+      return;
+    }
+
+    const form = root.querySelector("[data-pauli-assessment-form]");
+    const payload = root.querySelector("[data-pauli-answer-payload]");
+    const status = root.querySelector("[data-pauli-save-status]");
+    const answers = root.querySelectorAll("[data-pauli-answer]");
+    if (!form || !payload || !status || !answers.length) {
+      return;
+    }
+
+    let saveTimer = 0;
+    let hasUnflushedInput = false;
+    let saveQueue = Promise.resolve();
+    const saveColumn = function saveColumn() {
+      const value = Array(99).fill("-");
+      answers.forEach(function collectPauliAnswer(input) {
+        const index = Number(input.dataset.answerIndex);
+        if (Number.isInteger(index) && index >= 0 && index < value.length) {
+          value[index] = /^[0-9]$/.test(input.value) ? input.value : "-";
+        }
+      });
+      payload.value = value.join("");
+      const body = new URLSearchParams({
+        action: "recruitment_pauli_save_column",
+        nonce: root.dataset.saveNonce || "",
+        segment: root.dataset.segment || "",
+        answers: payload.value,
+      });
+      status.textContent = "Menyimpan jawaban kolom...";
+      saveQueue = saveQueue
+        .catch(function continueAfterPreviousSaveFailure() {})
+        .then(function sendColumn() {
+          return postAssessment(root.dataset.ajaxUrl, body);
+        })
+        .then(function savedColumn() {
+          hasUnflushedInput = false;
+          status.textContent = "Jawaban kolom tersimpan.";
+        })
+        .catch(function reportColumnError(error) {
+          hasUnflushedInput = true;
+          status.textContent = error.message;
+          throw error;
+        });
+      return saveQueue;
+    };
+
+    root.addEventListener("input", function schedulePauliSave(event) {
+      if (!event.target.matches("[data-pauli-answer]")) {
+        return;
+      }
+      hasUnflushedInput = true;
+      event.target.value = event.target.value.replace(/[^0-9]/g, "").slice(0, 1);
+      window.clearTimeout(saveTimer);
+      saveTimer = window.setTimeout(function persistPauliColumn() {
+        saveColumn().catch(function keepFailureVisible() {});
+      }, 350);
+    });
+
+    const segmentDeadline = Number(root.dataset.segmentDeadline || 0);
+    const refreshAtBoundary = function refreshPauliColumn() {
+      if (segmentDeadline <= Math.floor(Date.now() / 1000)) {
+        if (saveTimer || hasUnflushedInput) {
+          window.clearTimeout(saveTimer);
+          saveColumn()
+            .then(function reloadAfterSave() {
+              window.location.reload();
+            })
+            .catch(function keepFailureVisible() {});
+        } else {
+          window.location.reload();
+        }
+        return;
+      }
+      window.setTimeout(refreshAtBoundary, 1000);
+    };
+    refreshAtBoundary();
+
+    form.addEventListener("submit", function submitPauliColumn(event) {
+      event.preventDefault();
+      window.clearTimeout(saveTimer);
+      saveColumn()
+        .catch(function allowServerToRetryPauliAnswers() {})
+        .then(function advancePauliColumn() {
+          HTMLFormElement.prototype.submit.call(form);
+        })
+        .catch(function keepFailureVisible() {});
+    });
+  }
+
+  function setupPersonalityAssessment() {
+    const root = document.querySelector("[data-personality-assessment]");
+    if (!root) {
+      return;
+    }
+
+    const form = root.querySelector("[data-personality-form]");
+    const status = root.querySelector("[data-personality-save-status]");
+    const progress = root.querySelector("[data-personality-progress]");
+    if (!form || !status || !progress) {
+      return;
+    }
+
+    const pendingTimers = new Map();
+    const savedQuestions = new Set();
+    root.querySelectorAll("[data-personality-question]").forEach(function trackExistingAnswer(question) {
+      if (question.querySelector("[data-personality-answer]:checked")) {
+        savedQuestions.add(question.dataset.personalityQuestion || "");
+      }
+    });
+    let saveQueue = Promise.resolve();
+    const saveQuestion = function saveQuestion(question) {
+      const questionId = question.dataset.personalityQuestion || "";
+      const values = new URLSearchParams({
+        action: "recruitment_personality_save_answer",
+        nonce: root.dataset.saveNonce || "",
+        test: root.dataset.testKey || "",
+        question_id: questionId,
+      });
+      question
+        .querySelectorAll("[data-personality-answer]:checked")
+        .forEach(function appendPersonalityAnswer(input) {
+          values.set(`answer[${input.dataset.answerPart}]`, input.value);
+        });
+      status.textContent = "Menyimpan jawaban...";
+      saveQueue = saveQueue
+        .catch(function continueAfterPreviousSaveFailure() {})
+        .then(function sendPersonalityAnswer() {
+          return postAssessment(root.dataset.ajaxUrl, values);
+        })
+        .then(function savedPersonalityAnswer() {
+          savedQuestions.add(questionId);
+          progress.textContent = String(savedQuestions.size);
+          status.textContent = "Jawaban tersimpan.";
+        })
+        .catch(function reportPersonalityError(error) {
+          status.textContent = error.message;
+          throw error;
+        });
+      return saveQueue;
+    };
+
+    root.addEventListener("change", function schedulePersonalitySave(event) {
+      if (!event.target.matches("[data-personality-answer]")) {
+        return;
+      }
+      const question = event.target.closest("[data-personality-question]");
+      if (!question) {
+        return;
+      }
+      window.clearTimeout(pendingTimers.get(question));
+      pendingTimers.set(
+        question,
+        window.setTimeout(function persistPersonalityAnswer() {
+          pendingTimers.delete(question);
+          saveQuestion(question).catch(function keepFailureVisible() {});
+        }, 250),
+      );
+    });
+
+    form.addEventListener("submit", function waitForPersonalitySaves(event) {
+      event.preventDefault();
+      pendingTimers.forEach(function flushTimer(timerId, question) {
+        window.clearTimeout(timerId);
+        saveQuestion(question);
+      });
+      pendingTimers.clear();
+      saveQueue
+        .catch(function allowServerToRetryPersonalityAnswers() {})
+        .then(function submitPersonalityForm() {
+          HTMLFormElement.prototype.submit.call(form);
+        })
+        .catch(function preventIncompleteSubmit() {});
+    });
+
+    const reminderMinutes = Number(root.dataset.reminderMinutes || 0);
+    const startedAt = Number(root.dataset.startedAt || 0);
+    const elapsed = root.querySelector("[data-personality-elapsed]");
+    const reminder = root.querySelector("[data-personality-reminder]");
+    if (elapsed && startedAt) {
+      const updateElapsed = function updateElapsedTime() {
+        const seconds = Math.max(0, Math.floor(Date.now() / 1000) - startedAt);
+        elapsed.textContent = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+        if (reminder && reminderMinutes && seconds >= reminderMinutes * 60) {
+          reminder.hidden = false;
+          reminder.textContent = `Pengingat: standar waktu pengerjaan ${reminderMinutes} menit telah tercapai. Anda dapat melanjutkan hingga seluruh soal selesai.`;
+        }
+        window.setTimeout(updateElapsedTime, 1000);
+      };
+      updateElapsedTime();
+    }
+  }
+
+  async function postAssessment(url, body) {
+    if (!url) {
+      throw new Error("Alamat penyimpanan jawaban tidak tersedia.");
+    }
+    const response = await fetch(url, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
+      body: body.toString(),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.data && result.data.message
+          ? result.data.message
+          : "Jawaban gagal disimpan. Periksa koneksi lalu coba lagi.",
+      );
+    }
+    return result;
   }
 
   function setupPsychotestDeviceCheck() {

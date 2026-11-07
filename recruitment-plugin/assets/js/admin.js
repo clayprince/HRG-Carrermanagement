@@ -517,45 +517,97 @@ document.documentElement.classList.add("js");
 
   const createForm = screen.querySelector("[data-vacancy-create-form]");
   const list = screen.querySelector("[data-vacancy-list]");
-  const feedback = screen.querySelector("[data-vacancy-feedback]");
-  const getStatusLabel = function getStatusLabel(status) {
-    return {
-      published: "Published",
-      draft: "Draft",
-      closed: "Closed",
-      archived: "Archived",
-    }[status];
-  };
-  const setStatus = function setStatus(row, status) {
-    row.dataset.status = status;
-    const badge = row.querySelector("[data-vacancy-status]");
-    badge.className = "daw-vacancies__badge daw-vacancies__badge--" + status;
-    badge.textContent = getStatusLabel(status);
-    const actionButton = row.querySelector("[data-vacancy-toggle]");
-    if (actionButton) {
-      actionButton.textContent = "published" === status ? "Tutup" : "Publish";
-    }
-  };
-  const showFeedback = function showFeedback(message) {
-    if (feedback) {
-      feedback.textContent = message;
-      feedback.hidden = false;
-    }
-  };
 
   if (createForm) {
-    createForm.addEventListener("submit", function previewVacancy(event) {
-      event.preventDefault();
-      showFeedback(
-        "Validasi berhasil. Penyimpanan lowongan belum dihubungkan ke database.",
-      );
-    });
-
     const saveDraftButton = createForm.querySelector("[data-vacancy-save-draft]");
-    saveDraftButton.addEventListener("click", function saveDraft() {
-      createForm.querySelector('[name="status"][value="draft"]').checked = true;
-      createForm.requestSubmit();
-    });
+    if (saveDraftButton) {
+      saveDraftButton.addEventListener("click", function saveDraft() {
+        createForm.querySelector('[name="status"][value="draft"]').checked = true;
+        createForm.requestSubmit();
+      });
+    }
+
+    const steps = Array.from(createForm.querySelectorAll("[data-vacancy-step]"));
+    if (steps.length) {
+      const indicators = Array.from(
+        createForm.querySelectorAll("[data-vacancy-step-label]"),
+      );
+      const backButtons = Array.from(
+        createForm.querySelectorAll("[data-vacancy-step-back]"),
+      );
+      const nextButtons = Array.from(
+        createForm.querySelectorAll("[data-vacancy-step-next]"),
+      );
+      let activeStep = 0;
+
+      const showStep = function showStep(index) {
+        activeStep = Math.max(0, Math.min(index, steps.length - 1));
+        steps.forEach(function updateStep(step, stepIndex) {
+          step.hidden = stepIndex !== activeStep;
+        });
+        indicators.forEach(function updateIndicator(indicator, stepIndex) {
+          indicator.classList.toggle("is-active", stepIndex === activeStep);
+          indicator.classList.toggle("is-complete", stepIndex < activeStep);
+          indicator.setAttribute(
+            "aria-current",
+            stepIndex === activeStep ? "step" : "false",
+          );
+        });
+        backButtons.forEach(function updateBackButton(button) {
+          button.hidden =
+            steps.indexOf(button.closest("[data-vacancy-step]")) !== activeStep;
+        });
+        nextButtons.forEach(function updateNextButton(button) {
+          button.hidden =
+            steps.indexOf(button.closest("[data-vacancy-step]")) !== activeStep;
+        });
+        const submitButton = createForm.querySelector("[data-vacancy-submit]");
+        if (submitButton) {
+          submitButton.hidden = activeStep !== steps.length - 1;
+        }
+      };
+
+      const validateStep = function validateStep(step) {
+        const controls = Array.from(
+          step.querySelectorAll("input, select, textarea"),
+        ).filter(function isEnabled(control) {
+          return !control.disabled;
+        });
+        const invalid = controls.find(function findInvalid(control) {
+          return !control.checkValidity();
+        });
+        return invalid || null;
+      };
+
+      backButtons.forEach(function bindBackButton(button) {
+        button.addEventListener("click", function showPreviousStep() {
+          showStep(activeStep - 1);
+        });
+      });
+      nextButtons.forEach(function bindNextButton(button) {
+        button.addEventListener("click", function showNextStep() {
+          const currentStep = steps.indexOf(button.closest("[data-vacancy-step]"));
+          const invalid = validateStep(steps[currentStep]);
+          if (!invalid) {
+            showStep(currentStep + 1);
+          } else {
+            invalid.reportValidity();
+          }
+        });
+      });
+      createForm.addEventListener("submit", function validateVacancyDraft(event) {
+        for (let index = 0; index < steps.length; index++) {
+          const invalid = validateStep(steps[index]);
+          if (invalid) {
+            showStep(index);
+            invalid.reportValidity();
+            event.preventDefault();
+            return;
+          }
+        }
+      });
+      showStep(0);
+    }
   }
 
   if (!list) {
@@ -583,23 +635,29 @@ document.documentElement.classList.add("js");
     });
   });
 
-  list.addEventListener("click", function handleVacancyAction(event) {
-    const button = event.target.closest("button");
-    const row = button && button.closest("[data-vacancy-row]");
-    if (!button || !row) {
-      return;
-    }
-    if (button.hasAttribute("data-vacancy-toggle")) {
-      const status = "published" === row.dataset.status ? "closed" : "published";
-      setStatus(row, status);
-      showFeedback("Status lowongan diperbarui pada pratinjau.");
-    } else if (button.hasAttribute("data-vacancy-archive")) {
-      setStatus(row, "archived");
-      button.remove();
-      showFeedback("Lowongan diarsipkan pada pratinjau.");
-    }
-    applyStatusFilter();
-  });
+})();
+
+(function departmentRequestReview() {
+  const reviewForm = document.querySelector("[data-department-review-form]");
+  if (!reviewForm) {
+    return;
+  }
+  const publishFields = reviewForm.querySelector("[data-publish-request-fields]");
+  const publishInputs = Array.from(
+    publishFields.querySelectorAll("[data-publish-required]"),
+  );
+  const updatePublishFields = function updatePublishFields() {
+    const decision = reviewForm.querySelector(
+      '[name="decision"]:checked, [name="decision"][type="hidden"]',
+    );
+    const requiresPublication = decision && "approve" === decision.value;
+    publishFields.hidden = !requiresPublication;
+    publishInputs.forEach(function updateRequired(input) {
+      input.required = Boolean(requiresPublication);
+    });
+  };
+  reviewForm.addEventListener("change", updatePublishFields);
+  updatePublishFields();
 })();
 
 (function recruitmentFormBuilder() {
@@ -645,6 +703,11 @@ document.documentElement.classList.add("js");
       const questions = Array.from(
         section.querySelectorAll("[data-form-question]"),
       );
+      const removeSection = section.querySelector("[data-remove-section]");
+      if (removeSection) {
+        removeSection.disabled =
+          null !== section.querySelector("[data-fixed-question]");
+      }
       questionTotal += questions.length;
       section.querySelector("[data-section-question-count]").textContent =
         String(questions.length);
@@ -912,10 +975,28 @@ document.documentElement.classList.add("js");
   const choices = form.querySelector("[data-question-choices]");
   const choicesLabel = form.querySelector("[data-question-choices-label]");
   const answerLabel = form.querySelector("[data-question-answer-label]");
+  const testSelect = form.querySelector("[data-question-test]");
+  const subtestSelect = form.querySelector("[data-question-subtest]");
+  const testValue = form.querySelector("[data-question-test-value]");
+  const subtestValue = form.querySelector("[data-question-subtest-value]");
+  const typeValue = form.querySelector("[data-question-type-value]");
+  const subtestLabel = form.querySelector("[data-question-subtest-label]");
+  const promptHelp = form.querySelector("[data-question-prompt-help]");
+  const typeSelect = form.querySelector("[data-question-type]");
   const updateTypeFields = function updateTypeFields() {
+    const test = testSelect.value;
     const type = form.querySelector("[data-question-type]").value;
-    choicesLabel.hidden = "numeric" === type;
-    answerLabel.hidden = !["multiple_choice", "numeric"].includes(type);
+    choicesLabel.hidden = "iq" !== test;
+    answerLabel.hidden = "iq" !== test || !["multiple_choice", "multi_select"].includes(type);
+    subtestLabel.hidden = "iq" !== test;
+    promptHelp.textContent =
+      "disc" === test
+        ? "Masukkan tepat 4 pernyataan, satu per baris."
+        : "papi" === test
+          ? "Masukkan tepat 2 pernyataan, satu per baris."
+          : "pauli" === test
+            ? "Ubah label kolom tanpa mengubah urutan tes."
+            : "";
   };
   const openDialog = function openDialog(question) {
     form.reset();
@@ -928,27 +1009,21 @@ document.documentElement.classList.add("js");
     form.querySelector("[data-question-type]").value = question
       ? question.dataset.type
       : "multiple_choice";
-    form.querySelector("[data-question-status]").value = question
-      ? question.dataset.status
-      : "active";
+    subtestSelect.value = question ? question.dataset.subtest : "iq_numbers";
+    testValue.value = testSelect.value;
+    subtestValue.value = subtestSelect.value;
+    typeValue.value = typeSelect.value;
     prompt.value = question ? question.dataset.prompt : "";
     choices.value = question ? question.dataset.choices : "";
     form.querySelector("[data-question-answer]").value = question
       ? question.dataset.answer
       : "";
-    bank.querySelector("#question-dialog-title").textContent = question
-      ? "Edit Soal"
-      : "Tambah Soal";
+    bank.querySelector("#question-dialog-title").textContent = "Edit Soal";
     updateTypeFields();
     dialog.showModal();
     prompt.focus();
   };
 
-  bank
-    .querySelector("[data-open-question-dialog]")
-    .addEventListener("click", function addQuestion() {
-      openDialog(null);
-    });
   bank
     .querySelectorAll("[data-edit-question]")
     .forEach(function bindEditButton(button) {
@@ -956,9 +1031,7 @@ document.documentElement.classList.add("js");
         openDialog(button);
       });
     });
-  form
-    .querySelector("[data-question-type]")
-    .addEventListener("change", updateTypeFields);
+  typeSelect.addEventListener("change", updateTypeFields);
   dialog
     .querySelectorAll("[data-close-question-dialog]")
     .forEach(function bindClose(button) {

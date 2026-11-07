@@ -161,7 +161,7 @@ $pipeline_rows = [
             <span class="recruitment-dashboard__quick-title">Database Pelamar</span>
             <span class="recruitment-dashboard__quick-description">Arsip dan riwayat lamaran</span>
         </a>
-        <a class="recruitment-dashboard__quick-card recruitment-dashboard__quick-card--red" href="<?= esc_url( admin_url( 'post-new.php?post_type=daw_vacancy' ) ) ?>">
+        <a class="recruitment-dashboard__quick-card recruitment-dashboard__quick-card--red" href="<?= esc_url( add_query_arg( 'view', 'create', recruitment_get_admin_url( 'vacancies' ) ) ) ?>">
             <span class="recruitment-dashboard__icon dashicons dashicons-plus-alt2" aria-hidden="true"></span>
             <span class="recruitment-dashboard__quick-title">Buat Lowongan</span>
             <span class="recruitment-dashboard__quick-description">Tambah posisi baru</span>

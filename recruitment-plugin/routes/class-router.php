@@ -23,6 +23,9 @@ class Recruitment_Router {
         'psychotest'         => 'public/pages/psychotest-home.php',
         'psychotest-preparation' => 'public/pages/psychotest-preparation.php',
         'psychotest-device'  => 'public/pages/psychotest-device.php',
+        'psych-iq'           => 'public/pages/iq-assessment.php',
+        'psych-pauli'        => 'public/pages/pauli-assessment.php',
+        'psych-personality'  => 'public/pages/personality-assessment.php',
         'application-status' => 'public/pages/application-history.php',
         'tracking-detail'    => 'public/pages/application-process.php',
         'login'              => 'admin/pages/login.php',
@@ -41,6 +44,7 @@ class Recruitment_Router {
         'hr-profile'         => 'admin/pages/hr-profile.php',
         'application-form-builder' => 'admin/pages/application-form-builder.php',
         'psychotest-settings' => 'admin/pages/psychotest-settings.php',
+        'personality-results' => 'admin/pages/personality-results.php',
         'question-bank'      => 'admin/pages/question-bank.php',
         'settings'           => 'admin/pages/settings.php',
     ];
@@ -60,6 +64,7 @@ class Recruitment_Router {
         'hr-profile',
         'application-form-builder',
         'psychotest-settings',
+        'personality-results',
         'question-bank',
         'settings',
     ];
@@ -74,12 +79,14 @@ class Recruitment_Router {
         'application-detail',
         'application-status',
         'application-process',
-        'tracking-detail',
         'interview-booking',
         'psych-test',
         'psychotest',
         'psychotest-preparation',
         'psychotest-device',
+        'psych-iq',
+        'psych-pauli',
+        'psych-personality',
     ];
 
     /**
