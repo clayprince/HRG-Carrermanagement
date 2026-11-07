@@ -7,6 +7,7 @@ class Recruitment_Admin {
 		add_action( 'admin_post_daw_create_vacancy', [ $this, 'handle_vacancy_creation' ] );
 		add_action( 'admin_post_daw_set_vacancy_status', [ $this, 'handle_vacancy_status_change' ] );
 		add_action( 'admin_post_daw_save_application_form', [ $this, 'handle_application_form_save' ] );
+		add_action( 'admin_post_daw_save_final_decision', [ $this, 'handle_final_decision_save' ] );
 		add_action( 'admin_post_daw_save_department_request', [ $this, 'handle_department_request_post' ] );
 		add_action( 'admin_post_daw_review_department_request', [ $this, 'handle_department_request_review' ] );
 		add_action( 'admin_post_daw_create_department_account', [ $this, 'handle_department_account_creation' ] );
@@ -756,6 +757,29 @@ class Recruitment_Admin {
 		$result = ( new Recruitment_Database() )->save_application_form( $normalized['sections'] );
 		$notice = ! empty( $result['success'] ) ? 'saved' : 'save_failed';
 		wp_safe_redirect( add_query_arg( 'form_notice', $notice, admin_url( 'admin.php?page=recruitment-form-builder' ) ) );
+		exit;
+	}
+
+	public function handle_final_decision_save(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengubah keputusan akhir.', 'recruitment-plugin' ) );
+		}
+
+		$candidate_id = isset( $_POST['candidate_id'] ) && is_scalar( $_POST['candidate_id'] )
+			? absint( wp_unslash( (string) $_POST['candidate_id'] ) )
+			: 0;
+		check_admin_referer( 'daw_save_final_decision_' . $candidate_id );
+		$decision = isset( $_POST['decision'] ) && is_scalar( $_POST['decision'] )
+			? sanitize_text_field( wp_unslash( (string) $_POST['decision'] ) )
+			: '';
+		$result = ( new Recruitment_Database() )->save_final_decision( $candidate_id, $decision );
+		$notice = ! empty( $result['success'] ) ? 'saved' : 'failed';
+		wp_safe_redirect(
+			add_query_arg(
+				[ 'page' => 'recruitment-final-decision', 'section' => 'decision', 'decision_notice' => $notice ],
+				admin_url( 'admin.php' )
+			)
+		);
 		exit;
 	}
 

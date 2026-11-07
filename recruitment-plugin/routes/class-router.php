@@ -79,7 +79,6 @@ class Recruitment_Router {
         'application-detail',
         'application-status',
         'application-process',
-        'tracking-detail',
         'interview-booking',
         'psych-test',
         'psychotest',

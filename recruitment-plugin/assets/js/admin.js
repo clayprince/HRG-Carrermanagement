@@ -975,10 +975,28 @@ document.documentElement.classList.add("js");
   const choices = form.querySelector("[data-question-choices]");
   const choicesLabel = form.querySelector("[data-question-choices-label]");
   const answerLabel = form.querySelector("[data-question-answer-label]");
+  const testSelect = form.querySelector("[data-question-test]");
+  const subtestSelect = form.querySelector("[data-question-subtest]");
+  const testValue = form.querySelector("[data-question-test-value]");
+  const subtestValue = form.querySelector("[data-question-subtest-value]");
+  const typeValue = form.querySelector("[data-question-type-value]");
+  const subtestLabel = form.querySelector("[data-question-subtest-label]");
+  const promptHelp = form.querySelector("[data-question-prompt-help]");
+  const typeSelect = form.querySelector("[data-question-type]");
   const updateTypeFields = function updateTypeFields() {
+    const test = testSelect.value;
     const type = form.querySelector("[data-question-type]").value;
-    choicesLabel.hidden = "numeric" === type;
-    answerLabel.hidden = !["multiple_choice", "numeric"].includes(type);
+    choicesLabel.hidden = "iq" !== test;
+    answerLabel.hidden = "iq" !== test || !["multiple_choice", "multi_select"].includes(type);
+    subtestLabel.hidden = "iq" !== test;
+    promptHelp.textContent =
+      "disc" === test
+        ? "Masukkan tepat 4 pernyataan, satu per baris."
+        : "papi" === test
+          ? "Masukkan tepat 2 pernyataan, satu per baris."
+          : "pauli" === test
+            ? "Ubah label kolom tanpa mengubah urutan tes."
+            : "";
   };
   const openDialog = function openDialog(question) {
     form.reset();
@@ -991,27 +1009,21 @@ document.documentElement.classList.add("js");
     form.querySelector("[data-question-type]").value = question
       ? question.dataset.type
       : "multiple_choice";
-    form.querySelector("[data-question-status]").value = question
-      ? question.dataset.status
-      : "active";
+    subtestSelect.value = question ? question.dataset.subtest : "iq_numbers";
+    testValue.value = testSelect.value;
+    subtestValue.value = subtestSelect.value;
+    typeValue.value = typeSelect.value;
     prompt.value = question ? question.dataset.prompt : "";
     choices.value = question ? question.dataset.choices : "";
     form.querySelector("[data-question-answer]").value = question
       ? question.dataset.answer
       : "";
-    bank.querySelector("#question-dialog-title").textContent = question
-      ? "Edit Soal"
-      : "Tambah Soal";
+    bank.querySelector("#question-dialog-title").textContent = "Edit Soal";
     updateTypeFields();
     dialog.showModal();
     prompt.focus();
   };
 
-  bank
-    .querySelector("[data-open-question-dialog]")
-    .addEventListener("click", function addQuestion() {
-      openDialog(null);
-    });
   bank
     .querySelectorAll("[data-edit-question]")
     .forEach(function bindEditButton(button) {
@@ -1019,9 +1031,7 @@ document.documentElement.classList.add("js");
         openDialog(button);
       });
     });
-  form
-    .querySelector("[data-question-type]")
-    .addEventListener("change", updateTypeFields);
+  typeSelect.addEventListener("change", updateTypeFields);
   dialog
     .querySelectorAll("[data-close-question-dialog]")
     .forEach(function bindClose(button) {

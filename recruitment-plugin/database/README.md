@@ -56,6 +56,10 @@ it is not a live-schema verification.
 - The HR personality-results screen follows those WordPress session records
   to read the corresponding Oracle response and result IDs. This does not
   establish a direct candidate-to-result relationship in Oracle.
+- The HR question bank reads and edits existing Oracle IQ, Pauli, DISC, and
+  PAPI questions. It preserves question IDs, order, active state, and the
+  assessment's fixed question/answer counts; adding or disabling questions is
+  not supported.
 - IQ, Pauli, DISC, and PAPI routes require the `daw_applicant` role.
 
 ## Schema alignment and migrations
@@ -130,10 +134,10 @@ must not be applied until the Oracle owner approves it.
 
 ## Current prototype persistence
 
-The User Department request and interview-rating UI currently stores those
-records in WordPress user meta. Candidate lists, results, and various summary
-values are prototype data. They are not Oracle CRUD and must not be presented
-as live recruitment records.
+The User Department request UI currently stores those records in WordPress
+user meta. Candidate lists and interview ratings use Oracle CRUD only where
+the gateway and target schema are aligned; remaining prototype values must not
+be presented as live recruitment records.
 
 Some legacy application and vacancy gateway methods still contain
 `DAW_*`-table operations; they need schema reconciliation before being treated
