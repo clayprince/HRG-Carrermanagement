@@ -6,6 +6,17 @@ migration log.
 
 ## 2026-11-08
 
+### Personality assessment stage
+
+- Grouped DISC and PAPI Kostick under one applicant-facing Personality stage;
+  the overall sequence and progress now contain three stages: IQ, Pauli, and
+  Personality.
+- Aligned new personality sessions to the supplied PDFs: 24 DISC groups of
+  four statements with distinct most/least selections, followed by 90 required
+  PAPI pairs with one selection each. Sessions use the Oracle display order.
+- Kept DISC and PAPI result records separate in Oracle while grouping their
+  presentation in applicant progress and HR result headings.
+
 ### Pauli online assessment
 
 - Replaced the Pauli worksheet with a one-sum-at-a-time interface, keyboard

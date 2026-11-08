@@ -4,12 +4,18 @@ $user_id = recruitment_get_assessment_user_id();
 $iq_state = recruitment_get_assessment_state( $user_id, 'recruitment_iq_assessment' );
 $pauli_state = recruitment_get_assessment_state( $user_id, 'recruitment_pauli_assessment' );
 $personality_state = recruitment_get_assessment_state( $user_id, 'recruitment_personality_assessment' );
+$personality_tests = is_array( $personality_state['tests'] ?? null ) ? $personality_state['tests'] : [];
 $iq_complete = is_array( $iq_state ) && 'complete' === ( $iq_state['status'] ?? '' );
 $pauli_complete = is_array( $pauli_state ) && 'complete' === ( $pauli_state['status'] ?? '' );
-$disc_complete = is_array( $personality_state ) && 'complete' === ( $personality_state['tests']['disc']['status'] ?? '' );
-$papi_complete = is_array( $personality_state ) && 'complete' === ( $personality_state['tests']['papi']['status'] ?? '' );
-$completed_count = count( array_filter( [ $iq_complete, $pauli_complete, $disc_complete, $papi_complete ] ) );
-$progress = (int) round( $completed_count / 4 * 100 );
+$disc_complete = 'complete' === ( $personality_tests['disc']['status'] ?? '' );
+$papi_complete = 'complete' === ( $personality_tests['papi']['status'] ?? '' );
+$personality_complete = $disc_complete && $papi_complete;
+$personality_active_test = is_array( $personality_state ) ? sanitize_key( (string) ( $personality_state['active_test'] ?? '' ) ) : '';
+$personality_next_test = 'papi' === $personality_active_test || $disc_complete ? 'papi' : 'disc';
+$personality_active = in_array( $personality_active_test, [ 'disc', 'papi' ], true )
+    && 'active' === ( $personality_tests[ $personality_active_test ]['status'] ?? '' );
+$completed_count = count( array_filter( [ $iq_complete, $pauli_complete, $personality_complete ] ) );
+$progress = (int) round( $completed_count / 3 * 100 );
 $assessment_database = new Recruitment_Database();
 $pauli_assessments = $assessment_database->get_pauli_assessment();
 $pauli_question_count = count( (array) ( $pauli_assessments[0]['questions'] ?? [] ) );
@@ -19,6 +25,16 @@ $pauli_duration = $assessment_database->has_error() || $pauli_question_count < 2
 $pauli_duration_label = $pauli_duration > 0
     ? $pauli_duration . ' menit'
     : 'Belum tersedia';
+$personality_assessments = $assessment_database->get_personality_assessments();
+$disc_assessment = $personality_assessments['disc'] ?? [];
+$papi_assessment = $personality_assessments['papi'] ?? [];
+$disc_questions = (array) ( $disc_assessment['questions'] ?? [] );
+$papi_questions = (array) ( $papi_assessment['questions'] ?? [] );
+$personality_ready = ! $assessment_database->has_error()
+    && 24 === count( $disc_questions )
+    && 90 === count( $papi_questions )
+    && 24 === count( array_filter( $disc_questions, static fn ( array $question ): bool => 4 === count( (array) ( $question['items'] ?? [] ) ) ) )
+    && 90 === count( array_filter( $papi_questions, static fn ( array $question ): bool => 2 === count( (array) ( $question['items'] ?? [] ) ) ) );
 $tests = [
     [
         'number' => '01',
@@ -44,25 +60,16 @@ $tests = [
     ],
     [
         'number' => '03',
-        'title' => 'DISC',
-        'description' => 'Asesmen Perilaku',
-        'duration' => 'Tanpa batas waktu · pengingat setelah 20 menit',
-        'complete' => $disc_complete,
-        'active' => is_array( $personality_state ) && 'active' === ( $personality_state['tests']['disc']['status'] ?? '' ),
-        'unlocked' => $pauli_complete,
+        'title' => 'KEPRIBADIAN',
+        'description' => 'DISC, lalu PAPI Kostick',
+        'duration' => $personality_ready
+            ? 'DISC 24 nomor · PAPI Kostick 90 pasang · tanpa batas waktu'
+            : 'Bank soal DISC/PAPI belum memenuhi format PDF',
+        'complete' => $personality_complete,
+        'active' => $personality_active,
+        'unlocked' => $personality_active || ( $pauli_complete && $personality_ready ),
         'screen' => 'psych-personality',
-        'test' => 'disc',
-    ],
-    [
-        'number' => '04',
-        'title' => 'PAPI KOSTICK',
-        'description' => 'Asesmen Preferensi dalam Lingkungan Kerja',
-        'duration' => 'Tanpa batas waktu · pengingat setelah 30 menit',
-        'complete' => $papi_complete,
-        'active' => is_array( $personality_state ) && 'active' === ( $personality_state['tests']['papi']['status'] ?? '' ),
-        'unlocked' => $disc_complete,
-        'screen' => 'psych-personality',
-        'test' => 'papi',
+        'test' => $personality_active ? $personality_active_test : $personality_next_test,
     ],
 ];
 ?>
@@ -76,11 +83,11 @@ $tests = [
                 <div class="daw-recruitment__psychotest-header-copy">
                     <span class="daw-recruitment__eyebrow daw-recruitment__eyebrow--red">TES PSIKOLOGI ONLINE</span>
                     <h1>Tes Psikologi</h1>
-                    <p>Selesaikan tes secara berurutan. Jawaban tersimpan saat Anda mengerjakannya. Tes Pauli berlangsung 60 menit dengan pergantian lajur setiap tiga menit.</p>
+                    <p>Selesaikan tiga tahap secara berurutan. Tahap Kepribadian terdiri dari DISC dan PAPI Kostick; jawaban tersimpan saat Anda mengerjakannya.</p>
                 </div>
                 <div class="daw-recruitment__psychotest-counter" aria-label="Progress tes psikologi">
-                    <span class="daw-recruitment__muted-small"><?= esc_html( (string) $completed_count ) ?> / 4</span>
-                    <strong>Tes Selesai</strong>
+                    <span class="daw-recruitment__muted-small"><?= esc_html( (string) $completed_count ) ?> / 3</span>
+                    <strong>Tahap Selesai</strong>
                 </div>
             </header>
 
@@ -93,7 +100,7 @@ $tests = [
                     <span style="width: <?= esc_attr( (string) $progress ) ?>%"></span>
                 </div>
                 <div class="daw-recruitment__psychotest-summary-meta">
-                    <span><?= esc_html( (string) $completed_count ) ?> dari 4 tes selesai</span>
+                    <span><?= esc_html( (string) $completed_count ) ?> dari 3 tahap selesai</span>
                     <span><?= esc_html( (string) $progress ) ?>%</span>
                 </div>
             </section>

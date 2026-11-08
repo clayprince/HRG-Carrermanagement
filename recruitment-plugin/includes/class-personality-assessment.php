@@ -9,6 +9,8 @@ class Recruitment_Personality_Assessment {
     private const IQ_USER_META_KEY = 'recruitment_iq_assessment';
     private const PAULI_USER_META_KEY = 'recruitment_pauli_assessment';
     private const REMINDER_MINUTES = [ 'disc' => 20, 'papi' => 30 ];
+    private const QUESTION_COUNTS = [ 'disc' => 24, 'papi' => 90 ];
+    private const ITEM_COUNTS = [ 'disc' => 4, 'papi' => 2 ];
 
     private Recruitment_Database $database;
 
@@ -128,8 +130,7 @@ class Recruitment_Personality_Assessment {
                 return [ 'error' => 'Soal pada sesi ini tidak lagi tersedia. Silakan hubungi tim HR.' ];
             }
             $question = $questions_by_id[ $question_id ];
-            $expected_items = 'disc' === $test_key ? 4 : 2;
-            if ( $expected_items !== count( (array) ( $question['items'] ?? [] ) ) ) {
+            if ( self::ITEM_COUNTS[ $test_key ] !== count( (array) ( $question['items'] ?? [] ) ) ) {
                 return [ 'error' => 'Bank soal kepribadian tidak memiliki jumlah pernyataan yang valid. Silakan hubungi tim HR.' ];
             }
             $question['answer'] = $test_state['answers'][ $question_id ] ?? [];
@@ -143,7 +144,9 @@ class Recruitment_Personality_Assessment {
             'title' => 'disc' === $test_key ? 'DISC' : 'PAPI Kostick',
             'duration' => self::REMINDER_MINUTES[ $test_key ],
             'started_at' => absint( $test_state['started_at'] ),
-            'instructions' => (string) $test['INSTRUCTIONS'],
+            'instructions' => 'disc' === $test_key
+                ? 'Setiap nomor berisi empat pernyataan. Pilih tepat satu yang paling menggambarkan dan satu yang paling tidak menggambarkan diri Anda; kedua pilihan harus berbeda.'
+                : 'Terdapat 90 pasangan pernyataan. Pilih satu pernyataan yang paling mencerminkan diri Anda pada setiap pasangan dan jawab seluruh nomor.',
             'questions' => $questions,
             'answered_count' => count( $test_state['answers'] ),
             'question_count' => count( $questions ),
@@ -202,7 +205,6 @@ class Recruitment_Personality_Assessment {
             foreach ( [ 'disc', 'papi' ] as $key ) {
                 $test = $catalog[ $key ];
                 $question_order = array_map( 'intval', array_column( $test['questions'], 'id' ) );
-                shuffle( $question_order );
                 $state['tests'][ $key ] = [
                     'id' => (int) $test['ID'],
                     'status' => 'disc' === $key ? 'available' : 'locked',
@@ -254,13 +256,12 @@ class Recruitment_Personality_Assessment {
         foreach ( [ 'disc', 'papi' ] as $key ) {
             if ( ! isset( $catalog[ $key ] )
                 || self::REMINDER_MINUTES[ $key ] !== (int) $catalog[ $key ]['DURATION']
-                || empty( $catalog[ $key ]['questions'] )
+                || self::QUESTION_COUNTS[ $key ] !== count( (array) ( $catalog[ $key ]['questions'] ?? [] ) )
                 || (int) $catalog[ $key ]['QUESTION_COUNT'] !== count( $catalog[ $key ]['questions'] ) ) {
                 return false;
             }
-            $expected_items = 'disc' === $key ? 4 : 2;
             foreach ( $catalog[ $key ]['questions'] as $question ) {
-                if ( $expected_items !== count( (array) ( $question['items'] ?? [] ) ) ) {
+                if ( self::ITEM_COUNTS[ $key ] !== count( (array) ( $question['items'] ?? [] ) ) ) {
                     return false;
                 }
             }

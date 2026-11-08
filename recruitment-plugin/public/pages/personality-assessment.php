@@ -6,6 +6,8 @@ $view = ( new Recruitment_Personality_Assessment() )->get_page_view();
 $psychotest_home_url = recruitment_get_public_url( 'psychotest' );
 $preparation_url = recruitment_get_public_url( 'psychotest-preparation', [ 'test' => $test_key ] );
 $next_preparation_url = recruitment_get_public_url( 'psychotest-preparation', [ 'test' => 'papi' ] );
+$question_label = 'papi' === $test_key ? 'Pasangan' : 'Nomor';
+$progress_label = 'papi' === $test_key ? 'pasang terjawab' : 'nomor terjawab';
 ?>
 <div class="daw-recruitment daw-recruitment--psych-test daw-recruitment--personality">
     <?php require recruitment_get_plugin_path( 'public/components/header.php' ); ?>
@@ -63,7 +65,7 @@ $next_preparation_url = recruitment_get_public_url( 'psychotest-preparation', [ 
                     </header>
 
                     <div class="daw-personality-assessment__progress">
-                        <span><strong data-personality-progress><?= esc_html( (string) $view['answered_count'] ) ?></strong> / <?= esc_html( (string) $view['question_count'] ) ?> soal terjawab</span>
+                        <span><strong data-personality-progress><?= esc_html( (string) $view['answered_count'] ) ?></strong> / <?= esc_html( (string) $view['question_count'] ) ?> <?= esc_html( $progress_label ) ?></span>
                         <span>Autosave aktif</span>
                     </div>
                     <p class="daw-personality-assessment__reminder" data-personality-reminder role="status" hidden></p>
@@ -79,8 +81,8 @@ $next_preparation_url = recruitment_get_public_url( 'psychotest-preparation', [ 
                                 ?>
                                 <?php if ( 'disc' === $view['test_key'] ) : ?>
                                     <fieldset class="daw-personality-assessment__question daw-personality-assessment__question--disc" data-personality-question="<?= esc_attr( (string) $question_id ) ?>">
-                                        <legend><strong>Nomor <?= esc_html( (string) $question['number'] ) ?></strong><span>Pilih satu yang paling menggambarkan dan satu yang paling tidak menggambarkan diri Anda.</span></legend>
-                                        <div class="daw-personality-assessment__disc-head" aria-hidden="true"><span>Pernyataan</span><span>Paling menggambarkan</span><span>Paling tidak</span></div>
+                                        <legend><strong><?= esc_html( $question_label ) ?> <?= esc_html( (string) $question['number'] ) ?></strong><span>Pilih satu yang paling menggambarkan dan satu yang paling tidak menggambarkan diri Anda.</span></legend>
+                                        <div class="daw-personality-assessment__disc-head" aria-hidden="true"><span>Pernyataan</span><span>P · Paling menggambarkan</span><span>K · Paling tidak</span></div>
                                         <?php foreach ( $question['items'] as $item_index => $item ) : ?>
                                             <div class="daw-personality-assessment__disc-row">
                                                 <span><?= esc_html( $item ) ?></span>
@@ -91,7 +93,7 @@ $next_preparation_url = recruitment_get_public_url( 'psychotest-preparation', [ 
                                     </fieldset>
                                 <?php else : ?>
                                     <fieldset class="daw-personality-assessment__question daw-personality-assessment__question--papi" data-personality-question="<?= esc_attr( (string) $question_id ) ?>">
-                                        <legend><strong>Nomor <?= esc_html( (string) $question['number'] ) ?></strong><span>Pilih satu pernyataan yang paling mencerminkan diri Anda.</span></legend>
+                                        <legend><strong><?= esc_html( $question_label ) ?> <?= esc_html( (string) $question['number'] ) ?></strong><span>Pilih satu pernyataan yang paling mencerminkan diri Anda.</span></legend>
                                         <div class="daw-personality-assessment__pairs">
                                             <?php foreach ( $question['items'] as $item_index => $item ) : ?>
                                                 <label class="daw-personality-assessment__pair">

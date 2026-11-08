@@ -53,12 +53,15 @@ $admin_user = wp_get_current_user();
     <table class="widefat striped">
         <thead>
             <tr>
-                <th>Kandidat</th>
-                <th>ID akun WordPress</th>
+                <th rowspan="2">Kandidat</th>
+                <th rowspan="2">ID akun WordPress</th>
+                <th colspan="2">Tahap Kepribadian</th>
+                <th rowspan="2">Jawaban tersimpan</th>
+                <th rowspan="2">Data jawaban</th>
+            </tr>
+            <tr>
                 <th>DISC</th>
                 <th>PAPI Kostick</th>
-                <th>Jawaban tersimpan</th>
-                <th>Data jawaban</th>
             </tr>
         </thead>
         <tbody>

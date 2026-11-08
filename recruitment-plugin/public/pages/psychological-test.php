@@ -13,14 +13,12 @@ $complete_url = recruitment_get_public_url( 'psych-test', [ 'state' => 'complete
                 <div class="daw-psych-test-icon daw-psych-test-icon--success" aria-hidden="true">&#10003;</div>
                 <h1>Seluruh Tes Selesai</h1>
                 <p>Semua rangkaian tes psikologi telah diselesaikan. Periksa kembali sebelum mengirim hasil.</p>
-                <div class="daw-psych-test-progress-heading"><strong>RANGKUMAN TES</strong><span>5 / 5 Selesai</span></div>
+                <div class="daw-psych-test-progress-heading"><strong>RANGKUMAN TAHAP TES</strong><span>3 / 3 Selesai</span></div>
                 <div class="daw-psych-test-progress"><span></span></div>
                 <div class="daw-psych-test-list">
                     <div><i>&#10003;</i><strong>IQ</strong><span>Tes Kemampuan Intelektual</span><b>Selesai</b></div>
                     <div><i>&#10003;</i><strong>Pauli</strong><span>Tes Ketelitian dan Kecepatan Kerja</span><b>Selesai</b></div>
-                    <div><i>&#10003;</i><strong>Kepribadian</strong><span>Asesmen Karakteristik Individu</span><b>Selesai</b></div>
-                    <div><i>&#10003;</i><strong>DISC</strong><span>Asesmen Perilaku</span><b>Selesai</b></div>
-                    <div><i>&#10003;</i><strong>PAPI Kostick</strong><span>Asesmen Preferensi dalam Lingkungan Kerja</span><b>Selesai</b></div>
+                    <div><i>&#10003;</i><strong>Kepribadian</strong><span>DISC dan PAPI Kostick selesai</span><b>Selesai</b></div>
                 </div>
                 <div class="daw-psych-test-warning"><span aria-hidden="true">&#9888;</span><p>Pastikan seluruh rangkaian tes telah Anda selesaikan sebelum mengirim hasil. Setelah dikirim, jawaban tidak dapat diubah kembali.</p></div>
                 <a class="daw-psych-test-button" href="<?= esc_url( $processing_url ) ?>">Kirim Hasil</a>
@@ -43,9 +41,7 @@ $complete_url = recruitment_get_public_url( 'psych-test', [ 'state' => 'complete
                     <strong>Tes yang telah diselesaikan:</strong>
                     <span><i>&#10003;</i>IQ</span>
                     <span><i>&#10003;</i>Pauli</span>
-                    <span><i>&#10003;</i>Kepribadian</span>
-                    <span><i>&#10003;</i>DISC</span>
-                    <span><i>&#10003;</i>PAPI Kostick</span>
+                    <span><i>&#10003;</i>Kepribadian (DISC dan PAPI Kostick)</span>
                 </div>
                 <div class="daw-psych-test-next-notice"><strong>SELANJUTNYA</strong><p>Tim HR akan melakukan proses validasi dan memberikan informasi mengenai tahapan berikutnya melalui akun pelamar.</p></div>
                 <a class="daw-psych-test-button" href="<?= esc_url( recruitment_get_public_url( 'application-process' ) ) ?>">Kembali ke Proses Lamaran</a>

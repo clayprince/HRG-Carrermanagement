@@ -114,8 +114,14 @@ their SQL is compatible with the current Oracle database.
   minutes. Each lane supports up to 900 answers; the applicant can use the
   on-screen keypad or keyboard, and Oracle stores the generated number sequence,
   submitted digits, and correct-answer score. The Pauli bank must contain at
-  least 20 questions to provide the fixed one-hour session. DISC questions
-  require four statements and PAPI questions require two.
+  least 20 questions to provide the fixed one-hour session. The applicant
+  psychotest flow has three stages: IQ, Pauli, and Personality. Personality is
+  completed in order as two separately persisted subtests: DISC (24 groups of
+  four statements, one "most" and one distinct "least" choice per group), then
+  PAPI Kostick (90 pairs, one required choice per pair). These question counts
+  and response shapes follow the supplied company reference PDFs. Questions
+  retain Oracle display order, and neither personality subtest has a hard time
+  limit; the displayed elapsed-time reminders do not end a session.
 - Active assessment sessions keep their original question order when HR adds
   questions; new questions are included in sessions started afterward.
 - Psychometric routes require an authenticated applicant portal session.
