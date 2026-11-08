@@ -239,7 +239,14 @@ if ( 'POST' === $request_method ) {
         $email = (string) ( $result['payload']['applicant_email'] ?? $email );
         if ( $result['success'] ) {
             $confirmation_key = 'daw_applicant_confirmation_' . hash( 'sha256', (string) $applicant['session_token'] );
-            set_transient( $confirmation_key, true, 5 * MINUTE_IN_SECONDS );
+            set_transient(
+                $confirmation_key,
+                [
+                    'application_id'    => (string) ( $result['application_id'] ?? '' ),
+                    'application_token' => (string) ( $result['application_token'] ?? '' ),
+                ],
+                5 * MINUTE_IN_SECONDS
+            );
             wp_safe_redirect( recruitment_get_public_url( 'application-confirmation' ) );
             exit;
         }

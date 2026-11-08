@@ -34,9 +34,10 @@ it is not a live-schema verification.
 
 - Applicants authenticate against `HRS_PROFILE_KANDIDAT_LOGIN`, linked to
   their personal data in `HRS_PROFIL_KANDIDAT`. Migration
-  `migrations/009_candidate_account_auth.sql` adds the password and account
-  status fields; it must be reviewed and applied by the authorized Oracle
-  owner before account registration and login can work.
+  [`migrations/009_candidate_account_auth.sql`](migrations/009_candidate_account_auth.sql)
+  adds the password and account status fields. With explicit user approval, it
+  was applied to the Oracle schema connected to this workspace on 2026-11-08.
+  It is not applied automatically in other environments.
 - Admin HR and Kepala Departemen authenticate against `HRS_ROLE_AKSES`.
   `PERAN` must be `ADMIN_HR` or `KEPALA_DEPARTEMEN`; email and username are
   stored in the same account row.
@@ -51,11 +52,10 @@ it is not a live-schema verification.
   bridges, not copies of Oracle passwords.
 - Applicant signup and edit-profile store extended education, work history,
   family, interests, and private document metadata in
-  `HRS_PROFIL_KANDIDAT_DETAIL`. Review and apply
+  `HRS_PROFIL_KANDIDAT_DETAIL`. With explicit user approval, migration
   [`migrations/010_applicant_profile_details.sql`](migrations/010_applicant_profile_details.sql)
-  before enabling the expanded registration form. It was applied to the
-  Oracle schema connected to this workspace on 2026-11-06 with explicit user
-  approval; it is not applied automatically in other environments.
+  was applied to the Oracle schema connected to this workspace on 2026-11-08.
+  It is not applied automatically in other environments.
   Registration rolls back the account transaction when this table is
   unavailable, so no incomplete account is left behind.
 - Applicant photos, resumes, and portfolios are stored under the WordPress
@@ -223,6 +223,29 @@ schema contains the expected table and approves the change. Migration
 applicant authentication flow.
 Migration `004_portal_account_status.sql` is also only a reviewed draft and
 must not be applied until the Oracle owner approves it.
+
+## Application tracking tokens
+
+The active HRS application flow creates a unique `APPLICATION_TOKEN` for each
+new `HRS_LAMARAN` record and links each new dynamic-form snapshot to its
+`LAMARAN_ID`. The confirmation page displays the token, and the authenticated
+tracking page resolves it only among applications owned by the signed-in
+applicant. HR answer review prefers this direct application link; its older
+email-and-vacancy lookup remains as a compatibility fallback for existing
+snapshots. Tracking also detects when the token column is not installed yet
+and continues listing existing applications without a token rather than
+failing the entire page.
+
+The active token flow requires
+`migrations/013_application_tracking_tokens.sql`. It backfills tokens for
+existing HRS applications and adds the optional submission link. With explicit
+approval, this migration was applied to the Oracle schema connected to this
+workspace on 2026-11-08 and verified to leave no HRS applications without a
+token. It is not applied automatically to other target schemas; review and
+apply it there before accepting new tokenized submissions. Oracle DDL commits
+implicitly. Before applying it elsewhere, older applications remain visible
+but cannot display or be searched by token. Existing form snapshots remain
+unlinked and are handled by the legacy lookup.
 
 ## Adding database functionality
 

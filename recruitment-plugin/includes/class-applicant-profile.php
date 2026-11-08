@@ -255,6 +255,32 @@ class Recruitment_Applicant_Profile {
     }
 
     /**
+     * Store a validated application upload as a private applicant document.
+     *
+     * @param array<string, mixed> $file
+     * @return array<string, string>|null
+     */
+    public function store_uploaded_document( array $file, string $field ): ?array {
+        if ( ! in_array( $field, [ 'profile_photo', 'resume', 'portfolio' ], true ) ) {
+            throw new RuntimeException( 'Unsupported applicant document field.' );
+        }
+
+        $upload = $this->validate_upload(
+            [
+                'error'    => UPLOAD_ERR_OK,
+                'name'     => $file['name'] ?? '',
+                'tmp_name' => $file['tmp_name'] ?? '',
+            ],
+            $field
+        );
+        if ( null === $upload ) {
+            return null;
+        }
+
+        return $this->store_upload( $upload );
+    }
+
+    /**
      * @param array<string, mixed> $document
      */
     public function document_path( array $document ): ?string {

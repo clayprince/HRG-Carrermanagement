@@ -67,11 +67,11 @@ $registration = ! empty( $applicant_profile_registration );
 $profile_disabled = ! empty( $preview ) || ! empty( $applicant_profile_disabled );
 $profile_readonly = ! empty( $applicant_profile_readonly );
 $profile_edit_url = recruitment_get_public_url( 'account-profile', [ 'edit' => '1' ] );
-$profile_readonly_value = static function ( $value ) use ( $profile_edit_url ): string {
+$profile_readonly_value = static function ( $value ): string {
     $value = trim( (string) $value );
     return '' !== $value
         ? esc_html( $value )
-        : '<a class="daw-profile__complete-link" href="' . esc_url( $profile_edit_url ) . '">Lengkapi sekarang!</a>';
+        : '<span class="daw-profile__empty-value">—</span>';
 };
 
 // Helper: render application table
@@ -81,6 +81,7 @@ $render_app_table = static function ( string $prefix, bool $include_row_1 = true
     $application_profile_answers,
     $profile_details,
     $education_options,
+    $registration,
     $profile_disabled,
     $profile_readonly,
     $profile_readonly_value
@@ -190,7 +191,8 @@ $render_app_table = static function ( string $prefix, bool $include_row_1 = true
                     <tr>
                         <th scope="col"><?= 0 === strpos( $prefix, 'keluarga_' ) ? 'Anggota Keluarga' : 'No.' ?></th>
                         <?php foreach ( $fields as $f ) : ?>
-                            <th scope="col"><?= esc_html( 0 === strpos( $prefix, 'keluarga_' ) ? preg_replace( '/^.*\s+[—-]\s+/u', '', (string) $first_row[ $f ]['title'] ) : preg_replace( [ '/\s*[—-]\s*\d+$/u', '/^Prioritas\s+\d+\s*[—-]\s*/u' ], '', (string) $first_row[ $f ]['title'] ) ) ?></th>
+                            <?php $column_title = 0 === strpos( $prefix, 'keluarga_' ) ? preg_replace( '/^.*\s+[—-]\s+/u', '', (string) $first_row[ $f ]['title'] ) : preg_replace( [ '/\s*[—-]\s*\d+$/u', '/^Prioritas\s+\d+\s*[—-]\s*/u' ], '', (string) $first_row[ $f ]['title'] ); ?>
+                            <th scope="col"><?= esc_html( $column_title ) ?><?php if ( $registration && 'pendidikan_formal' === $prefix && in_array( $f, [ 'tingkat', 'nama_sekolah', 'program_studi', 'ipk', 'tahun_lulus' ], true ) ) : ?> <span class="daw-registration__required-mark" aria-label="wajib diisi">*</span><?php endif; ?></th>
                         <?php endforeach; ?>
                     </tr>
                 </thead>
@@ -858,10 +860,10 @@ $render_qa_input = static function ( string $q_key, string $custom_title = '', b
             </div>
 
             <h3 class="daw-profile__subheading">Susunan Keluarga Inti</h3>
-            <p class="daw-profile__section-note"><?= $registration ? 'Isi minimal satu anggota keluarga.' : 'Opsional saat edit. Jika mulai mengisi anggota keluarga, lengkapi semua kolomnya.' ?> Maksimal 50 baris.</p>
+            <p class="daw-profile__section-note"><?= $registration ? 'Isi minimal satu anggota keluarga. Jika mulai mengisi satu baris, semua kolom bertanda * wajib dilengkapi.' : 'Opsional saat edit. Jika mulai mengisi anggota keluarga, lengkapi semua kolomnya.' ?> Maksimal 50 baris.</p>
             <div class="daw-application__table-scroll">
                 <table class="daw-application__table daw-profile__family-table">
-                    <thead><tr><th scope="col">No.</th><th scope="col">Nama Keluarga</th><th scope="col">Hubungan</th><th scope="col">Usia</th><th scope="col">Pendidikan Terakhir</th><th scope="col">Aksi</th></tr></thead>
+                    <thead><tr><th scope="col">No.</th><th scope="col">Nama Keluarga<?php if ( $registration ) : ?> <span class="daw-registration__required-mark" aria-label="wajib diisi">*</span><?php endif; ?></th><th scope="col">Hubungan<?php if ( $registration ) : ?> <span class="daw-registration__required-mark" aria-label="wajib diisi">*</span><?php endif; ?></th><th scope="col">Usia<?php if ( $registration ) : ?> <span class="daw-registration__required-mark" aria-label="wajib diisi">*</span><?php endif; ?></th><th scope="col">Pendidikan Terakhir<?php if ( $registration ) : ?> <span class="daw-registration__required-mark" aria-label="wajib diisi">*</span><?php endif; ?></th><th scope="col">Aksi</th></tr></thead>
                     <tbody data-profile-tbody="family_members">
                         <?php foreach ( $profile_family_members as $index => $member ) : ?>
                             <tr class="daw-profile__family-row" data-profile-row>

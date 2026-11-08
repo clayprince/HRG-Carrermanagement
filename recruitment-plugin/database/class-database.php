@@ -12,6 +12,7 @@ class Recruitment_Database {
 
     private Recruitment_Oracle_Connection $oracle;
     private ?string $last_error = null;
+    private ?bool $application_token_column_exists = null;
 
     /**
      * @param array<string, string> $config Optional configuration overrides.
@@ -92,7 +93,7 @@ class Recruitment_Database {
             if ( $this->is_unique_violation( $exception ) ) {
                 return [ 'success' => false, 'error' => 'email_exists' ];
             }
-            if ( $this->is_missing_table( $exception ) ) {
+            if ( $this->is_missing_schema_object( $exception ) ) {
                 $this->log_error( 'Applicant account creation requires an unapplied Oracle migration', $exception );
                 return [ 'success' => false, 'error' => 'schema_not_ready' ];
             }
@@ -319,8 +320,12 @@ class Recruitment_Database {
         if ( ! ctype_digit( $login_id ) || '0' === $login_id ) {
             return [];
         }
+        $token_column = $this->get_application_token_column_expression();
+        if ( null === $token_column ) {
+            return [];
+        }
         return $this->fetch_all(
-            'SELECT l.lamaran_id AS "id", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", d.nama_departemen AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status", (SELECT MAX(r.tahap_seleksi) KEEP (DENSE_RANK LAST ORDER BY r.tanggal_status, r.riwayat_status_id) FROM HRS_RIWAYAT_STATUS_PELAMAR r WHERE r.lamaran_id = l.lamaran_id) AS "latest_stage" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id ORDER BY NVL(l.created_at, l.tanggal_melamar) DESC, l.lamaran_id DESC',
+            'SELECT l.lamaran_id AS "id", ' . $token_column . ' AS "token", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", d.nama_departement AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status", (SELECT MAX(r.tahap_seleksi) KEEP (DENSE_RANK LAST ORDER BY r.tanggal_status, r.riwayat_status_id) FROM HRS_RIWAYAT_STATUS_PELAMAR r WHERE r.lamaran_id = l.lamaran_id) AS "latest_stage" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id ORDER BY NVL(l.created_at, l.tanggal_melamar) DESC, l.lamaran_id DESC',
             [ 'login_id' => $login_id ]
         );
     }
@@ -330,9 +335,29 @@ class Recruitment_Database {
         if ( ! ctype_digit( $login_id ) || '0' === $login_id || ! ctype_digit( $application_id ) || '0' === $application_id ) {
             return null;
         }
+        $token_column = $this->get_application_token_column_expression();
+        if ( null === $token_column ) {
+            return null;
+        }
         $rows = $this->fetch_all(
-            'SELECT l.lamaran_id AS "id", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", d.nama_departemen AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id AND l.lamaran_id = :application_id',
+            'SELECT l.lamaran_id AS "id", ' . $token_column . ' AS "token", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", d.nama_departement AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id AND l.lamaran_id = :application_id',
             [ 'login_id' => $login_id, 'application_id' => $application_id ]
+        );
+        return $rows[0] ?? null;
+    }
+
+    /** @return array<string, string>|null */
+    public function get_applicant_application_by_token( string $login_id, string $application_token ): ?array {
+        if ( ! ctype_digit( $login_id ) || '0' === $login_id || ! preg_match( '/^DAW-\d{4}-[A-F0-9]{32}$/', $application_token ) ) {
+            return null;
+        }
+        $token_column = $this->get_application_token_column_expression();
+        if ( null === $token_column || 'l.application_token' !== $token_column ) {
+            return null;
+        }
+        $rows = $this->fetch_all(
+            'SELECT l.lamaran_id AS "id", l.application_token AS "token", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", d.nama_departement AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id AND l.application_token = :application_token',
+            [ 'login_id' => $login_id, 'application_token' => $application_token ]
         );
         return $rows[0] ?? null;
     }
@@ -954,7 +979,7 @@ class Recruitment_Database {
         try {
             $connection = $this->get_connection();
             $section_statement = $connection->query(
-                'SELECT BAGIAN_PENDAFTARAN_ID AS "id", SECTION_KEY AS "section_key", NAMA_SECTION AS "title", DESKRIPSI AS "description", DISPLAY_ORDER AS "display_order" FROM BAGIAN_PENDAFTARAN WHERE IS_ACTIVE = 1 ORDER BY DISPLAY_ORDER, BAGIAN_PENDAFTARAN_ID'
+                'SELECT BAGIAN_PENDAFTARAN_ID AS "id", NAMA_SECTION AS "title", DESKRIPSI AS "description", DISPLAY_ORDER AS "display_order" FROM HRS_BAGIAN_PENDAFTARAN WHERE IS_ACTIVE = 1 ORDER BY DISPLAY_ORDER, BAGIAN_PENDAFTARAN_ID'
             );
             $sections = [];
             $section_indexes = [];
@@ -963,7 +988,7 @@ class Recruitment_Database {
                 $section_indexes[ $section_id ] = count( $sections );
                 $sections[] = [
                     'id'          => $section_id,
-                    'section_key' => (string) ( $row['section_key'] ?? '' ),
+                    'section_key' => '',
                     'title'       => (string) ( $row['title'] ?? '' ),
                     'description' => $this->oracle_lob_to_string( $row['description'] ?? '' ),
                     'questions'   => [],
@@ -1033,7 +1058,7 @@ class Recruitment_Database {
             $connection->beginTransaction();
 
             $existing_sections = [];
-            foreach ( $connection->query( 'SELECT BAGIAN_PENDAFTARAN_ID FROM BAGIAN_PENDAFTARAN' )->fetchAll( PDO::FETCH_COLUMN ) as $id ) {
+            foreach ( $connection->query( 'SELECT BAGIAN_PENDAFTARAN_ID FROM HRS_BAGIAN_PENDAFTARAN' )->fetchAll( PDO::FETCH_COLUMN ) as $id ) {
                 $existing_sections[ (string) $id ] = true;
             }
             $existing_fields = [];
@@ -1048,7 +1073,7 @@ class Recruitment_Database {
             }
             $active_sections = array_map(
                 'strval',
-                $connection->query( 'SELECT BAGIAN_PENDAFTARAN_ID FROM BAGIAN_PENDAFTARAN WHERE IS_ACTIVE = 1' )->fetchAll( PDO::FETCH_COLUMN )
+                $connection->query( 'SELECT BAGIAN_PENDAFTARAN_ID FROM HRS_BAGIAN_PENDAFTARAN WHERE IS_ACTIVE = 1' )->fetchAll( PDO::FETCH_COLUMN )
             );
             $active_fields = array_map(
                 'strval',
@@ -1059,17 +1084,15 @@ class Recruitment_Database {
             $submitted_fields = [];
             foreach ( $sections as $section_index => $section ) {
                 $section_id = trim( (string) ( $section['id'] ?? '' ) );
-                $section_key = 'form_section_' . wp_generate_uuid4();
                 if ( '' !== $section_id ) {
                     if ( ! ctype_digit( $section_id ) || ! isset( $existing_sections[ $section_id ] ) || isset( $submitted_sections[ $section_id ] ) ) {
                         throw new InvalidArgumentException( 'The submitted form contains an invalid section reference.' );
                     }
                     $section_statement = $connection->prepare(
-                        'UPDATE BAGIAN_PENDAFTARAN SET SECTION_KEY = NVL(SECTION_KEY, :section_key), NAMA_SECTION = :title, DESKRIPSI = :description, DISPLAY_ORDER = :display_order, UPDATE_AT = CURRENT_TIMESTAMP, IS_ACTIVE = 1 WHERE BAGIAN_PENDAFTARAN_ID = :section_id'
+                        'UPDATE HRS_BAGIAN_PENDAFTARAN SET NAMA_SECTION = :title, DESKRIPSI = :description, DISPLAY_ORDER = :display_order, IS_ACTIVE = 1 WHERE BAGIAN_PENDAFTARAN_ID = :section_id'
                     );
                     $section_statement->execute(
                         [
-                            'section_key'  => $section_key,
                             'title'        => $section['title'],
                             'description'  => $section['description'],
                             'display_order' => $section_index + 1,
@@ -1078,24 +1101,18 @@ class Recruitment_Database {
                     );
                 } else {
                     $section_statement = $connection->prepare(
-                        'INSERT INTO BAGIAN_PENDAFTARAN (SECTION_KEY, NAMA_SECTION, DESKRIPSI, DISPLAY_ORDER, CREATED_AT, UPDATE_AT, IS_ACTIVE) VALUES (:section_key, :title, :description, :display_order, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 1)'
+                        'INSERT INTO HRS_BAGIAN_PENDAFTARAN (NAMA_SECTION, DESKRIPSI, DISPLAY_ORDER, IS_ACTIVE) VALUES (:title, :description, :display_order, 1) RETURNING BAGIAN_PENDAFTARAN_ID INTO :section_id'
                     );
-                    $section_statement->execute(
-                        [
-                            'section_key'  => $section_key,
-                            'title'        => $section['title'],
-                            'description'  => $section['description'],
-                            'display_order' => $section_index + 1,
-                        ]
-                    );
-                    $section_id_statement = $connection->prepare(
-                        'SELECT BAGIAN_PENDAFTARAN_ID FROM BAGIAN_PENDAFTARAN WHERE SECTION_KEY = :section_key'
-                    );
-                    $section_id_statement->execute( [ 'section_key' => $section_key ] );
-                    $section_id = (string) $section_id_statement->fetchColumn();
-                    if ( '' === $section_id ) {
+                    $new_section_id = 0;
+                    $section_statement->bindValue( ':title', $section['title'] );
+                    $section_statement->bindValue( ':description', $section['description'] );
+                    $section_statement->bindValue( ':display_order', $section_index + 1, PDO::PARAM_INT );
+                    $section_statement->bindParam( ':section_id', $new_section_id, PDO::PARAM_INT | PDO::PARAM_INPUT_OUTPUT, 40 );
+                    $section_statement->execute();
+                    if ( 0 >= (int) $new_section_id ) {
                         throw new RuntimeException( 'The new application section could not be retrieved.' );
                     }
+                    $section_id = (string) $new_section_id;
                     $existing_sections[ $section_id ] = true;
                 }
 
@@ -1192,7 +1209,7 @@ class Recruitment_Database {
             foreach ( $active_sections as $section_id ) {
                 if ( ! isset( $submitted_sections[ $section_id ] ) ) {
                     $statement = $connection->prepare(
-                        'UPDATE BAGIAN_PENDAFTARAN SET IS_ACTIVE = 0, UPDATE_AT = CURRENT_TIMESTAMP WHERE BAGIAN_PENDAFTARAN_ID = :section_id'
+                        'UPDATE HRS_BAGIAN_PENDAFTARAN SET IS_ACTIVE = 0 WHERE BAGIAN_PENDAFTARAN_ID = :section_id'
                     );
                     $statement->execute( [ 'section_id' => $section_id ] );
                 }
@@ -1217,10 +1234,12 @@ class Recruitment_Database {
      * Save an application and all of its dynamic answers atomically.
      *
      * @param array<string, mixed> $submission
-     * @return array{success: bool, error?: string}
+     * @return array{success: bool, application_id?: string, application_token?: string, error?: string}
      */
     public function save_application_submission( array $submission ): array {
         $connection = null;
+        $profile_service = null;
+        $stored_documents = [];
         try {
             $connection = $this->get_connection();
             $connection->beginTransaction();
@@ -1301,7 +1320,27 @@ class Recruitment_Database {
                 ] );
             }
 
-            // Sync answers and uploaded files into applicant's DATA_PROFIL in Oracle
+            try {
+                $application_random = bin2hex( random_bytes( 16 ) );
+            } catch ( \Exception $exception ) {
+                throw new RuntimeException( 'A secure application token could not be generated.', 0, $exception );
+            }
+            $application_token = 'DAW-' . gmdate( 'Y' ) . '-' . strtoupper( $application_random );
+            $application_id = 0;
+            $application = $connection->prepare(
+                'INSERT INTO HRS_LAMARAN (PROFILE_KANDIDAT_ID, DETAIL_LOWONGAN_ID, APPLICATION_TOKEN, TANGGAL_MELAMAR, STATUS_TERKINI, STATUS_AKHIR, CREATED_AT, UPDATED_AT) VALUES (:candidate_id, :vacancy_id, :application_token, CURRENT_TIMESTAMP, :initial_status, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING LAMARAN_ID INTO :application_id'
+            );
+            $application->bindValue( ':candidate_id', $candidate_login_id );
+            $application->bindValue( ':vacancy_id', $vacancy_id );
+            $application->bindValue( ':application_token', $application_token );
+            $application->bindValue( ':initial_status', 'SUBMITTED' );
+            $application->bindParam( ':application_id', $application_id, PDO::PARAM_INT | PDO::PARAM_INPUT_OUTPUT, 40 );
+            $application->execute();
+            if ( 1 !== $application->rowCount() || 0 >= (int) $application_id ) {
+                throw new RuntimeException( 'The new application ID could not be retrieved.' );
+            }
+
+            // Sync answers into applicant's DATA_PROFIL in Oracle
             if ( '' !== $profile_id ) {
                 $details_statement = $connection->prepare( 'SELECT DATA_PROFIL FROM HRS_PROFIL_KANDIDAT_DETAIL WHERE KANDIDAT_ID = :profile_id' );
                 $details_statement->execute( [ 'profile_id' => $profile_id ] );
@@ -1329,35 +1368,13 @@ class Recruitment_Database {
                 }
 
                 $profile_details['applications'][ $vacancy_id ] = [
-                    'vacancy_id'    => $vacancy_id,
-                    'vacancy_title' => (string) ( $submission['vacancy_title'] ?? '' ),
-                    'applied_at'    => function_exists( 'current_time' ) ? current_time( 'mysql' ) : gmdate( 'Y-m-d H:i:s' ),
-                    'answers'       => $current_app_answers,
+                    'application_id'    => (string) $application_id,
+                    'application_token' => $application_token,
+                    'vacancy_id'        => $vacancy_id,
+                    'vacancy_title'     => (string) ( $submission['vacancy_title'] ?? '' ),
+                    'applied_at'        => function_exists( 'current_time' ) ? current_time( 'mysql' ) : gmdate( 'Y-m-d H:i:s' ),
+                    'answers'           => $current_app_answers,
                 ];
-
-                // Process uploaded files into documents if applicable
-                if ( class_exists( 'Recruitment_Applicant_Profile' ) ) {
-                    $profile_service = new Recruitment_Applicant_Profile();
-                    foreach ( $submission['answers'] as $ans ) {
-                        if ( ! empty( $ans['file'] ) && is_array( $ans['file'] ) && ! empty( $ans['file']['tmp_name'] ) ) {
-                            $doc_key = [
-                                'foto_terkini' => 'profile_photo',
-                                'cv_resume'    => 'resume',
-                                'portofolio'   => 'portfolio',
-                            ][ $ans['field_key'] ] ?? $ans['field_key'];
-
-                            $stored_doc = $profile_service->store_uploaded_document( $ans['file'], $doc_key );
-                            if ( $stored_doc ) {
-                                if ( ! isset( $profile_details['documents'] ) || ! is_array( $profile_details['documents'] ) ) {
-                                    $profile_details['documents'] = [];
-                                }
-                                $profile_details['documents'][ $doc_key ] = $stored_doc;
-                            }
-                        }
-                    }
-                }
-
-                $this->save_applicant_profile_details( $connection, (string) $profile_id, $profile_details );
             }
 
             // Check if RECRUIT_FORM_SUBMISSIONS table exists in the schema
@@ -1366,11 +1383,12 @@ class Recruitment_Database {
             if ( 0 < (int) $table_check->fetchColumn() ) {
                 $submission_token = function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : sprintf( '%04x%04x-%04x-%04x-%04x-%04x%04x%04x', mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ), mt_rand( 0, 0x0fff ) | 0x4000, mt_rand( 0, 0x3fff ) | 0x8000, mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ), mt_rand( 0, 0xffff ) );
                 $statement = $connection->prepare(
-                    'INSERT INTO RECRUIT_FORM_SUBMISSIONS (SUBMISSION_TOKEN, APPLICANT_EMAIL, APPLICANT_NAME, SOURCE_VACANCY_ID, SOURCE_VACANCY_TITLE, PDP_ACCURACY, PDP_DATA, PDP_PLACEMENT) VALUES (:token, :email, :name, :vacancy_id, :vacancy_title, 1, 1, 1)'
+                    'INSERT INTO RECRUIT_FORM_SUBMISSIONS (SUBMISSION_TOKEN, LAMARAN_ID, APPLICANT_EMAIL, APPLICANT_NAME, SOURCE_VACANCY_ID, SOURCE_VACANCY_TITLE, PDP_ACCURACY, PDP_DATA, PDP_PLACEMENT) VALUES (:token, :application_id, :email, :name, :vacancy_id, :vacancy_title, 1, 1, 1)'
                 );
                 $statement->execute(
                     [
                         'token'         => $submission_token,
+                        'application_id' => $application_id,
                         'email'         => $submission['applicant_email'],
                         'name'          => $submission['applicant_name'],
                         'vacancy_id'    => $submission['vacancy_source_id'],
@@ -1424,26 +1442,41 @@ class Recruitment_Database {
                 }
             }
 
-            // Insert application into HRS_LAMARAN
-            $application = $connection->prepare(
-                'INSERT INTO HRS_LAMARAN (PROFILE_KANDIDAT_ID, DETAIL_LOWONGAN_ID, TANGGAL_MELAMAR, STATUS_TERKINI, STATUS_AKHIR, CREATED_AT, UPDATED_AT) VALUES (:candidate_id, :vacancy_id, CURRENT_TIMESTAMP, :initial_status, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)'
-            );
-            $application->execute( [
-                'candidate_id'   => $candidate_login_id,
-                'vacancy_id'     => $vacancy_id,
-                'initial_status' => 'SUBMITTED',
-            ] );
-            if ( 1 !== $application->rowCount() ) {
-                throw new InvalidArgumentException( 'The selected Oracle vacancy is no longer available.' );
-            }
+            if ( '' !== $profile_id ) {
+                foreach ( $submission['answers'] as $answer ) {
+                    $file = $answer['file'] ?? null;
+                    if ( ! is_array( $file ) || empty( $file['tmp_name'] ) ) {
+                        continue;
+                    }
 
-            $application_id_query = $connection->prepare(
-                'SELECT lamaran_id FROM HRS_LAMARAN WHERE profile_kandidat_id = :candidate_id AND detail_lowongan_id = :vacancy_id ORDER BY lamaran_id DESC FETCH FIRST 1 ROW ONLY'
-            );
-            $application_id_query->execute( [ 'candidate_id' => $candidate_login_id, 'vacancy_id' => $vacancy_id ] );
-            $application_id = $application_id_query->fetchColumn();
-            if ( false === $application_id ) {
-                throw new RuntimeException( 'The new application ID could not be retrieved.' );
+                    $field_key = (string) ( $answer['field_key'] ?? '' );
+                    $doc_key = [
+                        'foto_terkini' => 'profile_photo',
+                        'cv_resume'    => 'resume',
+                        'portofolio'   => 'portfolio',
+                    ][ $field_key ] ?? null;
+                    if ( null === $doc_key ) {
+                        continue;
+                    }
+                    if ( ! class_exists( 'Recruitment_Applicant_Profile' ) ) {
+                        throw new RuntimeException( 'Applicant document storage is unavailable.' );
+                    }
+                    if ( null === $profile_service ) {
+                        $profile_service = new Recruitment_Applicant_Profile();
+                    }
+
+                    $stored_doc = $profile_service->store_uploaded_document( $file, $doc_key );
+                    if ( null === $stored_doc ) {
+                        throw new RuntimeException( 'Applicant document could not be stored.' );
+                    }
+                    $stored_documents[] = $stored_doc;
+                    if ( ! isset( $profile_details['documents'] ) || ! is_array( $profile_details['documents'] ) ) {
+                        $profile_details['documents'] = [];
+                    }
+                    $profile_details['documents'][ $doc_key ] = $stored_doc;
+                }
+
+                $this->save_applicant_profile_details( $connection, $profile_id, $profile_details );
             }
 
             $history = $connection->prepare(
@@ -1459,10 +1492,13 @@ class Recruitment_Database {
             );
 
             $connection->commit();
-            return [ 'success' => true, 'application_id' => (string) $application_id ];
+            return [ 'success' => true, 'application_id' => (string) $application_id, 'application_token' => $application_token ];
         } catch ( InvalidArgumentException $exception ) {
             if ( $connection instanceof PDO && $connection->inTransaction() ) {
                 $connection->rollBack();
+            }
+            if ( $profile_service instanceof Recruitment_Applicant_Profile ) {
+                $profile_service->delete_documents( $stored_documents );
             }
             $message = 'Lowongan tidak tersedia atau akun pelamar tidak aktif.';
             if ( 'Applicant has already applied to this vacancy.' === $exception->getMessage() ) {
@@ -1472,6 +1508,9 @@ class Recruitment_Database {
         } catch ( PDOException | RuntimeException $exception ) {
             if ( $connection instanceof PDO && $connection->inTransaction() ) {
                 $connection->rollBack();
+            }
+            if ( $profile_service instanceof Recruitment_Applicant_Profile ) {
+                $profile_service->delete_documents( $stored_documents );
             }
             $this->log_oracle_failure( 'Application submission save failed', $exception );
             return [ 'success' => false, 'error' => 'Data lamaran gagal disimpan. Silakan coba lagi.' ];
@@ -1483,7 +1522,7 @@ class Recruitment_Database {
      */
     public function get_vacancies(): array {
         return $this->fetch_all(
-            'SELECT d.detail_lowongan_id AS "id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", k.nama_dealer AS "dealer", d.kategori_kj AS "job_type", d.deskripsi_pekerjaan AS "description", d.pendidikan_minimum AS "education", TO_CHAR(d.batas_lamaran, \'YYYY-MM-DD\') AS "deadline", d.nama_departemen AS "department", TO_CHAR(d.request_at, \'YYYY-MM-DD\') AS "posted_at" FROM HRS_DETAIL_INFO_LOWONGAN d JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE k.status_kolom = :status AND (d.batas_lamaran IS NULL OR d.batas_lamaran >= CURRENT_DATE) ORDER BY d.detail_lowongan_id DESC',
+            'SELECT d.detail_lowongan_id AS "id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", k.nama_dealer AS "dealer", d.kategori_kj AS "job_type", d.deskripsi_pekerjaan AS "description", d.pendidikan_minimum AS "education", TO_CHAR(d.batas_lamaran, \'YYYY-MM-DD\') AS "deadline", d.nama_departement AS "department", TO_CHAR(d.request_at, \'YYYY-MM-DD\') AS "posted_at" FROM HRS_DETAIL_INFO_LOWONGAN d JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE k.status_kolom = :status AND (d.batas_lamaran IS NULL OR d.batas_lamaran >= CURRENT_DATE) ORDER BY d.detail_lowongan_id DESC',
             [ 'status' => 1 ]
         );
     }
@@ -2582,7 +2621,15 @@ class Recruitment_Database {
             return [];
         }
 
-        // Try RECRUIT_FORM_ANSWERS first if table exists and has answers
+        // Prefer the direct application link; retain the legacy lookup for older snapshots.
+        $answers = $this->fetch_all(
+            'SELECT a.FIELD_KEY AS "field_key", a.FIELD_TITLE AS "field_title", a.ANSWER_VALUE AS "answer_value", a.FILE_NAME AS "file_name" FROM RECRUIT_FORM_ANSWERS a JOIN RECRUIT_FORM_SUBMISSIONS s ON s.SUBMISSION_ID = a.SUBMISSION_ID WHERE s.LAMARAN_ID = :application_id ORDER BY a.SUBMISSION_ID DESC, a.FIELD_KEY',
+            [ 'application_id' => $application_id ]
+        );
+        if ( ! empty( $answers ) ) {
+            return $answers;
+        }
+
         $answers = $this->fetch_all(
             'SELECT a.FIELD_KEY AS "field_key", a.FIELD_TITLE AS "field_title", a.ANSWER_VALUE AS "answer_value", a.FILE_NAME AS "file_name" FROM RECRUIT_FORM_ANSWERS a JOIN RECRUIT_FORM_SUBMISSIONS s ON s.SUBMISSION_ID = a.SUBMISSION_ID JOIN HRS_LAMARAN l ON l.LAMARAN_ID = :application_id AND s.SOURCE_VACANCY_ID = l.DETAIL_LOWONGAN_ID JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.PROFILE_KANDIDAT_LOGIN = l.PROFILE_KANDIDAT_ID WHERE LOWER(TRIM(s.APPLICANT_EMAIL)) = LOWER(TRIM(pkl.EMAIL)) ORDER BY a.SUBMISSION_ID DESC, a.FIELD_KEY',
             [ 'application_id' => $application_id ]
@@ -2806,6 +2853,24 @@ class Recruitment_Database {
 
     public function has_error(): bool {
         return null !== $this->last_error;
+    }
+
+    private function get_application_token_column_expression(): ?string {
+        if ( null === $this->application_token_column_exists ) {
+            try {
+                $statement = $this->get_connection()->prepare(
+                    'SELECT COUNT(*) FROM USER_TAB_COLUMNS WHERE TABLE_NAME = :table_name AND COLUMN_NAME = :column_name'
+                );
+                $statement->execute( [ 'table_name' => 'HRS_LAMARAN', 'column_name' => 'APPLICATION_TOKEN' ] );
+                $this->application_token_column_exists = 0 < (int) $statement->fetchColumn();
+            } catch ( PDOException | RuntimeException $exception ) {
+                $this->last_error = $exception->getMessage();
+                $this->log_error( 'Application token schema lookup failed', $exception );
+                return null;
+            }
+        }
+
+        return $this->application_token_column_exists ? 'l.application_token' : 'CAST(NULL AS VARCHAR2(64))';
     }
 
     /** @return array<string, string>|null */
@@ -3321,8 +3386,9 @@ class Recruitment_Database {
         return false !== stripos( $exception->getMessage(), 'ORA-00001' ) || false !== stripos( $exception->getMessage(), 'unique constraint' );
     }
 
-    private function is_missing_table( PDOException $exception ): bool {
-        return false !== stripos( $exception->getMessage(), 'ORA-00942' );
+    private function is_missing_schema_object( PDOException $exception ): bool {
+        return false !== stripos( $exception->getMessage(), 'ORA-00942' )
+            || false !== stripos( $exception->getMessage(), 'ORA-00904' );
     }
 
 }

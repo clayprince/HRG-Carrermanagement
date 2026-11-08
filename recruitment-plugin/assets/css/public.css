@@ -1522,9 +1522,47 @@
   align-items: flex-start;
   max-width: 1160px;
   min-height: 0;
+  padding-bottom: 48px;
+  padding-top: 40px;
 }
 .daw-account-auth__card--registration {
-  max-width: 840px;
+  max-width: 960px;
+  padding: 32px;
+}
+.daw-account-auth__card--registration form {
+  gap: 20px;
+}
+.daw-registration__field-legend {
+  align-items: center;
+  background: #fff7f7;
+  border: 1px solid #f3d9dc;
+  border-radius: 8px;
+  color: var(--daw-gray);
+  display: flex;
+  font-size: 12px;
+  gap: 7px;
+  margin: 0;
+  padding: 11px 14px;
+}
+.daw-registration__field-legend strong,
+.daw-registration__required-mark {
+  color: var(--daw-red);
+  font-size: 15px;
+  font-weight: 800;
+}
+.daw-account-auth__card--registration label.daw-profile__value:has(input[required], select[required], textarea[required]) > span::after {
+  color: var(--daw-red);
+  content: " *";
+  font-size: 14px;
+  font-weight: 800;
+}
+.daw-profile-fields--registration .daw-profile__section-note {
+  background: #f8fafc;
+  border-left: 3px solid var(--daw-red);
+  border-radius: 0 6px 6px 0;
+  line-height: 1.5;
+  margin: 0 0 14px;
+  padding: 9px 12px;
 }
 .daw-registration__password {
   margin-top: 0;
@@ -1921,6 +1959,7 @@
 .daw-account__main--tracking > .daw-account__heading,
 .daw-account__main--tracking > .daw-account__card,
 .daw-account__main--tracking > .daw-account__empty,
+.daw-account__main--tracking > .daw-account__token-search,
 .daw-account__main--tracking > .daw-account__tracking-footer {
   max-width: 445px;
 }
@@ -1950,6 +1989,35 @@
   font-size: 9px;
   min-height: 29px;
   padding: 4px 7px;
+}
+.daw-account__main--tracking > .daw-account__token-search {
+  align-items: flex-end;
+  display: flex;
+  gap: 8px;
+  margin: 0 auto 12px;
+}
+.daw-account__main--tracking .daw-account__token-search label {
+  color: var(--daw-gray);
+  display: grid;
+  flex: 1;
+  font-size: 8px;
+  gap: 3px;
+  text-transform: uppercase;
+}
+.daw-account__main--tracking .daw-account__token-search input {
+  border: 1px solid #dfe2e7;
+  border-radius: 6px;
+  box-sizing: border-box;
+  font-size: 10px;
+  min-height: 31px;
+  min-width: 0;
+  padding: 6px 8px;
+  width: 100%;
+}
+.daw-account__main--tracking .daw-account__token-search .daw-recruitment__button {
+  font-size: 9px;
+  min-height: 31px;
+  padding: 6px 10px;
 }
 .daw-account__main--tracking > .daw-account__card {
   border-radius: 7px;
@@ -1994,7 +2062,7 @@
 }
 .daw-account__main--tracking .daw-account__process-summary .daw-account__fields {
   gap: 8px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 7px;
   padding-top: 7px;
 }
@@ -2248,6 +2316,9 @@
     flex-basis: auto;
     max-width: 100%;
   }
+  .daw-account__main--tracking > .daw-account__token-search {
+    align-items: stretch;
+  }
   .daw-account__main--tracking .daw-account__process-summary .daw-account__fields {
     grid-template-columns: 1fr;
   }
@@ -2299,6 +2370,167 @@
   }
   .daw-recruitment--tracking .daw-recruitment__cta {
     font-size: 11px;
+    padding: 9px 10px;
+  }
+}
+
+.daw-account-auth__main--registration {
+  font-size: 15px;
+  line-height: 1.5;
+  padding-left: 20px;
+  padding-right: 20px;
+}
+.daw-account-auth__card--registration {
+  font-size: 15px;
+  line-height: 1.5;
+}
+.daw-account-auth__card--registration > h2 {
+  font-size: 24px;
+  line-height: 1.25;
+  margin: 0 0 8px;
+}
+.daw-account-auth__card--registration > p {
+  font-size: 15px;
+  line-height: 1.55;
+  margin: 0 0 20px;
+}
+.daw-account-auth__card--registration form {
+  gap: 18px;
+}
+.daw-profile-fields--registration > .daw-profile__accordion,
+.daw-registration__password {
+  margin-bottom: 12px;
+  padding: 18px 20px;
+}
+.daw-profile-fields--registration .daw-profile__accordion-summary h2,
+.daw-registration__password h2 {
+  font-size: 17px;
+  line-height: 1.35;
+}
+.daw-profile-fields--registration .daw-profile__accordion-body {
+  margin-top: 12px;
+  padding-top: 16px;
+}
+.daw-account-auth__card--registration label.daw-profile__value {
+  font-size: 13px;
+  gap: 6px;
+}
+.daw-account-auth__card--registration label.daw-profile__value > span {
+  font-size: 11px;
+  line-height: 1.4;
+}
+.daw-account-auth__card--registration .daw-profile__value input:not([type="file"]),
+.daw-account-auth__card--registration .daw-profile__value select,
+.daw-account-auth__card--registration .daw-profile__value textarea {
+  border: 1px solid #dfe1e6;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1.45;
+  min-height: 44px;
+  padding: 10px 12px;
+}
+.daw-account-auth__card--registration .daw-profile__value textarea {
+  min-height: 96px;
+}
+.daw-account-auth__card--registration .daw-profile__value input[type="file"] {
+  font-size: 13px;
+  min-height: 44px;
+  padding: 8px;
+}
+.daw-account-auth__card--registration .daw-profile__value small,
+.daw-profile-fields--registration .daw-profile__section-note {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.daw-profile-fields--registration .daw-profile__subheading {
+  font-size: 15px;
+  line-height: 1.4;
+  margin: 20px 0 10px;
+}
+.daw-profile-fields--registration .daw-application__table-group {
+  margin: 14px 0;
+}
+.daw-profile-fields--registration .daw-application__table-group h3 {
+  font-size: 14px;
+  line-height: 1.4;
+  margin: 0 0 8px;
+}
+.daw-profile-fields--registration .daw-application__table {
+  font-size: 12px;
+}
+.daw-profile-fields--registration .daw-application__table th,
+.daw-profile-fields--registration .daw-application__table td {
+  line-height: 1.45;
+  padding: 9px 10px;
+  vertical-align: middle;
+}
+.daw-profile-fields--registration .daw-profile__family-table {
+  min-width: 800px;
+}
+.daw-profile-fields--registration .daw-profile__family-table .daw-profile__family-row {
+  display: table-row;
+}
+.daw-profile-fields--registration .daw-application__table input,
+.daw-profile-fields--registration .daw-application__table select,
+.daw-profile-fields--registration .daw-application__table textarea {
+  box-sizing: border-box;
+  font-size: 13px;
+  line-height: 1.4;
+  margin: 0;
+  min-height: 40px;
+  min-width: 120px;
+  padding: 8px 10px;
+  width: 100%;
+}
+.daw-profile-fields--registration .daw-profile__add-row,
+.daw-profile-fields--registration .daw-profile__remove-row {
+  align-items: center;
+  display: inline-flex;
+  font-size: 13px;
+  justify-content: center;
+  line-height: 1.35;
+  min-height: 38px;
+  padding: 8px 12px;
+  white-space: normal;
+}
+.daw-profile-fields--registration .daw-profile__add-row {
+  margin-top: 12px;
+}
+.daw-account-auth__card--registration form > .daw-recruitment__button {
+  font-size: 15px;
+  line-height: 1.4;
+  min-height: 48px;
+}
+
+@media (max-width: 600px) {
+  .daw-account-auth__main--registration {
+    padding: 24px 12px 36px;
+  }
+  .daw-account-auth__card--registration {
+    padding: 20px 16px;
+  }
+  .daw-account-auth__card--registration > h2 {
+    font-size: 21px;
+  }
+  .daw-account-auth__card--registration > p {
+    font-size: 14px;
+    margin-bottom: 16px;
+  }
+  .daw-profile-fields--registration > .daw-profile__accordion,
+  .daw-registration__password {
+    padding: 16px 14px;
+  }
+  .daw-profile-fields--registration .daw-profile__accordion-summary h2,
+  .daw-registration__password h2 {
+    font-size: 16px;
+  }
+  .daw-registration__field-legend {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    font-size: 12px;
+    padding: 10px 12px;
+  }
+  .daw-profile-fields--registration .daw-profile__section-note {
     padding: 9px 10px;
   }
 }
@@ -5103,7 +5335,11 @@ body:has(.daw-account-auth) .daw-account-auth__main {
   min-width: 0;
 }
 .daw-account__main--profile {
-  max-width: none;
+  max-width: 1200px;
+}
+.daw-profile__empty-value {
+  color: #777d87;
+  font-weight: 400;
 }
 .daw-account__main--profile > .daw-profile__overview-details,
 .daw-account__main--profile > .daw-profile__next-step {
@@ -5768,5 +6004,25 @@ body:has(.daw-account-auth) .daw-account-auth__main {
   .daw-pauli-live__footer {
     align-items: flex-start;
     gap: 8px;
+  }
+}
+
+body:has(.daw-account-auth__main--registration) .daw-account-auth__main--registration {
+  padding: 40px 20px 48px !important;
+}
+
+body:has(.daw-recruitment) main.daw-account__main--profile {
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding: 28px 24px 56px !important;
+}
+
+@media (max-width: 600px) {
+  body:has(.daw-account-auth__main--registration) .daw-account-auth__main--registration {
+    padding: 24px 12px 36px !important;
+  }
+
+  body:has(.daw-recruitment) main.daw-account__main--profile {
+    padding: 20px 14px 36px !important;
   }
 }

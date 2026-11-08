@@ -445,11 +445,13 @@ class Recruitment_Plugin {
             $profile_service = new Recruitment_Applicant_Profile();
             $prepared_profile = $profile_service->prepare( $_POST, $_FILES, [], true );
             if ( empty( $prepared_profile['success'] ) ) {
-                $this->redirect_to_applicant_screen( 'applicant-register', (string) ( $prepared_profile['error'] ?? 'invalid_profile' ) );
+                $this->keep_applicant_registration_input( (string) ( $prepared_profile['error'] ?? 'invalid_profile' ) );
+                return;
             }
             if ( strlen( $password ) < 10 || $password !== $password_confirmation ) {
                 $profile_service->delete_documents( $prepared_profile['new_documents'] ?? [] );
-                $this->redirect_to_applicant_screen( 'applicant-register', 'password_mismatch' );
+                $this->keep_applicant_registration_input( 'password_mismatch' );
+                return;
             }
 
             $profile = $prepared_profile['profile'];
@@ -462,7 +464,8 @@ class Recruitment_Plugin {
                     : ( 'invalid_account_data' === $error
                         ? 'invalid_registration'
                         : ( 'schema_not_ready' === $error ? 'registration_setup_required' : 'registration_failed' ) );
-                $this->redirect_to_applicant_screen( 'applicant-register', $notice );
+                $this->keep_applicant_registration_input( $notice );
+                return;
             }
 
             if ( ! recruitment_start_applicant_session( $created['account'] ) ) {
@@ -598,6 +601,71 @@ class Recruitment_Plugin {
         }
         wp_safe_redirect( recruitment_get_public_url( $screen, $arguments ) );
         exit;
+    }
+
+    private function keep_applicant_registration_input( string $error ): void {
+        $input = wp_unslash( $_POST );
+        $text = static function ( $value, int $limit = 10000 ): string {
+            if ( ! is_scalar( $value ) ) {
+                return '';
+            }
+            return substr( sanitize_textarea_field( (string) $value ), 0, $limit );
+        };
+        $rows = static function ( $value, array $fields, int $limit ) use ( $text ): array {
+            if ( ! is_array( $value ) ) {
+                return [];
+            }
+            $result = [];
+            foreach ( array_slice( array_values( $value ), 0, $limit ) as $row ) {
+                if ( ! is_array( $row ) ) {
+                    continue;
+                }
+                $safe_row = [];
+                foreach ( $fields as $field ) {
+                    $safe_row[ $field ] = $text( $row[ $field ] ?? '', 1000 );
+                }
+                $result[] = $safe_row;
+            }
+            return $result;
+        };
+
+        $answers = [];
+        if ( is_array( $input['application_answers'] ?? null ) ) {
+            foreach ( array_slice( $input['application_answers'], 0, 200, true ) as $key => $value ) {
+                if ( is_string( $key ) && is_scalar( $value ) ) {
+                    $answers[ sanitize_key( $key ) ] = $text( $value );
+                }
+            }
+        }
+
+        $details = [
+            'education_level' => $text( $input['education_level'] ?? '' ),
+            'institution' => $text( $input['institution'] ?? '' ),
+            'major' => $text( $input['major'] ?? '' ),
+            'gpa' => $text( $input['gpa'] ?? '' ),
+            'graduation_year' => $text( $input['graduation_year'] ?? '' ),
+            'work_experiences' => $rows( $input['work_experiences'] ?? [], [ 'company', 'position', 'period' ], 50 ),
+            'social_media' => $rows( $input['social_media'] ?? [], [ 'platform', 'username' ], 10 ),
+            'marital_status' => $text( $input['marital_status'] ?? '' ),
+            'family_members' => $rows( $input['family_members'] ?? [], [ 'name', 'relationship', 'age', 'education' ], 50 ),
+            'interests' => $text( $input['interests'] ?? '' ),
+            'application_answers' => $answers,
+            'documents' => [],
+        ];
+
+        $GLOBALS['daw_applicant_registration_form_state'] = [
+            'error' => sanitize_key( $error ),
+            'profile' => [
+                'full_name' => $text( $input['full_name'] ?? '', 255 ),
+                'email' => sanitize_email( $text( $input['email'] ?? '', 254 ) ),
+                'gender' => $text( $input['gender'] ?? '', 100 ),
+                'birth_place' => $text( $input['birth_place'] ?? '', 255 ),
+                'birth_date' => $text( $input['birth_date'] ?? '', 10 ),
+                'phone' => $text( $input['phone'] ?? '', 19 ),
+                'address' => $text( $input['address'] ?? '', 100 ),
+                'profile_details' => $details,
+            ],
+        ];
     }
 
     private function get_applicant_destination_from_post(): string {

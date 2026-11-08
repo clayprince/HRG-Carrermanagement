@@ -9,6 +9,9 @@ if ( ! $preview && ! $confirmation_pending ) {
     wp_safe_redirect( recruitment_get_public_url( 'applicant-dashboard' ) );
     exit;
 }
+$confirmation_data = $preview ? [] : get_transient( $confirmation_key );
+$application_token = is_array( $confirmation_data ) ? (string) ( $confirmation_data['application_token'] ?? '' ) : '';
+$application_id = is_array( $confirmation_data ) ? (string) ( $confirmation_data['application_id'] ?? '' ) : '';
 if ( ! $preview ) {
     delete_transient( $confirmation_key );
 }
@@ -21,8 +24,9 @@ if ( ! $preview ) {
                 <div class="daw-recruitment__success-icon" aria-hidden="true">&#10003;</div>
                 <h1>Lamaran Berhasil Dikirim</h1>
                 <p>Terima kasih, <?= esc_html( $applicant['full_name'] ?? '' ) ?>. Lamaran Anda berhasil dikirim dan tercatat pada akun Oracle.</p>
+                <?php if ( '' !== $application_token ) : ?><div class="daw-recruitment__success-notice"><strong>Simpan Token Tracking Anda</strong><p>Gunakan token ini untuk mencari lamaran pada halaman Tracking Lamaran.</p><code><?= esc_html( $application_token ) ?></code><?php if ( '' !== $application_id ) : ?><p>No. Lamaran: <?= esc_html( $application_id ) ?></p><?php endif; ?></div><?php endif; ?>
                 <div class="daw-recruitment__success-notice"><strong>Langkah selanjutnya</strong><p>Tim rekrutmen akan meninjau data Anda. Pantau status lamaran melalui menu Tracking Lamaran di akun Anda.</p></div>
-                <div class="daw-recruitment__form-actions"><a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'applicant-dashboard', $preview ? [ 'daw_ui_preview' => '1' ] : [] ) ) ?>">Kembali ke Akun</a><a class="daw-recruitment__button daw-recruitment__button--muted" href="<?= esc_url( recruitment_get_public_url( 'careers' ) ) ?>">Lihat Lowongan</a></div>
+                <div class="daw-recruitment__form-actions"><a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'application-process', '' !== $application_token ? [ 'token' => $application_token ] : ( $preview ? [ 'daw_ui_preview' => '1' ] : [] ) ) ) ?>">Lacak Lamaran</a><a class="daw-recruitment__button daw-recruitment__button--muted" href="<?= esc_url( recruitment_get_public_url( 'applicant-dashboard', $preview ? [ 'daw_ui_preview' => '1' ] : [] ) ) ?>">Kembali ke Akun</a></div>
             </section>
         </div>
     </main>

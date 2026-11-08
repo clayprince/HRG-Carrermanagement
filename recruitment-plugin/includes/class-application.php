@@ -787,7 +787,7 @@ class Recruitment_Application {
      * @param array<string, mixed> $files
      * @param array<int, array<string, mixed>> $sections
      * @param array<string, mixed> $vacancy
-     * @return array{errors: array<int, string>, payload: array<string, mixed>, success: bool}
+     * @return array{errors: array<int, string>, payload: array<string, mixed>, success: bool, application_id?: string, application_token?: string}
      */
     public function submit(
         array $request,
@@ -827,7 +827,13 @@ class Recruitment_Application {
             ];
         }
 
-        return [ 'errors' => [], 'payload' => $prepared['payload'], 'success' => true ];
+        return [
+            'errors'           => [],
+            'payload'          => $prepared['payload'],
+            'success'          => true,
+            'application_id'    => (string) ( $saved['application_id'] ?? '' ),
+            'application_token' => (string) ( $saved['application_token'] ?? '' ),
+        ];
     }
 
     private function normalize_answer( string $type, string $value ): string {
