@@ -2261,7 +2261,7 @@ class Recruitment_Database {
             $count_query->execute( [ 'test_id' => $test_id ] );
             $question_count = (int) $count_query->fetchColumn();
             if ( 'pauli' === $test_key ) {
-                $question_count *= 99;
+                $question_count *= 900;
             }
             $update_test = $connection->prepare(
                 'UPDATE HRS_TES_PSIKOLOGI SET JUMLAH_SOAL = :question_count, UPDATED_AT = CURRENT_TIMESTAMP WHERE TES_PSIKOLOGI_ID = :test_id'
@@ -2299,7 +2299,7 @@ class Recruitment_Database {
         if ( isset( $tests[0] ) ) {
             $tests[0]['QUESTION_COUNT'] = (int) $tests[0]['QUESTION_COUNT'] > 0
                 ? (int) $tests[0]['QUESTION_COUNT']
-                : count( $tests[0]['questions'] ) * 99;
+                : count( $tests[0]['questions'] ) * 900;
         }
         return $tests;
     }
@@ -2456,7 +2456,11 @@ class Recruitment_Database {
      */
     public function save_pauli_column_response( int $candidate_id, int $test_id, int $question_id, int $response_id, string $answers, array $numbers ): array {
         $numbers = array_values( array_map( 'absint', $numbers ) );
-        if ( $candidate_id < 1 || $test_id < 1 || $question_id < 1 || 100 !== count( $numbers ) || 1 !== preg_match( '/\A[0-9-]{99}\z/', $answers ) || count( array_filter( $numbers, static fn ( int $number ): bool => $number > 9 ) ) > 0 ) {
+        $answer_count = count( $numbers ) - 1;
+        if ( $candidate_id < 1 || $test_id < 1 || $question_id < 1
+            || $answer_count < 99 || $answer_count > 900
+            || 1 !== preg_match( '/\A[0-9-]{' . $answer_count . '}\z/', $answers )
+            || count( array_filter( $numbers, static fn ( int $number ): bool => $number > 9 ) ) > 0 ) {
             return [ 'success' => false, 'error' => 'Kolom tes Pauli tidak valid.' ];
         }
         if ( ! $this->question_belongs_to_test( $test_id, $question_id ) ) {
@@ -2470,7 +2474,13 @@ class Recruitment_Database {
         if ( ! is_string( $answer_json ) ) {
             return [ 'success' => false, 'error' => 'Jawaban tes Pauli tidak dapat diproses.' ];
         }
-        $score = strlen( str_replace( '-', '', $answers ) );
+        $score = 0;
+        for ( $index = 0; $index < $answer_count; $index++ ) {
+            if ( ctype_digit( $answers[ $index ] )
+                && (int) $answers[ $index ] === ( $numbers[ $index ] + $numbers[ $index + 1 ] ) % 10 ) {
+                $score++;
+            }
+        }
         try {
             $connection = $this->get_connection();
             $connection->beginTransaction();
@@ -2933,7 +2943,7 @@ class Recruitment_Database {
                         $test['questions'] = $questions;
                         unset( $test['questions_by_id'] );
                         $test['QUESTION_COUNT'] = 'pauli' === $test['test_key']
-                            ? count( $questions ) * 99
+                            ? count( $questions ) * 900
                             : count( $questions );
                         if ( 'pauli' === $test['test_key'] ) {
                             $test['DURATION'] = count( $questions ) * 3;

@@ -664,88 +664,209 @@
     const form = root.querySelector("[data-pauli-assessment-form]");
     const payload = root.querySelector("[data-pauli-answer-payload]");
     const status = root.querySelector("[data-pauli-save-status]");
-    const answers = root.querySelectorAll("[data-pauli-answer]");
-    if (!form || !payload || !status || !answers.length) {
+    const segmentTimer = root.querySelector("[data-pauli-segment-timer]");
+    const totalTimer = root.querySelector("[data-pauli-total-timer]");
+    const currentAnswer = root.querySelector("[data-pauli-current-answer]");
+    const previousAnswer = root.querySelector("[data-pauli-previous]");
+    const leftNumber = root.querySelector("[data-pauli-left]");
+    const rightNumber = root.querySelector("[data-pauli-right]");
+    const correctCount = root.querySelector("[data-pauli-correct]");
+    const incorrectCount = root.querySelector("[data-pauli-incorrect]");
+    const answeredCount = root.querySelector("[data-pauli-answered]");
+    const numberSequence = root.dataset.numberSequence || "";
+    if (
+      !form ||
+      !payload ||
+      !status ||
+      !currentAnswer ||
+      !leftNumber ||
+      !rightNumber ||
+      !numberSequence
+    ) {
       return;
     }
 
+    const answers = payload.value.split("");
+    const answerLimit = answers.length;
+    let cursor = Number(root.dataset.cursor || 0);
+    let correct = Number(root.dataset.correct || 0);
+    let incorrect = Number(root.dataset.incorrect || 0);
     let saveTimer = 0;
-    let hasUnflushedInput = false;
+    let version = 0;
+    let savedVersion = 0;
+    let queuedVersion = 0;
     let saveQueue = Promise.resolve();
+    let boundarySaveStarted = false;
+    const setAnswerControlsDisabled = function setAnswerControlsDisabled(disabled) {
+      root
+        .querySelectorAll("[data-pauli-key], [data-pauli-clear], [data-pauli-confirm]")
+        .forEach(function setDisabled(button) {
+          button.disabled = disabled;
+        });
+    };
+    const updateProblem = function updateProblem() {
+      while (cursor < answerLimit && answers[cursor] !== "-") {
+        cursor += 1;
+      }
+      root.dataset.cursor = String(cursor);
+      currentAnswer.value = "";
+      if (cursor >= answerLimit || cursor + 1 >= numberSequence.length) {
+        leftNumber.textContent = "—";
+        rightNumber.textContent = "—";
+        status.textContent = "Lajur ini selesai. Tunggu aba-aba untuk lajur berikutnya.";
+        setAnswerControlsDisabled(true);
+        return;
+      }
+      leftNumber.textContent = numberSequence[cursor];
+      rightNumber.textContent = numberSequence[cursor + 1];
+      if (previousAnswer) {
+        previousAnswer.textContent = cursor > 0 ? answers[cursor - 1] : "—";
+      }
+      setAnswerControlsDisabled(false);
+    };
     const saveColumn = function saveColumn() {
-      const value = Array(99).fill("-");
-      answers.forEach(function collectPauliAnswer(input) {
-        const index = Number(input.dataset.answerIndex);
-        if (Number.isInteger(index) && index >= 0 && index < value.length) {
-          value[index] = /^[0-9]$/.test(input.value) ? input.value : "-";
-        }
-      });
-      payload.value = value.join("");
+      const submittedVersion = version;
+      queuedVersion = Math.max(queuedVersion, submittedVersion);
       const body = new URLSearchParams({
         action: "recruitment_pauli_save_column",
         nonce: root.dataset.saveNonce || "",
         segment: root.dataset.segment || "",
-        answers: payload.value,
+        answers: answers.join(""),
       });
-      status.textContent = "Menyimpan jawaban kolom...";
+      status.textContent = "Menyimpan jawaban...";
       saveQueue = saveQueue
         .catch(function continueAfterPreviousSaveFailure() {})
         .then(function sendColumn() {
           return postAssessment(root.dataset.ajaxUrl, body);
         })
         .then(function savedColumn() {
-          hasUnflushedInput = false;
-          status.textContent = "Jawaban kolom tersimpan.";
+          savedVersion = Math.max(savedVersion, submittedVersion);
+          status.textContent = "Jawaban tersimpan.";
         })
         .catch(function reportColumnError(error) {
-          hasUnflushedInput = true;
+          queuedVersion = savedVersion;
           status.textContent = error.message;
           throw error;
         });
       return saveQueue;
     };
 
-    root.addEventListener("input", function schedulePauliSave(event) {
-      if (!event.target.matches("[data-pauli-answer]")) {
+    const scheduleSave = function scheduleSave() {
+      window.clearTimeout(saveTimer);
+      if (version - savedVersion >= 10 && version > queuedVersion) {
+        saveColumn().catch(function keepFailureVisible() {});
         return;
       }
-      hasUnflushedInput = true;
-      event.target.value = event.target.value.replace(/[^0-9]/g, "").slice(0, 1);
-      window.clearTimeout(saveTimer);
       saveTimer = window.setTimeout(function persistPauliColumn() {
-        saveColumn().catch(function keepFailureVisible() {});
-      }, 350);
+        if (version > savedVersion && version > queuedVersion) {
+          saveColumn().catch(function keepFailureVisible() {});
+        }
+      }, 2500);
+    };
+    const acceptAnswer = function acceptAnswer() {
+      if (currentAnswer.value === "" || cursor >= answerLimit) {
+        return;
+      }
+      const answer = currentAnswer.value;
+      answers[cursor] = answer;
+      payload.value = answers.join("");
+      const expected = (Number(numberSequence[cursor]) + Number(numberSequence[cursor + 1])) % 10;
+      if (Number(answer) === expected) {
+        correct += 1;
+      } else {
+        incorrect += 1;
+      }
+      cursor += 1;
+      version += 1;
+      root.dataset.cursor = String(cursor);
+      root.dataset.correct = String(correct);
+      root.dataset.incorrect = String(incorrect);
+      if (correctCount) {
+        correctCount.textContent = String(correct);
+      }
+      if (incorrectCount) {
+        incorrectCount.textContent = String(incorrect);
+      }
+      if (answeredCount) {
+        answeredCount.textContent = String(correct + incorrect);
+      }
+      status.textContent = "Jawaban diterima.";
+      updateProblem();
+      scheduleSave();
+    };
+
+    root.addEventListener("click", function handlePauliKeypad(event) {
+      const key = event.target.closest("[data-pauli-key]");
+      if (key) {
+        if (!key.disabled) {
+          currentAnswer.value = key.dataset.pauliKey || "";
+        }
+        return;
+      }
+      if (event.target.closest("[data-pauli-clear]")) {
+        currentAnswer.value = "";
+        return;
+      }
+      if (event.target.closest("[data-pauli-confirm]")) {
+        acceptAnswer();
+      }
+    });
+    root.addEventListener("keydown", function handlePauliKeyboard(event) {
+      if (/^[0-9]$/.test(event.key)) {
+        event.preventDefault();
+        currentAnswer.value = event.key;
+      } else if ("Backspace" === event.key) {
+        event.preventDefault();
+        currentAnswer.value = "";
+      } else if ("Enter" === event.key) {
+        event.preventDefault();
+        acceptAnswer();
+      }
+    });
+    form.addEventListener("submit", function preventPauliFormSubmit(event) {
+      event.preventDefault();
+      acceptAnswer();
     });
 
     const segmentDeadline = Number(root.dataset.segmentDeadline || 0);
+    const totalDeadline = Number(root.dataset.deadline || 0);
+    const formatRemaining = function formatRemaining(deadline) {
+      const remaining = Math.max(0, deadline - Math.floor(Date.now() / 1000));
+      const minutes = Math.floor(remaining / 60);
+      const seconds = remaining % 60;
+      return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    };
     const refreshAtBoundary = function refreshPauliColumn() {
+      if (segmentTimer) {
+        segmentTimer.textContent = formatRemaining(segmentDeadline);
+      }
+      if (totalTimer) {
+        totalTimer.textContent = formatRemaining(totalDeadline);
+      }
       if (segmentDeadline <= Math.floor(Date.now() / 1000)) {
-        if (saveTimer || hasUnflushedInput) {
+        setAnswerControlsDisabled(true);
+        if (!boundarySaveStarted) {
+          boundarySaveStarted = true;
           window.clearTimeout(saveTimer);
           saveColumn()
             .then(function reloadAfterSave() {
               window.location.reload();
             })
-            .catch(function keepFailureVisible() {});
-        } else {
-          window.location.reload();
+            .catch(function retryBoundarySave(error) {
+              if (409 === error.status) {
+                window.location.reload();
+                return;
+              }
+              boundarySaveStarted = false;
+              window.setTimeout(refreshAtBoundary, 2500);
+            });
         }
         return;
       }
       window.setTimeout(refreshAtBoundary, 1000);
     };
     refreshAtBoundary();
-
-    form.addEventListener("submit", function submitPauliColumn(event) {
-      event.preventDefault();
-      window.clearTimeout(saveTimer);
-      saveColumn()
-        .catch(function allowServerToRetryPauliAnswers() {})
-        .then(function advancePauliColumn() {
-          HTMLFormElement.prototype.submit.call(form);
-        })
-        .catch(function keepFailureVisible() {});
-    });
+    updateProblem();
   }
 
   function setupPersonalityAssessment() {
@@ -863,11 +984,13 @@
     });
     const result = await response.json();
     if (!response.ok || !result.success) {
-      throw new Error(
+      const error = new Error(
         result.data && result.data.message
           ? result.data.message
           : "Jawaban gagal disimpan. Periksa koneksi lalu coba lagi.",
       );
+      error.status = response.status;
+      throw error;
     }
     return result;
   }

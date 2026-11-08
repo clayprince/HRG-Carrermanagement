@@ -109,8 +109,12 @@ their SQL is compatible with the current Oracle database.
   run it automatically.
 - HR can add and edit IQ, Pauli, DISC, and PAPI questions. IQ remains divided
   into four subtests with the existing fixed time limits; additional questions
-  use those same limits. Each Pauli column lasts three minutes, so adding a
-  column increases the total test time by three minutes. DISC questions
+  use those same limits. Pauli presents one vertical sum at a time for 60
+  minutes, with 20 timed lanes and an automatic lane change every three
+  minutes. Each lane supports up to 900 answers; the applicant can use the
+  on-screen keypad or keyboard, and Oracle stores the generated number sequence,
+  submitted digits, and correct-answer score. The Pauli bank must contain at
+  least 20 questions to provide the fixed one-hour session. DISC questions
   require four statements and PAPI questions require two.
 - Active assessment sessions keep their original question order when HR adds
   questions; new questions are included in sessions started afterward.

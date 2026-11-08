@@ -18,7 +18,7 @@ $global_defaults = [
 ];
 $test_defaults = [
     'iq' => [ 'name' => 'IQ', 'duration' => 20, 'question_count' => 10, 'passing_score' => 70, 'active' => true, 'shuffle' => true ],
-    'pauli' => [ 'name' => 'PAULI', 'duration' => 15, 'question_count' => 40, 'passing_score' => 0, 'active' => true, 'shuffle' => false ],
+    'pauli' => [ 'name' => 'PAULI', 'duration' => 60, 'question_count' => 20, 'passing_score' => 0, 'active' => true, 'shuffle' => false ],
     'personality' => [ 'name' => 'KEPRIBADIAN', 'duration' => 15, 'question_count' => 30, 'passing_score' => 0, 'active' => true, 'shuffle' => true ],
     'disc' => [ 'name' => 'DISC', 'duration' => 10, 'question_count' => 5, 'passing_score' => 0, 'active' => true, 'shuffle' => true ],
     'papi' => [ 'name' => 'PAPI KOSTICK', 'duration' => 10, 'question_count' => 8, 'passing_score' => 0, 'active' => true, 'shuffle' => true ],
@@ -28,6 +28,8 @@ $test_settings = (array) get_option( 'recruitment_psychotest_tests', [] );
 foreach ( $test_defaults as $test_key => $defaults ) {
     $test_settings[ $test_key ] = wp_parse_args( (array) ( $test_settings[ $test_key ] ?? [] ), $defaults );
 }
+$test_settings['pauli']['duration'] = 60;
+$test_settings['pauli']['question_count'] = 20;
 $selected_test = sanitize_key( $_GET['test'] ?? 'iq' );
 if ( ! isset( $test_settings[ $selected_test ] ) ) {
     $selected_test = 'iq';
@@ -70,8 +72,8 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['psychotest_settings
         if ( isset( $test_settings[ $test_key ] ) ) {
             $posted = isset( $_POST['test_settings'] ) && is_array( $_POST['test_settings'] ) ? wp_unslash( $_POST['test_settings'] ) : [];
             $test_settings[ $test_key ] = array_merge( $test_settings[ $test_key ], [
-                'duration' => max( 1, absint( $posted['duration'] ?? 1 ) ),
-                'question_count' => max( 1, absint( $posted['question_count'] ?? 1 ) ),
+                'duration' => 'pauli' === $test_key ? 60 : max( 1, absint( $posted['duration'] ?? 1 ) ),
+                'question_count' => 'pauli' === $test_key ? 20 : max( 1, absint( $posted['question_count'] ?? 1 ) ),
                 'passing_score' => min( 100, max( 0, absint( $posted['passing_score'] ?? 0 ) ) ),
                 'camera_required' => ! empty( $posted['camera_required'] ),
                 'active' => ! empty( $posted['active'] ),
@@ -127,24 +129,24 @@ $test_order = [ 'iq', 'pauli', 'personality', 'disc', 'papi' ];
         <nav class="daw-psychotest-settings__test-list" aria-label="Pilih jenis tes">
             <h2>Jenis Tes</h2>
             <?php foreach ( $test_order as $test_key ) : $test = $test_settings[ $test_key ]; ?>
-                <a href="<?= esc_url( add_query_arg( [ 'page' => 'recruitment-psychotest-settings', 'test' => $test_key ], admin_url( 'admin.php' ) ) ) ?>" class="<?= $selected_test === $test_key ? 'is-active' : '' ?>" <?= $selected_test === $test_key ? 'aria-current="page"' : '' ?>><span class="daw-psychotest-settings__test-icon" aria-hidden="true"><?= esc_html( strtoupper( substr( $test['name'], 0, 2 ) ) ) ?></span><span><strong><?= esc_html( $test['name'] ) ?></strong><small><?= esc_html( (string) $test['duration'] ) ?> menit · <?= esc_html( (string) $test['question_count'] ) ?> soal</small></span><i class="<?= $test['active'] ? 'is-active' : '' ?>" aria-label="<?= $test['active'] ? 'Aktif' : 'Nonaktif' ?>"></i></a>
+                <a href="<?= esc_url( add_query_arg( [ 'page' => 'recruitment-psychotest-settings', 'test' => $test_key ], admin_url( 'admin.php' ) ) ) ?>" class="<?= $selected_test === $test_key ? 'is-active' : '' ?>" <?= $selected_test === $test_key ? 'aria-current="page"' : '' ?>><span class="daw-psychotest-settings__test-icon" aria-hidden="true"><?= esc_html( strtoupper( substr( $test['name'], 0, 2 ) ) ) ?></span><span><strong><?= esc_html( $test['name'] ) ?></strong><small><?= 'pauli' === $test_key ? '60 menit · 20 lajur' : esc_html( (string) $test['duration'] ) . ' menit · ' . esc_html( (string) $test['question_count'] ) . ' soal' ?></small></span><i class="<?= $test['active'] ? 'is-active' : '' ?>" aria-label="<?= $test['active'] ? 'Aktif' : 'Nonaktif' ?>"></i></a>
             <?php endforeach; ?>
         </nav>
         <section class="daw-psychotest-settings__panel daw-psychotest-settings__test-panel" aria-labelledby="psychotest-test-title">
-            <div class="daw-psychotest-settings__panel-heading"><div><h2 id="psychotest-test-title"><?= esc_html( $selected_config['name'] ) ?></h2><p>Atur durasi, jumlah soal, nilai lulus, dan perilaku tes.</p></div><a class="button" href="<?= esc_url( add_query_arg( [ 'page' => 'recruitment-question-bank', 'test' => $selected_test ], admin_url( 'admin.php' ) ) ) ?>">Bank Soal</a></div>
+            <div class="daw-psychotest-settings__panel-heading"><div><h2 id="psychotest-test-title"><?= esc_html( $selected_config['name'] ) ?></h2><p><?= 'pauli' === $selected_test ? 'Sesi tetap 60 menit dengan 20 lajur dan aba-aba pindah setiap tiga menit.' : 'Atur durasi, jumlah soal, nilai lulus, dan perilaku tes.' ?></p></div><a class="button" href="<?= esc_url( add_query_arg( [ 'page' => 'recruitment-question-bank', 'test' => $selected_test ], admin_url( 'admin.php' ) ) ) ?>">Bank Soal</a></div>
             <form method="post" class="daw-psychotest-settings__form">
                 <?php wp_nonce_field( 'recruitment_psychotest_settings' ); ?>
                 <input type="hidden" name="psychotest_settings_action" value="save_test"><input type="hidden" name="test_key" value="<?= esc_attr( $selected_test ) ?>">
                 <div class="daw-psychotest-settings__fields daw-psychotest-settings__fields--test">
-                    <label class="daw-psychotest-settings__field"><span>Durasi (menit)</span><input type="number" min="1" name="test_settings[duration]" value="<?= esc_attr( (string) $selected_config['duration'] ) ?>" required></label>
-                    <label class="daw-psychotest-settings__field"><span>Jumlah Soal</span><input type="number" min="1" name="test_settings[question_count]" value="<?= esc_attr( (string) $selected_config['question_count'] ) ?>" required></label>
+                    <label class="daw-psychotest-settings__field"><span><?= 'pauli' === $selected_test ? 'Durasi tetap (menit)' : 'Durasi (menit)' ?></span><input type="number" min="1" name="test_settings[duration]" value="<?= esc_attr( (string) $selected_config['duration'] ) ?>" <?= 'pauli' === $selected_test ? 'readonly' : 'required' ?>></label>
+                    <label class="daw-psychotest-settings__field"><span><?= 'pauli' === $selected_test ? 'Jumlah Lajur (3 menit per lajur)' : 'Jumlah Soal' ?></span><input type="number" min="1" name="test_settings[question_count]" value="<?= esc_attr( (string) $selected_config['question_count'] ) ?>" <?= 'pauli' === $selected_test ? 'readonly' : 'required' ?>></label>
                     <label class="daw-psychotest-settings__field"><span>Nilai Lulus (%)</span><input type="number" min="0" max="100" name="test_settings[passing_score]" value="<?= esc_attr( (string) $selected_config['passing_score'] ) ?>"></label>
                 </div>
                 <div class="daw-psychotest-settings__switch-list">
                     <label class="daw-psychotest-settings__switch"><span><strong>Wajib Kamera</strong><small>Kandidat wajib mengaktifkan kamera untuk tes ini.</small></span><input type="checkbox" name="test_settings[camera_required]" value="1" <?= checked( $selected_config['camera_required'] ?? $global_settings['camera_required'], true, false ) ?>><span class="daw-psychotest-settings__switch-ui" aria-hidden="true"></span></label>
                     <label class="daw-psychotest-settings__switch"><span><strong>Aktifkan Tes</strong><small>Tampilkan tes ini pada rangkaian psikotes.</small></span><input type="checkbox" name="test_settings[active]" value="1" <?= checked( $selected_config['active'], true, false ) ?>><span class="daw-psychotest-settings__switch-ui" aria-hidden="true"></span></label>
                 </div>
-                <div class="daw-psychotest-settings__preview"><h3>Pratinjau Konfigurasi</h3><dl><div><dt>Durasi</dt><dd><?= esc_html( (string) $selected_config['duration'] ) ?> menit</dd></div><div><dt>Soal</dt><dd><?= esc_html( (string) $selected_config['question_count'] ) ?> soal</dd></div><div><dt>Nilai Lulus</dt><dd><?= esc_html( (string) $selected_config['passing_score'] ) ?>%</dd></div><div><dt>Kamera</dt><dd><?= ! empty( $selected_config['camera_required'] ?? $global_settings['camera_required'] ) ? 'Wajib' : 'Tidak wajib' ?></dd></div><div><dt>Status</dt><dd><?= $selected_config['active'] ? 'Aktif' : 'Nonaktif' ?></dd></div></dl></div>
+                <div class="daw-psychotest-settings__preview"><h3>Pratinjau Konfigurasi</h3><dl><div><dt>Durasi</dt><dd><?= esc_html( (string) $selected_config['duration'] ) ?> menit</dd></div><div><dt><?= 'pauli' === $selected_test ? 'Lajur' : 'Soal' ?></dt><dd><?= 'pauli' === $selected_test ? '20 lajur · 3 menit per lajur' : esc_html( (string) $selected_config['question_count'] ) . ' soal' ?></dd></div><div><dt>Nilai Lulus</dt><dd><?= esc_html( (string) $selected_config['passing_score'] ) ?>%</dd></div><div><dt>Kamera</dt><dd><?= ! empty( $selected_config['camera_required'] ?? $global_settings['camera_required'] ) ? 'Wajib' : 'Tidak wajib' ?></dd></div><div><dt>Status</dt><dd><?= $selected_config['active'] ? 'Aktif' : 'Nonaktif' ?></dd></div></dl></div>
                 <div class="daw-psychotest-settings__actions"><button type="submit" class="button button-primary">Simpan Konfigurasi Tes</button></div>
             </form>
         </section>

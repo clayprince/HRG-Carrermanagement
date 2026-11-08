@@ -12,9 +12,10 @@ $completed_count = count( array_filter( [ $iq_complete, $pauli_complete, $disc_c
 $progress = (int) round( $completed_count / 4 * 100 );
 $assessment_database = new Recruitment_Database();
 $pauli_assessments = $assessment_database->get_pauli_assessment();
-$pauli_duration = $assessment_database->has_error()
+$pauli_question_count = count( (array) ( $pauli_assessments[0]['questions'] ?? [] ) );
+$pauli_duration = $assessment_database->has_error() || $pauli_question_count < 20
     ? 0
-    : absint( $pauli_assessments[0]['DURATION'] ?? 0 );
+    : 60;
 $pauli_duration_label = $pauli_duration > 0
     ? $pauli_duration . ' menit'
     : 'Belum tersedia';
@@ -34,10 +35,10 @@ $tests = [
         'number' => '02',
         'title' => 'PAULI',
         'description' => 'Tes Ketelitian dan Konsentrasi Kerja',
-        'duration' => $pauli_duration_label,
+        'duration' => $pauli_duration > 0 ? '60 menit · ganti lajur tiap 3 menit' : $pauli_duration_label,
         'complete' => $pauli_complete,
         'active' => is_array( $pauli_state ) && 'active' === ( $pauli_state['status'] ?? '' ),
-        'unlocked' => $iq_complete,
+        'unlocked' => $iq_complete && $pauli_duration > 0,
         'screen' => 'psych-pauli',
         'test' => 'pauli',
     ],
@@ -75,7 +76,7 @@ $tests = [
                 <div class="daw-recruitment__psychotest-header-copy">
                     <span class="daw-recruitment__eyebrow daw-recruitment__eyebrow--red">TES PSIKOLOGI ONLINE</span>
                     <h1>Tes Psikologi</h1>
-                    <p>Selesaikan tes secara berurutan. Jawaban tersimpan saat Anda mengerjakannya. Durasi Pauli berubah mengikuti jumlah kolom yang ditetapkan HR.</p>
+                    <p>Selesaikan tes secara berurutan. Jawaban tersimpan saat Anda mengerjakannya. Tes Pauli berlangsung 60 menit dengan pergantian lajur setiap tiga menit.</p>
                 </div>
                 <div class="daw-recruitment__psychotest-counter" aria-label="Progress tes psikologi">
                     <span class="daw-recruitment__muted-small"><?= esc_html( (string) $completed_count ) ?> / 4</span>

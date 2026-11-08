@@ -11,7 +11,7 @@ $psychotest_home_url = recruitment_get_public_url( 'psychotest' );
                 <section class="daw-psych-test-card daw-pauli-assessment__message">
                     <div class="daw-psych-test-icon daw-psych-test-icon--success" aria-hidden="true">&#10003;</div>
                     <h1>Tes Pauli Selesai</h1>
-                    <p>Seluruh <?= esc_html( (string) $view['column_count'] ) ?> kolom telah ditutup dan hasil tes Anda tersimpan untuk ditinjau oleh tim HR.</p>
+                    <p>Tes 60 menit selesai. Anda menjawab <?= esc_html( (string) $view['total_answered'] ) ?> soal dan memperoleh <?= esc_html( (string) $view['score'] ) ?> jawaban benar. Hasil tersimpan untuk ditinjau oleh tim HR.</p>
                     <a class="daw-psych-test-button" href="<?= esc_url( $psychotest_home_url ) ?>">Kembali ke Daftar Tes</a>
                 </section>
             <?php elseif ( ! empty( $view['error'] ) ) : ?>
@@ -29,78 +29,67 @@ $psychotest_home_url = recruitment_get_public_url( 'psychotest' );
             <?php else : ?>
                 <?php
                 $test = $view['test'];
-                $numbers = $test['numbers'];
-                $answers = $test['answers'];
+                $number_sequence = implode( '', $test['numbers'] );
                 ?>
                 <section
-                    class="daw-psych-test-card daw-pauli-assessment"
+                    class="daw-psych-test-card daw-pauli-assessment daw-pauli-live"
                     data-pauli-assessment
                     data-ajax-url="<?= esc_url( $view['ajax_url'] ) ?>"
                     data-save-nonce="<?= esc_attr( $view['nonce'] ) ?>"
                     data-segment="<?= esc_attr( (string) $test['segment'] ) ?>"
                     data-segment-deadline="<?= esc_attr( (string) $test['segment_deadline'] ) ?>"
                     data-deadline="<?= esc_attr( (string) $test['deadline'] ) ?>"
+                    data-number-sequence="<?= esc_attr( $number_sequence ) ?>"
+                    data-cursor="<?= esc_attr( (string) $test['cursor'] ) ?>"
+                    data-correct="<?= esc_attr( (string) $test['correct'] ) ?>"
+                    data-incorrect="<?= esc_attr( (string) $test['incorrect'] ) ?>"
                 >
                     <header class="daw-pauli-assessment__header">
                         <div>
-                            <span class="daw-recruitment__eyebrow daw-recruitment__eyebrow--red">TES PAULI · KOLOM <?= esc_html( (string) ( $test['segment'] + 1 ) ) ?> DARI <?= esc_html( (string) $test['segment_count'] ) ?></span>
-                            <h1><?= esc_html( $test['title'] ) ?></h1>
-                            <p>Jumlahkan dua angka yang berurutan dari atas ke bawah. Masukkan hanya angka satuan hasil penjumlahan. Tes ini berlangsung <?= esc_html( (string) $test['duration_minutes'] ) ?> menit.</p>
+                            <span class="daw-recruitment__eyebrow daw-recruitment__eyebrow--red">TES PAULI · LAJUR <?= esc_html( (string) ( $test['segment'] + 1 ) ) ?> DARI <?= esc_html( (string) $test['segment_count'] ) ?></span>
+                            <h1>Tes Koran Pauli</h1>
+                            <p>Jumlahkan dua angka yang berurutan. Masukkan angka satuan hasilnya secepat dan setepat mungkin.</p>
                         </div>
                         <div class="daw-pauli-assessment__timers">
-                            <div><span>GARIS DALAM</span><time data-pauli-segment-timer>--:--</time></div>
-                            <div><span>TOTAL TES</span><time data-pauli-total-timer>--:--</time></div>
+                            <div><span>PINDAH LAJUR</span><time data-pauli-segment-timer>--:--</time></div>
+                            <div><span>SISA WAKTU</span><time data-pauli-total-timer>--:--</time></div>
                         </div>
                     </header>
 
-                    <ol class="daw-pauli-assessment__progress" aria-label="Progres kolom tes Pauli">
-                        <?php for ( $step = 0; $step < $test['segment_count']; $step++ ) :
-                            $step_class = $step < $test['segment'] ? 'is-complete' : ( $step === $test['segment'] ? 'is-current' : '' );
-                            ?>
-                            <li class="<?= esc_attr( $step_class ) ?>" <?= $step === $test['segment'] ? 'aria-current="step"' : '' ?>>
-                                <span><?= esc_html( (string) ( $step + 1 ) ) ?></span>
-                            </li>
-                        <?php endfor; ?>
-                    </ol>
+                    <div class="daw-pauli-live__scoreboard" aria-label="Skor tes">
+                        <div class="is-correct"><span>Benar</span><strong data-pauli-correct><?= esc_html( (string) $test['correct'] ) ?></strong></div>
+                        <div class="is-incorrect"><span>Salah</span><strong data-pauli-incorrect><?= esc_html( (string) $test['incorrect'] ) ?></strong></div>
+                        <div><span>Total</span><strong data-pauli-answered><?= esc_html( (string) $test['answered'] ) ?></strong></div>
+                    </div>
 
-                    <p class="daw-pauli-assessment__instruction"><strong>Contoh:</strong> 7 + 8 = 5 (tulis angka satuannya). Saat aba-aba garis muncul, kolom ini dikunci dan kolom berikutnya dibuka. Anda tidak dapat kembali ke kolom sebelumnya.</p>
-                    <p class="daw-pauli-assessment__save-status" role="status" data-pauli-save-status>Jawaban disimpan otomatis. Jangan tutup halaman tes.</p>
+                    <p class="daw-pauli-live__instruction"><strong>Contoh:</strong> 7 + 8 = 5. Hanya masukkan angka satuan. Lajur berganti otomatis setiap tiga menit.</p>
+                    <p class="daw-pauli-assessment__save-status" role="status" data-pauli-save-status>Jawaban disimpan otomatis.</p>
 
-                    <form method="post" action="<?= esc_url( recruitment_get_public_url( 'psych-pauli' ) ) ?>" data-pauli-assessment-form>
-                        <?php wp_nonce_field( 'recruitment_pauli_advance' ); ?>
-                        <input type="hidden" name="pauli_action" value="advance">
-                        <input type="hidden" name="segment" value="<?= esc_attr( (string) $test['segment'] ) ?>">
-                        <input type="hidden" name="answers" value="<?= esc_attr( $answers ) ?>" data-pauli-answer-payload>
-                        <div class="daw-pauli-assessment__sheet" aria-label="Lembar angka Pauli">
-                            <?php foreach ( $numbers as $index => $number ) : ?>
-                                <label class="daw-pauli-assessment__row">
-                                    <span class="daw-pauli-assessment__number" aria-label="Angka <?= esc_attr( (string) ( $index + 1 ) ) ?>"><?= esc_html( (string) $number ) ?></span>
-                                    <?php if ( $index < count( $numbers ) - 1 ) :
-                                        $answer = '-' === $answers[ $index ] ? '' : $answers[ $index ];
-                                        ?>
-                                        <input
-                                            type="text"
-                                            inputmode="numeric"
-                                            pattern="[0-9]"
-                                            maxlength="1"
-                                            autocomplete="off"
-                                            aria-label="Jawaban penjumlahan baris <?= esc_attr( (string) ( $index + 1 ) ) ?>"
-                                            value="<?= esc_attr( $answer ) ?>"
-                                            data-pauli-answer
-                                            data-answer-index="<?= esc_attr( (string) $index ) ?>"
-                                        >
-                                    <?php else : ?>
-                                        <span class="daw-pauli-assessment__end" aria-hidden="true">&bull;</span>
-                                    <?php endif; ?>
-                                </label>
-                            <?php endforeach; ?>
+                    <form class="daw-pauli-live__form" data-pauli-assessment-form autocomplete="off">
+                        <input type="hidden" value="<?= esc_attr( $test['answers'] ) ?>" data-pauli-answer-payload>
+                        <div class="daw-pauli-live__problem" aria-live="polite">
+                            <div class="daw-pauli-live__previous" aria-label="Jawaban sebelumnya"><span data-pauli-previous><?= $test['cursor'] > 0 ? esc_html( $test['answers'][ $test['cursor'] - 1 ] ) : '—' ?></span></div>
+                            <div class="daw-pauli-live__sum" aria-label="Penjumlahan saat ini">
+                                <span data-pauli-left><?= esc_html( (string) ( $test['numbers'][ $test['cursor'] ] ?? '—' ) ) ?></span>
+                                <span class="daw-pauli-live__plus" aria-hidden="true">+</span>
+                                <span data-pauli-right><?= esc_html( (string) ( $test['numbers'][ $test['cursor'] + 1 ] ?? '—' ) ) ?></span>
+                            </div>
+                            <label class="daw-pauli-live__answer-label" for="daw-pauli-answer">Jawaban angka satuan</label>
+                            <input id="daw-pauli-answer" class="daw-pauli-live__answer" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" readonly autofocus data-pauli-current-answer aria-label="Jawaban angka satuan">
                         </div>
-                        <button type="submit" class="screen-reader-text" data-pauli-advance>Garis dan lanjutkan</button>
-                    </form>
 
-                    <footer class="daw-pauli-assessment__footer">
-                        <span>Kolom terdahulu terkunci setelah aba-aba.</span>
-                        <strong><?= esc_html( (string) ( $test['segment'] + 1 ) ) ?> / <?= esc_html( (string) $test['segment_count'] ) ?></strong>
+                        <div class="daw-pauli-live__keypad" aria-label="Keypad angka">
+                            <?php for ( $digit = 1; $digit <= 9; $digit++ ) : ?>
+                                <button type="button" data-pauli-key="<?= esc_attr( (string) $digit ) ?>"><?= esc_html( (string) $digit ) ?></button>
+                            <?php endfor; ?>
+                            <button type="button" class="is-clear" data-pauli-clear aria-label="Hapus jawaban">&larr;</button>
+                            <button type="button" data-pauli-key="0">0</button>
+                            <button type="button" class="is-confirm" data-pauli-confirm aria-label="Konfirmasi jawaban">&check;</button>
+                        </div>
+                    </form>
+                    <footer class="daw-pauli-live__footer">
+                        <span>Lajur berikutnya terbuka otomatis saat aba-aba.</span>
+                        <strong><?= esc_html( (string) ( $test['segment'] + 1 ) ) ?> / <?= esc_html( (string) $test['segment_count'] ) ?> lajur</strong>
                     </footer>
                 </section>
             <?php endif; ?>

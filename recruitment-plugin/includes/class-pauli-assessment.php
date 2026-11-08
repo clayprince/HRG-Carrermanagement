@@ -8,8 +8,9 @@ class Recruitment_Pauli_Assessment {
     private const USER_META_KEY = 'recruitment_pauli_assessment';
     private const IQ_USER_META_KEY = 'recruitment_iq_assessment';
     private const COLUMN_DURATION = 180;
-    private const NUMBER_COUNT = 100;
-    private const ANSWER_COUNT = 99;
+    private const SEGMENT_COUNT = 20;
+    private const ANSWER_COUNT = 900;
+    private const NUMBER_COUNT = self::ANSWER_COUNT + 1;
 
     private Recruitment_Database $database;
 
@@ -30,11 +31,14 @@ class Recruitment_Pauli_Assessment {
 
         $user_id = recruitment_get_assessment_user_id();
         $state = recruitment_get_assessment_state( $user_id, self::USER_META_KEY );
+        $state = is_array( $state ) ? $state : [];
+        if ( 'active' === ( $state['status'] ?? '' ) && (int) ( $state['candidate_id'] ?? 0 ) === $candidate_id ) {
+            $this->upgrade_session( $user_id, $state );
+        }
         if ( 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
-            $this->handle_advance_request( $user_id, $candidate_id, is_array( $state ) ? $state : [] );
+            $this->handle_advance_request( $user_id, $candidate_id, $state );
         }
 
-        $state = is_array( $state ) ? $state : [];
         if ( '1' === sanitize_text_field( wp_unslash( $_GET['start'] ?? '' ) ) ) {
             if ( ! in_array( $state['status'] ?? '', [ 'active', 'complete' ], true )
                 || (int) ( $state['candidate_id'] ?? 0 ) !== $candidate_id ) {
@@ -68,13 +72,14 @@ class Recruitment_Pauli_Assessment {
 
         $segment = absint( wp_unslash( $_POST['segment'] ?? 0 ) );
         $current_segment = absint( $state['current_segment'] ?? 0 );
-        $segment_deadline = absint( $state['started_at'] ?? 0 ) + ( ( $current_segment + 1 ) * self::COLUMN_DURATION );
-        if ( $segment !== $current_segment || time() >= $segment_deadline || $current_segment >= count( (array) ( $state['columns'] ?? [] ) ) ) {
+        if ( $segment !== $current_segment || $current_segment >= count( (array) ( $state['columns'] ?? [] ) ) ) {
             wp_send_json_error( [ 'message' => 'Kolom ini sudah berakhir. Halaman akan beralih ke kolom berikutnya.' ], 409 );
         }
 
         $answers = wp_unslash( $_POST['answers'] ?? '' );
-        if ( ! is_string( $answers ) || 1 !== preg_match( '/\A[0-9-]{99}\z/', $answers ) ) {
+        $column = $state['columns'][ $current_segment ] ?? [];
+        $answer_count = max( 0, count( (array) ( $column['numbers'] ?? [] ) ) - 1 );
+        if ( self::ANSWER_COUNT !== $answer_count || ! is_string( $answers ) || 1 !== preg_match( '/\A[0-9-]{' . $answer_count . '}\z/', $answers ) ) {
             wp_send_json_error( [ 'message' => 'Jawaban kolom Pauli tidak valid.' ], 400 );
         }
 
@@ -83,6 +88,7 @@ class Recruitment_Pauli_Assessment {
             wp_send_json_error( [ 'message' => (string) ( $saved['error'] ?? 'Jawaban belum tersimpan.' ) ], 500 );
         }
         recruitment_update_assessment_state( $user_id, self::USER_META_KEY, $state );
+        $this->sync_elapsed_columns( $user_id, $candidate_id, $state );
         wp_send_json_success( [ 'saved' => true ] );
     }
 
@@ -100,10 +106,15 @@ class Recruitment_Pauli_Assessment {
             return [ 'ready' => false ];
         }
         if ( 'complete' === ( $state['status'] ?? '' ) ) {
+            $total_answered = 0;
+            foreach ( (array) ( $state['columns'] ?? [] ) as $completed_column ) {
+                $total_answered += strlen( str_replace( '-', '', (string) ( $completed_column['answers'] ?? '' ) ) );
+            }
             return [
                 'complete' => true,
                 'score' => absint( $state['score'] ?? 0 ),
                 'column_count' => count( (array) ( $state['columns'] ?? [] ) ),
+                'total_answered' => $total_answered,
             ];
         }
         if ( 'active' !== ( $state['status'] ?? '' ) ) {
@@ -120,7 +131,7 @@ class Recruitment_Pauli_Assessment {
         $column_count = count( (array) ( $state['columns'] ?? [] ) );
         $total_duration = absint( $state['deadline'] ?? 0 ) - absint( $state['started_at'] ?? 0 );
         if ( ! is_array( $test ) || (int) $test['ID'] !== (int) ( $state['test_id'] ?? 0 )
-            || $column_count < 1 || absint( $state['column_count'] ?? $column_count ) !== $column_count
+            || self::SEGMENT_COUNT !== $column_count || absint( $state['column_count'] ?? $column_count ) !== $column_count
             || count( $test['questions'] ) < $column_count
             || (int) $test['DURATION'] < $column_count * 3
             || (int) $test['QUESTION_COUNT'] < $column_count * self::ANSWER_COUNT
@@ -134,7 +145,11 @@ class Recruitment_Pauli_Assessment {
             $questions_by_id[ (int) $question['id'] ] = $question;
         }
         $question_id = absint( $column['question_id'] ?? 0 );
-        if ( ! isset( $questions_by_id[ $question_id ] ) || self::NUMBER_COUNT !== count( (array) ( $column['numbers'] ?? [] ) ) ) {
+        $numbers = array_map( 'absint', (array) ( $column['numbers'] ?? [] ) );
+        $answer_count = count( $numbers ) - 1;
+        if ( ! isset( $questions_by_id[ $question_id ] )
+            || self::ANSWER_COUNT !== $answer_count
+            || 1 !== preg_match( '/\A[0-9-]{' . $answer_count . '}\z/', (string) ( $column['answers'] ?? '' ) ) ) {
             return [ 'error' => 'Kolom tes Pauli tidak tersedia. Silakan hubungi tim HR.' ];
         }
 
@@ -142,8 +157,21 @@ class Recruitment_Pauli_Assessment {
         $deadline = $started_at + $total_duration;
         $column_deadline = min( $started_at + ( ( $segment + 1 ) * self::COLUMN_DURATION ), $deadline );
         $answers = (string) ( $column['answers'] ?? str_repeat( '-', self::ANSWER_COUNT ) );
-        if ( 1 !== preg_match( '/\A[0-9-]{99}\z/', $answers ) ) {
-            $answers = str_repeat( '-', self::ANSWER_COUNT );
+        $answer_count = count( $numbers ) - 1;
+        if ( 1 !== preg_match( '/\A[0-9-]{' . $answer_count . '}\z/', $answers ) ) {
+            $answers = str_repeat( '-', $answer_count );
+        }
+        $cursor = strpos( $answers, '-' );
+        $cursor = false === $cursor ? $answer_count : $cursor;
+        $answered_total = 0;
+        $correct_count = 0;
+        foreach ( (array) $state['columns'] as $column_index => $session_column ) {
+            if ( $column_index > $segment ) {
+                break;
+            }
+            $session_answers = (string) ( $session_column['answers'] ?? '' );
+            $answered_total += strlen( str_replace( '-', '', $session_answers ) );
+            $correct_count += $this->count_correct_answers( $session_column );
         }
 
         return [
@@ -155,8 +183,12 @@ class Recruitment_Pauli_Assessment {
                 'duration_minutes' => $column_count * 3,
                 'segment_deadline' => $column_deadline,
                 'deadline' => $deadline,
-                'numbers' => array_map( 'absint', (array) $column['numbers'] ),
+                'numbers' => $numbers,
                 'answers' => $answers,
+                'cursor' => $cursor,
+                'answered' => $answered_total,
+                'correct' => $correct_count,
+                'incorrect' => $answered_total - $correct_count,
             ],
             'nonce' => wp_create_nonce( 'recruitment_pauli_save_column' ),
             'advance_nonce' => wp_create_nonce( 'recruitment_pauli_advance' ),
@@ -192,12 +224,14 @@ class Recruitment_Pauli_Assessment {
         $test = $catalog[0] ?? null;
         if ( ! is_array( $test ) || empty( $test['questions'] )
             || (int) $test['DURATION'] !== count( $test['questions'] ) * 3
-            || (int) $test['QUESTION_COUNT'] !== count( $test['questions'] ) * self::ANSWER_COUNT ) {
+            || count( (array) ( $test['questions'] ?? [] ) ) < self::SEGMENT_COUNT
+            || (int) $test['DURATION'] < self::SEGMENT_COUNT * 3
+            || (int) $test['QUESTION_COUNT'] < self::SEGMENT_COUNT * self::ANSWER_COUNT ) {
             wp_die( esc_html__( 'Bank soal Pauli belum tersedia atau belum lengkap. Silakan hubungi tim HR.', 'recruitment-plugin' ) );
         }
 
         $columns = [];
-        foreach ( $test['questions'] as $index => $question ) {
+        foreach ( array_slice( $test['questions'], 0, self::SEGMENT_COUNT ) as $question ) {
             $numbers = [];
             for ( $number = 0; $number < self::NUMBER_COUNT; $number++ ) {
                 $numbers[] = random_int( 0, 9 );
@@ -207,6 +241,7 @@ class Recruitment_Pauli_Assessment {
                 'numbers' => $numbers,
                 'answers' => str_repeat( '-', self::ANSWER_COUNT ),
                 'response_id' => 0,
+                'score' => 0,
             ];
         }
 
@@ -216,6 +251,7 @@ class Recruitment_Pauli_Assessment {
             self::USER_META_KEY,
             [
                 'version' => 1,
+                'interface' => 'sequential',
                 'candidate_id' => $candidate_id,
                 'test_id' => (int) $test['ID'],
                 'status' => 'active',
@@ -228,6 +264,39 @@ class Recruitment_Pauli_Assessment {
                 'score' => 0,
             ]
         );
+    }
+
+    /**
+     * Expand active sessions created with the earlier 99-answer worksheet.
+     *
+     * @param array<string, mixed> $state
+     */
+    private function upgrade_session( int $user_id, array &$state ): void {
+        $changed = false;
+        foreach ( (array) ( $state['columns'] ?? [] ) as &$column ) {
+            if ( ! is_array( $column ) ) {
+                continue;
+            }
+            $numbers = array_map( 'absint', (array) ( $column['numbers'] ?? [] ) );
+            $answers = (string) ( $column['answers'] ?? '' );
+            if ( count( $numbers ) < self::NUMBER_COUNT ) {
+                for ( $index = count( $numbers ); $index < self::NUMBER_COUNT; $index++ ) {
+                    $numbers[] = random_int( 0, 9 );
+                }
+                $column['numbers'] = $numbers;
+                $column['answers'] = str_pad( substr( $answers, 0, self::ANSWER_COUNT ), self::ANSWER_COUNT, '-' );
+                $changed = true;
+            }
+            $column['score'] = $this->count_correct_answers( $column );
+        }
+        unset( $column );
+        if ( 'sequential' !== ( $state['interface'] ?? '' ) ) {
+            $state['interface'] = 'sequential';
+            $changed = true;
+        }
+        if ( $changed ) {
+            recruitment_update_assessment_state( $user_id, self::USER_META_KEY, $state );
+        }
     }
 
     /**
@@ -252,7 +321,12 @@ class Recruitment_Pauli_Assessment {
         }
 
         $answers = wp_unslash( $_POST['answers'] ?? '' );
-        if ( ! is_string( $answers ) || 1 !== preg_match( '/\A[0-9-]{99}\z/', $answers ) ) {
+        $column = $state['columns'][ $current_segment ] ?? [];
+        $answer_count = max( 0, count( (array) ( $column['numbers'] ?? [] ) ) - 1 );
+        if ( is_string( $answers ) && 99 === strlen( $answers ) && self::ANSWER_COUNT === $answer_count ) {
+            $answers = str_pad( $answers, self::ANSWER_COUNT, '-' );
+        }
+        if ( self::ANSWER_COUNT !== $answer_count || ! is_string( $answers ) || 1 !== preg_match( '/\A[0-9-]{' . $answer_count . '}\z/', $answers ) ) {
             wp_die( esc_html__( 'Jawaban kolom Pauli tidak valid.', 'recruitment-plugin' ), '', [ 'response' => 400 ] );
         }
         $saved = $this->save_column( $state, $current_segment, $answers );
@@ -281,7 +355,7 @@ class Recruitment_Pauli_Assessment {
         while ( absint( $state['current_segment'] ?? 0 ) < $target_segment ) {
             $segment = absint( $state['current_segment'] );
             $column = $state['columns'][ $segment ] ?? [];
-            $answers = (string) ( $column['answers'] ?? str_repeat( '-', self::ANSWER_COUNT ) );
+            $answers = (string) ( $column['answers'] ?? str_repeat( '-', max( 0, count( (array) ( $column['numbers'] ?? [] ) ) - 1 ) ) );
             $saved = $this->save_column( $state, $segment, $answers );
             if ( empty( $saved['success'] ) ) {
                 wp_die( esc_html( $saved['error'] ?? 'Jawaban kolom Pauli gagal disimpan.' ), '', [ 'response' => 500 ] );
@@ -300,11 +374,11 @@ class Recruitment_Pauli_Assessment {
      * @return array{success: bool, error?: string}
      */
     private function save_column( array &$state, int $segment, string $answers ): array {
-        if ( 1 !== preg_match( '/\A[0-9-]{99}\z/', $answers ) ) {
-            return [ 'success' => false, 'error' => 'Jawaban kolom Pauli tidak valid.' ];
-        }
         $column = $state['columns'][ $segment ] ?? null;
-        if ( ! is_array( $column ) || self::NUMBER_COUNT !== count( (array) ( $column['numbers'] ?? [] ) ) ) {
+        $numbers = is_array( $column ) ? array_map( 'absint', (array) ( $column['numbers'] ?? [] ) ) : [];
+        $answer_count = count( $numbers ) - 1;
+        if ( ! is_array( $column ) || self::ANSWER_COUNT !== $answer_count
+            || 1 !== preg_match( '/\A[0-9-]{' . $answer_count . '}\z/', $answers ) ) {
             return [ 'success' => false, 'error' => 'Kolom Pauli tidak ditemukan.' ];
         }
 
@@ -314,14 +388,32 @@ class Recruitment_Pauli_Assessment {
             absint( $column['question_id'] ?? 0 ),
             absint( $column['response_id'] ?? 0 ),
             $answers,
-            (array) $column['numbers']
+            $numbers
         );
         if ( empty( $saved['success'] ) || empty( $saved['response_id'] ) ) {
             return [ 'success' => false, 'error' => (string) ( $saved['error'] ?? 'Jawaban kolom Pauli gagal disimpan.' ) ];
         }
         $state['columns'][ $segment ]['answers'] = $answers;
         $state['columns'][ $segment ]['response_id'] = (int) $saved['response_id'];
+        $state['columns'][ $segment ]['score'] = $this->count_correct_answers( $state['columns'][ $segment ] );
         return [ 'success' => true ];
+    }
+
+    /**
+     * @param array<string, mixed> $column
+     */
+    private function count_correct_answers( array $column ): int {
+        $numbers = array_map( 'absint', (array) ( $column['numbers'] ?? [] ) );
+        $answers = (string) ( $column['answers'] ?? '' );
+        $limit = min( strlen( $answers ), max( 0, count( $numbers ) - 1 ) );
+        $correct = 0;
+        for ( $index = 0; $index < $limit; $index++ ) {
+            if ( ctype_digit( $answers[ $index ] )
+                && (int) $answers[ $index ] === ( $numbers[ $index ] + $numbers[ $index + 1 ] ) % 10 ) {
+                $correct++;
+            }
+        }
+        return $correct;
     }
 
     /**

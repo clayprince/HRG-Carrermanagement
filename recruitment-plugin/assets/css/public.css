@@ -5520,3 +5520,253 @@ body:has(.daw-account-auth) .daw-account-auth__main {
     padding: 14px;
   }
 }
+
+.daw-recruitment--pauli {
+  background: #e8efff;
+  min-height: 100vh;
+}
+.daw-recruitment--pauli .daw-recruitment__psychotest-main {
+  padding: 20px 16px 40px;
+}
+.daw-recruitment--pauli .daw-recruitment__psychotest-shell--assessment {
+  max-width: 680px;
+}
+.daw-pauli-live {
+  border: 2px solid #365273;
+  border-radius: 22px;
+  box-shadow: none;
+  overflow: hidden;
+  padding: 0 24px 20px;
+  text-align: left;
+  width: 100%;
+}
+.daw-pauli-live .daw-pauli-assessment__header {
+  align-items: center;
+  border-bottom: 2px dotted #777;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin: 0 -24px 14px;
+  padding: 17px 24px;
+}
+.daw-pauli-live .daw-pauli-assessment__header h1 {
+  color: var(--daw-charcoal);
+  font-size: 19px;
+  margin: 3px 0;
+}
+.daw-pauli-live .daw-pauli-assessment__header p {
+  font-size: 11px;
+  margin: 0;
+}
+.daw-pauli-live .daw-pauli-assessment__timers {
+  display: grid;
+  flex: 0 0 112px;
+  gap: 5px;
+}
+.daw-pauli-live .daw-pauli-assessment__timers > div {
+  align-items: center;
+  background: #3a3a3c;
+  border-radius: 6px;
+  color: #fff;
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 8px;
+}
+.daw-pauli-live .daw-pauli-assessment__timers span {
+  font-size: 8px;
+  font-weight: 700;
+}
+.daw-pauli-live .daw-pauli-assessment__timers time {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+.daw-pauli-live__scoreboard {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin: 0 0 6px;
+}
+.daw-pauli-live__scoreboard > div {
+  align-items: center;
+  background: #3a3a3c;
+  border-radius: 7px;
+  color: #fff;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  min-width: 86px;
+  padding: 5px 9px;
+}
+.daw-pauli-live__scoreboard .is-correct {
+  background: #16a34a;
+}
+.daw-pauli-live__scoreboard .is-incorrect {
+  background: #d83a3a;
+}
+.daw-pauli-live__scoreboard span {
+  font-size: 10px;
+}
+.daw-pauli-live__scoreboard strong {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.daw-pauli-live__instruction {
+  color: var(--daw-gray);
+  font-size: 10px;
+  margin: 0 0 4px;
+  text-align: center;
+}
+.daw-pauli-assessment__save-status {
+  color: var(--daw-gray);
+  font-size: 10px;
+  min-height: 16px;
+  text-align: center;
+}
+.daw-pauli-live__problem {
+  margin: 0 auto;
+  max-width: 250px;
+  min-height: 245px;
+  padding: 6px 0 12px;
+  text-align: center;
+}
+.daw-pauli-live__previous {
+  color: #858585;
+  font-size: 22px;
+  font-weight: 700;
+  height: 36px;
+}
+.daw-pauli-live__sum {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  font-size: clamp(72px, 16vw, 112px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  line-height: 0.9;
+  min-height: 145px;
+}
+.daw-pauli-live__plus {
+  font-size: 25px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+.daw-pauli-live__answer-label {
+  color: var(--daw-gray);
+  display: block;
+  font-size: 10px;
+  margin: 8px 0 2px;
+}
+.daw-pauli-live__answer {
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid var(--daw-border);
+  border-radius: 0;
+  color: var(--daw-charcoal);
+  font-size: 30px;
+  font-weight: 700;
+  height: 42px;
+  outline-offset: 3px;
+  text-align: center;
+  width: 62px;
+}
+.daw-pauli-live__keypad {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0 auto;
+  max-width: 540px;
+}
+.daw-pauli-live__keypad button {
+  background: var(--daw-red);
+  border: 1px solid var(--daw-red-dark);
+  border-radius: 12px;
+  box-shadow: 0 4px 0 #343a40;
+  color: #fff;
+  cursor: pointer;
+  font-size: 27px;
+  font-weight: 800;
+  min-height: 64px;
+}
+.daw-pauli-live__keypad button:hover:not(:disabled) {
+  background: var(--daw-red-dark);
+}
+.daw-pauli-live__keypad button:active:not(:disabled) {
+  box-shadow: 0 1px 0 #343a40;
+  transform: translateY(3px);
+}
+.daw-pauli-live__keypad button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.daw-pauli-live__keypad .is-clear {
+  background: #eceff1;
+  border-color: #b7c0c8;
+  box-shadow: 0 4px 0 #b7c0c8;
+  color: #586574;
+}
+.daw-pauli-live__keypad .is-confirm {
+  background: var(--daw-green);
+  border-color: #13833d;
+  box-shadow: 0 4px 0 #176b37;
+}
+.daw-pauli-live__footer {
+  align-items: center;
+  border-top: 1px solid var(--daw-border);
+  color: var(--daw-gray);
+  display: flex;
+  font-size: 10px;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding-top: 10px;
+}
+.daw-pauli-live__footer strong {
+  color: var(--daw-charcoal);
+}
+@media (max-width: 600px) {
+  .daw-recruitment--pauli .daw-recruitment__header {
+    padding: 0 14px;
+  }
+  .daw-recruitment--pauli .daw-recruitment__psychotest-main {
+    padding: 10px 8px 24px;
+  }
+  .daw-pauli-live {
+    border-radius: 14px;
+    padding: 0 14px 14px;
+  }
+  .daw-pauli-live .daw-pauli-assessment__header {
+    margin: 0 -14px 12px;
+    padding: 13px 14px;
+  }
+  .daw-pauli-live .daw-pauli-assessment__header h1 {
+    font-size: 16px;
+  }
+  .daw-pauli-live .daw-pauli-assessment__timers {
+    flex-basis: 100px;
+  }
+  .daw-pauli-live__scoreboard {
+    gap: 5px;
+  }
+  .daw-pauli-live__scoreboard > div {
+    min-width: 74px;
+    padding: 4px 7px;
+  }
+  .daw-pauli-live__problem {
+    min-height: 220px;
+  }
+  .daw-pauli-live__sum {
+    font-size: clamp(68px, 20vw, 100px);
+  }
+  .daw-pauli-live__keypad {
+    gap: 7px;
+  }
+  .daw-pauli-live__keypad button {
+    border-radius: 10px;
+    font-size: 24px;
+    min-height: 60px;
+  }
+  .daw-pauli-live__footer {
+    align-items: flex-start;
+    gap: 8px;
+  }
+}

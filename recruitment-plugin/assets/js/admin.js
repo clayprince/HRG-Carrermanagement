@@ -879,7 +879,7 @@ document.documentElement.classList.add("js");
       promptHelp.textContent = "Masukkan satu pertanyaan IQ.";
     } else if (isPauli) {
       promptHelp.textContent =
-        "Membuat satu kolom Pauli berisi 100 angka acak dan 99 jawaban.";
+        "Setiap entri bank menjadi satu lajur Pauli; lajur berjalan tiga menit dan memuat hingga 900 jawaban.";
     } else if (isPersonality) {
       promptHelp.textContent =
         "Masukkan satu pernyataan per baris (DISC: 4; PAPI Kostick: 2).";

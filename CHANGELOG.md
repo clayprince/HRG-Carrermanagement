@@ -4,6 +4,20 @@ This file records material, verified project changes and guides future human
 and AI contributors. It is not a substitute for source review or a database
 migration log.
 
+## 2026-11-08
+
+### Pauli online assessment
+
+- Replaced the Pauli worksheet with a one-sum-at-a-time interface, keyboard
+  and on-screen keypad input, a one-hour timer, and 20 three-minute lanes.
+- Expanded each lane to 900 answers while retaining saved responses when an
+  in-progress legacy session is upgraded. Oracle stores the source numbers,
+  submitted digits, and correct-answer score.
+- HR settings now show the fixed Pauli duration and lane count. The applicant
+  portal requires a 20-question Pauli bank before unlocking the assessment.
+- Validation is limited to local source checks; no live Oracle session was
+  submitted or modified for verification.
+
 ## 2026-11-06
 
 ### Applicant registration and login
