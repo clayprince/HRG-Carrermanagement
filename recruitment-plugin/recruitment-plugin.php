@@ -17,6 +17,10 @@ define( 'RECRUITMENT_PLUGIN_FILE', __FILE__ );
 define( 'RECRUITMENT_PLUGIN_PATH', plugin_dir_path( __FILE__ ) );
 define( 'RECRUITMENT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
+if ( is_readable( __DIR__ . '/vendor/autoload.php' ) ) {
+    require_once __DIR__ . '/vendor/autoload.php';
+}
+
 // Load shared helpers and modular services.
 require_once __DIR__ . '/includes/helpers.php';
 require_once __DIR__ . '/database/class-database.php';
@@ -26,6 +30,7 @@ require_once __DIR__ . '/includes/class-auth.php';
 require_once __DIR__ . '/includes/class-iq-assessment.php';
 require_once __DIR__ . '/includes/class-pauli-assessment.php';
 require_once __DIR__ . '/includes/class-personality-assessment.php';
+require_once __DIR__ . '/services/class-psychotest-pdf-importer.php';
 require_once __DIR__ . '/routes/class-router.php';
 require_once __DIR__ . '/includes/class-plugin.php';
 

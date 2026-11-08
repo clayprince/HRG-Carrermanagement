@@ -165,56 +165,6 @@ document.documentElement.classList.add("js");
   });
 })();
 
-(function userInterviewNotes() {
-  const screen = document.querySelector(".daw-user-interview--notes");
-  if (!screen) {
-    return;
-  }
-
-  screen
-    .querySelectorAll("[data-choice-group]")
-    .forEach(function bindChoiceGroup(group) {
-      group.querySelectorAll("button").forEach(function bindChoice(button) {
-        button.addEventListener("click", function selectChoice() {
-          group
-            .querySelectorAll("button")
-            .forEach(function clearChoice(choice) {
-              const selected = choice === button;
-              choice.classList.toggle("is-selected", selected);
-              choice.setAttribute("aria-pressed", String(selected));
-            });
-        });
-      });
-    });
-
-  const form = screen.querySelector("[data-user-interview-form]");
-  const saveFeedback = screen.querySelector("[data-interview-feedback]");
-  form.addEventListener("submit", function saveInterviewNotes(event) {
-    event.preventDefault();
-    saveFeedback.textContent = "Catatan diperbarui pada preview ini.";
-    saveFeedback.hidden = false;
-  });
-
-  const decisionFeedback = screen.querySelector("[data-decision-feedback]");
-  screen
-    .querySelectorAll("[data-final-decision]")
-    .forEach(function bindDecision(button) {
-      button.addEventListener("click", function chooseDecision() {
-        screen
-          .querySelectorAll("[data-final-decision]")
-          .forEach(function updateDecision(choice) {
-            const selected = choice === button;
-            choice.classList.toggle("is-selected", selected);
-            choice.setAttribute("aria-pressed", String(selected));
-          });
-        decisionFeedback.textContent =
-          "Keputusan dipilih: " +
-          button.textContent.trim().replace(/^[✓×]\s*/, "");
-        decisionFeedback.hidden = false;
-      });
-    });
-})();
-
 (function recruitmentInterviewSchedule() {
   const schedule = document.querySelector(".daw-interview-schedule");
   if (!schedule) {
@@ -844,6 +794,19 @@ document.documentElement.classList.add("js");
   const bank = document.querySelector("[data-question-bank]");
   if (!bank) {
     return;
+  }
+
+  const pdfTest = bank.querySelector("[data-pdf-import-test]");
+  const pdfSubtest = bank.querySelector("[data-pdf-import-subtest]");
+  const pdfSubtestField = bank.querySelector("[data-pdf-import-subtest-field]");
+  if (pdfTest && pdfSubtest && pdfSubtestField) {
+    const updatePdfSubtest = function updatePdfSubtest() {
+      const isIq = "iq" === pdfTest.value;
+      pdfSubtestField.hidden = !isIq;
+      pdfSubtest.required = isIq;
+    };
+    pdfTest.addEventListener("change", updatePdfSubtest);
+    updatePdfSubtest();
   }
 
   const dialog = bank.querySelector("[data-question-dialog]");

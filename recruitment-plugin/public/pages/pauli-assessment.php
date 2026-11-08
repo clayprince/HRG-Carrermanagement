@@ -16,7 +16,7 @@ $psychotest_home_url = recruitment_get_public_url( 'psychotest' );
                 </section>
             <?php elseif ( ! empty( $view['error'] ) ) : ?>
                 <section class="daw-psych-test-card daw-pauli-assessment__message">
-                    <h1>Tes Pauli belum dapat dibuka</h1>
+                    <h1><?= ! empty( $view['needs_hr_review'] ) ? 'Tes Pauli perlu ditinjau' : 'Tes Pauli belum dapat dibuka' ?></h1>
                     <p role="alert"><?= esc_html( $view['error'] ) ?></p>
                     <a class="daw-psych-test-button" href="<?= esc_url( $psychotest_home_url ) ?>">Kembali</a>
                 </section>

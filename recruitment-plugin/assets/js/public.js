@@ -966,9 +966,9 @@
           reminder.hidden = false;
           reminder.textContent = `Pengingat: standar waktu pengerjaan ${reminderMinutes} menit telah tercapai. Anda dapat melanjutkan hingga seluruh soal selesai.`;
         }
-        window.setTimeout(updateElapsedTime, 1000);
+        window.setTimeout(updateElapsed, 1000);
       };
-      updateElapsedTime();
+      updateElapsed();
     }
   }
 

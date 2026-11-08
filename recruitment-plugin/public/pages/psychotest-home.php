@@ -31,10 +31,10 @@ $papi_assessment = $personality_assessments['papi'] ?? [];
 $disc_questions = (array) ( $disc_assessment['questions'] ?? [] );
 $papi_questions = (array) ( $papi_assessment['questions'] ?? [] );
 $personality_ready = ! $assessment_database->has_error()
-    && 24 === count( $disc_questions )
-    && 90 === count( $papi_questions )
-    && 24 === count( array_filter( $disc_questions, static fn ( array $question ): bool => 4 === count( (array) ( $question['items'] ?? [] ) ) ) )
-    && 90 === count( array_filter( $papi_questions, static fn ( array $question ): bool => 2 === count( (array) ( $question['items'] ?? [] ) ) ) );
+    && 24 <= count( $disc_questions )
+    && 90 <= count( $papi_questions )
+    && count( $disc_questions ) === count( array_filter( $disc_questions, static fn ( array $question ): bool => 4 === count( (array) ( $question['items'] ?? [] ) ) ) )
+    && count( $papi_questions ) === count( array_filter( $papi_questions, static fn ( array $question ): bool => 2 === count( (array) ( $question['items'] ?? [] ) ) ) );
 $tests = [
     [
         'number' => '01',
@@ -63,7 +63,7 @@ $tests = [
         'title' => 'KEPRIBADIAN',
         'description' => 'DISC, lalu PAPI Kostick',
         'duration' => $personality_ready
-            ? 'DISC 24 nomor · PAPI Kostick 90 pasang · tanpa batas waktu'
+            ? sprintf( 'DISC %d nomor · PAPI Kostick %d pasang · tanpa batas waktu', count( $disc_questions ), count( $papi_questions ) )
             : 'Bank soal DISC/PAPI belum memenuhi format PDF',
         'complete' => $personality_complete,
         'active' => $personality_active,

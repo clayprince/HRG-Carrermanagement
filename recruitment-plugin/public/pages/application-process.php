@@ -29,6 +29,24 @@ $timeline = $selected_application
     ? $database->get_applicant_application_timeline( (string) $applicant['id'], (string) $selected_application['id'] )
     : [];
 $database_error = ! $preview && $database->has_error();
+$tracking_stage_labels = [
+    'ADMINISTRASI' => 'Seleksi Administrasi',
+    'SCREENING' => 'Seleksi Administrasi',
+    'PSIKOTES' => 'Psikotes',
+    'INTERVIEW_HR' => 'Wawancara HR',
+    'INTERVIEW_USER' => 'Wawancara Departemen',
+    'WAWANCARA_USER' => 'Wawancara Departemen',
+    'FINAL' => 'Keputusan Akhir',
+];
+$tracking_status_labels = [
+    'SUBMITTED' => 'Lamaran Diterima',
+    'SCREENING' => 'Seleksi Administrasi',
+    'PSIKOTES' => 'Psikotes',
+    'INTERVIEW_HR' => 'Wawancara HR',
+    'INTERVIEW_USER' => 'Wawancara Departemen',
+    'DITERIMA' => 'Diterima',
+    'DITOLAK' => 'Tidak Lolos',
+];
 ?>
 <div class="daw-recruitment daw-account daw-recruitment--tracking">
     <?php require recruitment_get_plugin_path( 'public/components/header.php' ); ?>
@@ -47,14 +65,15 @@ $database_error = ! $preview && $database->has_error();
             <section class="daw-account__empty"><h2>Belum ada lamaran untuk dilacak</h2><p>Tracking akan muncul setelah Anda mengirim lamaran menggunakan akun ini.</p><a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'careers' ) ) ?>">Lihat Lowongan</a></section>
         <?php else :
             $status = trim( (string) ( $selected_application['final_status'] ?: $selected_application['status'] ) );
+            $status_label = $tracking_status_labels[ strtoupper( $status ) ] ?? $status;
             $timestamp = strtotime( (string) ( $selected_application['created_at'] ?? '' ) );
             ?>
-            <section class="daw-account__card daw-account__process-summary"><div class="daw-account__process-identity"><span class="daw-account__tracking-label">Status lamaran</span><span class="daw-account__status"><?= esc_html( $status ?: 'Menunggu pembaruan' ) ?></span><h2><?= esc_html( $selected_application['title'] ) ?></h2><small><?= esc_html( trim( (string) $selected_application['department'] . ' · ' . (string) $selected_application['location'], ' ·' ) ) ?></small></div><div class="daw-account__fields"><span>No. Lamaran<strong><?= esc_html( $selected_application['id'] ) ?></strong></span><span>Token Tracking<strong><?= esc_html( (string) ( $selected_application['token'] ?? '' ) ?: 'Belum tersedia' ) ?></strong></span><span>Tanggal melamar<strong><?= esc_html( $timestamp ? wp_date( 'j F Y', $timestamp ) : '—' ) ?></strong></span><span>Tahap saat ini<strong><?= esc_html( $timeline ? $timeline[ count( $timeline ) - 1 ]['stage'] : 'Belum ada riwayat tahap' ) ?></strong></span></div></section>
+            <section class="daw-account__card daw-account__process-summary"><div class="daw-account__process-identity"><span class="daw-account__tracking-label">Status lamaran</span><span class="daw-account__status"><?= esc_html( $status_label ?: 'Menunggu pembaruan' ) ?></span><h2><?= esc_html( $selected_application['title'] ) ?></h2><small><?= esc_html( trim( (string) $selected_application['department'] . ' · ' . (string) $selected_application['location'], ' ·' ) ) ?></small></div><div class="daw-account__fields"><span>No. Lamaran<strong><?= esc_html( $selected_application['id'] ) ?></strong></span><span>Token Tracking<strong><?= esc_html( (string) ( $selected_application['token'] ?? '' ) ?: 'Belum tersedia' ) ?></strong></span><span>Tanggal melamar<strong><?= esc_html( $timestamp ? wp_date( 'j F Y', $timestamp ) : '—' ) ?></strong></span><span>Tahap saat ini<strong><?= esc_html( $timeline ? ( $tracking_stage_labels[ strtoupper( trim( (string) $timeline[ count( $timeline ) - 1 ]['stage'] ) ) ] ?? $timeline[ count( $timeline ) - 1 ]['stage'] ) : 'Belum ada riwayat tahap' ) ?></strong></span></div></section>
             <section class="daw-account__card"><h2>Riwayat Status Seleksi</h2><p class="daw-account__muted">Menampilkan pembaruan yang tercatat oleh tim rekrutmen.</p>
                 <?php if ( $timeline ) : ?><div class="daw-account__timeline"><?php foreach ( $timeline as $index => $event ) :
                     $event_time = strtotime( (string) ( $event['changed_at'] ?? '' ) );
                     $state = $index === count( $timeline ) - 1 ? 'current' : 'done';
-                    ?><article class="is-<?= esc_attr( $state ) ?>"><span class="daw-account__timeline-marker"><?= 'done' === $state ? '&#10003;' : '●' ?></span><div><strong><?= esc_html( $event['stage'] ?: 'Tahap seleksi' ) ?></strong><small><?= esc_html( $event_time ? wp_date( 'j F Y H:i', $event_time ) : '—' ) ?></small><?php if ( '' !== trim( (string) $event['note'] ) ) : ?><p><?= esc_html( $event['note'] ) ?></p><?php endif; ?></div><b><?= esc_html( $event['status'] ?: 'Diperbarui' ) ?></b></article><?php endforeach; ?></div><?php else : ?><p class="daw-account__muted">Belum ada pembaruan status untuk lamaran ini.</p><?php endif; ?>
+                    ?><article class="is-<?= esc_attr( $state ) ?>"><span class="daw-account__timeline-marker"><?= 'done' === $state ? '&#10003;' : '●' ?></span><div><strong><?= esc_html( $tracking_stage_labels[ strtoupper( trim( (string) $event['stage'] ) ) ] ?? ( $event['stage'] ?: 'Tahap seleksi' ) ) ?></strong><small><?= esc_html( $event_time ? wp_date( 'j F Y H:i', $event_time ) : '—' ) ?></small><?php if ( '' !== trim( (string) $event['note'] ) ) : ?><p><?= esc_html( $event['note'] ) ?></p><?php endif; ?></div><b><?= esc_html( $tracking_status_labels[ strtoupper( trim( (string) $event['status'] ) ) ] ?? ( $event['status'] ?: 'Diperbarui' ) ) ?></b></article><?php endforeach; ?></div><?php else : ?><p class="daw-account__muted">Belum ada pembaruan status untuk lamaran ini.</p><?php endif; ?>
             </section>
             <div class="daw-account__tracking-footer"><span>Status diperbarui saat tim rekrutmen mencatat tahap seleksi.</span></div>
         <?php endif; ?>

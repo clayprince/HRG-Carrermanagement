@@ -1,0 +1,8 @@
+{
+  "name": "daya-adicipta-wisesa/recruitment-plugin",
+  "type": "wordpress-plugin",
+  "require": {
+    "php": ">=8.0",
+    "smalot/pdfparser": "^2.12"
+  }
+}

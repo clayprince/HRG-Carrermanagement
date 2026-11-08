@@ -1,3 +1,4 @@
+<?php
 $database = new Recruitment_Database();
 $applications = $database->get_applications();
 $applicants = $database->get_applicants();
@@ -364,11 +365,11 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
                     <input type="hidden" name="candidate_id" value="<?= esc_attr( (int) $selected_candidate['id'] ) ?>">
                     <?php wp_nonce_field( 'daw_update_application_status_' . (int) $selected_candidate['application_id'] ); ?>
                     <p><label>Status<br><select name="status" required>
-                        <?php foreach ( [ 'SUBMITTED' => 'Lamaran Diterima', 'SCREENING' => 'Seleksi Administrasi', 'PSIKOTES' => 'Psikotes', 'INTERVIEW_HR' => 'Wawancara HR', 'INTERVIEW_USER' => 'Wawancara User', 'DITERIMA' => 'Diterima', 'DITOLAK' => 'Tidak Lolos' ] as $status_value => $status_label ) : ?>
+                        <?php foreach ( [ 'SUBMITTED' => 'Lamaran Diterima', 'SCREENING' => 'Seleksi Administrasi', 'PSIKOTES' => 'Psikotes', 'INTERVIEW_HR' => 'Wawancara HR', 'INTERVIEW_USER' => 'Wawancara Departemen', 'DITERIMA' => 'Diterima', 'DITOLAK' => 'Tidak Lolos' ] as $status_value => $status_label ) : ?>
                             <option value="<?= esc_attr( $status_value ) ?>" <?= selected( strtoupper( (string) ( $selected_candidate['raw_status'] ?? '' ) ), $status_value, false ) ?>><?= esc_html( $status_label ) ?></option>
                         <?php endforeach; ?>
                     </select></label></p>
-                    <p><label>Tahap Seleksi<br><input type="text" name="stage" value="ADMINISTRASI" required></label></p>
+                    <p>Tahap tracking akan mengikuti status lamaran yang dipilih.</p>
                     <p><label>Catatan untuk pelamar<br><textarea name="note" rows="3"></textarea></label></p>
                     <button type="submit" class="button button-primary">Simpan Status</button>
                 </form>

@@ -9,7 +9,7 @@ class Recruitment_Personality_Assessment {
     private const IQ_USER_META_KEY = 'recruitment_iq_assessment';
     private const PAULI_USER_META_KEY = 'recruitment_pauli_assessment';
     private const REMINDER_MINUTES = [ 'disc' => 20, 'papi' => 30 ];
-    private const QUESTION_COUNTS = [ 'disc' => 24, 'papi' => 90 ];
+    private const MINIMUM_QUESTION_COUNTS = [ 'disc' => 24, 'papi' => 90 ];
     private const ITEM_COUNTS = [ 'disc' => 4, 'papi' => 2 ];
 
     private Recruitment_Database $database;
@@ -146,7 +146,7 @@ class Recruitment_Personality_Assessment {
             'started_at' => absint( $test_state['started_at'] ),
             'instructions' => 'disc' === $test_key
                 ? 'Setiap nomor berisi empat pernyataan. Pilih tepat satu yang paling menggambarkan dan satu yang paling tidak menggambarkan diri Anda; kedua pilihan harus berbeda.'
-                : 'Terdapat 90 pasangan pernyataan. Pilih satu pernyataan yang paling mencerminkan diri Anda pada setiap pasangan dan jawab seluruh nomor.',
+                : sprintf( 'Terdapat %d pasangan pernyataan. Pilih satu pernyataan yang paling mencerminkan diri Anda pada setiap pasangan dan jawab seluruh nomor.', count( $questions ) ),
             'questions' => $questions,
             'answered_count' => count( $test_state['answers'] ),
             'question_count' => count( $questions ),
@@ -256,7 +256,7 @@ class Recruitment_Personality_Assessment {
         foreach ( [ 'disc', 'papi' ] as $key ) {
             if ( ! isset( $catalog[ $key ] )
                 || self::REMINDER_MINUTES[ $key ] !== (int) $catalog[ $key ]['DURATION']
-                || self::QUESTION_COUNTS[ $key ] !== count( (array) ( $catalog[ $key ]['questions'] ?? [] ) )
+                || self::MINIMUM_QUESTION_COUNTS[ $key ] > count( (array) ( $catalog[ $key ]['questions'] ?? [] ) )
                 || (int) $catalog[ $key ]['QUESTION_COUNT'] !== count( $catalog[ $key ]['questions'] ) ) {
                 return false;
             }

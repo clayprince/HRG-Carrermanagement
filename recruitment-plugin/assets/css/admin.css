@@ -2124,12 +2124,6 @@ body:has(.daw-admin-login) main {
   text-align: left;
   width: 288px;
 }
-.daw-admin-login__schema-disabled {
-  border: 0;
-  margin: 0;
-  min-width: 0;
-  padding: 0;
-}
 .daw-admin-login__card form {
   display: grid;
   gap: 7px;
@@ -10598,6 +10592,65 @@ body.daw-recruitment-admin.post-type-daw_vacancy .wp-list-table .no-items td {
 .daw-question-bank__panel-actions > .button {
   min-height: 30px;
 }
+.daw-question-bank__pdf-import,
+.daw-question-bank__pdf-preview {
+  border-top: 1px solid #e5e7e9;
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+}
+.daw-question-bank__pdf-import {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.daw-question-bank__pdf-import-copy h3,
+.daw-question-bank__pdf-preview h3 {
+  color: #303840;
+  font-size: 11px;
+  margin: 0 0 4px;
+}
+.daw-question-bank__pdf-import-copy p,
+.daw-question-bank__pdf-import-copy small,
+.daw-question-bank__pdf-preview label,
+.daw-question-bank__pdf-validation {
+  color: #69727a;
+  font-size: 9px;
+  margin: 0;
+}
+.daw-question-bank__pdf-import-copy small {
+  display: block;
+  margin-top: 4px;
+}
+.daw-question-bank__pdf-upload {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.daw-question-bank__pdf-upload label {
+  color: #525a62;
+  font-size: 9px;
+}
+.daw-question-bank__pdf-upload select,
+.daw-question-bank__pdf-upload input {
+  font-size: 9px;
+  margin: 0;
+  max-width: 190px;
+}
+.daw-question-bank__pdf-preview {
+  border-top: 0;
+  padding-top: 0;
+}
+.daw-question-bank__pdf-preview textarea {
+  font-size: 10px;
+  margin: 0;
+  max-width: none;
+  width: 100%;
+}
+.daw-question-bank__pdf-validation--error {
+  color: #b32d2e;
+}
 .daw-question-bank__table-wrap {
   overflow-x: auto;
 }
@@ -10771,6 +10824,13 @@ body.daw-recruitment-admin.post-type-daw_vacancy .wp-list-table .no-items td {
   .daw-question-bank__panel-actions {
     justify-content: flex-start;
     width: 100%;
+  }
+  .daw-question-bank__pdf-import {
+    align-items: flex-start;
+    grid-template-columns: 1fr;
+  }
+  .daw-question-bank__pdf-upload {
+    justify-content: flex-start;
   }
 }
 @media (max-width: 600px) {

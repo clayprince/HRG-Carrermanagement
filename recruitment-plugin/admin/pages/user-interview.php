@@ -9,6 +9,7 @@ $notes_url = add_query_arg( 'view', 'notes', $list_url );
 
 $database = new Recruitment_Database();
 $applications = $database->get_applications();
+$database_error = $database->has_error();
 
 $candidates = [];
 $stats = [
@@ -20,22 +21,25 @@ $stats = [
 
 foreach ( $applications as $app ) {
     $raw_status = strtoupper( (string) ( $app['status'] ?? 'SUBMITTED' ) );
-    $is_passed = in_array( $raw_status, [ 'DITERIMA', 'ACCEPTED' ], true );
-    $is_failed = in_array( $raw_status, [ 'DITOLAK', 'REJECTED' ], true );
-    $is_waiting = in_array( $raw_status, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true );
+    $selection_status = trim( (string) ( $app['user_selection_status'] ?? '' ) );
+    $has_result = '' !== $selection_status;
+    $is_passed = in_array( $selection_status, [ 'Lolos Wawancara User', 'Lolos' ], true );
+    $is_failed = in_array( $selection_status, [ 'Tidak Lolos Wawancara User', 'Tidak Lolos' ], true );
+    $is_waiting = 'INTERVIEW_USER' === $raw_status && ! $has_result;
 
-    if ( ! in_array( $raw_status, [ 'INTERVIEW_HR', 'INTERVIEW_USER', 'DITERIMA', 'DITOLAK' ], true ) ) {
+    if ( ! in_array( $raw_status, [ 'INTERVIEW_USER', 'DITERIMA', 'DITOLAK' ], true ) && ! $has_result ) {
         continue;
     }
 
     if ( $is_waiting ) {
         $stats['waiting']++;
-    } elseif ( $is_passed ) {
-        $stats['passed']++;
+    } elseif ( $has_result ) {
         $stats['interviewed']++;
-    } elseif ( $is_failed ) {
-        $stats['failed']++;
-        $stats['interviewed']++;
+        if ( $is_passed ) {
+            $stats['passed']++;
+        } elseif ( $is_failed ) {
+            $stats['failed']++;
+        }
     }
 
     $created_at = (string) ( $app['created_at'] ?? '' );
@@ -50,24 +54,36 @@ foreach ( $applications as $app ) {
         'position'       => (string) ( $app['title'] ?: 'Posisi belum ditentukan' ),
         'dealer'         => (string) ( $app['dealer'] ?: '-' ),
         'region'         => (string) ( $app['location'] ?: $app['province'] ?: '-' ),
-        'hr_result'      => 'Lolos',
-        'interview_date' => '—',
-        'status'         => $is_passed ? 'Lolos' : ( $is_failed ? 'Tidak Lolos' : 'Menunggu' ),
+        'hr_result'      => trim( (string) ( $app['hr_result'] ?? '' ) ) ?: 'Belum tersedia',
+        'interview_date' => trim( (string) ( $app['user_interview_date'] ?? '' ) ) ?: '—',
+        'status'         => $has_result ? $selection_status : 'Menunggu Wawancara',
         'status_class'   => $is_passed ? 'is-passed' : ( $is_failed ? 'is-failed' : 'is-waiting' ),
+        'score'          => (string) ( $app['user_score'] ?? '' ),
+        'recommendation' => trim( (string) ( $app['user_recommendation'] ?? '' ) ),
+        'interviewer'    => trim( (string) ( $app['user_interviewer'] ?? '' ) ),
+        'notes'          => trim( (string) ( $app['user_interview_notes'] ?? '' ) ),
+        'final_decision' => [
+            'DITERIMA' => 'Diterima',
+            'ACCEPTED' => 'Diterima',
+            'DITOLAK' => 'Tidak Diterima',
+            'REJECTED' => 'Tidak Diterima',
+        ][ strtoupper( trim( (string) ( $app['hr_final_decision'] ?? '' ) ) ) ] ?? 'Menunggu Keputusan',
     ];
 }
 
 $selected_candidate_id = absint( $_GET['candidate_id'] ?? 0 );
+$selected_application_id = absint( $_GET['application_id'] ?? 0 );
 $selected_cand = null;
-if ( $selected_candidate_id > 0 ) {
+if ( $selected_application_id > 0 || $selected_candidate_id > 0 ) {
     foreach ( $candidates as $c ) {
-        if ( $c['id'] === $selected_candidate_id ) {
+        if ( ( $selected_application_id > 0 && $c['application_id'] === $selected_application_id )
+            || ( 0 === $selected_application_id && $c['id'] === $selected_candidate_id ) ) {
             $selected_cand = $c;
             break;
         }
     }
 }
-if ( ! $selected_cand && ! empty( $candidates ) ) {
+if ( ! $selected_cand && 0 === $selected_application_id && 0 === $selected_candidate_id && ! empty( $candidates ) ) {
     $selected_cand = $candidates[0];
 }
 ?>
@@ -100,7 +116,7 @@ if ( ! $selected_cand && ! empty( $candidates ) ) {
         <nav class="daw-user-interview__breadcrumb" aria-label="Breadcrumb">
             <span class="daw-user-interview__breadcrumb-root">DAW Admin</span>
             <span aria-hidden="true">/</span>
-            <strong><?= $show_notes ? 'Catatan Wawancara User' : 'Wawancara User' ?></strong>
+            <strong><?= $show_notes ? 'Hasil Wawancara User' : 'Wawancara User' ?></strong>
         </nav>
         <div class="daw-user-interview__account">
             <span class="daw-user-interview__avatar" aria-hidden="true">HR</span>
@@ -114,6 +130,7 @@ if ( ! $selected_cand && ! empty( $candidates ) ) {
 
     <main class="daw-user-interview__main">
         <?php if ( $show_notes ) : ?>
+            <?php if ( $database_error ) : ?><div class="notice notice-error"><p>Data hasil wawancara User belum dapat dimuat dari Oracle. Silakan coba kembali.</p></div><?php endif; ?>
             <a class="daw-user-interview__back" href="<?= esc_url( $list_url ) ?>"><span aria-hidden="true">&#8249;</span> Kembali ke Daftar Wawancara</a>
             <?php if ( $selected_cand ) : ?>
                 <div class="daw-user-interview__detail-grid">
@@ -137,50 +154,24 @@ if ( ! $selected_cand && ! empty( $candidates ) ) {
                     </section>
 
                     <section class="daw-user-interview__card daw-user-interview__notes-card" aria-labelledby="notes-title">
-                        <h1 id="notes-title">Catatan Wawancara User</h1>
-                        <form data-user-interview-form>
-                            <div class="daw-user-interview__field-row">
-                                <label class="daw-user-interview__field">Interviewer<input name="interviewer" type="text" value="Kepala Cabang"></label>
-                                <label class="daw-user-interview__field">Tanggal Wawancara<input name="interview_date" type="date" value="<?= esc_attr( date( 'Y-m-d' ) ) ?>"></label>
-                            </div>
-                            <label class="daw-user-interview__field daw-user-interview__field--notes">Catatan Wawancara<textarea name="notes" rows="3" placeholder="Catat observasi, poin diskusi, dan kesan umum kandidat..."></textarea></label>
-
-                            <fieldset class="daw-user-interview__choice-field">
-                                <legend>Penilaian</legend>
-                                <div class="daw-user-interview__choice-grid daw-user-interview__choice-grid--rating" data-choice-group>
-                                    <button type="button" aria-pressed="false">Sangat Baik</button>
-                                    <button type="button" aria-pressed="false">Baik</button>
-                                    <button type="button" aria-pressed="false">Cukup</button>
-                                    <button type="button" aria-pressed="false">Kurang</button>
-                                </div>
-                            </fieldset>
-
-                            <fieldset class="daw-user-interview__choice-field">
-                                <legend>Rekomendasi</legend>
-                                <div class="daw-user-interview__choice-grid daw-user-interview__choice-grid--recommendation" data-choice-group>
-                                    <button type="button" aria-pressed="false">Lanjut ke Tahap Berikutnya</button>
-                                    <button type="button" aria-pressed="false">Tidak Dilanjutkan</button>
-                                </div>
-                            </fieldset>
-
-                            <button class="daw-user-interview__save" type="submit">Simpan Catatan</button>
-                            <p class="daw-user-interview__feedback" role="status" aria-live="polite" data-interview-feedback hidden></p>
-                        </form>
-
-                        <section class="daw-user-interview__decision" aria-labelledby="decision-title">
-                            <h2 id="decision-title">Keputusan Wawancara User</h2>
-                            <div class="daw-user-interview__decision-grid" data-choice-group>
-                                <button class="is-success" type="button" aria-pressed="false" data-final-decision>✓ &nbsp; ACC / Lolos</button>
-                                <button class="is-reject" type="button" aria-pressed="false" data-final-decision>× &nbsp; Tidak Lolos</button>
-                            </div>
-                            <p class="daw-user-interview__feedback" role="status" aria-live="polite" data-decision-feedback hidden></p>
-                        </section>
+                        <h1 id="notes-title">Hasil Wawancara User</h1>
+                        <dl class="daw-user-interview__candidate-facts">
+                            <div><dt>Status</dt><dd><?= esc_html( $selected_cand['status'] ) ?></dd></div>
+                            <div><dt>Tanggal Wawancara</dt><dd><?= esc_html( $selected_cand['interview_date'] ) ?></dd></div>
+                            <div><dt>Interviewer</dt><dd><?= esc_html( $selected_cand['interviewer'] ?: '—' ) ?></dd></div>
+                            <div><dt>Skor</dt><dd><?= '' !== $selected_cand['score'] ? esc_html( $selected_cand['score'] . '/100' ) : '—' ?></dd></div>
+                            <div><dt>Rekomendasi</dt><dd><?= esc_html( $selected_cand['recommendation'] ?: 'Belum tersedia' ) ?></dd></div>
+                            <div><dt>Keputusan Final HR</dt><dd><?= esc_html( $selected_cand['final_decision'] ?: 'Menunggu Keputusan' ) ?></dd></div>
+                        </dl>
+                        <p><?= '' !== $selected_cand['notes'] ? nl2br( esc_html( $selected_cand['notes'] ) ) : 'Catatan wawancara belum tersedia.' ?></p>
+                        <a class="button button-primary" href="<?= esc_url( recruitment_get_admin_url( 'final-decision' ) ) ?>">Buka Final Decision</a>
                     </section>
                 </div>
             <?php else : ?>
                 <div class="daw-empty-state" style="padding:40px; text-align:center; background:#fff; border-radius:8px;">Belum ada kandidat yang tersedia untuk wawancara user.</div>
             <?php endif; ?>
         <?php else : ?>
+            <?php if ( $database_error ) : ?><div class="notice notice-error"><p>Data wawancara User belum dapat dimuat dari Oracle. Silakan coba kembali.</p></div><?php endif; ?>
             <div class="daw-interview-screen__heading">
                 <div><h1>Wawancara User</h1><p>Kelola wawancara user (hiring manager) untuk kandidat yang lolos wawancara HR.</p></div>
             </div>
@@ -218,10 +209,10 @@ if ( ! $selected_cand && ! empty( $candidates ) ) {
                                         <td><?= esc_html( $candidate['position'] ) ?></td>
                                         <td><?= esc_html( $candidate['dealer'] ) ?></td>
                                         <td><?= esc_html( $candidate['region'] ) ?></td>
-                                        <td><span class="daw-interview-screen__result is-passed"><?= esc_html( $candidate['hr_result'] ) ?></span></td>
+                                        <td><span class="daw-interview-screen__result"><?= esc_html( $candidate['hr_result'] ) ?></span></td>
                                         <td><?= esc_html( $candidate['interview_date'] ) ?></td>
                                         <td><span class="daw-interview-screen__status <?= esc_attr( $candidate['status_class'] ) ?>"><?= esc_html( $candidate['status'] ) ?></span></td>
-                                        <td><a class="daw-interview-screen__action" href="<?= esc_url( add_query_arg( [ 'view' => 'notes', 'candidate_id' => $candidate['id'] ], $list_url ) ) ?>">Catat Wawancara</a></td>
+                                        <td><a class="daw-interview-screen__action" href="<?= esc_url( add_query_arg( [ 'view' => 'notes', 'candidate_id' => $candidate['id'], 'application_id' => $candidate['application_id'] ], $list_url ) ) ?>">Lihat Hasil</a></td>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php else : ?>

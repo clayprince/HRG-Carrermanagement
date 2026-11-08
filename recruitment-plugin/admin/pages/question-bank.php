@@ -13,6 +13,13 @@ $notice = '';
 $error = $database->has_error()
     ? 'Bank soal belum dapat dimuat dari Oracle. Silakan coba kembali.'
     : '';
+$pdf_preview = false;
+$pdf_preview_test = 'disc';
+$pdf_preview_subtest = 'iq_numbers';
+$pdf_preview_text = '';
+$pdf_preview_count = 0;
+$pdf_parse_error = '';
+$pdf_importer = new Recruitment_Psychotest_Pdf_Importer();
 
 if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) && isset( $_POST['question_bank_action'] ) ) {
     check_admin_referer( 'recruitment_question_bank' );
@@ -35,7 +42,68 @@ if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) && isset( $_POST['questi
         : '';
     $result = [ 'success' => false, 'error' => 'Aksi bank soal tidak valid.' ];
 
-    if ( 'create_question' === $action && '' !== trim( $prompt ) ) {
+    if ( in_array( $action, [ 'preview_pdf_import', 'save_pdf_import' ], true ) ) {
+        $pdf_preview_test = $test;
+        $pdf_preview_subtest = isset( $posted['subtest'] ) && is_scalar( $posted['subtest'] )
+            ? sanitize_key( (string) $posted['subtest'] )
+            : '';
+        if ( ! in_array( $pdf_preview_test, [ 'iq', 'disc', 'papi' ], true ) ) {
+            $result = [ 'success' => false, 'error' => 'Jenis tes untuk impor PDF tidak valid.' ];
+        } elseif ( 'preview_pdf_import' === $action ) {
+            $upload = isset( $_FILES['source_pdf'] ) && is_array( $_FILES['source_pdf'] )
+                ? $_FILES['source_pdf']
+                : [];
+            $upload_error = isset( $upload['error'] ) && is_scalar( $upload['error'] )
+                ? (int) $upload['error']
+                : UPLOAD_ERR_NO_FILE;
+            $temporary_path = isset( $upload['tmp_name'] ) && is_string( $upload['tmp_name'] )
+                ? $upload['tmp_name']
+                : '';
+            $filename = isset( $upload['name'] ) && is_string( $upload['name'] )
+                ? sanitize_file_name( $upload['name'] )
+                : '';
+            $mime = class_exists( 'finfo' ) && '' !== $temporary_path
+                ? ( new finfo( FILEINFO_MIME_TYPE ) )->file( $temporary_path )
+                : '';
+            $header = '' !== $temporary_path && is_readable( $temporary_path )
+                ? file_get_contents( $temporary_path, false, null, 0, 5 )
+                : false;
+
+            if ( UPLOAD_ERR_OK !== $upload_error || ! is_uploaded_file( $temporary_path ) ) {
+                $result = [ 'success' => false, 'error' => UPLOAD_ERR_INI_SIZE === $upload_error || UPLOAD_ERR_FORM_SIZE === $upload_error
+                    ? 'Ukuran PDF melebihi batas unggah server.'
+                    : 'Pilih file PDF yang valid untuk diproses.' ];
+            } elseif ( 'pdf' !== strtolower( pathinfo( $filename, PATHINFO_EXTENSION ) )
+                || 'application/pdf' !== $mime
+                || '%PDF-' !== $header ) {
+                $result = [ 'success' => false, 'error' => 'File harus berformat PDF yang valid (ekstensi dan MIME application/pdf).' ];
+            } else {
+                $result = $pdf_importer->extract_text( $temporary_path );
+                if ( ! empty( $result['success'] ) ) {
+                    $pdf_preview = true;
+                    $pdf_preview_text = (string) ( $result['text'] ?? '' );
+                    $parsed = $pdf_importer->parse_questions( $pdf_preview_text, $pdf_preview_test, $pdf_preview_subtest );
+                    if ( ! empty( $parsed['success'] ) ) {
+                        $pdf_preview_count = count( $parsed['questions'] ?? [] );
+                    } else {
+                        $pdf_parse_error = (string) ( $parsed['error'] ?? 'Format grup soal perlu diperiksa.' );
+                    }
+                }
+            }
+        } else {
+            $pdf_preview = true;
+            $pdf_preview_text = isset( $_POST['pdf_import_text'] ) && is_scalar( $_POST['pdf_import_text'] )
+                ? sanitize_textarea_field( wp_unslash( (string) $_POST['pdf_import_text'] ) )
+                : '';
+            $parsed = $pdf_importer->parse_questions( $pdf_preview_text, $pdf_preview_test, $pdf_preview_subtest );
+            if ( ! empty( $parsed['success'] ) ) {
+                $result = $database->create_psychotest_questions( $pdf_preview_test, $parsed['questions'] ?? [] );
+            } else {
+                $result = [ 'success' => false, 'error' => (string) ( $parsed['error'] ?? 'Format soal PDF tidak valid.' ) ];
+                $pdf_parse_error = (string) ( $parsed['error'] ?? 'Format soal PDF tidak valid.' );
+            }
+        }
+    } elseif ( 'create_question' === $action && '' !== trim( $prompt ) ) {
         $type = isset( $posted['type'] ) && is_scalar( $posted['type'] )
             ? sanitize_key( (string) $posted['type'] )
             : '';
@@ -120,11 +188,17 @@ if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) && isset( $_POST['questi
         ];
     }
 
-    if ( ! empty( $result['success'] ) ) {
+    if ( ! empty( $result['success'] ) && 'preview_pdf_import' !== $action ) {
         $redirect_args = [ 'page' => 'recruitment-question-bank', 'saved' => '1' ];
+        if ( 'save_pdf_import' === $action ) {
+            $redirect_args['pdf_imported'] = '1';
+        }
         $filter = isset( $_GET['test'] ) && is_scalar( $_GET['test'] )
             ? sanitize_key( wp_unslash( (string) $_GET['test'] ) )
-            : '';
+            : $test;
+        if ( 'save_pdf_import' === $action ) {
+            $filter = $test;
+        }
         if ( isset( $test_labels[ $filter ] ) ) {
             $redirect_args['test'] = $filter;
         }
@@ -132,11 +206,15 @@ if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) && isset( $_POST['questi
         exit;
     }
 
-    $error = (string) ( $result['error'] ?? 'Soal gagal disimpan ke Oracle.' );
+    if ( empty( $result['success'] ) ) {
+        $error = (string) ( $result['error'] ?? 'Soal gagal disimpan ke Oracle.' );
+    }
 }
 
 if ( '1' === sanitize_text_field( wp_unslash( $_GET['saved'] ?? '' ) ) ) {
-    $notice = 'Soal berhasil disimpan pada bank Oracle.';
+    $notice = '1' === sanitize_text_field( wp_unslash( $_GET['pdf_imported'] ?? '' ) )
+        ? 'Soal hasil impor berhasil disimpan pada bank Oracle.'
+        : 'Soal berhasil disimpan pada bank Oracle.';
 }
 $filter_test = sanitize_key( $_GET['test'] ?? '' );
 $filter_status = sanitize_key( $_GET['status'] ?? '' );
@@ -153,31 +231,58 @@ foreach ( $questions as $question ) {
         $test_counts[ $question['test'] ]++;
     }
 }
+$test_stat_cards = [
+    [ 'label' => 'IQ', 'count' => $test_counts['iq'] ],
+    [ 'label' => 'Pauli', 'count' => $test_counts['pauli'] ],
+    [ 'label' => 'Kepribadian', 'count' => $test_counts['disc'] + $test_counts['papi'] ],
+    [ 'label' => 'DISC', 'count' => $test_counts['disc'] ],
+    [ 'label' => 'PAPI Kostick', 'count' => $test_counts['papi'] ],
+];
 $active_count = count( array_filter( $questions, static function ( $question ) {
     return 'active' === ( $question['status'] ?? 'inactive' );
 } ) );
 $admin_user = wp_get_current_user();
 $logout_form = recruitment_logout_form( 'Keluar', home_url( '/' ) );
-$test_filter_url = static function ( string $test ): string {
-    return add_query_arg( [ 'page' => 'recruitment-question-bank', 'test' => $test ], admin_url( 'admin.php' ) );
-};
 ?>
 <div class="wrap daw-question-bank" data-question-bank data-filter-test="<?= esc_attr( isset( $test_labels[ $filter_test ] ) ? $filter_test : '' ) ?>">
     <header class="daw-question-bank__header"><div><p class="daw-question-bank__breadcrumb"><a href="<?= esc_url( recruitment_get_admin_url( 'psychotest-settings' ) ) ?>">Setting Psikotes</a><span>/</span>Bank Soal</p><h1>Bank Soal Psikotes</h1><p>Tambah atau perbarui soal IQ, Pauli, DISC, dan PAPI yang digunakan tes online.</p></div><span class="daw-question-bank__profile"><span>HR</span><span class="daw-question-bank__profile-copy"><strong><?= esc_html( $admin_user->display_name ) ?></strong><small><?= esc_html( $admin_user->user_email ) ?></small></span><?= $logout_form ?></span></header>
     <?php if ( '' !== $notice ) : ?><div class="notice notice-success is-dismissible"><p><?= esc_html( $notice ) ?></p></div><?php endif; ?>
     <?php if ( '' !== $error ) : ?><div class="notice notice-error"><p><?= esc_html( $error ) ?></p></div><?php endif; ?>
     <section class="daw-question-bank__stats" aria-label="Jumlah soal per tes">
-        <?php foreach ( $test_labels as $test_key => $test_label ) : ?><a href="<?= esc_url( $test_filter_url( $test_key ) ) ?>" class="daw-question-bank__stat"><strong><?= esc_html( (string) $test_counts[ $test_key ] ) ?></strong><span><?= esc_html( $test_label ) ?></span></a><?php endforeach; ?>
+        <?php foreach ( $test_stat_cards as $card ) : ?><div class="daw-question-bank__stat"><strong><?= esc_html( (string) $card['count'] ) ?></strong><span><?= esc_html( $card['label'] ) ?></span></div><?php endforeach; ?>
     </section>
-    <nav class="daw-question-bank__test-tabs" aria-label="Filter jenis tes">
-        <a href="<?= esc_url( add_query_arg( 'page', 'recruitment-question-bank', admin_url( 'admin.php' ) ) ) ?>" class="<?= '' === $filter_test ? 'is-active' : '' ?>">Semua</a>
-        <?php foreach ( $test_labels as $test_key => $test_label ) : ?><a href="<?= esc_url( $test_filter_url( $test_key ) ) ?>" class="<?= $filter_test === $test_key ? 'is-active' : '' ?>"><?= esc_html( $test_label ) ?><b><?= esc_html( (string) $test_counts[ $test_key ] ) ?></b></a><?php endforeach; ?>
-    </nav>
     <section class="daw-question-bank__panel">
         <div class="daw-question-bank__panel-heading"><div><h2>Bank Soal Psikotes</h2><p><?= esc_html( (string) count( $filtered_questions ) ) ?> soal ditampilkan<?php if ( isset( $test_labels[ $filter_test ] ) ) : ?> untuk <?= esc_html( $test_labels[ $filter_test ] ) ?><?php endif; ?></p><small>Soal baru ditambahkan setelah urutan terakhir. Sesi yang sedang berjalan tetap menggunakan soal yang sudah dibuka saat sesi dimulai.</small></div><div class="daw-question-bank__panel-actions">
             <form method="get" class="daw-question-bank__filters"><input type="hidden" name="page" value="recruitment-question-bank"><label class="screen-reader-text" for="question-test-filter">Filter tes</label><select id="question-test-filter" name="test"><option value="">Semua Tes</option><?php foreach ( $test_labels as $test_key => $test_label ) : ?><option value="<?= esc_attr( $test_key ) ?>" <?= selected( $filter_test, $test_key, false ) ?>><?= esc_html( $test_label ) ?></option><?php endforeach; ?></select><label class="screen-reader-text" for="question-status-filter">Filter status</label><select id="question-status-filter" name="status"><option value="">Semua Status</option><option value="active" <?= selected( $filter_status, 'active', false ) ?>>Aktif</option><option value="inactive" <?= selected( $filter_status, 'inactive', false ) ?>>Nonaktif</option></select><label class="screen-reader-text" for="question-search">Cari soal</label><input id="question-search" type="search" name="s" value="<?= esc_attr( $search ) ?>" placeholder="Cari soal..."><button type="submit" class="button">Filter</button></form>
             <button type="button" class="button button-primary" data-new-question>Tambah Soal</button>
         </div></div>
+        <div class="daw-question-bank__pdf-import">
+            <div class="daw-question-bank__pdf-import-copy"><h3>Impor soal dari PDF</h3><p>Unggah naskah soal kosong berbasis teks. Hasil ekstraksi hanya ditampilkan untuk ditinjau HR dan tidak disimpan sebelum dikonfirmasi. Impor IQ dilakukan untuk satu subtes per PDF.</p><small>PDF scan/OCR belum didukung. Jangan unggah hasil tes peserta atau dokumen berisi identitas.</small></div>
+            <form method="post" enctype="multipart/form-data" class="daw-question-bank__pdf-upload">
+                <?php wp_nonce_field( 'recruitment_question_bank' ); ?>
+                <input type="hidden" name="question_bank_action" value="preview_pdf_import">
+                <label for="pdf-import-test">Jenis tes</label>
+                <select id="pdf-import-test" name="question[test]" data-pdf-import-test required><option value="disc" <?= selected( $pdf_preview_test, 'disc', false ) ?>>DISC</option><option value="papi" <?= selected( $pdf_preview_test, 'papi', false ) ?>>PAPI Kostick</option><option value="iq" <?= selected( $pdf_preview_test, 'iq', false ) ?>>IQ</option></select>
+                <label for="pdf-import-subtest" data-pdf-import-subtest-field <?= 'iq' !== $pdf_preview_test ? 'hidden' : '' ?>>Subtes IQ</label>
+                <select id="pdf-import-subtest" name="question[subtest]" data-pdf-import-subtest <?= 'iq' === $pdf_preview_test ? 'required' : '' ?>><option value="iq_numbers" <?= selected( $pdf_preview_subtest, 'iq_numbers', false ) ?>>IQ - 1 Berhitung Angka</option><option value="iq_assembly" <?= selected( $pdf_preview_subtest, 'iq_assembly', false ) ?>>IQ - 2 Gabungan Bagian</option><option value="iq_words" <?= selected( $pdf_preview_subtest, 'iq_words', false ) ?>>IQ - 3 Hubungan Kata</option><option value="iq_abstraction" <?= selected( $pdf_preview_subtest, 'iq_abstraction', false ) ?>>IQ - 4 Abstraksi Nonverbal</option></select>
+                <label for="pdf-import-file">File PDF</label>
+                <input id="pdf-import-file" type="file" name="source_pdf" accept="application/pdf,.pdf" required>
+                <button type="submit" class="button">Ekstrak untuk ditinjau</button>
+            </form>
+        </div>
+        <?php if ( $pdf_preview ) : ?>
+            <form method="post" class="daw-question-bank__pdf-preview">
+                <?php wp_nonce_field( 'recruitment_question_bank' ); ?>
+                <input type="hidden" name="question_bank_action" value="save_pdf_import">
+                <input type="hidden" name="question[test]" value="<?= esc_attr( $pdf_preview_test ) ?>">
+                <input type="hidden" name="question[subtest]" value="<?= esc_attr( $pdf_preview_subtest ) ?>">
+                <h3>Pratinjau hasil ekstraksi</h3>
+                <?php if ( '' !== $pdf_parse_error ) : ?><p class="daw-question-bank__pdf-validation daw-question-bank__pdf-validation--error"><?= esc_html( $pdf_parse_error ) ?></p><?php elseif ( $pdf_preview_count > 0 ) : ?><p class="daw-question-bank__pdf-validation"><?= esc_html( (string) $pdf_preview_count ) ?> <?= 'iq' === $pdf_preview_test ? 'soal IQ' : 'grup pernyataan' ?> valid. Periksa dan edit isi berikut sebelum menyimpan.</p><?php endif; ?>
+                <label for="pdf-import-text"><?= 'iq' === $pdf_preview_test ? 'Format tiap soal: teks pertanyaan, pilihan berlabel A. sampai F., lalu kunci jawaban (contoh: Kunci: B). Pisahkan soal dengan satu baris kosong.' : 'Satu pernyataan per baris. Tanpa baris kosong, pernyataan dikelompokkan otomatis per 4 untuk DISC atau per 2 untuk PAPI.' ?></label>
+                <textarea id="pdf-import-text" name="pdf_import_text" rows="16" required><?= esc_textarea( $pdf_preview_text ) ?></textarea>
+                <button type="submit" class="button button-primary">Simpan soal yang valid ke bank Oracle</button>
+            </form>
+        <?php endif; ?>
         <div class="daw-question-bank__table-wrap"><table class="widefat striped daw-question-bank__table"><thead><tr><th>No</th><th>Pertanyaan / Soal</th><th>Tes</th><th>Tipe</th><th>Status</th><th>Diperbarui</th><th>Aksi</th></tr></thead><tbody>
             <?php if ( ! $filtered_questions ) : ?><tr><td colspan="7" class="daw-question-bank__empty"><?= '' !== $error ? 'Data bank soal belum tersedia karena Oracle tidak dapat dimuat.' : 'Belum ada soal yang sesuai dengan filter.' ?></td></tr><?php endif; ?>
             <?php foreach ( $filtered_questions as $index => $question ) :

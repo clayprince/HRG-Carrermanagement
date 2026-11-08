@@ -17,9 +17,7 @@ $open_forgot = '1' === sanitize_key( wp_unslash( $_GET['forgot'] ?? '' ) );
     <section class="daw-admin-login__card" aria-labelledby="daw-admin-login-title">
         <p class="daw-admin-login__eyebrow"><?= 'reset-password' === $mode ? 'PENGATURAN AKUN' : 'SELAMAT DATANG KEMBALI' ?></p>
         <h1 id="daw-admin-login-title">Selamat Datang di Sistem Rekrutmen, Silahkan Login</h1>
-        <p class="daw-admin-login__error" role="alert">Login dan reset password Oracle dinonaktifkan karena ERD terbaru belum menyediakan skema akun yang aman. Gunakan akun WordPress berwenang jika Anda memilikinya.</p>
 
-        <fieldset class="daw-admin-login__schema-disabled" disabled>
         <?php if ( 'login' === $mode ) : ?>
             <?php if ( '' !== $error ) : ?>
                 <p class="daw-admin-login__error" role="alert"><?= esc_html( $error ) ?></p>
@@ -44,7 +42,7 @@ $open_forgot = '1' === sanitize_key( wp_unslash( $_GET['forgot'] ?? '' ) );
                 <input id="daw-admin-password" name="password" type="password" autocomplete="current-password" required>
                 <button type="submit">Masuk</button>
             </form>
-            <p class="daw-admin-login__lost-password">Reset password Oracle juga dinonaktifkan.</p>
+            <a class="daw-admin-login__lost-password" data-portal-forgot href="<?= esc_url( $is_department_login ? $forgot_department_url : $forgot_hr_url ) ?>" aria-haspopup="dialog">Lupa password?</a>
         <?php else : ?>
             <h2>Buat Password Baru</h2>
             <p class="daw-admin-login__description">Masukkan password baru untuk akun Admin HR Anda.</p>
@@ -59,7 +57,6 @@ $open_forgot = '1' === sanitize_key( wp_unslash( $_GET['forgot'] ?? '' ) );
                 <button type="submit">Simpan password baru</button>
             </form>
         <?php endif; ?>
-        </fieldset>
 
         <a class="daw-admin-login__lost-password" href="<?= esc_url( wp_login_url( admin_url() ) ) ?>">Masuk melalui WordPress</a>
         <a class="daw-admin-login__back" href="<?= esc_url( $public_url ) ?>">Pergi ke tampilan pelamar</a>

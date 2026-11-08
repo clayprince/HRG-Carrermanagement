@@ -308,7 +308,7 @@ if ( 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) &
 	$valid_selection_statuses = [ 'Lolos Wawancara User', 'Tidak Lolos Wawancara User' ];
 	$valid_candidate = false;
 	foreach ( $interviews as $interview ) {
-		if ( $interview['code'] === $posted_code && in_array( $interview['status'], [ 'Terjadwal', 'Sudah Dinilai' ], true ) ) {
+		if ( $interview['code'] === $posted_code && in_array( $interview['status'], [ 'Menunggu Jadwal', 'Terjadwal', 'Sudah Dinilai' ], true ) ) {
 			$valid_candidate = true;
 			break;
 		}
@@ -436,9 +436,9 @@ $results = array_map(
 			'name' => (string) ( $row['CANDIDATE_NAME'] ?? '' ),
 			'code' => (string) ( $row['CANDIDATE_ID'] ?? '' ),
 			'position' => (string) ( $row['POSITION'] ?? '' ),
-			'date' => (string) ( $row['INTERVIEW_DATE'] ?? '' ),
+			'date' => (string) ( $row['INTERVIEW_RESULT_DATE'] ?? '' ),
 			'score' => (int) ( $row['SCORE'] ?? 0 ),
-			'recommendation' => (string) ( $row['RECOMMENDATION'] ?? '' ),
+			'recommendation' => (string) ( $row['REKOMENDASI'] ?? '' ),
 			'decision' => (string) ( $row['FINAL_DECISION'] ?? '' ) ?: 'Pending',
 		];
 	},
@@ -690,7 +690,7 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 					$is_saved = 'Sudah Dinilai' === $selected_interview['status'];
 					$decision_locked = '' !== (string) ( $selected_interview['final_decision'] ?? '' );
 					$is_editing_result = $is_saved && ! $decision_locked && '1' === sanitize_text_field( wp_unslash( $_GET['edit'] ?? '' ) );
-					$show_rating_form = ! $decision_locked && ( 'Terjadwal' === $selected_interview['status'] || $is_editing_result );
+					$show_rating_form = ! $decision_locked && ( in_array( $selected_interview['status'], [ 'Menunggu Jadwal', 'Terjadwal' ], true ) || $is_editing_result );
 					$detail_scores = $posted_scores ?: ( $selected_interview['scores'] ?? [] );
 					$detail_score_total = ! empty( $detail_scores ) ? (int) round( array_sum( array_map( 'absint', $detail_scores ) ) / ( count( $rating_criteria ) * 5 ) * 100 ) : 0;
 					?>
@@ -701,7 +701,7 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 					<div class="daw-ud-detail-layout">
 						<section class="daw-ud-detail-main">
 							<div class="daw-ud-interview-summary"><div><small>Jadwal</small><strong><?= esc_html( $selected_interview['date'] ) ?></strong></div><div><small>Metode</small><strong><?= esc_html( $selected_interview['method'] ) ?></strong></div><div><small>Lokasi</small><strong><?= esc_html( $selected_interview['location'] ) ?></strong></div><div><small>Hasil HR</small><strong><?= esc_html( $selected_interview['hr_result'] ) ?></strong></div></div>
-							<?php if ( 'Menunggu Jadwal' === $selected_interview['status'] ) : ?>
+							<?php if ( 'Menunggu Jadwal' === $selected_interview['status'] && ! $show_rating_form ) : ?>
 								<div class="daw-ud-detail-panel"><div class="daw-ud-alert"><span class="dashicons dashicons-clock" aria-hidden="true"></span><span><strong>Menunggu Jadwal Wawancara</strong><small>Jadwal wawancara user belum ditentukan. Hubungi HR untuk konfirmasi jadwal.</small></span></div><div class="daw-ud-summary-grid"><div><small>Hasil HR Interview</small><strong><?= esc_html( $selected_interview['hr_result'] ) ?></strong></div><div><small>Departemen</small><strong><?= esc_html( $department ) ?></strong></div></div><p class="daw-ud-muted-panel">Form penilaian wawancara akan tersedia setelah jadwal wawancara user dikonfirmasi.</p></div>
 							<?php elseif ( $show_rating_form ) : ?>
 								<form class="daw-ud-detail-panel daw-ud-rating-form" method="post" action="<?= esc_url( add_query_arg( [ 'page' => 'daw-user-department', 'view' => 'interview-detail', 'candidate_code' => $selected_interview['code'], 'edit' => $is_editing_result ? '1' : '' ], admin_url( 'admin.php' ) ) ) ?>" data-interview-rating>

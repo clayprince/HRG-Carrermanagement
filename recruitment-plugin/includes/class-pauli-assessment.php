@@ -32,10 +32,17 @@ class Recruitment_Pauli_Assessment {
         $user_id = recruitment_get_assessment_user_id();
         $state = recruitment_get_assessment_state( $user_id, self::USER_META_KEY );
         $state = is_array( $state ) ? $state : [];
-        if ( 'active' === ( $state['status'] ?? '' ) && (int) ( $state['candidate_id'] ?? 0 ) === $candidate_id ) {
+        $expired_legacy_session = (int) ( $state['candidate_id'] ?? 0 ) === $candidate_id
+            && $this->is_expired_legacy_session( $state );
+        if ( 'active' === ( $state['status'] ?? '' )
+            && (int) ( $state['candidate_id'] ?? 0 ) === $candidate_id
+            && ! $expired_legacy_session ) {
             $this->upgrade_session( $user_id, $state );
         }
         if ( 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
+            if ( $expired_legacy_session ) {
+                wp_die( esc_html__( 'Sesi Pauli lama telah melewati batas waktu dan perlu ditinjau tim HR sebelum diselesaikan.', 'recruitment-plugin' ), '', [ 'response' => 409 ] );
+            }
             $this->handle_advance_request( $user_id, $candidate_id, $state );
         }
 
@@ -48,7 +55,9 @@ class Recruitment_Pauli_Assessment {
             exit;
         }
 
-        if ( 'active' === ( $state['status'] ?? '' ) && (int) ( $state['candidate_id'] ?? 0 ) === $candidate_id ) {
+        if ( 'active' === ( $state['status'] ?? '' )
+            && (int) ( $state['candidate_id'] ?? 0 ) === $candidate_id
+            && ! $expired_legacy_session ) {
             $this->sync_elapsed_columns( $user_id, $candidate_id, $state );
         }
     }
@@ -104,6 +113,12 @@ class Recruitment_Pauli_Assessment {
         $state = recruitment_get_assessment_state( $user_id, self::USER_META_KEY );
         if ( $candidate_id < 1 || ! is_array( $state ) || (int) ( $state['candidate_id'] ?? 0 ) !== $candidate_id ) {
             return [ 'ready' => false ];
+        }
+        if ( $this->is_expired_legacy_session( $state ) ) {
+            return [
+                'error' => 'Sesi Pauli lama telah melewati batas waktu dan perlu ditinjau tim HR sebelum diselesaikan.',
+                'needs_hr_review' => true,
+            ];
         }
         if ( 'complete' === ( $state['status'] ?? '' ) ) {
             $total_answered = 0;
@@ -273,7 +288,11 @@ class Recruitment_Pauli_Assessment {
      */
     private function upgrade_session( int $user_id, array &$state ): void {
         $changed = false;
-        foreach ( (array) ( $state['columns'] ?? [] ) as &$column ) {
+        $columns = $state['columns'] ?? [];
+        if ( ! is_array( $columns ) ) {
+            return;
+        }
+        foreach ( $columns as &$column ) {
             if ( ! is_array( $column ) ) {
                 continue;
             }
@@ -295,8 +314,31 @@ class Recruitment_Pauli_Assessment {
             $changed = true;
         }
         if ( $changed ) {
+            $state['columns'] = $columns;
             recruitment_update_assessment_state( $user_id, self::USER_META_KEY, $state );
         }
+    }
+
+    /**
+     * Keep an expired session in the legacy format available for HR review.
+     *
+     * @param array<string, mixed> $state
+     */
+    private function is_expired_legacy_session( array $state ): bool {
+        if ( 'active' !== ( $state['status'] ?? '' ) || time() < absint( $state['deadline'] ?? 0 ) ) {
+            return false;
+        }
+
+        $columns = $state['columns'] ?? [];
+        if ( ! is_array( $columns ) ) {
+            return true;
+        }
+        foreach ( $columns as $column ) {
+            if ( ! is_array( $column ) || count( (array) ( $column['numbers'] ?? [] ) ) < self::NUMBER_COUNT ) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

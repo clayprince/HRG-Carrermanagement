@@ -43,6 +43,7 @@ class Recruitment_Router {
         'user-management'    => 'admin/pages/user-management-oracle.php',
         'hr-profile'         => 'admin/pages/hr-profile.php',
         'psychotest-settings' => 'admin/pages/psychotest-settings.php',
+        'psychotest-results' => 'admin/pages/psychotest-results.php',
         'question-bank'      => 'admin/pages/question-bank.php',
         'settings'           => 'admin/pages/settings.php',
     ];
@@ -61,6 +62,7 @@ class Recruitment_Router {
         'user-management',
         'hr-profile',
         'psychotest-settings',
+        'psychotest-results',
         'question-bank',
         'settings',
     ];

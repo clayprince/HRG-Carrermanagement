@@ -6,6 +6,20 @@ migration log.
 
 ## 2026-11-08
 
+### Pauli legacy session handling
+
+- Fixed expansion of legacy Pauli columns so the updated number sequence and
+  answer payload are persisted for sessions that have not expired.
+- Expired legacy sessions are kept unchanged for HR review rather than
+  auto-saving the remaining lanes as blank and completing the assessment.
+
+### Admin HR login
+
+- Re-enabled the Oracle-backed Admin HR login and password-reset entry point
+  after confirming the connected schema has the required account fields.
+- HR can sign in with either the account email or username; account passwords
+  remain verified as hashes in Oracle.
+
 ### Personality assessment stage
 
 - Grouped DISC and PAPI Kostick under one applicant-facing Personality stage;
@@ -26,8 +40,46 @@ migration log.
   submitted digits, and correct-answer score.
 - HR settings now show the fixed Pauli duration and lane count. The applicant
   portal requires a 20-question Pauli bank before unlocking the assessment.
-- Validation is limited to local source checks; no live Oracle session was
-  submitted or modified for verification.
+- Verified that an HR-created synthetic Pauli question appears in the
+  Oracle-backed assessment catalog, then removed the fixture. No participant
+  assessment session was submitted or modified.
+
+### Psychotest question PDF import
+
+- Added an HR-only PDF extraction preview for IQ, DISC, and PAPI Kostick. IQ
+  imports support labeled A–F choices and answer keys for one selected IQ
+  subtest per PDF; HR can review and edit extracted text before saving.
+  Extraction alone never writes to the question bank.
+- Added automatic grouping from sequential extracted statement lines when a
+  PDF does not preserve blank lines. New personality questions are included in
+  future sessions while retaining the minimum 24 DISC / 90 PAPI question bank.
+- Save reviewed IQ questions and their answer choices together in one Oracle
+  transaction; map answer keys to the stored correct choices.
+- Added PDF type, size, page-count, text-layer, and participant-report checks.
+  Scanned PDFs remain unsupported, and likely participant result reports are
+  rejected without displaying their extracted text.
+- Validated four-statement DISC groups and two-statement PAPI groups, then save
+  accepted groups through one Oracle transaction. A synthetic PDF was
+  extracted, grouped into two DISC questions, saved to Oracle, and verified in
+  HR and applicant catalogs; the PDF and question fixtures were then removed.
+  IQ, Pauli, and DISC question visibility was also verified with temporary
+  records, then cleaned up.
+
+### Interview and final-decision synchronization
+
+- HR status changes to a final outcome now use the same Oracle transaction as
+  the Final Decision screen, updating the HR decision record, application
+  status, and applicant timeline together.
+- Final outcomes require the candidate to have reached department interview
+  and have a saved User Department result. Department interview results can be
+  recorded from the HR-advanced candidate list without a separate Oracle
+  schedule row.
+- Kept the next-step applicant tracking note within the Oracle history
+  column's 100-character limit.
+- Verified the HR-to-department interview, saved department result, final HR
+  decision, and applicant tracking flow against the local disposable Oracle
+  database using synthetic accounts and a vacancy. The decision appeared in
+  HR, department, and tracking views; all fixture records were removed.
 
 ## 2026-11-06
 

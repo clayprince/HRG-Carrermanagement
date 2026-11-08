@@ -3910,10 +3910,261 @@ body:has(.daw-account-auth) .daw-account-auth__main {
 .daw-psych-test-card--complete .daw-psych-test-button {
   margin: 0;
 }
+.daw-personality-assessment {
+  margin: 0 auto;
+  max-width: 820px;
+  padding: 24px;
+  text-align: left;
+  width: 100%;
+}
+.daw-personality-assessment__header {
+  align-items: start;
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.daw-psych-test-card.daw-personality-assessment h1 {
+  color: var(--daw-charcoal);
+  font-size: 28px;
+  line-height: 1.2;
+  margin: 0 0 8px;
+}
+.daw-psych-test-card.daw-personality-assessment p {
+  color: var(--daw-gray);
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+}
+.daw-personality-assessment__timer {
+  background: var(--daw-light);
+  border-radius: 8px;
+  display: grid;
+  gap: 3px;
+  min-width: 150px;
+  padding: 10px 14px;
+  text-align: center;
+}
+.daw-personality-assessment__timer > span {
+  color: var(--daw-gray);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.daw-personality-assessment__timer time {
+  color: var(--daw-charcoal);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.daw-personality-assessment__timer small {
+  color: var(--daw-gray);
+  font-size: 11px;
+}
+.daw-personality-assessment__progress {
+  align-items: center;
+  border-bottom: 1px solid #e5e5e7;
+  border-top: 1px solid #e5e5e7;
+  color: var(--daw-gray);
+  display: flex;
+  font-size: 12px;
+  justify-content: space-between;
+  margin: 20px 0 10px;
+  padding: 10px 0;
+}
+.daw-personality-assessment__progress strong {
+  color: var(--daw-charcoal);
+}
+.daw-personality-assessment__reminder,
+.daw-personality-assessment__save-status {
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 8px 0;
+}
+.daw-personality-assessment__reminder {
+  background: #fff4ce;
+  border-radius: 6px;
+  color: #825400;
+  padding: 10px 12px;
+}
+.daw-personality-assessment__save-status {
+  color: var(--daw-gray);
+}
+.daw-personality-assessment__questions {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+.daw-personality-assessment__question {
+  background: #fff;
+  border: 1px solid #e5e5e7;
+  border-radius: 8px;
+  margin: 0;
+  min-width: 0;
+  padding: 14px 16px;
+}
+.daw-personality-assessment__question legend {
+  color: var(--daw-charcoal);
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 0;
+  width: 100%;
+}
+.daw-personality-assessment__question legend strong {
+  display: block;
+  font-size: 15px;
+  margin-bottom: 2px;
+}
+.daw-personality-assessment__question legend > span {
+  color: var(--daw-gray);
+  display: block;
+}
+.daw-personality-assessment__disc-head,
+.daw-personality-assessment__disc-row {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(130px, 170px) minmax(130px, 170px);
+}
+.daw-personality-assessment__disc-head {
+  color: var(--daw-gray);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 12px 8px 7px;
+}
+.daw-personality-assessment__disc-head > span:not(:first-child) {
+  text-align: center;
+}
+.daw-personality-assessment__disc-row {
+  border-top: 1px solid #eeeef0;
+  color: var(--daw-charcoal);
+  font-size: 13px;
+  line-height: 1.45;
+  min-height: 46px;
+  padding: 7px 8px;
+}
+.daw-personality-assessment__disc-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.daw-personality-assessment__disc-row > label {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  min-height: 32px;
+}
+.daw-personality-assessment__disc-row input,
+.daw-personality-assessment__pair input {
+  accent-color: var(--daw-red);
+  flex: 0 0 auto;
+  height: 18px;
+  margin: 0;
+  width: 18px;
+}
+.daw-personality-assessment__pairs {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.daw-personality-assessment__pair {
+  align-items: flex-start;
+  background: #f8f8f9;
+  border: 1px solid #eeeef0;
+  border-radius: 6px;
+  color: var(--daw-charcoal);
+  cursor: pointer;
+  display: flex;
+  font-size: 13px;
+  gap: 10px;
+  line-height: 1.5;
+  padding: 10px 12px;
+}
+.daw-personality-assessment__footer {
+  align-items: center;
+  border-top: 1px solid #e5e5e7;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-top: 20px;
+  padding-top: 16px;
+}
+.daw-personality-assessment__footer .daw-recruitment__button {
+  font-size: 13px;
+}
 @media (max-width: 600px) {
   .daw-recruitment__psych-test-main {
     min-height: calc(100vh - 64px);
     padding-top: 24px;
+  }
+  .daw-personality-assessment {
+    padding: 16px 12px;
+  }
+  .daw-personality-assessment__header {
+    gap: 12px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .daw-psych-test-card.daw-personality-assessment h1 {
+    font-size: 22px;
+  }
+  .daw-psych-test-card.daw-personality-assessment p {
+    font-size: 13px;
+  }
+  .daw-personality-assessment__timer {
+    align-items: center;
+    column-gap: 8px;
+    grid-template-columns: auto auto 1fr;
+    justify-items: start;
+    min-width: 0;
+    text-align: left;
+    width: 100%;
+  }
+  .daw-personality-assessment__timer time {
+    font-size: 18px;
+  }
+  .daw-personality-assessment__timer small {
+    justify-self: end;
+  }
+  .daw-personality-assessment__progress {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 14px;
+  }
+  .daw-personality-assessment__question {
+    padding: 12px 10px;
+  }
+  .daw-personality-assessment__disc-head,
+  .daw-personality-assessment__disc-row {
+    gap: 6px;
+    grid-template-columns: minmax(0, 1fr) 36px 36px;
+  }
+  .daw-personality-assessment__disc-head {
+    font-size: 0;
+    padding: 10px 4px 6px;
+  }
+  .daw-personality-assessment__disc-head > span:not(:first-child) {
+    font-size: 0;
+  }
+  .daw-personality-assessment__disc-head > span:not(:first-child)::before {
+    font-size: 11px;
+  }
+  .daw-personality-assessment__disc-head > span:nth-child(2)::before {
+    content: "P";
+  }
+  .daw-personality-assessment__disc-head > span:nth-child(3)::before {
+    content: "K";
+  }
+  .daw-personality-assessment__disc-row {
+    font-size: 13px;
+    padding: 7px 4px;
+  }
+  .daw-personality-assessment__footer {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+  .daw-personality-assessment__footer .daw-recruitment__button {
+    justify-content: center;
+    width: 100%;
   }
   .daw-psych-test-list > div {
     grid-template-columns: 22px auto 1fr;

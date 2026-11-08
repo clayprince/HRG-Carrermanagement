@@ -113,7 +113,8 @@ their SQL is compatible with the current Oracle database.
   minutes, with 20 timed lanes and an automatic lane change every three
   minutes. Each lane supports up to 900 answers; the applicant can use the
   on-screen keypad or keyboard, and Oracle stores the generated number sequence,
-  submitted digits, and correct-answer score. The Pauli bank must contain at
+  submitted digits, and correct-answer score. Long answer payloads are split
+  into bounded CLOB binds for PDO_OCI. The Pauli bank must contain at
   least 20 questions to provide the fixed one-hour session. The applicant
   psychotest flow has three stages: IQ, Pauli, and Personality. Personality is
   completed in order as two separately persisted subtests: DISC (24 groups of
@@ -125,6 +126,9 @@ their SQL is compatible with the current Oracle database.
 - Active assessment sessions keep their original question order when HR adds
   questions; new questions are included in sessions started afterward.
 - Psychometric routes require an authenticated applicant portal session.
+- The HR Hasil Psikotes page reads saved and completed IQ, Pauli, DISC, and PAPI
+  records from Oracle, including response counts for sessions without a result
+  record yet.
 
 ## Schema alignment and migrations
 
@@ -203,6 +207,12 @@ column `NAMA_DEPARTEMEN` and does not contain a location column; the linked
 `HRS_KOLOM_LANDING_PENDAFTARAN.NAMA_DEALER` supplies the displayed location.
 Keep this mapping distinct from `NAMA_DEPARTEMENT` on
 `HRS_REKAPAN_KEPUTUSAN_HR`.
+
+HR-managed WordPress vacancies store geography in `_daw_region` and the
+Oracle department ID/name in `_daw_department_id` and `_daw_department`.
+Application submission resolves the ID against active `HRS_DEPARTEMEN` rows
+before writing `HRS_DETAIL_INFO_LOWONGAN.NAMA_DEPARTEMEN`; never use region as
+the department.
 
 When HR approves a User Department request, the plugin creates and publishes
 the Oracle vacancy immediately. HR supplies any missing location, Dealer/AHASS,

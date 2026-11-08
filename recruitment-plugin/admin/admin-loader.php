@@ -109,6 +109,7 @@ class Recruitment_Admin {
 		add_submenu_page( 'recruitment-dashboard', 'Pengelolaan Akun User', 'Pengelolaan Akun User', 'manage_recruitment', 'recruitment-user-management', [ $this, 'render_user_management' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Profil Admin HR', 'Profil Admin HR', 'manage_recruitment', 'recruitment-hr-profile', [ $this, 'render_hr_profile' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Setting Psikotes', 'Setting Psikotes', 'manage_recruitment', 'recruitment-psychotest-settings', [ $this, 'render_psychotest_settings' ] );
+		add_submenu_page( 'recruitment-dashboard', 'Hasil Psikotes', 'Hasil Psikotes', 'manage_recruitment', 'recruitment-psychotest-results', [ $this, 'render_psychotest_results' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Bank Soal', 'Bank Soal', 'manage_recruitment', 'recruitment-question-bank', [ $this, 'render_question_bank' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Pengaturan', 'Pengaturan', 'manage_recruitment', 'recruitment-settings', [ $this, 'render_settings' ] );
 	}
@@ -170,17 +171,30 @@ class Recruitment_Admin {
 		$requirements = sanitize_textarea_field( wp_unslash( $_POST['requirements'] ?? '' ) );
 		$type = sanitize_text_field( wp_unslash( $_POST['type'] ?? '' ) );
 		$region = sanitize_text_field( wp_unslash( $_POST['region'] ?? '' ) );
+		$department_id = absint( $_POST['department_id'] ?? 0 );
 		$dealer = sanitize_text_field( wp_unslash( $_POST['dealer'] ?? '' ) );
 		$location = sanitize_text_field( wp_unslash( $_POST['location'] ?? '' ) );
 		$deadline = sanitize_text_field( wp_unslash( $_POST['deadline'] ?? '' ) );
 		$status = sanitize_key( wp_unslash( $_POST['status'] ?? 'draft' ) );
+		$database = new Recruitment_Database();
+		$departments = $database->get_departments();
+		if ( $database->has_error() ) {
+			$this->redirect_to_vacancies( 'department_unavailable', $vacancy_id );
+		}
+		$department_name = '';
+		foreach ( $departments as $department ) {
+			if ( (int) $department['id'] === $department_id ) {
+				$department_name = (string) $department['name'];
+				break;
+			}
+		}
 		$valid_date = DateTimeImmutable::createFromFormat( '!Y-m-d', $deadline );
 		$date_errors = DateTimeImmutable::getLastErrors();
 		$is_valid_date = $valid_date && ( false === $date_errors || ( 0 === $date_errors['warning_count'] && 0 === $date_errors['error_count'] ) )
 			&& $valid_date->format( 'Y-m-d' ) === $deadline
 			&& $deadline >= current_time( 'Y-m-d' );
 
-		if ( '' === $title || '' === $dealer || ! $is_valid_date || ! in_array( $status, [ 'draft', 'published' ], true ) ) {
+		if ( '' === $title || '' === $dealer || '' === $department_name || ! $is_valid_date || ! in_array( $status, [ 'draft', 'published' ], true ) ) {
 			$this->redirect_to_vacancies( 'invalid_data', $vacancy_id );
 		}
 		if ( $vacancy_id && ( 'daw_vacancy' !== get_post_type( $vacancy_id ) || ! current_user_can( 'edit_post', $vacancy_id ) ) ) {
@@ -209,6 +223,8 @@ class Recruitment_Admin {
 				'_daw_requirements' => $requirements,
 				'_daw_type' => $type,
 				'_daw_region' => $region,
+				'_daw_department_id' => $department_id,
+				'_daw_department' => $department_name,
 				'_daw_dealer' => $dealer,
 				'_daw_location' => $location,
 				'_daw_deadline' => $deadline,
@@ -329,6 +345,23 @@ class Recruitment_Admin {
 			}
 			$fields = is_array( $request['fields'] ?? null ) ? $request['fields'] : [];
 			if ( 'approve' === $decision && empty( $request['vacancy_id'] ) ) {
+				$department_name = trim( sanitize_text_field( (string) ( $fields['department'] ?? '' ) ) );
+				$department_id = 0;
+				$database = new Recruitment_Database();
+				$departments = $database->get_departments();
+				if ( $database->has_error() ) {
+					wp_die( esc_html__( 'Daftar departemen Oracle tidak tersedia. Lowongan belum dapat dibuat.', 'recruitment-plugin' ) );
+				}
+				foreach ( $departments as $department ) {
+					if ( 0 === strcasecmp( trim( (string) $department['name'] ), $department_name ) ) {
+						$department_id = (int) $department['id'];
+						$department_name = (string) $department['name'];
+						break;
+					}
+				}
+				if ( ! $department_id ) {
+					wp_die( esc_html__( 'Departemen pada pengajuan tidak cocok dengan daftar departemen Oracle. Perbarui data departemen sebelum menyetujui.', 'recruitment-plugin' ) );
+				}
 				$vacancy_id = wp_insert_post(
 					[
 						'post_type' => 'daw_vacancy',
@@ -338,6 +371,8 @@ class Recruitment_Admin {
 						'meta_input' => [
 							'_daw_dealer' => sanitize_text_field( $fields['dealer'] ?? '' ),
 							'_daw_region' => sanitize_text_field( $fields['region'] ?? '' ),
+							'_daw_department_id' => $department_id,
+							'_daw_department' => $department_name,
 							'_daw_type' => sanitize_text_field( $fields['employment_type'] ?? '' ),
 							'_daw_location' => sanitize_text_field( $fields['location'] ?? '' ),
 							'_daw_fptk_code' => $request_code,
@@ -421,7 +456,18 @@ class Recruitment_Admin {
 		$status = sanitize_text_field( wp_unslash( $_POST['status'] ?? '' ) );
 		$stage = sanitize_text_field( wp_unslash( $_POST['stage'] ?? '' ) );
 		$note = sanitize_textarea_field( wp_unslash( $_POST['note'] ?? '' ) );
-		$result = ( new Recruitment_Database() )->update_application_status( (string) $application_id, $status, $stage, $note );
+		$database = new Recruitment_Database();
+		$normalized_status = strtoupper( trim( $status ) );
+		if ( in_array( $normalized_status, [ 'DITERIMA', 'DITOLAK' ], true ) ) {
+			$role_access_id = absint( get_user_meta( get_current_user_id(), 'daw_oracle_account_id', true ) );
+			$result = $database->save_final_decision(
+				(string) $application_id,
+				$normalized_status,
+				$role_access_id > 0 ? $role_access_id : null
+			);
+		} else {
+			$result = $database->update_application_status( (string) $application_id, $status, $stage, $note );
+		}
 		if ( empty( $result['success'] ) ) {
 			wp_die( esc_html( $result['error'] ?? 'Status lamaran gagal disimpan.' ) );
 		}
@@ -673,6 +719,10 @@ class Recruitment_Admin {
 		$this->render_page( 'psychotest-settings' );
 	}
 
+	public function render_psychotest_results(): void {
+		$this->render_page( 'psychotest-results' );
+	}
+
 	public function render_question_bank(): void {
 		$this->render_page( 'question-bank' );
 	}
@@ -704,6 +754,7 @@ class Recruitment_Admin {
 			'recruitment-user-management',
 			'recruitment-hr-profile',
 			'recruitment-psychotest-settings',
+			'recruitment-psychotest-results',
 			'recruitment-question-bank',
 			'recruitment-settings',
 			'daw-user-department',
