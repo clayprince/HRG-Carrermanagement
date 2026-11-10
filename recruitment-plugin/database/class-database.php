@@ -488,6 +488,73 @@ class Recruitment_Database {
     }
 
     /**
+     * Get details for attendance reminder email.
+     *
+     * @return array{application_id: string, applicant_id: string, applicant_name: string, applicant_email: string, title: string, location: string, confirmed_at: string}|null
+     */
+    public function get_attendance_reminder_details( string $application_id ): ?array {
+        if ( ! ctype_digit( $application_id ) || '0' === $application_id ) {
+            return null;
+        }
+
+        try {
+            $rows = $this->fetch_all(
+                'SELECT c.lamaran_id AS "application_id",
+                        c.profile_kandidat_id AS "applicant_id",
+                        NVL(p.nama_lengkap, p.nama_kandidat) AS "applicant_name",
+                        NVL(p.email, pkl.email) AS "applicant_email",
+                        NVL(d.judul_pekerjaan, k.judul_pekerjaan) AS "title",
+                        NVL(k.nama_dealer, d.lokasi_penempatan) AS "location",
+                        TO_CHAR(c.confirmed_at, \'YYYY-MM-DD HH24:MI:SS\') AS "confirmed_at"
+                 FROM HRS_KONFIRMASI_PSIKOTES c
+                 JOIN HRS_LAMARAN l ON l.lamaran_id = c.lamaran_id
+                 LEFT JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
+                 LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id
+                 LEFT JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = l.kandidat_id
+                 LEFT JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
+                 WHERE c.lamaran_id = :application_id
+                   AND c.attendance_confirmed = \'Y\'
+                   AND c.confirmed_at IS NOT NULL',
+                [ 'application_id' => $application_id ]
+            );
+            return $rows[0] ?? null;
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_oracle_failure( 'Attendance reminder details lookup failed', $exception );
+            return null;
+        }
+    }
+
+    /**
+     * Get all confirmed psychotest attendances that have a valid confirmed_at timestamp.
+     *
+     * @return array<int, array{application_id: string, applicant_id: string, applicant_name: string, applicant_email: string, title: string, location: string, confirmed_at: string}>
+     */
+    public function get_confirmed_psychotest_attendances(): array {
+        try {
+            return $this->fetch_all(
+                'SELECT c.lamaran_id AS "application_id",
+                        c.profile_kandidat_id AS "applicant_id",
+                        NVL(p.nama_lengkap, p.nama_kandidat) AS "applicant_name",
+                        NVL(p.email, pkl.email) AS "applicant_email",
+                        NVL(d.judul_pekerjaan, k.judul_pekerjaan) AS "title",
+                        NVL(k.nama_dealer, d.lokasi_penempatan) AS "location",
+                        TO_CHAR(c.confirmed_at, \'YYYY-MM-DD HH24:MI:SS\') AS "confirmed_at"
+                 FROM HRS_KONFIRMASI_PSIKOTES c
+                 JOIN HRS_LAMARAN l ON l.lamaran_id = c.lamaran_id
+                 LEFT JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
+                 LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id
+                 LEFT JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = l.kandidat_id
+                 LEFT JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
+                 WHERE c.attendance_confirmed = \'Y\'
+                   AND c.confirmed_at IS NOT NULL'
+            );
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_oracle_failure( 'Confirmed psychotest attendances lookup failed', $exception );
+            return [];
+        }
+    }
+
+    /**
      * Verify a portal account stored in HRS_ROLE_AKSES.
      *
      * @return array{success: bool, account?: array{type: string, id: string, email: string, username: string, display_name: string, department_id: string, department: string}, error?: string}
@@ -659,6 +726,43 @@ class Recruitment_Database {
             ];
         } catch ( PDOException | RuntimeException $exception ) {
             $this->log_error( 'HR Oracle password reset lookup failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /**
+     * Find an active applicant account for a password-reset request.
+     *
+     * @return array{success: bool, account?: array{id: string, profile_id: string, email: string, full_name: string}, error?: string}
+     */
+    public function get_active_applicant_by_email( string $email ): array {
+        $email = strtolower( trim( $email ) );
+        if ( ! filter_var( $email, FILTER_VALIDATE_EMAIL ) ) {
+            return [ 'success' => false, 'error' => 'account_not_found' ];
+        }
+
+        try {
+            $statement = $this->get_connection()->prepare(
+                'SELECT l.profile_kandidat_login AS "id", l.kandidat_id AS "profile_id", l.email AS "email", NVL(p.nama_lengkap, p.nama_kandidat) AS "full_name", l.status_akun AS "status" FROM HRS_PROFILE_KANDIDAT_LOGIN l LEFT JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = l.kandidat_id WHERE LOWER(TRIM(l.email)) = :email AND (l.status_akun = \'ACTIVE\' OR l.status_akun IS NULL)'
+            );
+            $statement->execute( [ 'email' => $email ] );
+            $rows = $statement->fetchAll( PDO::FETCH_ASSOC );
+            if ( empty( $rows ) ) {
+                return [ 'success' => false, 'error' => 'account_not_found' ];
+            }
+
+            $row = $rows[0];
+            return [
+                'success' => true,
+                'account' => [
+                    'id'         => (string) $row['id'],
+                    'profile_id' => (string) ( $row['profile_id'] ?? '' ),
+                    'email'      => (string) $row['email'],
+                    'full_name'  => (string) ( $row['full_name'] ?? 'Pelamar' ),
+                ],
+            ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_error( 'Applicant Oracle password reset lookup failed', $exception );
             return [ 'success' => false, 'error' => 'service_unavailable' ];
         }
     }
@@ -1099,6 +1203,42 @@ class Recruitment_Database {
             return [ 'success' => true ];
         } catch ( PDOException | RuntimeException $exception ) {
             $this->log_error( 'HR Oracle password reset failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /**
+     * Reset applicant password using a verified reset token.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    public function reset_applicant_password( string $login_id, string $new_password ): array {
+        if ( ! ctype_digit( $login_id ) || '0' === $login_id || strlen( $new_password ) < 8 ) {
+            return [ 'success' => false, 'error' => 'invalid_password_data' ];
+        }
+
+        try {
+            $password_hash = password_hash( $new_password, PASSWORD_BCRYPT );
+            if ( false === $password_hash ) {
+                throw new RuntimeException( 'Applicant reset password could not be hashed.' );
+            }
+
+            $statement = $this->get_connection()->prepare(
+                'UPDATE HRS_PROFILE_KANDIDAT_LOGIN SET KATA_SANDI = :password_hash, UPDATED_AT = CURRENT_TIMESTAMP WHERE PROFILE_KANDIDAT_LOGIN = :login_id AND (STATUS_AKUN = \'ACTIVE\' OR STATUS_AKUN IS NULL)'
+            );
+            $statement->execute(
+                [
+                    'password_hash' => $password_hash,
+                    'login_id'      => $login_id,
+                ]
+            );
+            if ( 1 !== $statement->rowCount() ) {
+                return [ 'success' => false, 'error' => 'account_not_found' ];
+            }
+
+            return [ 'success' => true ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_error( 'Applicant Oracle password reset failed', $exception );
             return [ 'success' => false, 'error' => 'service_unavailable' ];
         }
     }

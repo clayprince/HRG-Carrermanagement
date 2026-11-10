@@ -45,6 +45,15 @@ class Recruitment_Plugin {
         add_action( 'template_redirect', [ $this, 'handle_portal_login' ] );
         add_action( 'template_redirect', [ $this, 'handle_psychotest_consent' ], 1 );
         add_action( 'template_redirect', [ $this, 'handle_psychotest_attendance' ], 1 );
+        add_action( 'phpmailer_init', [ $this, 'configure_smtp' ] );
+        add_filter( 'wp_mail_from', [ $this, 'filter_mail_from' ] );
+        add_filter( 'wp_mail_from_name', [ $this, 'filter_mail_from_name' ] );
+        add_action( 'wp_mail_failed', [ $this, 'log_mail_failed' ] );
+        add_action( 'daw_daily_attendance_reminder_cron', [ $this, 'run_daily_attendance_reminder_cron' ] );
+        add_action( 'daw_send_attendance_reminder_event', [ $this, 'send_attendance_reminder' ], 10, 2 );
+        if ( ! wp_next_scheduled( 'daw_daily_attendance_reminder_cron' ) ) {
+            wp_schedule_event( time(), 'hourly', 'daw_daily_attendance_reminder_cron' );
+        }
         add_action( 'admin_init', [ $this, 'validate_oracle_portal_session' ] );
         add_action( 'admin_post_daw_logout', [ $this, 'handle_logout' ] );
         add_action( 'admin_post_nopriv_daw_logout', [ $this, 'handle_logout' ] );
@@ -236,7 +245,12 @@ class Recruitment_Plugin {
                     (string) $application_id,
                     $local_datetime
                 );
-                $return_args['attendance_result'] = empty( $result['success'] ) ? 'time_update_failed' : 'time_updated';
+                if ( ! empty( $result['success'] ) ) {
+                    $this->schedule_attendance_reminders( $application_id, $local_datetime );
+                    $return_args['attendance_result'] = 'time_updated';
+                } else {
+                    $return_args['attendance_result'] = 'time_update_failed';
+                }
             }
             wp_safe_redirect( recruitment_get_public_url( 'application-process', $return_args ) );
             exit;
@@ -300,7 +314,13 @@ class Recruitment_Plugin {
 
                 if ( empty( $save_result['success'] ) ) {
                     $return_args['attendance_result'] = 'save_failed';
-                } elseif ( 'online' === ( $settings['mode'] ?? '' ) && empty( $attendance['reminder_sent'] ) ) {
+                } else {
+                    $confirmed_target = ! empty( $attendance['confirmed_at'] )
+                        ? (string) $attendance['confirmed_at']
+                        : ( (string) ( $settings['test_date'] ?? '' ) . 'T' . (string) ( $settings['start_time'] ?? '09:00' ) );
+                    $this->schedule_attendance_reminders( $application_id, $confirmed_target );
+
+                    if ( 'online' === ( $settings['mode'] ?? '' ) && empty( $attendance['reminder_sent'] ) ) {
                     $email = sanitize_email( (string) ( $applicant['email'] ?? '' ) );
                     if ( ! is_email( $email ) ) {
                         $return_args['attendance_result'] = 'email_failed';
@@ -350,10 +370,11 @@ class Recruitment_Plugin {
                             $return_args['attendance_result'] = 'email_failed';
                         }
                     }
-                } else {
-                    $return_args['attendance_result'] = $confirmed
-                        ? 'already_confirmed'
-                        : ( 'online' === ( $settings['mode'] ?? '' ) ? 'confirmed' : 'confirmed_offline' );
+                    } else {
+                        $return_args['attendance_result'] = $confirmed
+                            ? 'already_confirmed'
+                            : ( 'online' === ( $settings['mode'] ?? '' ) ? 'confirmed' : 'confirmed_offline' );
+                    }
                 }
             }
         }
@@ -613,7 +634,7 @@ class Recruitment_Plugin {
         if ( 'applicant-file' === $screen && 'GET' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
             $this->serve_applicant_file();
         }
-        if ( ! in_array( $screen, [ 'applicant-login', 'applicant-register', 'account-profile' ], true ) || 'POST' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
+        if ( ! in_array( $screen, [ 'applicant-login', 'applicant-register', 'account-profile', 'applicant-reset-password' ], true ) || 'POST' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
             return;
         }
 
@@ -622,6 +643,17 @@ class Recruitment_Plugin {
         if ( $preview_submission ) {
             wp_safe_redirect( recruitment_get_public_url( $screen, [ 'preview_notice' => 'read_only' ] ) );
             exit;
+        }
+
+        $auth_action = sanitize_key( wp_unslash( $_POST['applicant_auth_action'] ?? '' ) );
+        if ( 'request_password_reset' === $auth_action ) {
+            $this->handle_applicant_password_reset_request();
+            return;
+        }
+
+        if ( 'execute_password_reset' === $auth_action || 'applicant-reset-password' === $screen ) {
+            $this->handle_applicant_password_reset();
+            return;
         }
 
         if ( 'account-profile' === $screen && isset( $_POST['applicant_password_nonce'] ) ) {
@@ -1026,13 +1058,17 @@ class Recruitment_Plugin {
                         'reset-password',
                         [ 'target' => 'hr', 'token' => $token ]
                     );
+                    $display_name = (string) ( $account['account']['display_name'] ?? 'Admin HR' );
+                    $expiry_minutes = 30;
+                    ob_start();
+                    require recruitment_get_plugin_path( 'templates/emails/hr-password-reset.php' );
+                    $html_message = (string) ob_get_clean();
+
                     $sent = wp_mail(
                         $account['account']['email'],
-                        'Permintaan reset password HR',
-                        "Kami menerima permintaan untuk mengatur ulang password akun HR Anda.\n\n"
-                            . "Gunakan tautan berikut dalam 30 menit. Tautan hanya dapat digunakan satu kali:\n"
-                            . $reset_url
-                            . "\n\nJika Anda tidak meminta reset, abaikan email ini."
+                        'Permintaan Reset Password Admin HR DAW',
+                        $html_message,
+                        [ 'Content-Type: text/html; charset=UTF-8' ]
                     );
                     if ( ! $sent ) {
                         delete_transient( $token_key );
@@ -1330,7 +1366,7 @@ class Recruitment_Plugin {
             'application' => 'application-form',
             'tracking' => 'application-process',
         ][ $requested_screen ] ?? $requested_screen;
-        if ( in_array( $screen, [ 'applicant-login', 'applicant-register', 'account-confirmation', 'account-profile', 'applicant-file', 'application-confirmation', 'application-process', 'tracking-detail', 'interview-booking', 'login', 'forgot-password', 'reset-password' ], true ) && function_exists( 'nocache_headers' ) ) {
+        if ( in_array( $screen, [ 'applicant-login', 'applicant-register', 'applicant-reset-password', 'account-confirmation', 'account-profile', 'applicant-file', 'application-confirmation', 'application-process', 'tracking-detail', 'interview-booking', 'login', 'forgot-password', 'reset-password' ], true ) && function_exists( 'nocache_headers' ) ) {
             nocache_headers();
         }
         $page_data = [];
@@ -1357,6 +1393,369 @@ class Recruitment_Plugin {
         ob_start();
         ( new Recruitment_Router() )->render( $screen, $page_data );
         return ob_get_clean();
+    }
+
+    /**
+     * Get email configuration with database and environment overrides.
+     *
+     * @return array{is_enabled: bool, smtp_host: string, smtp_port: int, smtp_encryption: string, smtp_auth: bool, smtp_user: string, smtp_pass: string, from_email: string, from_name: string}
+     */
+    public function get_email_settings(): array {
+        $options = (array) get_option( 'recruitment_email_settings', [] );
+
+        $is_enabled = ! empty( $options['is_enabled'] )
+            || ( defined( 'DAW_SMTP_HOST' ) && '' !== DAW_SMTP_HOST );
+
+        $smtp_host = defined( 'DAW_SMTP_HOST' ) && '' !== DAW_SMTP_HOST
+            ? DAW_SMTP_HOST
+            : (string) ( $options['smtp_host'] ?? 'smtp.gmail.com' );
+
+        $smtp_port = defined( 'DAW_SMTP_PORT' ) && 0 < (int) DAW_SMTP_PORT
+            ? (int) DAW_SMTP_PORT
+            : (int) ( $options['smtp_port'] ?? 587 );
+
+        $smtp_encryption = defined( 'DAW_SMTP_ENCRYPTION' ) && '' !== DAW_SMTP_ENCRYPTION
+            ? DAW_SMTP_ENCRYPTION
+            : (string) ( $options['smtp_encryption'] ?? 'tls' );
+
+        $smtp_auth = ! isset( $options['smtp_auth'] ) || ! empty( $options['smtp_auth'] );
+
+        $smtp_user = defined( 'DAW_SMTP_USER' ) && '' !== DAW_SMTP_USER
+            ? DAW_SMTP_USER
+            : (string) ( $options['smtp_user'] ?? '' );
+
+        $smtp_pass = defined( 'DAW_SMTP_PASS' ) && '' !== DAW_SMTP_PASS
+            ? DAW_SMTP_PASS
+            : (string) ( $options['smtp_pass'] ?? '' );
+
+        $from_email = defined( 'DAW_SMTP_FROM_EMAIL' ) && '' !== DAW_SMTP_FROM_EMAIL
+            ? DAW_SMTP_FROM_EMAIL
+            : (string) ( $options['from_email'] ?? get_option( 'admin_email' ) );
+
+        $from_name = defined( 'DAW_SMTP_FROM_NAME' ) && '' !== DAW_SMTP_FROM_NAME
+            ? DAW_SMTP_FROM_NAME
+            : (string) ( $options['from_name'] ?? 'Rekrutmen PT Daya Adicipta Wisesa' );
+
+        return [
+            'is_enabled'      => $is_enabled,
+            'smtp_host'       => $smtp_host,
+            'smtp_port'       => $smtp_port,
+            'smtp_encryption' => $smtp_encryption,
+            'smtp_auth'       => $smtp_auth,
+            'smtp_user'       => $smtp_user,
+            'smtp_pass'       => $smtp_pass,
+            'from_email'      => $from_email,
+            'from_name'       => $from_name,
+        ];
+    }
+
+    /**
+     * Hook into phpmailer_init to route emails via configured SMTP Relay.
+     *
+     * @param object $phpmailer PHPMailer instance.
+     */
+    public function configure_smtp( $phpmailer ): void {
+        $settings = $this->get_email_settings();
+
+        if ( empty( $settings['is_enabled'] ) || '' === $settings['smtp_host'] || '' === $settings['smtp_user'] ) {
+            return;
+        }
+
+        try {
+            $phpmailer->isSMTP();
+            $phpmailer->Host = $settings['smtp_host'];
+            $phpmailer->Port = (int) $settings['smtp_port'];
+            $phpmailer->SMTPAuth = true;
+            $phpmailer->Username = $settings['smtp_user'];
+            $phpmailer->Password = $settings['smtp_pass'];
+
+            if ( 'tls' === $settings['smtp_encryption'] ) {
+                $phpmailer->SMTPSecure = 'tls';
+            } elseif ( 'ssl' === $settings['smtp_encryption'] ) {
+                $phpmailer->SMTPSecure = 'ssl';
+            } else {
+                $phpmailer->SMTPSecure = '';
+                $phpmailer->SMTPAutoTLS = false;
+            }
+
+            $phpmailer->SMTPOptions = [
+                'ssl' => [
+                    'verify_peer'       => false,
+                    'verify_peer_name'  => false,
+                    'allow_self_signed' => true,
+                ],
+            ];
+
+            if ( ! empty( $settings['from_email'] ) ) {
+                $phpmailer->setFrom( $settings['from_email'], $settings['from_name'] );
+            }
+
+            $phpmailer->Timeout = 15;
+        } catch ( Throwable $exception ) {
+            error_log( 'PHPMailer SMTP Configuration failed: ' . $exception->getMessage() );
+        }
+    }
+
+    public function filter_mail_from( string $from_email ): string {
+        $settings = $this->get_email_settings();
+        if ( ! empty( $settings['is_enabled'] ) && ! empty( $settings['from_email'] ) && is_email( $settings['from_email'] ) ) {
+            return $settings['from_email'];
+        }
+        return $from_email;
+    }
+
+    public function filter_mail_from_name( string $from_name ): string {
+        $settings = $this->get_email_settings();
+        if ( ! empty( $settings['is_enabled'] ) && ! empty( $settings['from_name'] ) ) {
+            return $settings['from_name'];
+        }
+        return $from_name;
+    }
+
+    public function log_mail_failed( $wp_error ): void {
+        if ( is_wp_error( $wp_error ) ) {
+            $message = $wp_error->get_error_message();
+            error_log( 'Recruitment email dispatch failed: ' . $message );
+            set_transient( 'daw_last_mail_error', $message, 15 * MINUTE_IN_SECONDS );
+        }
+    }
+
+    private function handle_applicant_password_reset_request(): void {
+        $nonce = sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ?? '' ) );
+        if ( ! wp_verify_nonce( $nonce, 'daw_applicant_password_reset_request' ) ) {
+            wp_safe_redirect( recruitment_get_public_url( 'applicant-login', [ 'forgot_notice' => 'invalid_request' ] ) );
+            exit;
+        }
+
+        $email = strtolower( sanitize_email( wp_unslash( $_POST['reset_email'] ?? '' ) ) );
+        if ( is_email( $email ) ) {
+            $ip_address = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '' ) );
+            $rate_key = 'daw_applicant_reset_rate_' . hash( 'sha256', $ip_address );
+            $attempts = (int) get_transient( $rate_key );
+
+            if ( $attempts < 5 ) {
+                set_transient( $rate_key, $attempts + 1, 15 * MINUTE_IN_SECONDS );
+                $database = new Recruitment_Database();
+                $account_res = $database->get_active_applicant_by_email( $email );
+
+                if ( ! empty( $account_res['success'] ) && ! empty( $account_res['account'] ) ) {
+                    $account = $account_res['account'];
+                    $token = rtrim( strtr( base64_encode( random_bytes( 32 ) ), '+/', '-_' ), '=' );
+                    $token_hash = hash( 'sha256', $token );
+                    $token_key = 'daw_applicant_reset_' . $token_hash;
+                    $account_token_key = 'daw_applicant_reset_account_' . (string) $account['id'];
+
+                    $previous_token_hash = (string) get_transient( $account_token_key );
+                    if ( '' !== $previous_token_hash ) {
+                        delete_transient( 'daw_applicant_reset_' . $previous_token_hash );
+                    }
+
+                    set_transient( $token_key, (string) $account['id'], 30 * MINUTE_IN_SECONDS );
+                    set_transient( $account_token_key, $token_hash, 30 * MINUTE_IN_SECONDS );
+
+                    $reset_url = recruitment_get_public_url(
+                        'applicant-reset-password',
+                        [ 'token' => $token ]
+                    );
+
+                    $applicant_name = (string) ( $account['full_name'] ?? 'Pelamar' );
+                    $expiry_minutes = 30;
+                    ob_start();
+                    require recruitment_get_plugin_path( 'templates/emails/applicant-password-reset.php' );
+                    $html_message = (string) ob_get_clean();
+
+                    $sent = wp_mail(
+                        $account['email'],
+                        'Permintaan Reset Kata Sandi Akun Pelamar DAW',
+                        $html_message,
+                        [ 'Content-Type: text/html; charset=UTF-8' ]
+                    );
+
+                    if ( ! $sent ) {
+                        delete_transient( $token_key );
+                        delete_transient( $account_token_key );
+                        error_log( 'Applicant password reset email could not be sent.' );
+                    }
+                }
+            } else {
+                wp_safe_redirect( recruitment_get_public_url( 'applicant-login', [ 'forgot_notice' => 'throttled' ] ) );
+                exit;
+            }
+        }
+
+        wp_safe_redirect( recruitment_get_public_url( 'applicant-login', [ 'forgot_notice' => 'submitted' ] ) );
+        exit;
+    }
+
+    private function handle_applicant_password_reset(): void {
+        $token = sanitize_text_field( wp_unslash( $_POST['token'] ?? '' ) );
+        $notice = 'invalid_token';
+        $nonce = sanitize_text_field( wp_unslash( $_POST['_wpnonce'] ?? '' ) );
+        $password = (string) wp_unslash( $_POST['new_password'] ?? '' );
+        $confirmation = (string) wp_unslash( $_POST['password_confirmation'] ?? '' );
+
+        if ( wp_verify_nonce( $nonce, 'daw_applicant_password_reset' ) && 8 <= strlen( $password ) && $password === $confirmation && 43 === strlen( $token ) ) {
+            $token_hash = hash( 'sha256', $token );
+            $token_key = 'daw_applicant_reset_' . $token_hash;
+            $account_id = get_transient( $token_key );
+            $account_token_hash = false !== $account_id
+                ? (string) get_transient( 'daw_applicant_reset_account_' . (string) $account_id )
+                : '';
+
+            if ( false !== $account_id && '' !== $account_token_hash && hash_equals( $account_token_hash, $token_hash ) ) {
+                $result = ( new Recruitment_Database() )->reset_applicant_password( (string) $account_id, $password );
+                if ( ! empty( $result['success'] ) ) {
+                    delete_transient( $token_key );
+                    delete_transient( 'daw_applicant_reset_account_' . (string) $account_id );
+                    if ( function_exists( 'recruitment_end_applicant_session' ) ) {
+                        recruitment_end_applicant_session();
+                    }
+                    wp_safe_redirect( recruitment_get_public_url( 'applicant-login', [ 'reset_notice' => 'password_updated' ] ) );
+                    exit;
+                } elseif ( 'service_unavailable' === ( $result['error'] ?? '' ) ) {
+                    $notice = 'service_unavailable';
+                }
+            }
+        } elseif ( ! wp_verify_nonce( $nonce, 'daw_applicant_password_reset' ) ) {
+            $notice = 'invalid_request';
+        } elseif ( 8 > strlen( $password ) || $password !== $confirmation ) {
+            $notice = 'invalid_password';
+        }
+
+        wp_safe_redirect( recruitment_get_public_url( 'applicant-reset-password', [ 'token' => $token, 'reset_notice' => $notice ] ) );
+        exit;
+    }
+
+    /**
+     * Schedule attendance reminder events (H-3 and H-1) for a confirmed attendance.
+     *
+     * @param int    $application_id
+     * @param string $confirmed_datetime_str
+     */
+    public function schedule_attendance_reminders( int $application_id, string $confirmed_datetime_str ): void {
+        if ( $application_id <= 0 || '' === $confirmed_datetime_str ) {
+            return;
+        }
+
+        $timestamp = strtotime( $confirmed_datetime_str );
+        if ( false === $timestamp || $timestamp <= time() ) {
+            return;
+        }
+
+        $day_seconds = defined( 'DAY_IN_SECONDS' ) ? DAY_IN_SECONDS : 86400;
+
+        // Schedule H-3 (3 days before attendance)
+        $h3_time = $timestamp - ( 3 * $day_seconds );
+        if ( $h3_time > time() ) {
+            wp_clear_scheduled_hook( 'daw_send_attendance_reminder_event', [ $application_id, 'h_3' ] );
+            wp_schedule_single_event( $h3_time, 'daw_send_attendance_reminder_event', [ $application_id, 'h_3' ] );
+        }
+
+        // Schedule H-1 (1 day before attendance)
+        $h1_time = $timestamp - ( 1 * $day_seconds );
+        if ( $h1_time > time() ) {
+            wp_clear_scheduled_hook( 'daw_send_attendance_reminder_event', [ $application_id, 'h_1' ] );
+            wp_schedule_single_event( $h1_time, 'daw_send_attendance_reminder_event', [ $application_id, 'h_1' ] );
+        }
+    }
+
+    /**
+     * Send attendance reminder email for H-3 or H-1.
+     *
+     * @param int    $application_id
+     * @param string $stage 'h_3' or 'h_1'
+     * @return bool
+     */
+    public function send_attendance_reminder( int $application_id, string $stage = 'h_1' ): bool {
+        if ( $application_id <= 0 ) {
+            return false;
+        }
+
+        $stage = strtolower( trim( $stage ) );
+        $sent_option_key = 'daw_attendance_reminder_sent_' . $application_id . '_' . $stage;
+        if ( get_option( $sent_option_key ) ) {
+            return true;
+        }
+
+        $database = new Recruitment_Database();
+        $details = $database->get_attendance_reminder_details( (string) $application_id );
+        if ( ! $details || empty( $details['applicant_email'] ) ) {
+            return false;
+        }
+
+        $confirmed_at_str = (string) ( $details['confirmed_at'] ?? '' );
+        $confirmed_timestamp = strtotime( $confirmed_at_str );
+        $display_datetime = $confirmed_timestamp ? wp_date( 'l, j F Y \p\u\k\u\l H:i', $confirmed_timestamp ) . ' WIB' : $confirmed_at_str;
+
+        $psychotest_settings = (array) get_option( 'recruitment_psychotest_settings', [] );
+        $mode = (string) ( $psychotest_settings['mode'] ?? 'online' );
+        $instructions = (string) ( $psychotest_settings['instructions'] ?? '' );
+        $contact_person = (string) ( $psychotest_settings['contact_person'] ?? 'Tim HR Rekrutmen DAW' );
+        $location = (string) ( $details['location'] ?? 'Kantor DAW / Cabang Terkait' );
+
+        $applicant_name = (string) $details['applicant_name'];
+        $position = (string) $details['title'];
+        $stage_label = 'Psikotes';
+        $reminder_stage = 'h_3' === $stage ? 'H-3' : 'H-1';
+        $confirmed_datetime_str = $display_datetime;
+        $tracking_url = recruitment_get_public_url( 'application-process', [ 'application_id' => $application_id ] );
+
+        ob_start();
+        require recruitment_get_plugin_path( 'templates/emails/attendance-reminder.php' );
+        $html_content = (string) ob_get_clean();
+
+        $subject = sprintf( '[Pengingat %s] Jadwal %s - %s', $reminder_stage, $stage_label, $position );
+        $sent = wp_mail(
+            $details['applicant_email'],
+            $subject,
+            $html_content,
+            [ 'Content-Type: text/html; charset=UTF-8' ]
+        );
+
+        if ( $sent ) {
+            update_option( $sent_option_key, current_time( 'mysql' ), false );
+        }
+
+        return (bool) $sent;
+    }
+
+    /**
+     * Daily / hourly WP-Cron job scanning confirmed attendances and sending H-3 or H-1 reminders if due.
+     */
+    public function run_daily_attendance_reminder_cron(): void {
+        $database = new Recruitment_Database();
+        $attendances = $database->get_confirmed_psychotest_attendances();
+        if ( empty( $attendances ) ) {
+            return;
+        }
+
+        $now = time();
+        foreach ( $attendances as $row ) {
+            $application_id = (int) ( $row['application_id'] ?? 0 );
+            $confirmed_at = (string) ( $row['confirmed_at'] ?? '' );
+            if ( $application_id <= 0 || '' === $confirmed_at ) {
+                continue;
+            }
+
+            $confirmed_time = strtotime( $confirmed_at );
+            if ( false === $confirmed_time || $confirmed_time <= $now ) {
+                continue;
+            }
+
+            $day_seconds = defined( 'DAY_IN_SECONDS' ) ? DAY_IN_SECONDS : 86400;
+            $diff_seconds = $confirmed_time - $now;
+            $diff_days = $diff_seconds / $day_seconds;
+
+            // H-3 window: between 2 and 3.5 days before test
+            if ( $diff_days <= 3.5 && $diff_days >= 2.0 ) {
+                $this->send_attendance_reminder( $application_id, 'h_3' );
+            }
+
+            // H-1 window: within 1.5 days (and still in future)
+            if ( $diff_days <= 1.5 && $diff_seconds > 0 ) {
+                $this->send_attendance_reminder( $application_id, 'h_1' );
+            }
+        }
     }
 
 }
