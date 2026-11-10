@@ -98,7 +98,10 @@ $send_result = sanitize_key( $_GET['send_result'] ?? '' );
 $sent_count  = absint( $_GET['sent_count'] ?? 0 );
 $smtp_updated = '1' === (string) ( $_GET['updated'] ?? '' );
 $test_result = sanitize_key( $_GET['test_result'] ?? '' );
+$applicant_email_result = sanitize_key( $_GET['applicant_email_result'] ?? '' );
+$tpl_result  = sanitize_key( $_GET['tpl_result'] ?? '' );
 $error_msg   = isset( $_GET['error_msg'] ) ? sanitize_text_field( rawurldecode( (string) $_GET['error_msg'] ) ) : '';
+$email_templates = recruitment_get_email_templates();
 ?>
 <div class="wrap recruitment-admin daw-email-recruitment-page" style="max-width:1200px;margin:20px auto 40px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;">
 
@@ -114,6 +117,25 @@ $error_msg   = isset( $_GET['error_msg'] ) ? sanitize_text_field( rawurldecode( 
             </button>
         </div>
     </div>
+
+    <!-- Template CRUD Feedback -->
+    <?php if ( 'saved' === $tpl_result ) : ?>
+        <div class="notice notice-success is-dismissible" style="border-radius:8px;margin-bottom:20px;padding:12px 16px;">
+            <p style="margin:0;font-size:14px;color:#065f46;"><strong>Berhasil:</strong> Template email berhasil disimpan dan siap digunakan.</p>
+        </div>
+    <?php elseif ( 'deleted' === $tpl_result ) : ?>
+        <div class="notice notice-success is-dismissible" style="border-radius:8px;margin-bottom:20px;padding:12px 16px;">
+            <p style="margin:0;font-size:14px;color:#065f46;"><strong>Berhasil:</strong> Template email berhasil dihapus.</p>
+        </div>
+    <?php elseif ( 'empty_fields' === $tpl_result ) : ?>
+        <div class="notice notice-warning is-dismissible" style="border-radius:8px;margin-bottom:20px;padding:12px 16px;">
+            <p style="margin:0;font-size:14px;color:#92400e;"><strong>Peringatan:</strong> Judul, subjek, dan isi pesan template tidak boleh kosong.</p>
+        </div>
+    <?php elseif ( 'error' === $tpl_result ) : ?>
+        <div class="notice notice-error is-dismissible" style="border-radius:8px;margin-bottom:20px;padding:12px 16px;">
+            <p style="margin:0;font-size:14px;color:#991b1b;"><strong>Gagal:</strong> Terjadi kesalahan saat memproses template email.</p>
+        </div>
+    <?php endif; ?>
 
     <!-- Feedback Notices -->
     <?php if ( 'success' === $send_result ) : ?>
@@ -149,6 +171,51 @@ $error_msg   = isset( $_GET['error_msg'] ) ? sanitize_text_field( rawurldecode( 
             <p style="margin:0;font-size:14px;color:#991b1b;"><strong>Uji coba SMTP Gagal:</strong> <?= esc_html( $error_msg ) ?></p>
         </div>
     <?php endif; ?>
+
+    <?php if ( '' !== $applicant_email_result ) :
+        $applicant_email_messages = [
+            'success' => [ 'class' => 'success', 'text' => 'Email login dan profil pelamar berhasil diperbarui di Oracle.' ],
+            'invalid_email_change' => [ 'class' => 'error', 'text' => 'Data tidak valid atau konfirmasi perubahan belum dicentang.' ],
+            'applicant_not_found' => [ 'class' => 'error', 'text' => 'Akun dengan nama dan email lama tersebut tidak ditemukan. Periksa kembali datanya.' ],
+            'applicant_ambiguous' => [ 'class' => 'error', 'text' => 'Ditemukan lebih dari satu akun yang cocok. Email tidak diubah; hubungi administrator database.' ],
+            'email_exists' => [ 'class' => 'error', 'text' => 'Email baru sudah digunakan akun pelamar lain.' ],
+            'service_unavailable' => [ 'class' => 'error', 'text' => 'Perubahan gagal disimpan ke Oracle. Tidak ada perubahan yang diterapkan; periksa koneksi atau log server.' ],
+        ];
+        $applicant_email_message = $applicant_email_messages[ $applicant_email_result ] ?? [ 'class' => 'error', 'text' => 'Perubahan email gagal diproses.' ];
+        ?>
+        <div class="notice notice-<?= esc_attr( $applicant_email_message['class'] ) ?> is-dismissible" style="border-radius:8px;margin-bottom:20px;padding:12px 16px;">
+            <p style="margin:0;"><?= esc_html( $applicant_email_message['text'] ) ?></p>
+        </div>
+    <?php endif; ?>
+
+    <!-- Applicant account email maintenance -->
+    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
+        <h2 style="margin:0 0 8px;font-size:16px;font-weight:700;color:#111827;">Ubah Email Akun Pelamar</h2>
+        <p style="margin:0 0 18px;font-size:13px;line-height:1.6;color:#6b7280;">Perubahan hanya dilakukan jika nama dan email lama cocok dengan tepat satu akun Oracle. Email login dan email profil diperbarui dalam satu transaksi; riwayat lamaran tidak diubah.</p>
+        <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" style="max-width:760px;">
+            <input type="hidden" name="action" value="daw_update_applicant_email">
+            <?php wp_nonce_field( 'daw_update_applicant_email' ); ?>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px;">
+                <div>
+                    <label for="applicant-full-name" style="display:block;font-size:12px;font-weight:600;color:#4b5563;margin-bottom:4px;">Nama akun pelamar</label>
+                    <input id="applicant-full-name" type="text" name="applicant_full_name" value="AIKO HAPPY" maxlength="255" autocomplete="off" required style="width:100%;height:38px;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                </div>
+                <div>
+                    <label for="applicant-old-email" style="display:block;font-size:12px;font-weight:600;color:#4b5563;margin-bottom:4px;">Email lama</label>
+                    <input id="applicant-old-email" type="email" name="applicant_old_email" value="bem@unklab.ac.id" maxlength="254" autocomplete="off" required style="width:100%;height:38px;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                </div>
+                <div>
+                    <label for="applicant-new-email" style="display:block;font-size:12px;font-weight:600;color:#4b5563;margin-bottom:4px;">Email baru</label>
+                    <input id="applicant-new-email" type="email" name="applicant_new_email" value="uforumorganization@student.unklab.ac.id" maxlength="50" autocomplete="off" required style="width:100%;height:38px;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                </div>
+            </div>
+            <label style="display:flex;align-items:flex-start;gap:8px;margin-bottom:16px;font-size:13px;line-height:1.5;color:#374151;">
+                <input type="checkbox" name="confirm_applicant_email_change" value="1" required style="margin-top:2px;">
+                <span>Saya sudah memastikan identitas pelamar dan memahami email baru akan digunakan untuk login akun tersebut.</span>
+            </label>
+            <button type="submit" style="background:#c8102e;color:#fff;border:none;border-radius:6px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;">Perbarui Email di Oracle</button>
+        </form>
+    </div>
 
     <!-- CARD 1: DAFTAR PENERIMA -->
     <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;margin-bottom:24px;box-shadow:0 1px 3px rgba(0,0,0,0.03);">
@@ -317,62 +384,105 @@ $error_msg   = isset( $_GET['error_msg'] ) ? sanitize_text_field( rawurldecode( 
             </div>
 
             <!-- Templates List Cards -->
-            <div style="display:flex;flex-direction:column;gap:10px;" id="template-cards-container">
-
-                <!-- Template 1 -->
-                <div class="template-card" data-cat="lamaran"
-                     data-subject="Konfirmasi Penerimaan Lamaran - PT Daya Adicipta Wisesa"
-                     data-body="Halo {{nama}},\n\nTerima kasih telah melamar posisi {{posisi}} di PT Daya Adicipta Wisesa. Lamaran Anda telah kami terima dan saat ini sedang dalam proses peninjauan oleh tim rekrutmen kami.\n\nSalam,\nTim HR Recruitment DAW"
-                     style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;cursor:pointer;transition:all .15s;">
-                    <strong style="display:block;font-size:13px;color:#111827;margin-bottom:2px;">Konfirmasi Lamaran</strong>
-                    <span style="display:block;font-size:12px;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Konfirmasi Penerimaan Lamaran — {{p...</span>
-                </div>
-
-                <!-- Template 2 -->
-                <div class="template-card" data-cat="administrasi"
-                     data-subject="Selamat! Anda Lolos Seleksi Administrasi - PT Daya Adicipta Wisesa"
-                     data-body="Halo {{nama}},\n\nSelamat! Berdasarkan hasil seleksi berkas administrasi untuk posisi {{posisi}}, Anda dinyatakan LOLOS ke tahapan seleksi berikutnya.\n\nInformasi mengenai jadwal dan petunjuk tahapan selanjutnya akan kami kirimkan melalui email ini.\n\nSalam,\nTim HR Recruitment DAW"
-                     style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;cursor:pointer;transition:all .15s;">
-                    <strong style="display:block;font-size:13px;color:#111827;margin-bottom:2px;">Lolos Seleksi Administrasi</strong>
-                    <span style="display:block;font-size:12px;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Selamat — Anda Lolos Seleksi Adminis...</span>
-                </div>
-
-                <!-- Template 3 -->
-                <div class="template-card" data-cat="administrasi hasil"
-                     data-subject="Informasi Hasil Seleksi Administrasi - PT Daya Adicipta Wisesa"
-                     data-body="Halo {{nama}},\n\nTerima kasih atas partisipasi dan minat Anda melamar posisi {{posisi}} di PT Daya Adicipta Wisesa.\n\nSetelah melakukan peninjauan menyeluruh terhadap kualifikasi, saat ini kami belum dapat melanjutkan proses lamaran Anda ke tahapan berikutnya. Data profil Anda akan tetap tersimpan dalam database kami untuk kesempatan mendatang.\n\nSalam,\nTim HR Recruitment DAW"
-                     style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;cursor:pointer;transition:all .15s;">
-                    <strong style="display:block;font-size:13px;color:#111827;margin-bottom:2px;">Tidak Lolos Seleksi Administrasi</strong>
-                    <span style="display:block;font-size:12px;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Informasi Hasil Seleksi Administrasi — ...</span>
-                </div>
-
-                <!-- Template 4 -->
-                <div class="template-card" data-cat="psikotes"
-                     data-subject="Undangan Tes Psikologi - PT Daya Adicipta Wisesa"
-                     data-body="Halo {{nama}},\n\nAnda diundang untuk mengikuti tahapan Tes Psikologi untuk posisi {{posisi}} di PT Daya Adicipta Wisesa.\n\nSilakan masuk ke portal karir rekrutmen untuk mengonfirmasi kehadiran dan memilih sesi waktu yang tersedia.\n\nSalam,\nTim HR Recruitment DAW"
-                     style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;cursor:pointer;transition:all .15s;">
-                    <strong style="display:block;font-size:13px;color:#111827;margin-bottom:2px;">Undangan Psikotes</strong>
-                    <span style="display:block;font-size:12px;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Undangan Tes Psikologi — {{posisi}} di...</span>
-                </div>
-
-                <!-- Template 5 -->
-                <div class="template-card" data-cat="reminder psikotes"
-                     data-subject="Pengingat: Jadwal Tes Psikologi Besok - PT Daya Adicipta Wisesa"
-                     data-body="Halo {{nama}},\n\nIni adalah pengingat bahwa jadwal Tes Psikologi Anda untuk posisi {{posisi}} akan dilaksanakan besok.\n\nPastikan Anda mempersiapkan perangkat dan hadir tepat waktu sesuai konfirmasi yang telah Anda lakukan.\n\nSalam,\nTim HR Recruitment DAW"
-                     style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;cursor:pointer;transition:all .15s;">
-                    <strong style="display:block;font-size:13px;color:#111827;margin-bottom:2px;">Pengingat Psikotes</strong>
-                    <span style="display:block;font-size:12px;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Pengingat: Tes Psikologi Besok — {{po...</span>
-                </div>
-
+            <div style="display:flex;flex-direction:column;gap:10px;max-height:540px;overflow-y:auto;padding-right:4px;" id="template-cards-container">
+                <?php foreach ( $email_templates as $tpl ) : ?>
+                    <div class="template-card"
+                         data-id="<?= esc_attr( $tpl['id'] ) ?>"
+                         data-title="<?= esc_attr( $tpl['title'] ) ?>"
+                         data-cat="<?= esc_attr( $tpl['category'] ) ?>"
+                         data-stage="<?= esc_attr( $tpl['stage'] ?? '' ) ?>"
+                         data-subject="<?= esc_attr( $tpl['subject'] ) ?>"
+                         data-body="<?= esc_attr( $tpl['body'] ) ?>"
+                         style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;cursor:pointer;transition:all .15s;position:relative;">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+                            <div>
+                                <strong style="font-size:13px;color:#111827;display:block;"><?= esc_html( $tpl['title'] ) ?></strong>
+                                <span style="font-size:10px;text-transform:uppercase;color:#c8102e;font-weight:700;letter-spacing:0.5px;"><?= esc_html( $tpl['category'] ) ?></span>
+                            </div>
+                            <div style="display:flex;gap:4px;" onclick="event.stopPropagation();">
+                                <button type="button" class="btn-edit-tpl" data-tpl-id="<?= esc_attr( $tpl['id'] ) ?>" title="Edit template ini" style="background:#fff;border:1px solid #d1d5db;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:600;color:#374151;cursor:pointer;">Edit</button>
+                                <?php if ( empty( $tpl['is_default'] ) ) : ?>
+                                    <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" style="display:inline;" onsubmit="return confirm('Hapus template ini?');">
+                                        <input type="hidden" name="action" value="daw_delete_email_template">
+                                        <input type="hidden" name="template_id" value="<?= esc_attr( $tpl['id'] ) ?>">
+                                        <?php wp_nonce_field( 'daw_delete_email_template' ); ?>
+                                        <button type="submit" style="background:#fff;border:1px solid #fecaca;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:600;color:#dc2626;cursor:pointer;">Hapus</button>
+                                    </form>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <span style="display:block;font-size:12px;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?= esc_html( $tpl['subject'] ) ?></span>
+                    </div>
+                <?php endforeach; ?>
             </div>
 
             <!-- Button + Buat Template -->
-            <button type="button" onclick="alert('Fitur tambah custom template segera hadir.')" style="width:100%;margin-top:16px;background:#fff;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:13px;font-weight:600;color:#c8102e;cursor:pointer;text-align:center;">
+            <button type="button" id="btn-open-create-tpl" style="width:100%;margin-top:16px;background:#fff;border:1px solid #d1d5db;border-radius:8px;padding:10px;font-size:13px;font-weight:600;color:#c8102e;cursor:pointer;text-align:center;">
                 + Buat Template
             </button>
         </div>
 
     </div>
+
+    <!-- MODAL DIALOG BUAT / EDIT TEMPLATE -->
+    <dialog id="daw-template-modal" style="border:none;border-radius:12px;padding:0;max-width:620px;width:92%;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1),0 10px 10px -5px rgba(0,0,0,0.04);background:#fff;">
+        <div style="padding:18px 24px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;">
+            <h3 id="daw-template-modal-title" style="margin:0;font-size:16px;font-weight:700;color:#111827;">Buat Template Email</h3>
+            <button type="button" onclick="document.getElementById('daw-template-modal').close()" style="background:none;border:none;font-size:20px;color:#9ca3af;cursor:pointer;line-height:1;">&times;</button>
+        </div>
+        <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" style="padding:22px 24px;">
+            <input type="hidden" name="action" value="daw_save_email_template">
+            <input type="hidden" name="template_id" id="tpl-modal-id" value="">
+            <?php wp_nonce_field( 'daw_save_email_template' ); ?>
+
+            <div style="margin-bottom:14px;">
+                <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">Judul Template *</label>
+                <input type="text" name="template_title" id="tpl-modal-title" required placeholder="Contoh: Undangan Wawancara Final" style="width:100%;height:38px;padding:6px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;">
+                <div>
+                    <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">Kategori *</label>
+                    <select name="template_category" id="tpl-modal-category" style="width:100%;height:38px;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;background:#fff;">
+                        <option value="lamaran">Lamaran</option>
+                        <option value="administrasi">Administrasi</option>
+                        <option value="psikotes">Psikotes</option>
+                        <option value="wawancara">Wawancara</option>
+                        <option value="hasil">Hasil</option>
+                        <option value="reminder">Reminder</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">Tahap Terkait</label>
+                    <select name="template_stage" id="tpl-modal-stage" style="width:100%;height:38px;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;background:#fff;">
+                        <option value="ADMINISTRASI">Seleksi Administrasi</option>
+                        <option value="PSIKOTES">Psikotes</option>
+                        <option value="INTERVIEW_HR">Wawancara HR</option>
+                        <option value="INTERVIEW_USER">Wawancara User</option>
+                        <option value="FINAL">Keputusan Akhir</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="margin-bottom:14px;">
+                <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">Subjek Email *</label>
+                <input type="text" name="template_subject" id="tpl-modal-subject" required placeholder="Contoh: Undangan Wawancara Final - {{posisi}} - PT Daya Adicipta Wisesa" style="width:100%;height:38px;padding:6px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+            </div>
+
+            <div style="margin-bottom:14px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                    <label style="font-size:12px;font-weight:600;color:#374151;">Isi Pesan Email *</label>
+                    <span style="font-size:11px;color:#6b7280;">Sisipkan: <code style="background:#f3f4f6;padding:1px 4px;border-radius:3px;cursor:pointer;" onclick="insertTplPlaceholder('{{nama}}')">{{nama}}</code> <code style="background:#f3f4f6;padding:1px 4px;border-radius:3px;cursor:pointer;" onclick="insertTplPlaceholder('{{posisi}}')">{{posisi}}</code> <code style="background:#f3f4f6;padding:1px 4px;border-radius:3px;cursor:pointer;" onclick="insertTplPlaceholder('{{dealer}}')">{{dealer}}</code></span>
+                </div>
+                <textarea name="template_body" id="tpl-modal-body" rows="7" required placeholder="Tulis isi pesan email..." style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;line-height:1.6;resize:vertical;"></textarea>
+            </div>
+
+            <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:12px;border-top:1px solid #f3f4f6;">
+                <button type="button" onclick="document.getElementById('daw-template-modal').close()" style="background:#fff;border:1px solid #d1d5db;border-radius:6px;padding:8px 16px;font-size:13px;cursor:pointer;">Batal</button>
+                <button type="submit" style="background:#c8102e;color:#fff;border:none;border-radius:6px;padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer;">Simpan Template</button>
+            </div>
+        </form>
+    </dialog>
 
     <!-- MODAL DIALOG PENGATURAN SMTP -->
     <dialog id="daw-smtp-modal" style="border:none;border-radius:12px;padding:0;max-width:620px;width:90%;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1),0 10px 10px -5px rgba(0,0,0,0.04);background:#fff;">
@@ -616,5 +726,56 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    // Template creation & edit dialog handling
+    const tplModal = document.getElementById('daw-template-modal');
+    const btnCreateTpl = document.getElementById('btn-open-create-tpl');
+    const tplModalTitle = document.getElementById('daw-template-modal-title');
+    const tplModalId = document.getElementById('tpl-modal-id');
+    const tplModalTitleInput = document.getElementById('tpl-modal-title');
+    const tplModalCat = document.getElementById('tpl-modal-category');
+    const tplModalStage = document.getElementById('tpl-modal-stage');
+    const tplModalSubj = document.getElementById('tpl-modal-subject');
+    const tplModalBody = document.getElementById('tpl-modal-body');
+
+    if (btnCreateTpl && tplModal) {
+        btnCreateTpl.addEventListener('click', function() {
+            if (tplModalTitle) tplModalTitle.textContent = 'Buat Template Email Baru';
+            if (tplModalId) tplModalId.value = '';
+            if (tplModalTitleInput) tplModalTitleInput.value = '';
+            if (tplModalCat) tplModalCat.value = 'lamaran';
+            if (tplModalStage) tplModalStage.value = 'ADMINISTRASI';
+            if (tplModalSubj) tplModalSubj.value = '';
+            if (tplModalBody) tplModalBody.value = '';
+            tplModal.showModal();
+        });
+    }
+
+    document.querySelectorAll('.btn-edit-tpl').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const card = this.closest('.template-card');
+            if (!card || !tplModal) return;
+
+            if (tplModalTitle) tplModalTitle.textContent = 'Edit Template Email';
+            if (tplModalId) tplModalId.value = card.dataset.id || '';
+            if (tplModalTitleInput) tplModalTitleInput.value = card.dataset.title || '';
+            if (tplModalCat) tplModalCat.value = (card.dataset.cat || '').split(' ')[0] || 'lamaran';
+            if (tplModalStage) tplModalStage.value = card.dataset.stage || 'ADMINISTRASI';
+            if (tplModalSubj) tplModalSubj.value = card.dataset.subject || '';
+            if (tplModalBody) tplModalBody.value = (card.dataset.body || '').replace(/\\n/g, '\n');
+            tplModal.showModal();
+        });
+    });
+
+    window.insertTplPlaceholder = function(tag) {
+        const area = document.getElementById('tpl-modal-body');
+        if (!area) return;
+        const start = area.selectionStart;
+        const end = area.selectionEnd;
+        area.value = area.value.substring(0, start) + tag + area.value.substring(end);
+        area.focus();
+        area.selectionStart = area.selectionEnd = start + tag.length;
+    };
 });
 </script>

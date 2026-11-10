@@ -6,6 +6,7 @@ $current_stage = sanitize_key( $_GET['stage'] ?? '' );
 $settings_section = sanitize_key( $_GET['section'] ?? 'email' );
 $dashboard_url = recruitment_get_admin_url( 'dashboard' );
 $settings_url = recruitment_get_admin_url( 'settings' );
+$hr_identity = recruitment_get_current_hr_identity();
 $vacancy_view = 'create' === sanitize_key( $_GET['view'] ?? '' ) ? 'create' : ( 'recruitment-applications' === $current_page ? 'requests' : 'list' );
 $active_candidate_count = ( new Recruitment_Database() )->get_active_applicant_count();
 $stage_url = static function ( string $stage ) use ( $dashboard_url ): string {
@@ -33,6 +34,15 @@ $root_links = [
         <span class="recruitment-dashboard__brand-mark" aria-hidden="true">D</span>
         <span class="recruitment-dashboard__brand-name">DAW Admin</span>
     </a>
+    <div class="recruitment-dashboard__sidebar-user daw-sidebar-user-card" style="border-bottom:1px solid rgba(255,255,255,0.08);padding:10px 12px 12px;">
+        <a href="<?= esc_url( admin_url( 'admin.php?page=recruitment-hr-profile' ) ) ?>" class="daw-sidebar-user-link" title="Buka Profil Admin HR" style="display:flex;align-items:center;gap:10px;text-decoration:none;padding:6px 8px;border-radius:8px;transition:background 0.15s ease;">
+            <span class="recruitment-dashboard__sidebar-avatar" style="width:32px;height:32px;border-radius:50%;background:#c8102e;color:#fff;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;"><?= esc_html( $hr_identity['avatar'] ) ?></span>
+            <div class="recruitment-dashboard__sidebar-user-info" style="min-width:0;flex:1;overflow:hidden;">
+                <strong class="recruitment-dashboard__sidebar-user-name" style="display:block;font-size:12px;font-weight:700;color:#f3f4f6;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?= esc_html( $hr_identity['name'] ) ?></strong>
+                <span class="recruitment-dashboard__sidebar-user-email" style="display:block;font-size:11px;color:#9ca3af;line-height:1.3;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?= esc_html( $hr_identity['email'] ?: $hr_identity['role'] ) ?></span>
+            </div>
+        </a>
+    </div>
     <nav class="recruitment-dashboard__navigation" aria-label="Menu Recruitment">
         <a href="<?= esc_url( $dashboard_url ) ?>" class="<?= 'recruitment-dashboard' === $current_page && '' === $current_stage ? 'is-active' : '' ?>" title="Dashboard" <?= 'recruitment-dashboard' === $current_page && '' === $current_stage ? 'aria-current="page"' : '' ?>>
             <span class="dashicons dashicons-dashboard" aria-hidden="true"></span><span class="recruitment-dashboard__nav-label">Dashboard</span>

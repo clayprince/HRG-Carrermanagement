@@ -221,8 +221,8 @@ $attendance_messages = [
     'closed' => 'Psikotes sedang tidak aktif sehingga konfirmasi kehadiran ditutup.',
     'disabled' => 'Konfirmasi kehadiran tidak diwajibkan untuk jadwal ini.',
     'assessment_open' => 'Jadwal psikotes online sudah dibuka. Silakan mulai persiapan tes dari informasi psikotes.',
-    'time_updated' => 'Tanggal dan waktu konfirmasi berhasil diperbarui.',
-    'invalid_time' => 'Tanggal atau jam di luar jadwal yang ditentukan HR. Pilih kembali dalam batas jadwal.',
+    'time_updated' => 'Tanggal dan waktu konfirmasi berhasil diperbarui. Bukti pengingat jadwal telah dikirim ke email Anda.',
+    'invalid_time' => 'Tanggal di luar jadwal yang ditentukan HR. Pilih kembali dalam rentang tanggal jadwal.',
     'time_update_failed' => 'Tanggal dan waktu konfirmasi belum dapat diperbarui. Silakan coba kembali.',
 ];
 $reopen_psychotest_info = isset( $_GET['show_psychotest_info'] )
@@ -311,11 +311,11 @@ $reopen_psychotest_info = isset( $_GET['show_psychotest_info'] )
                                             <input type="hidden" name="psychotest_attendance_action" value="update_psychotest_attendance_time">
                                             <input type="hidden" name="application_id" value="<?= esc_attr( $selected_application_id ) ?>">
                                             <?php if ( null !== $psychotest_attendance_window ) : ?>
-                                                <small>Pilih tanggal <?= esc_html( $psychotest_attendance_window['start_date'] . ' sampai ' . $psychotest_attendance_window['end_date'] ) ?> dan jam <?= esc_html( $psychotest_attendance_window['start_time'] . ' sampai ' . $psychotest_attendance_window['end_time'] ) ?> sesuai jadwal HR.</small>
+                                                <small>Pilih tanggal <?= esc_html( $psychotest_attendance_window['start_date'] . ' sampai ' . $psychotest_attendance_window['end_date'] ) ?> dan tentukan jam kehadiran Anda.</small>
                                                 <label for="daw-psychotest-confirmed-date">Tanggal konfirmasi</label>
                                                 <input id="daw-psychotest-confirmed-date" type="date" name="confirmed_date" min="<?= esc_attr( $psychotest_attendance_window['start_date'] ) ?>" max="<?= esc_attr( $psychotest_attendance_window['end_date'] ) ?>" value="<?= esc_attr( $confirmed_datetime->format( 'Y-m-d' ) ) ?>" required>
                                                 <label for="daw-psychotest-confirmed-time">Jam konfirmasi</label>
-                                                <input id="daw-psychotest-confirmed-time" type="time" name="confirmed_time" min="<?= esc_attr( $psychotest_attendance_window['start_time'] ) ?>" max="<?= esc_attr( $psychotest_attendance_window['end_time'] ) ?>" value="<?= esc_attr( $confirmed_datetime->format( 'H:i' ) ) ?>" required>
+                                                <input id="daw-psychotest-confirmed-time" type="time" name="confirmed_time" value="<?= esc_attr( $confirmed_datetime->format( 'H:i' ) ) ?>" required>
                                                 <button class="daw-recruitment__button" type="submit">Simpan Perubahan</button>
                                             <?php else : ?>
                                                 <small class="daw-psychotest-attendance__notice">Jadwal tanggal dan jam belum lengkap atau tidak valid. Hubungi HR sebelum mengedit waktu konfirmasi.</small>
@@ -361,11 +361,11 @@ $reopen_psychotest_info = isset( $_GET['show_psychotest_info'] )
                                             <input type="hidden" name="psychotest_attendance_action" value="update_psychotest_attendance_time">
                                             <input type="hidden" name="application_id" value="<?= esc_attr( $selected_application_id ) ?>">
                                             <?php if ( null !== $psychotest_attendance_window ) : ?>
-                                                <small>Pilih tanggal <?= esc_html( $psychotest_attendance_window['start_date'] . ' sampai ' . $psychotest_attendance_window['end_date'] ) ?> dan jam <?= esc_html( $psychotest_attendance_window['start_time'] . ' sampai ' . $psychotest_attendance_window['end_time'] ) ?> sesuai jadwal HR.</small>
+                                                <small>Pilih tanggal <?= esc_html( $psychotest_attendance_window['start_date'] . ' sampai ' . $psychotest_attendance_window['end_date'] ) ?> dan tentukan jam kehadiran Anda.</small>
                                                 <label for="daw-psychotest-confirmed-date">Tanggal konfirmasi</label>
                                                 <input id="daw-psychotest-confirmed-date" type="date" name="confirmed_date" min="<?= esc_attr( $psychotest_attendance_window['start_date'] ) ?>" max="<?= esc_attr( $psychotest_attendance_window['end_date'] ) ?>" value="<?= esc_attr( $confirmed_datetime->format( 'Y-m-d' ) ) ?>" required>
                                                 <label for="daw-psychotest-confirmed-time">Jam konfirmasi</label>
-                                                <input id="daw-psychotest-confirmed-time" type="time" name="confirmed_time" min="<?= esc_attr( $psychotest_attendance_window['start_time'] ) ?>" max="<?= esc_attr( $psychotest_attendance_window['end_time'] ) ?>" value="<?= esc_attr( $confirmed_datetime->format( 'H:i' ) ) ?>" required>
+                                                <input id="daw-psychotest-confirmed-time" type="time" name="confirmed_time" value="<?= esc_attr( $confirmed_datetime->format( 'H:i' ) ) ?>" required>
                                                 <button class="daw-recruitment__button" type="submit">Simpan Perubahan</button>
                                             <?php else : ?>
                                                 <small class="daw-psychotest-attendance__notice">Jadwal tanggal dan jam belum lengkap atau tidak valid. Hubungi HR sebelum mengedit waktu konfirmasi.</small>

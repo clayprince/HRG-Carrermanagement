@@ -3,6 +3,7 @@ $database = new Recruitment_Database();
 $results = $database->get_psychotest_results();
 $results_error = $database->has_error();
 $admin_user = wp_get_current_user();
+$hr_identity = recruitment_get_current_hr_identity();
 $can_view_proctoring = current_user_can( 'manage_options' );
 $proctoring_report = [ 'sessions' => [], 'events' => [] ];
 $proctoring_error = false;
@@ -29,8 +30,8 @@ foreach ( $proctoring_report['events'] as $event ) {
                 <p>Hasil IQ, Pauli, DISC, dan PAPI Kostick beserta snapshot kamera dan status mikrofon untuk tinjauan. Tidak ada audio yang direkam.</p>
             </div>
             <div class="daw-psychotest-settings__header-account">
-                <span class="daw-psychotest-settings__avatar" aria-hidden="true">HR</span>
-                <span><strong><?= esc_html( $admin_user->display_name ) ?></strong><small><?= esc_html( $admin_user->user_email ) ?></small></span>
+                <span class="daw-psychotest-settings__avatar" aria-hidden="true"><?= esc_html( $hr_identity['avatar'] ) ?></span>
+                <span><strong><?= esc_html( $hr_identity['name'] ) ?></strong><small><?= esc_html( $hr_identity['email'] ) ?></small></span>
             </div>
         </div>
     </header>

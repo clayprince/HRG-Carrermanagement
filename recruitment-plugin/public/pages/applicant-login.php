@@ -46,7 +46,12 @@ $redirect_args = 'application-form' === $redirect_to && $redirect_job_id
             <?php if ( $error ) : ?><div class="daw-account__alert" role="alert"><?= esc_html( $error ) ?></div><?php endif; ?>
             <?php if ( isset( $forgot_messages[ $forgot_notice ] ) ) : ?>
                 <div class="daw-account__alert <?= 'submitted' === $forgot_notice ? 'daw-account__alert--success' : '' ?>" style="<?= 'submitted' === $forgot_notice ? 'background:#ecfdf5;border-color:#a7f3d0;color:#065f46;' : '' ?>" role="alert">
-                    <?= esc_html( $forgot_messages[ $forgot_notice ] ) ?>
+                    <p style="margin:0 0 8px;"><?= esc_html( $forgot_messages[ $forgot_notice ] ) ?></p>
+                    <p style="margin:0;">
+                        <a href="<?= esc_url( recruitment_get_public_url( 'applicant-reset-password' ) ) ?>" style="color:#065f46;font-weight:700;text-decoration:underline;">
+                            Sudah menerima token di email? Klik di sini untuk memasukkan token & kata sandi baru &rarr;
+                        </a>
+                    </p>
                 </div>
             <?php endif; ?>
             <?php if ( isset( $reset_messages[ $reset_notice ] ) ) : ?>
@@ -92,6 +97,9 @@ $redirect_args = 'application-form' === $redirect_to && $redirect_job_id
                     </label>
                     <button class="daw-recruitment__button" type="submit" style="width:100%;min-height:44px;">Kirim Tautan Reset</button>
                 </form>
+                <p style="margin:16px 0 0;font-size:12px;color:#6b7280;text-align:center;">
+                    Sudah memiliki token reset? <a href="<?= esc_url( recruitment_get_public_url( 'applicant-reset-password' ) ) ?>" style="color:#c8102e;font-weight:700;">Masukkan token di sini &rarr;</a>
+                </p>
             </div>
         </dialog>
         <script>

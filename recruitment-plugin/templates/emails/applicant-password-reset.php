@@ -46,6 +46,12 @@ $escape = static function ( $value ): string {
                     <a href="<?= esc_url( $reset_url ) ?>" style="display:inline-block;padding:12px 28px;background:#c8102e;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;border-radius:8px;letter-spacing:.02em;">
                         Atur Ulang Kata Sandi
                     </a>
+                    <?php if ( ! empty( $token ) ) : ?>
+                        <div style="margin-top:16px;padding-top:14px;border-top:1px dashed #d1d5db;">
+                            <span style="font-size:11px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;font-weight:700;display:block;margin-bottom:6px;">Atau Masukkan Token Ini di Halaman Reset:</span>
+                            <code style="display:inline-block;background:#fff;padding:8px 14px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;font-weight:700;color:#c8102e;font-family:monospace;letter-spacing:.5px;word-break:break-all;"><?= esc_html( $token ) ?></code>
+                        </div>
+                    <?php endif; ?>
                 </div>
                 <p style="margin:0 0 12px;color:#6b7280;font-size:13px;line-height:1.6;">
                     Jika tombol di atas tidak dapat diklik, salin dan tempel tautan berikut ke peramban Anda:<br>

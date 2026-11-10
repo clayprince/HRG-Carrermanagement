@@ -28,8 +28,8 @@ $instructions           = $instructions ?? '';
 $contact_person         = $contact_person ?? 'Tim Rekrutmen HR DAW';
 $tracking_url           = $tracking_url ?? home_url();
 
-$badge_color = 'H-1' === $reminder_stage ? '#c8102e' : '#1e40af';
-$badge_text  = 'H-1' === $reminder_stage ? 'PENGINGAT H-1 (BESOK)' : 'PENGINGAT H-3 (3 HARI LAGI)';
+$badge_color = 'H-1' === $reminder_stage ? '#c8102e' : ( 'H-3' === $reminder_stage ? '#1e40af' : '#059669' );
+$badge_text  = 'H-1' === $reminder_stage ? 'PENGINGAT H-1 (BESOK)' : ( 'H-3' === $reminder_stage ? 'PENGINGAT H-3 (3 HARI LAGI)' : 'KONFIRMASI KEHADIRAN TERCATAT' );
 
 $escape = static function ( $value ): string {
     return htmlspecialchars( (string) $value, ENT_QUOTES, 'UTF-8' );
@@ -40,7 +40,7 @@ $escape = static function ( $value ): string {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Pengingat Jadwal Kehadiran <?= $escape( $stage_label ) ?> - <?= $escape( $reminder_stage ) ?></title>
+    <title><?= 'KONFIRMASI' === $reminder_stage ? 'Konfirmasi Kehadiran' : 'Pengingat Jadwal' ?> <?= $escape( $stage_label ) ?> - <?= $escape( $reminder_stage ) ?></title>
 </head>
 <body style="margin:0;padding:32px 16px;background:#f3f4f6;color:#111827;font-family:Arial,Helvetica,sans-serif;-webkit-text-size-adjust:100%;">
     <table role="presentation" style="width:100%;max-width:620px;margin:0 auto;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
@@ -55,10 +55,16 @@ $escape = static function ( $value ): string {
                     <?= esc_html( $badge_text ) ?>
                 </div>
 
-                <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;color:#111827;">Pengingat Jadwal <?= $escape( $stage_label ) ?></h1>
+                <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;color:#111827;">
+                    <?= 'KONFIRMASI' === $reminder_stage ? 'Bukti Konfirmasi &amp; Pengingat Jadwal ' . $escape( $stage_label ) : 'Pengingat Jadwal ' . $escape( $stage_label ) ?>
+                </h1>
                 <p style="margin:0 0 14px;color:#374151;font-size:15px;">Halo <strong><?= $escape( $applicant_name ) ?></strong>,</p>
                 <p style="margin:0 0 20px;color:#4b5563;line-height:1.65;font-size:14px;">
-                    Ini adalah pengingat otomatis mengenai jadwal kehadiran <strong><?= $escape( $stage_label ) ?></strong> untuk posisi <strong><?= $escape( $position ) ?></strong> yang telah Anda konfirmasi:
+                    <?php if ( 'KONFIRMASI' === $reminder_stage ) : ?>
+                        Terima kasih telah melakukan konfirmasi kehadiran. Berikut adalah rincian bukti konfirmasi dan pengingat jadwal <strong><?= $escape( $stage_label ) ?></strong> Anda untuk posisi <strong><?= $escape( $position ) ?></strong>:
+                    <?php else : ?>
+                        Ini adalah pengingat otomatis mengenai jadwal kehadiran <strong><?= $escape( $stage_label ) ?></strong> untuk posisi <strong><?= $escape( $position ) ?></strong> yang telah Anda konfirmasi:
+                    <?php endif; ?>
                 </p>
 
                 <!-- Jadwal Card -->
