@@ -12,6 +12,7 @@ if ( ! $preview && ! $confirmation_pending ) {
 $confirmation_data = $preview ? [] : get_transient( $confirmation_key );
 $application_token = is_array( $confirmation_data ) ? (string) ( $confirmation_data['application_token'] ?? '' ) : '';
 $application_id = is_array( $confirmation_data ) ? (string) ( $confirmation_data['application_id'] ?? '' ) : '';
+$already_submitted = is_array( $confirmation_data ) && ! empty( $confirmation_data['already_submitted'] );
 if ( ! $preview ) {
     delete_transient( $confirmation_key );
 }
@@ -22,11 +23,11 @@ if ( ! $preview ) {
         <div class="daw-recruitment__container daw-recruitment__form-container">
             <section class="daw-recruitment__panel daw-recruitment__success">
                 <div class="daw-recruitment__success-icon" aria-hidden="true">&#10003;</div>
-                <h1>Lamaran Berhasil Dikirim</h1>
-                <p>Terima kasih, <?= esc_html( $applicant['full_name'] ?? '' ) ?>. Lamaran Anda berhasil dikirim dan tercatat pada akun Oracle.</p>
+                <h1><?= $already_submitted ? 'Lamaran Anda Sudah Tersimpan' : 'Pendaftaran Lamaran Berhasil' ?></h1>
+                <p>Selamat, <?= esc_html( $applicant['full_name'] ?? '' ) ?>. Pendaftaran lamaran Anda berhasil tersimpan dan akan ditinjau oleh HR.</p>
                 <?php if ( '' !== $application_token ) : ?><div class="daw-recruitment__success-notice"><strong>Simpan Token Tracking Anda</strong><p>Gunakan token ini untuk mencari lamaran pada halaman Tracking Lamaran.</p><code><?= esc_html( $application_token ) ?></code><?php if ( '' !== $application_id ) : ?><p>No. Lamaran: <?= esc_html( $application_id ) ?></p><?php endif; ?></div><?php endif; ?>
-                <div class="daw-recruitment__success-notice"><strong>Langkah selanjutnya</strong><p>Tim rekrutmen akan meninjau data Anda. Pantau status lamaran melalui menu Tracking Lamaran di akun Anda.</p></div>
-                <div class="daw-recruitment__form-actions"><a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'application-process', '' !== $application_token ? [ 'token' => $application_token ] : ( $preview ? [ 'daw_ui_preview' => '1' ] : [] ) ) ) ?>">Lacak Lamaran</a><a class="daw-recruitment__button daw-recruitment__button--muted" href="<?= esc_url( recruitment_get_public_url( 'applicant-dashboard', $preview ? [ 'daw_ui_preview' => '1' ] : [] ) ) ?>">Kembali ke Akun</a></div>
+                <div class="daw-recruitment__success-notice"><strong>Langkah selanjutnya</strong><p>Silakan cek status lamaran melalui fitur Tracking Lamaran dan periksa email Anda secara berkala. Pembaruan status akan diberikan secara berkala selama proses seleksi berlangsung hingga kebutuhan posisi terpenuhi.</p></div>
+                <div class="daw-recruitment__form-actions"><a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'application-process', '' !== $application_token ? [ 'token' => $application_token ] : ( $preview ? [ 'daw_ui_preview' => '1' ] : [] ) ) ) ?>">Cek Tracking Lamaran</a><a class="daw-recruitment__button daw-recruitment__button--muted" href="<?= esc_url( recruitment_get_public_url( 'careers', $preview ? [ 'daw_ui_preview' => '1' ] : [] ) ) ?>">Lihat Lowongan Lainnya</a></div>
             </section>
         </div>
     </main>

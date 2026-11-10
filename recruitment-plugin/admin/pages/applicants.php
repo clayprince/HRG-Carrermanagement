@@ -12,6 +12,7 @@ if ( function_exists( 'get_posts' ) ) {
             'dealer'   => (string) get_post_meta( $wp_v->ID, '_daw_dealer', true ),
             'location' => (string) get_post_meta( $wp_v->ID, '_daw_location', true ),
             'region'   => (string) get_post_meta( $wp_v->ID, '_daw_region', true ),
+            'type'     => (string) get_post_meta( $wp_v->ID, '_daw_type', true ),
         ];
     }
 }
@@ -73,7 +74,7 @@ $normalize_status_bucket = static function ( $raw_status ): string {
         return 'diterima';
     }
 
-    if ( in_array( $status_key, [ 'rejected', 'tidak_diterima', 'tidak_lolos', 'tolak' ], true ) ) {
+    if ( in_array( $status_key, [ 'rejected', 'ditolak', 'tidak_diterima', 'tidak_lolos', 'tolak' ], true ) ) {
         return 'tidak_diterima';
     }
 
@@ -82,6 +83,17 @@ $normalize_status_bucket = static function ( $raw_status ): string {
     }
 
     return 'dalam_proses';
+};
+
+$normalize_branch = static function ( $raw_branch ): string {
+    $branch = strtolower( trim( (string) $raw_branch ) );
+    if ( false !== strpos( $branch, 'bitung' ) ) {
+        return 'DAW BITUNG';
+    }
+    if ( false !== strpos( $branch, 'maumbi' ) || false !== strpos( $branch, 'main dealer' ) ) {
+        return 'Main Dealer DAW MAUMBI';
+    }
+    return '';
 };
 
 $applicant_map = [];
@@ -110,10 +122,21 @@ foreach ( $applications as $application ) {
     $created_at = (string) ( $application['created_at'] ?? $candidate['created_at'] ?? '' );
     $year = (string) date_i18n( 'Y', strtotime( $created_at ) );
     $position = (string) ( $application['title'] ?? $vacancy['title'] ?? $vacancy['job_title'] ?? $candidate['position'] ?? 'Posisi belum ditentukan' );
-    $dealer = (string) ( $vacancy['dealer'] ?? $vacancy['location'] ?? $application['location'] ?? $candidate['dealer'] ?? '-' );
+    $dealer_source = '';
+    foreach ( [ $vacancy['dealer'] ?? '', $vacancy['location'] ?? '', $application['location'] ?? '', $candidate['dealer'] ?? '' ] as $branch_value ) {
+        if ( is_scalar( $branch_value ) && '' !== trim( (string) $branch_value ) ) {
+            $dealer_source = trim( (string) $branch_value );
+            break;
+        }
+    }
+    $dealer = $normalize_branch( $dealer_source );
+    $category = trim( (string) ( $application['category'] ?? '' ) );
+    if ( '' === $category ) {
+        $category = trim( (string) ( $vacancy['type'] ?? '' ) );
+    }
     $region = (string) ( $vacancy['region'] ?? $vacancy['location'] ?? $application['province'] ?? $candidate['region'] ?? '' );
     $status_bucket = $normalize_status_bucket( $application['status'] ?? $candidate['status'] ?? 'submitted' );
-    $stage_key = $normalize_stage( $application['status'] ?? $candidate['status'] ?? 'submitted' );
+    $stage_key = $normalize_stage( $application['stage'] ?? $application['status'] ?? $candidate['status'] ?? 'submitted' );
     $stage_label = [
         'administration' => 'Seleksi Administrasi',
         'psychological_test' => 'Psikotes',
@@ -125,7 +148,7 @@ foreach ( $applications as $application ) {
     $code = 'DAW-' . $year . '-' . str_pad( (string) $applicant_id, 3, '0', STR_PAD_LEFT );
     $applicant_name = (string) ( $candidate['name'] ?? $application['applicant_name'] ?? 'Pelamar #' . $applicant_id );
     $applicant_email = (string) ( $candidate['email'] ?? $application['applicant_email'] ?? '' );
-    $search_text = strtolower( trim( $applicant_name . ' ' . $code . ' ' . $position . ' ' . $dealer . ' ' . $applicant_email ) );
+    $search_text = strtolower( trim( $applicant_name . ' ' . $code . ' ' . $position . ' ' . $dealer_source . ' ' . $applicant_email ) );
     $application_key = (string) ( $application['id'] ?? $applicant_id );
     $latest_candidates[ $application_key ] = [
         'id' => $applicant_id,
@@ -135,7 +158,9 @@ foreach ( $applications as $application ) {
         'email' => $applicant_email,
         'phone' => (string) ( $candidate['phone'] ?? $application['applicant_phone'] ?? '' ),
         'position' => $position,
-        'dealer' => $dealer,
+        'dealer' => '' !== $dealer ? $dealer : 'Cabang belum ditentukan',
+        'branch' => $dealer,
+        'category' => '' !== $category ? $category : 'Kategori belum tersedia',
         'region' => $region,
         'year' => $year,
         'stage' => $stage_label,
@@ -158,7 +183,7 @@ foreach ( $all_candidates as $candidate ) {
     $matches_search = '' === $search || false !== strpos( $candidate['search'], strtolower( $search ) );
     $matches_year = '' === $year_filter || (string) $candidate['year'] === $year_filter;
     $matches_position = '' === $position_filter || strtolower( $candidate['position'] ) === strtolower( $position_filter );
-    $matches_dealer = '' === $dealer_filter || strtolower( $candidate['dealer'] ) === strtolower( $dealer_filter );
+    $matches_dealer = '' === $dealer_filter || $candidate['branch'] === $dealer_filter;
     $matches_status = '' === $status_filter || 'all' === $status_filter || $candidate['status_key'] === $status_filter;
 
     if ( $matches_search && $matches_year && $matches_position && $matches_dealer && $matches_status ) {
@@ -181,13 +206,10 @@ foreach ( $all_candidates as $candidate ) {
 }
 ksort( $positions );
 
-$dealers = [];
-foreach ( $all_candidates as $candidate ) {
-    if ( '-' !== $candidate['dealer'] && '' !== $candidate['dealer'] ) {
-        $dealers[ strtolower( $candidate['dealer'] ) ] = $candidate['dealer'];
-    }
-}
-ksort( $dealers );
+$dealers = [
+    'Main Dealer DAW MAUMBI' => 'Main Dealer DAW MAUMBI',
+    'DAW BITUNG' => 'DAW BITUNG',
+];
 
 $stats = [
     'total' => count( $filtered_candidates ),
@@ -217,10 +239,48 @@ if ( $selected_candidate_id > 0 ) {
 
 $selected_profile = $selected_candidate ? $database->get_admin_applicant( (string) $selected_candidate['id'] ) : null;
 $selected_answers = $selected_candidate ? $database->get_admin_application_answers( (string) ( $selected_candidate['application_id'] ?? 0 ) ) : [];
+$selected_attendance = null;
+$selected_attendance_lookup_failed = false;
+$psychotest_attendance_window = recruitment_psychotest_attendance_window(
+    (array) get_option( 'recruitment_psychotest_settings', [] )
+);
+if (
+    $selected_candidate
+    && ! empty( $selected_candidate['application_id'] )
+    && 'Psikotes' === ( $selected_candidate['stage'] ?? '' )
+) {
+    $selected_attendance = $database->get_psychotest_attendance(
+        (string) $selected_candidate['id'],
+        (string) $selected_candidate['application_id']
+    );
+    $selected_attendance_lookup_failed = $database->has_error();
+}
 if ( is_array( $selected_profile ) ) {
     $selected_candidate['name'] = (string) ( $selected_profile['name'] ?? $selected_candidate['name'] );
     $selected_candidate['email'] = (string) ( $selected_profile['email'] ?? $selected_candidate['email'] );
     $selected_candidate['phone'] = (string) ( $selected_profile['phone'] ?? $selected_candidate['phone'] );
+}
+$selected_documents = is_array( $selected_profile['profile_details']['documents'] ?? null ) ? $selected_profile['profile_details']['documents'] : [];
+$profile_photo_url = ! empty( $selected_documents['profile_photo'] )
+    ? recruitment_get_public_url( 'applicant-file', [ 'candidate_id' => $selected_candidate['id'], 'document' => 'profile_photo' ] )
+    : '';
+$can_review_administration = in_array( $selected_candidate['raw_status'] ?? '', [ 'SUBMITTED', 'SCREENING' ], true );
+$email_preview_html = '';
+$email_recipient = (string) ( $selected_candidate['email'] ?? '' );
+$email_preview_status = (string) ( $selected_candidate['raw_status'] ?? '' );
+$pending_email_status = $selected_candidate
+    ? get_transient( 'daw_app_status_email_' . get_current_user_id() . '_' . (int) $selected_candidate['application_id'] )
+    : false;
+$email_confirmation_pending = is_string( $pending_email_status )
+    && $pending_email_status === ( $selected_candidate['raw_status'] ?? null );
+$show_email_preview = '1' === (string) ( $_GET['email_preview'] ?? '' ) && $email_confirmation_pending;
+if ( $show_email_preview ) {
+    $applicant_name = (string) $selected_candidate['name'];
+    $position = (string) $selected_candidate['position'];
+    $status = (string) $email_preview_status;
+    ob_start();
+    require recruitment_get_plugin_path( 'templates/emails/application-status.php' );
+    $email_preview_html = (string) ob_get_clean();
 }
 
 $answers_map = [];
@@ -323,16 +383,18 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
         </div>
 
         <section class="daw-applicant-profile-card">
-            <div class="daw-applicant-profile-card__avatar">
-                <?= esc_html( strtoupper( substr( $selected_candidate['name'], 0, 1 ) ) ) ?>
-            </div>
+            <?php if ( '' !== $profile_photo_url ) : ?>
+                <img class="daw-applicant-profile-card__avatar daw-applicant-profile-card__photo" src="<?= esc_url( $profile_photo_url ) ?>" alt="Foto <?= esc_attr( $selected_candidate['name'] ) ?>">
+            <?php else : ?>
+                <div class="daw-applicant-profile-card__avatar"><?= esc_html( strtoupper( substr( $selected_candidate['name'], 0, 1 ) ) ) ?></div>
+            <?php endif; ?>
             <div class="daw-applicant-profile-card__identity">
                 <h1><?= esc_html( $selected_candidate['name'] ) ?></h1>
                 <p class="daw-applicant-profile-card__code"><?= esc_html( $selected_candidate['code'] ) ?></p>
                 <div class="daw-applicant-profile-card__meta">
                     <span><?= esc_html( $selected_candidate['position'] ) ?></span>
+                    <span><?= esc_html( $selected_candidate['category'] ) ?></span>
                     <span><?= esc_html( $selected_candidate['dealer'] ) ?></span>
-                    <span><?= esc_html( $selected_candidate['region'] ?: 'Wilayah belum tersedia' ) ?></span>
                 </div>
             </div>
             <div class="daw-applicant-profile-card__stage">
@@ -357,48 +419,135 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
 
         <?php if ( ! empty( $selected_candidate['application_id'] ) ) : ?>
             <?php if ( '1' === (string) ( $_GET['status_updated'] ?? '' ) ) : ?><div class="notice notice-success inline"><p>Status lamaran berhasil diperbarui. Tracker kandidat akan membaca status terbaru dari Oracle.</p></div><?php endif; ?>
-            <section class="daw-documents-panel">
+            <?php
+            $attendance_time_result = isset( $_GET['attendance_time_result'] ) && is_scalar( $_GET['attendance_time_result'] )
+                ? sanitize_key( wp_unslash( (string) $_GET['attendance_time_result'] ) )
+                : '';
+            ?>
+            <?php if ( 'updated' === $attendance_time_result ) : ?><div class="notice notice-success inline"><p>Waktu konfirmasi psikotes berhasil diperbarui.</p></div><?php elseif ( in_array( $attendance_time_result, [ 'invalid', 'error' ], true ) ) : ?><div class="notice notice-error inline"><p>Waktu konfirmasi psikotes tidak berhasil diperbarui. Periksa tanggal dan jam, lalu coba lagi.</p></div><?php endif; ?>
+            <?php if ( '1' === (string) ( $_GET['status_email_sent'] ?? '' ) ) : ?><div class="notice notice-success inline"><p>Email pembaruan status berhasil dikirim ke pelamar.</p></div><?php endif; ?>
+            <?php if ( '1' === (string) ( $_GET['status_email_error'] ?? '' ) ) : ?><div class="notice notice-error inline"><p>Email belum berhasil dikirim. Periksa konfigurasi email lalu coba ACC kembali.</p></div><?php endif; ?>
+            <?php if ( $email_confirmation_pending && ! $show_email_preview ) : ?><div class="notice notice-info inline"><p>Status sudah tersimpan tetapi email belum dikirim. <a href="<?= esc_url( add_query_arg( 'email_preview', '1' ) ) ?>">Buka kembali pratinjau email</a>.</p></div><?php endif; ?>
+            <?php if ( is_array( $selected_attendance ) && ! empty( $selected_attendance['confirmed'] ) ) :
+                $attendance_datetime_raw = (string) ( $selected_attendance['confirmed_at'] ?? '' );
+                $attendance_datetime = '' !== $attendance_datetime_raw
+                    ? DateTimeImmutable::createFromFormat( '!Y-m-d H:i:s', $attendance_datetime_raw, wp_timezone() )
+                    : false;
+                $attendance_datetime_valid = $attendance_datetime instanceof DateTimeImmutable
+                    && $attendance_datetime->format( 'Y-m-d H:i:s' ) === $attendance_datetime_raw;
+                ?>
+                <section class="daw-documents-panel daw-psychotest-attendance-edit" aria-labelledby="daw-psychotest-attendance-edit-title">
+                    <h2 id="daw-psychotest-attendance-edit-title">Konfirmasi Kehadiran Psikotes</h2>
+                    <?php if ( $attendance_datetime_valid ) : ?>
+                        <p>Waktu konfirmasi saat ini: <strong><?= esc_html( wp_date( 'j F Y', $attendance_datetime->getTimestamp() ) . ' pukul ' . wp_date( 'H:i', $attendance_datetime->getTimestamp() ) ) ?></strong></p>
+                        <p>Perubahan hanya untuk catatan waktu konfirmasi lamaran ini dan harus berada dalam jadwal HR: <?= null !== $psychotest_attendance_window ? esc_html( $psychotest_attendance_window['start_date'] . ' sampai ' . $psychotest_attendance_window['end_date'] . ', pukul ' . $psychotest_attendance_window['start_time'] . ' sampai ' . $psychotest_attendance_window['end_time'] ) : 'jadwal tanggal dan jam belum lengkap atau tidak valid' ?>.</p>
+                        <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" class="daw-psychotest-attendance__edit-form">
+                            <input type="hidden" name="action" value="daw_update_psychotest_attendance_time">
+                            <input type="hidden" name="application_id" value="<?= esc_attr( (int) $selected_candidate['application_id'] ) ?>">
+                            <input type="hidden" name="candidate_id" value="<?= esc_attr( (int) $selected_candidate['id'] ) ?>">
+                            <?php wp_nonce_field( 'daw_update_psychotest_attendance_time_' . (int) $selected_candidate['application_id'] . '_' . (int) $selected_candidate['id'] ); ?>
+                            <?php if ( null !== $psychotest_attendance_window ) : ?>
+                                <label for="daw-admin-psychotest-confirmed-date">Edit tanggal konfirmasi</label>
+                                <input id="daw-admin-psychotest-confirmed-date" type="date" name="confirmed_date" min="<?= esc_attr( $psychotest_attendance_window['start_date'] ) ?>" max="<?= esc_attr( $psychotest_attendance_window['end_date'] ) ?>" value="<?= esc_attr( $attendance_datetime->format( 'Y-m-d' ) ) ?>" required>
+                                <label for="daw-admin-psychotest-confirmed-time">Edit jam konfirmasi</label>
+                                <input id="daw-admin-psychotest-confirmed-time" type="time" name="confirmed_time" min="<?= esc_attr( $psychotest_attendance_window['start_time'] ) ?>" max="<?= esc_attr( $psychotest_attendance_window['end_time'] ) ?>" value="<?= esc_attr( $attendance_datetime->format( 'H:i' ) ) ?>" required>
+                                <button type="submit" class="button button-primary">Simpan Perubahan</button>
+                            <?php endif; ?>
+                        </form>
+                    <?php else : ?>
+                        <p class="notice notice-error inline">Waktu konfirmasi tidak dapat dibaca untuk diedit.</p>
+                    <?php endif; ?>
+                </section>
+            <?php elseif ( $selected_attendance_lookup_failed ) : ?>
+                <div class="notice notice-error inline"><p>Data konfirmasi psikotes belum dapat dimuat dari Oracle.</p></div>
+            <?php endif; ?>
+            <section class="daw-documents-panel daw-application-decision">
                 <h2>Perbarui Status Lamaran</h2>
-                <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>">
+                <div class="daw-application-decision__current">
+                    <span>Tahap Saat Ini</span>
+                    <strong><?= esc_html( $selected_candidate['stage'] ) ?></strong>
+                </div>
+                <?php if ( $can_review_administration ) : ?>
+                <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" class="daw-application-decision__form" data-administrative-decision-form>
                     <input type="hidden" name="action" value="daw_update_application_status">
                     <input type="hidden" name="application_id" value="<?= esc_attr( (int) $selected_candidate['application_id'] ) ?>">
                     <input type="hidden" name="candidate_id" value="<?= esc_attr( (int) $selected_candidate['id'] ) ?>">
                     <?php wp_nonce_field( 'daw_update_application_status_' . (int) $selected_candidate['application_id'] ); ?>
-                    <p><label>Status<br><select name="status" required>
-                        <?php foreach ( [ 'SUBMITTED' => 'Lamaran Diterima', 'SCREENING' => 'Seleksi Administrasi', 'PSIKOTES' => 'Psikotes', 'INTERVIEW_HR' => 'Wawancara HR', 'INTERVIEW_USER' => 'Wawancara Departemen', 'DITERIMA' => 'Diterima', 'DITOLAK' => 'Tidak Lolos' ] as $status_value => $status_label ) : ?>
-                            <option value="<?= esc_attr( $status_value ) ?>" <?= selected( strtoupper( (string) ( $selected_candidate['raw_status'] ?? '' ) ), $status_value, false ) ?>><?= esc_html( $status_label ) ?></option>
-                        <?php endforeach; ?>
-                    </select></label></p>
-                    <p>Tahap tracking akan mengikuti status lamaran yang dipilih.</p>
-                    <p><label>Catatan untuk pelamar<br><textarea name="note" rows="3"></textarea></label></p>
-                    <button type="submit" class="button button-primary">Simpan Status</button>
+                    <p class="daw-application-decision__field"><label>Hasil Seleksi Administrasi<br>
+                        <select name="administrative_result" required>
+                            <option value="">Pilih hasil seleksi</option>
+                            <option value="passed">Lolos seleksi administrasi</option>
+                            <option value="failed">Tidak lolos seleksi administrasi</option>
+                        </select>
+                    </label></p>
+                    <p class="daw-application-decision__field" data-administrative-next-stage hidden><label>Tahap berikutnya<br>
+                        <select name="next_stage" disabled>
+                            <option value="">Pilih tahap berikutnya</option>
+                            <option value="PSIKOTES">Psikotes</option>
+                            <option value="INTERVIEW_HR">Wawancara HR</option>
+                            <option value="INTERVIEW_USER">Wawancara User</option>
+                        </select>
+                    </label></p>
+                    <p class="daw-application-decision__field daw-application-decision__field--note"><label>Catatan untuk pelamar<br><textarea name="note" rows="2"></textarea></label></p>
+                    <button type="submit" class="button button-primary daw-application-decision__submit">Simpan Status</button>
                 </form>
-            </section>
-            <section class="daw-documents-panel">
-                <h2>Data Administrasi Lamaran</h2>
-                <?php if ( $selected_answers ) : ?>
-                    <div class="daw-detail-grid">
-                        <?php foreach ( $selected_answers as $answer ) : ?>
-                            <?php $answer_value = trim( (string) ( $answer['answer_value'] ?? '' ) ); ?>
-                            <div class="daw-detail-field">
-                                <span><?= esc_html( $answer['field_title'] ?? $answer['field_key'] ?? 'Field' ) ?></span>
-                                <strong><?= esc_html( '' !== $answer_value ? $answer_value : ( $answer['file_name'] ?? 'File terlampir' ) ) ?></strong>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
                 <?php else : ?>
-                    <p class="daw-documents-panel__hint">Jawaban administrasi belum tersedia untuk lamaran ini.</p>
+                    <p class="daw-documents-panel__hint">Seleksi administrasi sudah diputuskan. Tahap lamaran tidak dapat diubah kembali dari formulir ini.</p>
                 <?php endif; ?>
             </section>
         <?php endif; ?>
 
-        <section class="daw-documents-panel">
-            <h2>Unduh Dokumen</h2>
-            <div class="daw-documents-panel__actions">
-                <button type="button" class="daw-document-btn" disabled>Download Profil Pelamar</button>
-                <button type="button" class="daw-document-btn daw-document-btn--muted" disabled>Download Laporan Psikotes</button>
+        <?php if ( $show_email_preview ) : ?>
+            <div class="daw-email-confirmation" role="presentation">
+                <section class="daw-email-confirmation__dialog" role="dialog" aria-modal="true" aria-labelledby="daw-email-confirmation-title" tabindex="-1">
+                    <div class="daw-email-confirmation__header">
+                        <div>
+                            <span class="daw-email-confirmation__eyebrow">Status sudah tersimpan</span>
+                            <h2 id="daw-email-confirmation-title">Konfirmasi email pelamar</h2>
+                            <p>Periksa template berikut. Email hanya dikirim setelah Anda menekan tombol ACC.</p>
+                        </div>
+                        <a class="daw-email-confirmation__close" href="<?= esc_url( remove_query_arg( 'email_preview' ) ) ?>" aria-label="Tutup pratinjau email">&times;</a>
+                    </div>
+                    <div class="daw-email-confirmation__recipient">
+                        <span>Penerima</span>
+                        <strong><?= esc_html( $email_recipient ?: 'Alamat email belum tersedia' ) ?></strong>
+                    </div>
+                    <iframe class="daw-email-confirmation__preview" title="Pratinjau isi email pembaruan status" sandbox="" srcdoc="<?= esc_attr( $email_preview_html ) ?>"></iframe>
+                    <div class="daw-email-confirmation__actions">
+                        <a class="button daw-email-confirmation__cancel" href="<?= esc_url( remove_query_arg( 'email_preview' ) ) ?>">Nanti saja</a>
+                        <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>">
+                            <input type="hidden" name="action" value="daw_send_application_status_email">
+                            <input type="hidden" name="application_id" value="<?= esc_attr( (int) $selected_candidate['application_id'] ) ?>">
+                            <input type="hidden" name="candidate_id" value="<?= esc_attr( (int) $selected_candidate['id'] ) ?>">
+                            <?php wp_nonce_field( 'daw_send_application_status_email_' . (int) $selected_candidate['application_id'] . '_' . (int) $selected_candidate['id'] ); ?>
+                            <button type="submit" class="button button-primary daw-email-confirmation__approve" <?= is_email( $email_recipient ) ? '' : 'disabled' ?>>ACC &amp; Kirim Status Terbaru</button>
+                        </form>
+                    </div>
+                </section>
             </div>
-            <p class="daw-documents-panel__hint">Dokumen kandidat belum tersedia di sistem saat ini. Tombol akan aktif otomatis setelah file diunggah dan diverifikasi.</p>
+        <?php endif; ?>
+
+        <section class="daw-documents-panel daw-applicant-downloads">
+            <h2>Dokumen Pelamar</h2>
+            <div class="daw-documents-panel__actions">
+                <?php if ( $selected_profile ) : ?>
+                    <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>">
+                        <input type="hidden" name="action" value="daw_download_applicant_profile">
+                        <input type="hidden" name="candidate_id" value="<?= esc_attr( (int) $selected_candidate['id'] ) ?>">
+                        <?php wp_nonce_field( 'daw_download_applicant_profile_' . (int) $selected_candidate['id'] ); ?>
+                        <button type="submit" class="button button-primary daw-document-btn">Download Profil Pelamar</button>
+                    </form>
+                <?php endif; ?>
+                <?php foreach ( [ 'resume' => 'Download CV Pelamar', 'portfolio' => 'Download Portofolio Pelamar' ] as $document_key => $document_label ) : ?>
+                    <?php if ( ! empty( $selected_documents[ $document_key ] ) ) : ?>
+                        <a class="button daw-document-btn daw-document-btn--light" href="<?= esc_url( recruitment_get_public_url( 'applicant-file', [ 'candidate_id' => $selected_candidate['id'], 'document' => $document_key ] ) ) ?>"><?= esc_html( $document_label ) ?></a>
+                    <?php else : ?>
+                        <span class="button daw-document-btn daw-document-btn--disabled" aria-disabled="true"><?= esc_html( $document_label ) ?> · Belum tersedia</span>
+                    <?php endif; ?>
+                <?php endforeach; ?>
+                <span class="button daw-document-btn daw-document-btn--disabled" aria-disabled="true">Download Laporan Psikotes · Belum tersedia</span>
+            </div>
+            <p class="daw-documents-panel__hint">Profil diunduh sebagai laporan HTML. Laporan psikotes belum dapat dihubungkan secara aman karena skema Oracle saat ini belum mengaitkan hasil tes ke kandidat atau lamaran.</p>
         </section>
 
         <section class="daw-applicant-detail-tabs" data-applicant-tabs>

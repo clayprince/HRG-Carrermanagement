@@ -2578,6 +2578,253 @@
   }
 }
 
+.daw-account__main--tracking .daw-account__timeline .daw-psychotest-info__trigger,
+.daw-account__main--tracking .daw-psychotest-info__trigger {
+  font-size: 12px;
+  justify-self: start;
+  margin-top: 10px;
+  min-height: 38px;
+  padding: 8px 12px;
+}
+.daw-account__main--tracking .daw-account__select-label select {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #69717a 50%),
+    linear-gradient(135deg, #69717a 50%, transparent 50%);
+  background-position:
+    calc(100% - 13px) 50%,
+    calc(100% - 8px) 50%;
+  background-repeat: no-repeat;
+  background-size: 5px 5px;
+  padding-right: 25px;
+}
+.daw-psychotest-attendance {
+  font-size: 13px;
+  line-height: 1.55;
+}
+.daw-psychotest-info .daw-psychotest-attendance > h3 {
+  color: var(--daw-charcoal);
+  font-size: 15px;
+  margin: 0 0 7px;
+}
+.daw-psychotest-attendance p {
+  margin: 7px 0;
+}
+.daw-psychotest-attendance__notice {
+  background: #fff8e6;
+  border: 1px solid #f5df9b;
+  border-radius: 6px;
+  padding: 9px 11px;
+}
+.daw-psychotest-attendance form {
+  margin-top: 12px;
+}
+.daw-psychotest-attendance .daw-recruitment__button {
+  font-size: 12px;
+  min-height: 38px;
+  padding: 9px 13px;
+}
+.daw-psychotest-attendance > small {
+  color: var(--daw-gray);
+  display: block;
+  font-size: 11px;
+  margin-top: 6px;
+}
+.daw-psychotest-attendance__edit {
+  margin-top: 10px;
+}
+.daw-psychotest-attendance__edit summary {
+  color: var(--daw-red);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+.daw-psychotest-attendance__edit form,
+.daw-psychotest-attendance__edit-form {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.daw-psychotest-attendance__edit label,
+.daw-psychotest-attendance__edit-form label {
+  color: var(--daw-charcoal);
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  width: 100%;
+}
+.daw-psychotest-attendance__edit small {
+  color: var(--daw-gray);
+  font-size: 11px;
+  line-height: 1.45;
+  width: 100%;
+}
+.daw-psychotest-attendance__edit input[type="datetime-local"],
+.daw-psychotest-attendance__edit-form input[type="datetime-local"] {
+  border: 1px solid #d5d9e0;
+  border-radius: 6px;
+  box-sizing: border-box;
+  min-height: 38px;
+  padding: 7px 9px;
+}
+.daw-psychotest-attendance-edit {
+  font-size: 13px;
+}
+.daw-psychotest-attendance-edit > p {
+  margin: 0 0 12px;
+}
+.daw-psychotest-attendance__edit-form button {
+  min-height: 38px;
+}
+.daw-psychotest-info {
+  border: 0;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(20, 25, 38, 0.24);
+  box-sizing: border-box;
+  color: var(--daw-charcoal);
+  max-height: min(85vh, 760px);
+  max-width: min(640px, calc(100vw - 32px));
+  overflow: auto;
+  padding: 24px;
+  width: 100%;
+}
+.daw-psychotest-info::backdrop {
+  background: rgba(15, 23, 42, 0.58);
+  backdrop-filter: blur(2px);
+}
+.daw-psychotest-info__header {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+.daw-psychotest-info__header .daw-recruitment__eyebrow {
+  color: var(--daw-red);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+.daw-psychotest-info__header h2 {
+  color: var(--daw-charcoal);
+  font-size: 24px;
+  line-height: 1.25;
+  margin: 5px 0 0;
+}
+.daw-psychotest-info__close {
+  align-items: center;
+  background: #f3f4f6;
+  border: 0;
+  border-radius: 50%;
+  color: var(--daw-charcoal);
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 36px;
+  font-size: 25px;
+  height: 36px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  width: 36px;
+}
+.daw-psychotest-info__intro {
+  color: var(--daw-gray);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 10px 0 18px;
+}
+.daw-psychotest-info__grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.daw-psychotest-info__grid > div {
+  background: #f7f8fa;
+  border: 1px solid #e8eaf0;
+  border-radius: 9px;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 11px 12px;
+}
+.daw-psychotest-info__grid span {
+  color: var(--daw-gray);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.daw-psychotest-info__grid strong {
+  color: var(--daw-charcoal);
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.daw-psychotest-info__instructions,
+.daw-psychotest-info__notice {
+  background: #fff8e6;
+  border: 1px solid #f5df9b;
+  border-radius: 9px;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 14px 0 0;
+  padding: 12px 14px;
+}
+.daw-psychotest-info__instructions p {
+  margin: 5px 0 0;
+}
+.daw-psychotest-info .daw-psychotest-attendance {
+  border-top: 1px solid #e8eaf0;
+  margin-top: 18px;
+  padding-top: 16px;
+}
+.daw-psychotest-info__actions {
+  border-top: 1px solid #e8eaf0;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+  padding-top: 16px;
+}
+.daw-psychotest-info__actions .daw-recruitment__button {
+  min-height: 42px;
+}
+
+@media (max-width: 600px) {
+  .daw-account__main--tracking .daw-account__timeline .daw-psychotest-info__trigger,
+  .daw-account__main--tracking .daw-psychotest-info__trigger {
+    font-size: 11px;
+    min-height: 36px;
+    padding: 8px 10px;
+  }
+  .daw-psychotest-attendance {
+    font-size: 12px;
+  }
+  .daw-psychotest-attendance .daw-recruitment__button {
+    font-size: 11px;
+    width: 100%;
+  }
+  .daw-psychotest-attendance__edit form,
+  .daw-psychotest-attendance__edit-form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .daw-psychotest-attendance__edit input[type="datetime-local"],
+  .daw-psychotest-attendance__edit-form input[type="datetime-local"] {
+    width: 100%;
+  }
+  .daw-psychotest-info {
+    border-radius: 12px;
+    max-height: 90vh;
+    padding: 19px 16px;
+  }
+  .daw-psychotest-info__header h2 {
+    font-size: 20px;
+  }
+  .daw-psychotest-info__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .daw-psychotest-info__actions .daw-recruitment__button {
+    width: 100%;
+  }
+}
+
 .daw-profile-fields--unified {
   background: #fff;
   border: 1px solid #dfe1e6;

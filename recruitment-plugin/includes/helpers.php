@@ -373,6 +373,39 @@ function recruitment_get_current_applicant(): ?array {
     return $cached_applicant;
 }
 
+function recruitment_applicant_psychotest_stage_status( ?string $application_id = null ): ?bool {
+    $applicant = recruitment_get_current_applicant();
+    if ( ! is_array( $applicant ) || empty( $applicant['id'] ) ) {
+        return false;
+    }
+
+    $database = new Recruitment_Database();
+    $applications = $database->get_applicant_applications( (string) $applicant['id'] );
+    if ( $database->has_error() ) {
+        return null;
+    }
+
+    foreach ( $applications as $application ) {
+        if ( null !== $application_id && (string) ( $application['id'] ?? '' ) !== $application_id ) {
+            continue;
+        }
+
+        $latest_stage = (string) ( $application['latest_stage'] ?? $application['status'] ?? '' );
+        $stage_key = strtolower( trim( preg_replace( '/[^a-z0-9]+/i', '_', $latest_stage ), '_' ) );
+        $final_status = strtoupper( trim( (string) ( $application['final_status'] ?? '' ) ) );
+        $is_psychotest_stage = (
+            false !== strpos( $stage_key, 'psikotes' )
+            || false !== strpos( $stage_key, 'psycholog' )
+            || 'tes_psikologi' === $stage_key
+        ) && ! in_array( $final_status, [ 'DITERIMA', 'DITOLAK', 'ACCEPTED', 'REJECTED' ], true );
+        if ( $is_psychotest_stage ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 /**
  * Start an isolated candidate session without changing WordPress administrator cookies.
  *
@@ -508,6 +541,210 @@ function recruitment_consume_psychotest_consent( string $test_key ): bool {
         return false;
     }
     delete_transient( $consent_key );
+    return true;
+}
+
+/**
+ * Get the configured online test closing timestamp.
+ *
+ * @param array<string, mixed> $settings
+ */
+function recruitment_psychotest_closing_timestamp( array $settings ): ?int {
+    $date = (string) ( $settings['closing_date'] ?? '' );
+    $time = (string) ( $settings['closing_time'] ?? '' );
+    if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) || ! preg_match( '/^(?:[01]\d|2[0-3]):[0-5]\d$/', $time ) ) {
+        return null;
+    }
+
+    $closing_at = DateTimeImmutable::createFromFormat( '!Y-m-d H:i', $date . ' ' . $time, wp_timezone() );
+    if ( ! $closing_at || $closing_at->format( 'Y-m-d H:i' ) !== $date . ' ' . $time ) {
+        return null;
+    }
+
+    return $closing_at->getTimestamp();
+}
+
+/**
+ * Get when an online psychotest opens on its scheduled date in the site timezone.
+ *
+ * @param array<string, mixed> $settings
+ */
+function recruitment_psychotest_start_timestamp( array $settings ): ?int {
+    $date = (string) ( $settings['test_date'] ?? '' );
+    $time = (string) ( $settings['start_time'] ?? '' );
+    if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $date ) || ! preg_match( '/^(?:[01]\d|2[0-3]):[0-5]\d$/', $time ) ) {
+        return null;
+    }
+
+    $start_at = DateTimeImmutable::createFromFormat( '!Y-m-d', $date, wp_timezone() );
+    if ( ! $start_at || $start_at->format( 'Y-m-d' ) !== $date ) {
+        return null;
+    }
+
+    return $start_at->getTimestamp();
+}
+
+/**
+ * Get the date and daily time bounds for editing an attendance timestamp.
+ *
+ * @param array<string, mixed> $settings
+ * @return array{start_date: string, end_date: string, start_time: string, end_time: string}|null
+ */
+function recruitment_psychotest_attendance_window( array $settings ): ?array {
+    $start_date = (string) ( $settings['test_date'] ?? '' );
+    $end_date = '' !== (string) ( $settings['closing_date'] ?? '' )
+        ? (string) $settings['closing_date']
+        : $start_date;
+    $start_time = (string) ( $settings['start_time'] ?? '' );
+    $end_time = (string) ( $settings['end_time'] ?? '' );
+    $date_pattern = '/^\d{4}-\d{2}-\d{2}$/';
+    $time_pattern = '/^(?:[01]\d|2[0-3]):[0-5]\d$/';
+
+    if (
+        ! preg_match( $date_pattern, $start_date )
+        || ! preg_match( $date_pattern, $end_date )
+        || ! preg_match( $time_pattern, $start_time )
+        || ! preg_match( $time_pattern, $end_time )
+    ) {
+        return null;
+    }
+
+    $start_day = DateTimeImmutable::createFromFormat( '!Y-m-d', $start_date, wp_timezone() );
+    $end_day = DateTimeImmutable::createFromFormat( '!Y-m-d', $end_date, wp_timezone() );
+    if (
+        ! $start_day
+        || ! $end_day
+        || $start_day->format( 'Y-m-d' ) !== $start_date
+        || $end_day->format( 'Y-m-d' ) !== $end_date
+        || $end_date < $start_date
+        || $end_time < $start_time
+    ) {
+        return null;
+    }
+
+    return [
+        'start_date' => $start_date,
+        'end_date' => $end_date,
+        'start_time' => $start_time,
+        'end_time' => $end_time,
+    ];
+}
+
+function recruitment_is_psychotest_attendance_time_in_window( array $settings, DateTimeImmutable $datetime ): bool {
+    $window = recruitment_psychotest_attendance_window( $settings );
+    if ( null === $window ) {
+        return false;
+    }
+
+    $date = $datetime->format( 'Y-m-d' );
+    $time = $datetime->format( 'H:i' );
+
+    return $date >= $window['start_date']
+        && $date <= $window['end_date']
+        && $time >= $window['start_time']
+        && $time <= $window['end_time'];
+}
+
+/**
+ * Close an expired online test immediately when settings or applicant pages load.
+ *
+ * @param array<string, mixed> $settings
+ * @return array<string, mixed>
+ */
+function recruitment_sync_psychotest_closing( array $settings ): array {
+    if ( 'online' === ( $settings['mode'] ?? '' ) && 'active' === ( $settings['status'] ?? '' ) ) {
+        $closing_at = recruitment_psychotest_closing_timestamp( $settings );
+        if ( null !== $closing_at && $closing_at <= time() ) {
+            $settings['status'] = 'inactive';
+            update_option( 'recruitment_psychotest_settings', $settings );
+        }
+    }
+
+    return $settings;
+}
+
+/**
+ * Schedule the automatic closure of an online psychotest.
+ *
+ * @param array<string, mixed> $settings
+ */
+function recruitment_schedule_psychotest_closing( array $settings ): void {
+    wp_clear_scheduled_hook( 'recruitment_close_psychotest' );
+    if ( 'online' !== ( $settings['mode'] ?? '' ) || 'active' !== ( $settings['status'] ?? '' ) ) {
+        return;
+    }
+
+    $closing_at = recruitment_psychotest_closing_timestamp( $settings );
+    if ( null !== $closing_at && $closing_at > time() ) {
+        wp_schedule_single_event( $closing_at, 'recruitment_close_psychotest' );
+    } elseif ( null !== $closing_at ) {
+        recruitment_sync_psychotest_closing( $settings );
+    }
+}
+
+function recruitment_ensure_psychotest_closing(): void {
+    $settings = (array) get_option( 'recruitment_psychotest_settings', [] );
+    $settings = recruitment_sync_psychotest_closing( $settings );
+    $closing_at = recruitment_psychotest_closing_timestamp( $settings );
+    if ( 'online' === ( $settings['mode'] ?? '' ) && 'active' === ( $settings['status'] ?? '' ) && null !== $closing_at && $closing_at > time() ) {
+        if ( (int) wp_next_scheduled( 'recruitment_close_psychotest' ) !== $closing_at ) {
+            recruitment_schedule_psychotest_closing( $settings );
+        }
+    } elseif ( wp_next_scheduled( 'recruitment_close_psychotest' ) ) {
+        wp_clear_scheduled_hook( 'recruitment_close_psychotest' );
+    }
+}
+
+function recruitment_close_psychotest_if_due(): void {
+    $settings = (array) get_option( 'recruitment_psychotest_settings', [] );
+    $settings = recruitment_sync_psychotest_closing( $settings );
+    if ( 'active' === ( $settings['status'] ?? '' ) ) {
+        recruitment_schedule_psychotest_closing( $settings );
+    }
+}
+
+function recruitment_is_psychotest_test_enabled( string $test_key ): bool {
+    $test_groups = [
+        'iq' => 'iq',
+        'pauli' => 'pauli',
+        'disc' => 'personality',
+        'papi' => 'personality',
+    ];
+    if ( ! isset( $test_groups[ $test_key ] ) ) {
+        return false;
+    }
+
+    $settings = recruitment_sync_psychotest_closing( (array) get_option( 'recruitment_psychotest_settings', [] ) );
+    if (
+        'active' !== ( $settings['status'] ?? '' )
+        || 'online' !== ( $settings['mode'] ?? '' )
+        || null === ( $start_at = recruitment_psychotest_start_timestamp( $settings ) )
+        || $start_at > time()
+        || null === ( $closing_at = recruitment_psychotest_closing_timestamp( $settings ) )
+        || $closing_at <= time()
+    ) {
+        return false;
+    }
+
+    $selected_tests = is_array( $settings['online_tests'] ?? null )
+        ? array_map( static fn ( $test ): string => sanitize_key( (string) $test ), array_filter( $settings['online_tests'], 'is_scalar' ) )
+        : [ 'iq', 'pauli', 'personality' ];
+    $group = $test_groups[ $test_key ];
+    if ( ! in_array( $group, $selected_tests, true ) ) {
+        return false;
+    }
+    if ( 'personality' === $group && ( ! in_array( 'iq', $selected_tests, true ) || ! in_array( 'pauli', $selected_tests, true ) ) ) {
+        return false;
+    }
+    if ( 'pauli' === $group && ! in_array( 'iq', $selected_tests, true ) ) {
+        return false;
+    }
+
+    $individual_settings = (array) get_option( 'recruitment_psychotest_tests', [] );
+    if ( isset( $individual_settings[ $test_key ]['active'] ) && empty( $individual_settings[ $test_key ]['active'] ) ) {
+        return false;
+    }
+
     return true;
 }
 

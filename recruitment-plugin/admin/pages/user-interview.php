@@ -10,6 +10,7 @@ $notes_url = add_query_arg( 'view', 'notes', $list_url );
 $database = new Recruitment_Database();
 $applications = $database->get_applications();
 $database_error = $database->has_error();
+$active_candidate_count = $database->get_active_applicant_count();
 
 $candidates = [];
 $stats = [
@@ -94,7 +95,7 @@ if ( ! $selected_cand && 0 === $selected_application_id && 0 === $selected_candi
             <nav aria-label="Navigasi admin">
                 <span class="daw-user-interview__nav-item">Dashboard</span>
                 <span class="daw-user-interview__nav-heading">Recruitment</span>
-                <span class="daw-user-interview__nav-item">Semua Kandidat Aktif <b>12</b></span>
+                <span class="daw-user-interview__nav-item">Semua Kandidat Aktif <b><?= esc_html( number_format_i18n( $active_candidate_count ) ) ?></b></span>
                 <span class="daw-user-interview__nav-item">Seleksi Administrasi</span>
                 <span class="daw-user-interview__nav-item">Psikotes</span>
                 <span class="daw-user-interview__nav-item">Wawancara HR</span>

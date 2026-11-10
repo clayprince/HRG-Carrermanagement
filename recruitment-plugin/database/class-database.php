@@ -375,6 +375,118 @@ class Recruitment_Database {
         );
     }
 
+    /** @return array{confirmed: bool, confirmed_at: string, reminder_sent: bool}|null */
+    public function get_psychotest_attendance( string $login_id, string $application_id ): ?array {
+        if ( ! ctype_digit( $login_id ) || '0' === $login_id || ! ctype_digit( $application_id ) || '0' === $application_id ) {
+            return null;
+        }
+        try {
+            $statement = $this->get_connection()->prepare(
+                'SELECT c.attendance_confirmed AS "confirmed", TO_CHAR(c.confirmed_at, \'YYYY-MM-DD HH24:MI:SS\') AS "confirmed_at", CASE WHEN c.email_reminder_sent_at IS NULL THEN \'N\' ELSE \'Y\' END AS "reminder_sent" FROM HRS_KONFIRMASI_PSIKOTES c JOIN HRS_LAMARAN l ON l.lamaran_id = c.lamaran_id WHERE l.profile_kandidat_id = :login_id AND l.lamaran_id = :application_id'
+            );
+            $statement->execute( [ 'login_id' => $login_id, 'application_id' => $application_id ] );
+            $attendance = $statement->fetch( PDO::FETCH_ASSOC );
+            if ( ! is_array( $attendance ) ) {
+                return null;
+            }
+
+            return [
+                'confirmed' => 'Y' === strtoupper( (string) $attendance['confirmed'] ),
+                'confirmed_at' => (string) $attendance['confirmed_at'],
+                'reminder_sent' => 'Y' === strtoupper( (string) $attendance['reminder_sent'] ),
+            ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_oracle_failure( 'Psychotest attendance lookup failed', $exception );
+            return null;
+        }
+    }
+
+    /** @return array{success: bool, error?: string} */
+    public function confirm_psychotest_attendance( string $login_id, string $application_id ): array {
+        if ( ! ctype_digit( $login_id ) || '0' === $login_id || ! ctype_digit( $application_id ) || '0' === $application_id ) {
+            return [ 'success' => false, 'error' => 'invalid_application' ];
+        }
+
+        try {
+            $statement = $this->get_connection()->prepare(
+                'MERGE INTO HRS_KONFIRMASI_PSIKOTES c USING (SELECT l.lamaran_id, l.profile_kandidat_id FROM HRS_LAMARAN l WHERE l.profile_kandidat_id = :login_id AND l.lamaran_id = :application_id) a ON (c.lamaran_id = a.lamaran_id) WHEN MATCHED THEN UPDATE SET c.profile_kandidat_id = a.profile_kandidat_id, c.attendance_confirmed = \'Y\', c.confirmed_at = CURRENT_TIMESTAMP WHEN NOT MATCHED THEN INSERT (lamaran_id, profile_kandidat_id, attendance_confirmed, confirmed_at) VALUES (a.lamaran_id, a.profile_kandidat_id, \'Y\', CURRENT_TIMESTAMP)'
+            );
+            $statement->execute( [ 'login_id' => $login_id, 'application_id' => $application_id ] );
+            if ( 0 === $statement->rowCount() ) {
+                return [ 'success' => false, 'error' => 'application_not_found' ];
+            }
+            return [ 'success' => true ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_oracle_failure( 'Psychotest attendance confirmation failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /** @return array{success: bool, error?: string} */
+    public function update_psychotest_attendance_time( string $login_id, string $application_id, string $local_datetime ): array {
+        if (
+            ! ctype_digit( $login_id )
+            || '0' === $login_id
+            || ! ctype_digit( $application_id )
+            || '0' === $application_id
+            || ! preg_match( '/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/', $local_datetime )
+        ) {
+            return [ 'success' => false, 'error' => 'invalid_datetime' ];
+        }
+
+        try {
+            $connection = $this->get_connection();
+            $check = $connection->prepare(
+                'SELECT COUNT(*) FROM HRS_KONFIRMASI_PSIKOTES c JOIN HRS_LAMARAN l ON l.lamaran_id = c.lamaran_id WHERE c.lamaran_id = :application_id AND c.profile_kandidat_id = :login_id AND c.attendance_confirmed = \'Y\' AND l.profile_kandidat_id = :application_login_id'
+            );
+            $check->execute(
+                [
+                    'application_id' => $application_id,
+                    'login_id' => $login_id,
+                    'application_login_id' => $login_id,
+                ]
+            );
+            if ( 1 !== (int) $check->fetchColumn() ) {
+                return [ 'success' => false, 'error' => 'confirmation_not_found' ];
+            }
+
+            $statement = $connection->prepare(
+                'UPDATE HRS_KONFIRMASI_PSIKOTES SET confirmed_at = TO_TIMESTAMP(:confirmed_at, \'YYYY-MM-DD"T"HH24:MI\') WHERE lamaran_id = :application_id AND profile_kandidat_id = :login_id AND attendance_confirmed = \'Y\''
+            );
+            $statement->execute(
+                [
+                    'confirmed_at' => $local_datetime,
+                    'application_id' => $application_id,
+                    'login_id' => $login_id,
+                ]
+            );
+            return [ 'success' => true ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_oracle_failure( 'Psychotest attendance time update failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /** @return array{success: bool, error?: string} */
+    public function mark_psychotest_reminder_sent( string $login_id, string $application_id ): array {
+        if ( ! ctype_digit( $login_id ) || '0' === $login_id || ! ctype_digit( $application_id ) || '0' === $application_id ) {
+            return [ 'success' => false, 'error' => 'invalid_application' ];
+        }
+
+        try {
+            $statement = $this->get_connection()->prepare(
+                'UPDATE HRS_KONFIRMASI_PSIKOTES SET email_reminder_sent_at = CURRENT_TIMESTAMP WHERE lamaran_id = :application_id AND attendance_confirmed = \'Y\' AND EXISTS (SELECT 1 FROM HRS_LAMARAN l WHERE l.lamaran_id = HRS_KONFIRMASI_PSIKOTES.lamaran_id AND l.profile_kandidat_id = :login_id)'
+            );
+            $statement->execute( [ 'application_id' => $application_id, 'login_id' => $login_id ] );
+            return 0 < $statement->rowCount()
+                ? [ 'success' => true ]
+                : [ 'success' => false, 'error' => 'confirmation_not_found' ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_oracle_failure( 'Psychotest reminder status update failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
     /**
      * Verify a portal account stored in HRS_ROLE_AKSES.
      *
@@ -406,8 +518,8 @@ class Recruitment_Database {
                     'type'          => 'hr',
                     'id'            => (string) $row['id'],
                     'email'         => (string) $row['email'],
-                    'username'      => (string) $row['username'],
-                    'display_name'  => (string) $row['display_name'],
+                    'username'      => ! empty( $row['username'] ) ? (string) $row['username'] : (string) $row['email'],
+                    'display_name'  => ! empty( $row['username'] ) ? (string) $row['username'] : (string) $row['email'],
                     'department_id' => '',
                     'department'    => '',
                 ];
@@ -781,6 +893,27 @@ class Recruitment_Database {
         } catch ( PDOException | RuntimeException $exception ) {
             $this->log_error( 'HR Oracle profile update failed', $exception );
             return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /**
+     * Retrieve current HR profile details from Oracle HRS_ROLE_AKSES.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function get_hr_profile( string $account_id ): ?array {
+        if ( ! ctype_digit( $account_id ) || '0' === $account_id ) {
+            return null;
+        }
+        try {
+            $statement = $this->get_connection()->prepare(
+                'SELECT role_akses_id AS "id", username AS "username", email AS "email", status_akun AS "status" FROM hrs_role_akses WHERE role_akses_id = :account_id AND peran = :role'
+            );
+            $statement->execute( [ 'account_id' => $account_id, 'role' => 'ADMIN_HR' ] );
+            $row = $statement->fetch( PDO::FETCH_ASSOC );
+            return $row ?: null;
+        } catch ( PDOException | RuntimeException $exception ) {
+            return null;
         }
     }
 
@@ -1236,7 +1369,7 @@ class Recruitment_Database {
      * Save an application and all of its dynamic answers atomically.
      *
      * @param array<string, mixed> $submission
-     * @return array{success: bool, application_id?: string, application_token?: string, error?: string}
+     * @return array{success: bool, application_id?: string, application_token?: string, already_submitted?: bool, error?: string}
      */
     public function save_application_submission( array $submission ): array {
         $connection = null;
@@ -1259,11 +1392,18 @@ class Recruitment_Database {
             $profile_id = (string) ( $candidate_row['KANDIDAT_ID'] ?? '' );
 
             $duplicate_check = $connection->prepare(
-                'SELECT COUNT(*) FROM HRS_LAMARAN WHERE PROFILE_KANDIDAT_ID = :candidate_id AND DETAIL_LOWONGAN_ID = :vacancy_id'
+                'SELECT LAMARAN_ID, APPLICATION_TOKEN FROM HRS_LAMARAN WHERE PROFILE_KANDIDAT_ID = :candidate_id AND DETAIL_LOWONGAN_ID = :vacancy_id ORDER BY LAMARAN_ID DESC FETCH FIRST 1 ROWS ONLY'
             );
             $duplicate_check->execute( [ 'candidate_id' => $candidate_login_id, 'vacancy_id' => $vacancy_id ] );
-            if ( 0 < (int) $duplicate_check->fetchColumn() ) {
-                throw new InvalidArgumentException( 'Applicant has already applied to this vacancy.' );
+            $existing_application = $duplicate_check->fetch( PDO::FETCH_ASSOC );
+            if ( $existing_application ) {
+                $connection->commit();
+                return [
+                    'success'          => true,
+                    'application_id'    => (string) $existing_application['LAMARAN_ID'],
+                    'application_token' => (string) $existing_application['APPLICATION_TOKEN'],
+                    'already_submitted' => true,
+                ];
             }
 
             // Ensure vacancy exists in Oracle HRS_DETAIL_INFO_LOWONGAN
@@ -1569,8 +1709,18 @@ class Recruitment_Database {
      */
     public function get_applicants(): array {
         return $this->fetch_all(
-            'SELECT pkl.profile_kandidat_login AS "id", NVL(p.nama_lengkap, p.nama_kandidat) AS "name", NVL(p.email, pkl.email) AS "email", NVL(p.nomor_telepon, TO_CHAR(pkl.nomor_telepon)) AS "phone", NVL(pkl.created_at, p.dibuat_pada) AS "created_at" FROM HRS_PROFILE_KANDIDAT_LOGIN pkl JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id ORDER BY NVL(pkl.created_at, p.dibuat_pada) DESC'
+            'SELECT pkl.profile_kandidat_login AS "id", NVL(p.nama_lengkap, p.nama_kandidat) AS "name", NVL(p.email, pkl.email) AS "email", NVL(p.nomor_telepon, TO_CHAR(pkl.nomor_telepon)) AS "phone", NVL(pkl.created_at, p.dibuat_pada) AS "created_at" FROM HRS_PROFILE_KANDIDAT_LOGIN pkl JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id WHERE UPPER(pkl.status_akun) = :status ORDER BY NVL(pkl.created_at, p.dibuat_pada) DESC',
+            [ 'status' => 'ACTIVE' ]
         );
+    }
+
+    public function get_active_applicant_count(): int {
+        $rows = $this->fetch_all(
+            'SELECT COUNT(DISTINCT pkl.kandidat_id) AS "candidate_count" FROM HRS_PROFILE_KANDIDAT_LOGIN pkl JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id WHERE UPPER(pkl.status_akun) = :status',
+            [ 'status' => 'ACTIVE' ]
+        );
+
+        return (int) ( $rows[0]['candidate_count'] ?? 0 );
     }
 
     /**
@@ -1585,21 +1735,22 @@ class Recruitment_Database {
                    l.status_akhir AS "final_status",
                    NVL(l.created_at, l.tanggal_melamar) AS "created_at",
                    NVL(d.judul_pekerjaan, k.judul_pekerjaan) AS "title",
-                   k.nama_dealer AS "location",
-                   k.nama_dealer AS "dealer",
-                   d.nama_departemen AS "department",
+                   NVL(k.nama_dealer, d.lokasi_penempatan) AS "location",
+                   NVL(k.nama_dealer, d.lokasi_penempatan) AS "dealer",
+                   d.kategori_kj AS "category",
+                   d.nama_departement AS "department",
                    NVL(p.nama_lengkap, p.nama_kandidat) AS "applicant_name",
                    NVL(p.email, pkl.email) AS "applicant_email",
                    NVL(p.nomor_hp, p.nomor_telepon) AS "applicant_phone",
                    p.provinsi AS "province",
-                   (SELECT s.hasil_hr FROM HRS_STATUS_KANDIDAT s WHERE s.kandidat_id = p.kandidat_id AND UPPER(TRIM(s.nama_departemen)) = UPPER(TRIM(d.nama_departemen)) ORDER BY s.status_kandidat_id DESC FETCH FIRST 1 ROW ONLY) AS "hr_result",
-                   (SELECT w.status_seleksi FROM HRS_HASIL_WAWANCARA_USER w WHERE w.kandidat_id = p.kandidat_id AND UPPER(TRIM(w.nama_departemen)) = UPPER(TRIM(d.nama_departemen)) ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_selection_status",
-                   (SELECT w.rekomendasi FROM HRS_HASIL_WAWANCARA_USER w WHERE w.kandidat_id = p.kandidat_id AND UPPER(TRIM(w.nama_departemen)) = UPPER(TRIM(d.nama_departemen)) ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_recommendation",
-                   (SELECT w.nilai_total FROM HRS_HASIL_WAWANCARA_USER w WHERE w.kandidat_id = p.kandidat_id AND UPPER(TRIM(w.nama_departemen)) = UPPER(TRIM(d.nama_departemen)) ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_score",
-                   (SELECT TO_CHAR(w.tanggal_wawancara, \'YYYY-MM-DD\') FROM HRS_HASIL_WAWANCARA_USER w WHERE w.kandidat_id = p.kandidat_id AND UPPER(TRIM(w.nama_departemen)) = UPPER(TRIM(d.nama_departemen)) ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_interview_date",
-                   (SELECT w.nama_pewawancara FROM HRS_HASIL_WAWANCARA_USER w WHERE w.kandidat_id = p.kandidat_id AND UPPER(TRIM(w.nama_departemen)) = UPPER(TRIM(d.nama_departemen)) ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_interviewer",
-                   (SELECT w.catatan_wawancara FROM HRS_HASIL_WAWANCARA_USER w WHERE w.kandidat_id = p.kandidat_id AND UPPER(TRIM(w.nama_departemen)) = UPPER(TRIM(d.nama_departemen)) ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_interview_notes",
-                   (SELECT r.keputusan_akhir FROM HRS_REKAPAN_KEPUTUSAN_HR r WHERE r.kandidat_id = p.kandidat_id AND UPPER(TRIM(r.nama_departement)) = UPPER(TRIM(d.nama_departemen)) ORDER BY r.rekapan_keputusan_id DESC FETCH FIRST 1 ROW ONLY) AS "hr_final_decision",
+                   (SELECT s.hasil_hr FROM HRS_STATUS_KANDIDAT s WHERE s.kandidat_id = p.kandidat_id AND UPPER(TRIM(s.nama_departemen)) = UPPER(TRIM(d.nama_departement)) ORDER BY s.status_kandidat_id DESC FETCH FIRST 1 ROW ONLY) AS "hr_result",
+                   (SELECT w.status_seleksi FROM HRS_HASIL_WAWANCARA_USER w WHERE w.kandidat_id = p.kandidat_id AND UPPER(TRIM(w.nama_departemen)) = UPPER(TRIM(d.nama_departement)) ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_selection_status",
+                   (SELECT w.rekomendasi FROM HRS_HASIL_WAWANCARA_USER w WHERE w.kandidat_id = p.kandidat_id AND UPPER(TRIM(w.nama_departemen)) = UPPER(TRIM(d.nama_departement)) ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_recommendation",
+                   (SELECT w.nilai_total FROM HRS_HASIL_WAWANCARA_USER w WHERE w.kandidat_id = p.kandidat_id AND UPPER(TRIM(w.nama_departemen)) = UPPER(TRIM(d.nama_departement)) ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_score",
+                   (SELECT TO_CHAR(w.tanggal_wawancara, \'YYYY-MM-DD\') FROM HRS_HASIL_WAWANCARA_USER w WHERE w.kandidat_id = p.kandidat_id AND UPPER(TRIM(w.nama_departemen)) = UPPER(TRIM(d.nama_departement)) ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_interview_date",
+                   (SELECT w.nama_pewawancara FROM HRS_HASIL_WAWANCARA_USER w WHERE w.kandidat_id = p.kandidat_id AND UPPER(TRIM(w.nama_departemen)) = UPPER(TRIM(d.nama_departement)) ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_interviewer",
+                   (SELECT w.catatan_wawancara FROM HRS_HASIL_WAWANCARA_USER w WHERE w.kandidat_id = p.kandidat_id AND UPPER(TRIM(w.nama_departemen)) = UPPER(TRIM(d.nama_departement)) ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_interview_notes",
+                   (SELECT r.keputusan_akhir FROM HRS_REKAPAN_KEPUTUSAN_HR r WHERE r.kandidat_id = p.kandidat_id AND UPPER(TRIM(r.nama_departement)) = UPPER(TRIM(d.nama_departement)) ORDER BY r.rekapan_keputusan_id DESC FETCH FIRST 1 ROW ONLY) AS "hr_final_decision",
                    (SELECT MAX(r.tahap_seleksi) KEEP (DENSE_RANK LAST ORDER BY r.tanggal_status, r.riwayat_status_id) FROM HRS_RIWAYAT_STATUS_PELAMAR r WHERE r.lamaran_id = l.lamaran_id) AS "stage"
             FROM HRS_LAMARAN l
             LEFT JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
@@ -3040,6 +3191,18 @@ class Recruitment_Database {
         try {
             $connection = $this->get_connection();
             $connection->beginTransaction();
+            $current_status_query = $connection->prepare(
+                'SELECT UPPER(TRIM(STATUS_TERKINI)) FROM HRS_LAMARAN WHERE LAMARAN_ID = :application_id FOR UPDATE'
+            );
+            $current_status_query->execute( [ 'application_id' => $application_id ] );
+            $current_status = $current_status_query->fetchColumn();
+            if ( false === $current_status ) {
+                throw new InvalidArgumentException( 'Application not found.' );
+            }
+            if ( ! in_array( $current_status, [ 'SUBMITTED', 'SCREENING' ], true ) ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'Seleksi administrasi untuk lamaran ini sudah diputuskan.' ];
+            }
             $update = $connection->prepare(
                 'UPDATE HRS_LAMARAN SET STATUS_TERKINI = :status_value, STATUS_AKHIR = CASE WHEN :is_final = 1 THEN :final_status ELSE STATUS_AKHIR END, UPDATED_AT = CURRENT_TIMESTAMP WHERE LAMARAN_ID = :application_id'
             );
@@ -3742,7 +3905,15 @@ class Recruitment_Database {
 
     private function log_oracle_failure( string $context, Throwable $exception ): void {
         $this->last_error = $exception->getMessage();
-        error_log( $context . ' (Oracle error ' . (string) $exception->getCode() . ').' );
+        if ( $exception instanceof PDOException && is_array( $exception->errorInfo ) ) {
+            $sql_state = (string) ( $exception->errorInfo[0] ?? $exception->getCode() );
+            $oracle_code = (string) ( $exception->errorInfo[1] ?? '' );
+            $oracle_message = trim( (string) ( $exception->errorInfo[2] ?? $exception->getMessage() ) );
+            error_log( sprintf( '%s (SQLSTATE %s, Oracle error %s): %s', $context, $sql_state, $oracle_code, $oracle_message ) );
+            return;
+        }
+
+        error_log( $context . ': ' . $exception->getMessage() );
     }
 
     private function log_error( string $context, Throwable $exception ): void {
