@@ -4506,6 +4506,38 @@ body:has(.daw-account-auth) .daw-account-auth__main {
   margin-bottom: 18px;
   padding: 18px 20px;
 }
+.daw-proctoring-watch {
+  align-items: flex-start;
+  background: #f8fafc;
+  border: 1px solid #dbe3ec;
+  border-radius: 12px;
+  display: grid;
+  gap: 8px 14px;
+  grid-template-columns: 128px minmax(0, 1fr);
+  margin: 0 0 14px;
+  padding: 10px;
+}
+.daw-proctoring-watch__video {
+  aspect-ratio: 4 / 3;
+  background: #20242a;
+  border-radius: 8px;
+  grid-row: span 2;
+  object-fit: cover;
+  width: 100%;
+}
+.daw-proctoring-watch p,
+.daw-proctoring-watch small {
+  margin: 0;
+}
+.daw-proctoring-capture video {
+  background: #20242a;
+  border-radius: 10px;
+  display: block;
+  margin: 12px 0;
+  max-height: 420px;
+  object-fit: contain;
+  width: 100%;
+}
 .daw-recruitment__psychotest-summary {
   padding: 18px 20px 16px;
 }

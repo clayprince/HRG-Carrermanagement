@@ -824,7 +824,7 @@ function recruitment_get_public_jobs_result(): array {
         ];
     }
 
-    return [ 'success' => ! $oracle_error || ! empty( $wordpress_jobs ), 'jobs' => $jobs ];
+    return [ 'success' => ! $oracle_error, 'jobs' => $jobs ];
 }
 
 /**

@@ -32,15 +32,20 @@ $device_url = recruitment_get_public_url( 'psychotest-device', $consent_argument
             </div>
             <section class="daw-recruitment__psychotest-card">
                 <h1>Persetujuan Tes <?= esc_html( $test_labels[ $test_key ] ) ?></h1>
-                <p>Jawaban dan waktu pengerjaan akan dicatat dan disimpan untuk proses seleksi. Kamera dan mikrofon digunakan untuk pemeriksaan perangkat di browser; plugin tidak mengunggah rekaman.</p>
+                <p>Jawaban dan waktu pengerjaan akan dicatat dan disimpan untuk proses seleksi. Untuk pemeriksaan identitas dan keamanan tes, sistem akan menyimpan satu foto selfie sambil memegang sisi depan KTP serta paling banyak lima snapshot peringatan untuk seluruh sesi tes. Anda dapat memilih “Periksa Mikrofon” saat tes untuk memeriksa izin dan ketersediaan perangkat; hanya status tersedia/tidak tersedia yang dicatat. Audio tidak direkam atau disimpan, kamera dan mikrofon hanya digunakan untuk pemeriksaan perangkat di browser, dan gambar tidak dianalisis dengan OCR atau pencocokan wajah.</p>
+                <ul>
+                    <li>Peringatan dapat dicatat saat Anda berpindah tab atau kamera terputus. Peringatan menjadi bahan tinjauan manusia dan tidak otomatis menggagalkan tes.</li>
+                    <li>Jika kamera tidak tersedia, Anda dapat meminta verifikasi identitas manual oleh HR.</li>
+                    <li>Gambar hanya dapat diakses melalui akun WordPress Administrator, dicatat saat diakses, dan dihapus otomatis paling lambat satu tahun setelah tes selesai. Jika tes tidak selesai, masa simpan dihitung sejak persetujuan diberikan.</li>
+                </ul>
                 <form method="post" action="<?= esc_url( recruitment_get_public_url( 'psychotest-consent', $consent_arguments ) ) ?>">
                     <?php wp_nonce_field( 'recruitment_psychotest_consent' ); ?>
                     <input type="hidden" name="test" value="<?= esc_attr( $test_key ) ?>">
                     <label>
                         <input type="checkbox" name="consent" value="1" required>
-                        Saya memahami dan menyetujui pemrosesan jawaban tes untuk keperluan seleksi.
+                        Saya memahami dan menyetujui pengambilan serta penyimpanan foto identitas dan snapshot peringatan serta pencatatan status ketersediaan mikrofon sesuai penjelasan di atas. Saya memahami bahwa audio tidak direkam dan jalur verifikasi manual tersedia bila kamera tidak dapat digunakan.
                     </label>
-                    <button class="daw-recruitment__button daw-recruitment__button--full" type="submit">Setuju dan mulai tes</button>
+                    <button class="daw-recruitment__button daw-recruitment__button--full" type="submit">Setuju dan lanjutkan verifikasi identitas</button>
                 </form>
             </section>
         </div>

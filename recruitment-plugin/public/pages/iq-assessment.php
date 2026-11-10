@@ -28,6 +28,7 @@ $psychotest_home_url = recruitment_get_public_url( 'psychotest' );
                     <a class="daw-psych-test-secondary" href="<?= esc_url( $psychotest_home_url ) ?>">Kembali ke daftar tes</a>
                 </section>
             <?php else : ?>
+                <?php require recruitment_get_plugin_path( 'public/components/psychotest-proctoring-watch.php' ); ?>
                 <section
                     class="daw-psych-test-card daw-iq-assessment"
                     data-iq-assessment

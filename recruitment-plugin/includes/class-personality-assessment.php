@@ -381,6 +381,9 @@ class Recruitment_Personality_Assessment {
             $state['tests']['papi']['status'] = 'available';
         } else {
             $state['completed_at'] = time();
+            if ( ! ( new Recruitment_Psychotest_Proctoring() )->mark_completed() ) {
+                error_log( 'Psychotest proctoring retention deadline could not be updated; the consent-based fallback deadline remains active.' );
+            }
         }
         recruitment_update_assessment_state( $user_id, self::USER_META_KEY, $state );
         wp_safe_redirect( recruitment_get_public_url( 'psych-personality', [ 'test' => $test_key ] ) );

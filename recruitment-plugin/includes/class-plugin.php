@@ -10,6 +10,8 @@
  */
 class Recruitment_Plugin {
 
+    private ?Recruitment_Psychotest_Proctoring $proctoring = null;
+
     /**
      * Plugin info used across the system.
      *
@@ -30,6 +32,8 @@ class Recruitment_Plugin {
      * Called from recruitment-plugin.php on init.
      */
     public function init(): void {
+        $this->proctoring = new Recruitment_Psychotest_Proctoring();
+        $this->proctoring->init();
         add_action( 'init', [ $this, 'register_content' ] );
         add_action( 'init', [ $this, 'register_portal_pages' ] );
         add_action( 'init', [ $this, 'register_hr_role' ] );
@@ -167,15 +171,14 @@ class Recruitment_Plugin {
             wp_die( esc_html__( 'Tes ini sedang tidak tersedia untuk sesi online. Silakan periksa status dan jadwal psikotes dengan tim HR.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
         }
 
-        if ( ! recruitment_grant_psychotest_consent( $test_key ) ) {
-            wp_die( esc_html__( 'Persetujuan tes tidak dapat disimpan. Muat ulang halaman dan coba kembali.', 'recruitment-plugin' ), '', [ 'response' => 500 ] );
+        if ( null === $this->proctoring || ! $this->proctoring->is_secure_transport() ) {
+            wp_die( esc_html__( 'Persetujuan kamera dan pengiriman bukti hanya diizinkan melalui HTTPS atau localhost.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+        }
+        if ( null === $this->proctoring || ! $this->proctoring->save_consent() ) {
+            wp_die( esc_html__( 'Persetujuan pengawasan tidak dapat disimpan di Oracle. Muat ulang halaman dan coba kembali.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
         }
 
-        $arguments = [ 'start' => '1' ];
-        if ( 'psych-personality' === $test_routes[ $test_key ] ) {
-            $arguments['test'] = $test_key;
-        }
-        wp_safe_redirect( recruitment_get_public_url( $test_routes[ $test_key ], $arguments ) );
+        wp_safe_redirect( recruitment_get_public_url( 'psychotest-identity', [ 'test' => $test_key ] ) );
         exit;
     }
 

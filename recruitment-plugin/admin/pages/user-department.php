@@ -340,34 +340,6 @@ if ( 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) &
 	}
 }
 
-$candidate_profiles = [
-	'DW-2026-0781' => [
-		'gender' => 'Laki-laki', 'birth' => 'Manado, 15 Mar 1995', 'email' => 'budi.santoso@example.test', 'phone' => '0812-3456-7890', 'city' => 'Manado, Sulawesi Utara',
-		'education' => [ 'S1 Manajemen Bisnis', 'Universitas Sam Ratulangi Manado', 'Lulus 2018 · IPK 3.42' ],
-		'experience' => [ [ 'Sales Representative', 'PT Auto Motor Manado', '2019 – 2023 · 4 tahun', 'Penjualan kendaraan roda dua dan pencapaian target.' ], [ 'Sales Supervisor', 'CV Mitra Niaga', '2023 – 2026 · 3 tahun', 'Memimpin tim penjualan dan menjaga kepuasan pelanggan.' ] ],
-		'full' => [
-			'application_date' => '22 Sep 2026',
-			'identity' => [ 'gender' => 'Laki-laki', 'birthplace' => 'Manado', 'birthdate' => '15 Maret 1995', 'email' => 'budi.santoso@email.com', 'phone' => '0812-3456-7890', 'province' => 'Sulawesi Utara', 'city' => 'Manado' ],
-			'education' => [ [ 'S1 Manajemen Bisnis', 'Universitas Sam Ratulangi', 'IPK 3.42', 'Lulus 2018' ] ],
-			'experience' => [ [ 'Sales Representative', 'PT Auto Motor Manado', '2019 – 2023', 'Penjualan kendaraan roda dua, pencapaian target 110% selama 3 tahun.' ], [ 'Sales Supervisor', 'CV Mitra Niaga', '2023 – 2026', 'Memimpin tim sales 5 orang dan laporan bulanan ke manajemen.' ] ],
-			'documents' => [ 'CV / Resume', 'KTP', 'Ijazah S1', 'Transkrip Nilai' ],
-			'selection' => [ [ 'Administrasi', 'Lolos', '5 Sep 2026', 'is-green' ], [ 'Psikotes', 'Lolos · 82/100', '10 Sep 2026', 'is-green' ], [ 'Wawancara HR', 'Lolos · Sangat Direkomendasikan', '15 Sep 2026', 'is-green' ], [ 'Wawancara User', 'Terjadwal', '24 Sep 2026', 'is-orange' ] ],
-		],
-	],
-	'DW-2026-0755' => [
-		'gender' => 'Laki-laki', 'birth' => 'Manado, 15 Mar 1995', 'email' => 'pelamar@email.com', 'phone' => '0812-3456-7890', 'city' => 'Manado',
-		'education' => [ 'S1 Manajemen Bisnis', 'Universitas Sam Ratulangi', 'Lulus 2018 · IPK 3.42' ],
-		'experience' => [ [ 'Sales Representative', 'PT Auto Motor Manado', '2019 – 2023', 'Penjualan kendaraan roda dua, pencapaian target 110% selama 3 tahun.' ], [ 'Sales Supervisor', 'CV Mitra Niaga', '2023 – 2026', 'Supervisi tim sales 5 orang, laporan bulanan ke manajemen.' ] ],
-		'full' => [
-			'application_date' => '14 Sep 2026',
-			'identity' => [ 'gender' => 'Laki-laki', 'birthplace' => 'Manado', 'birthdate' => '15 Maret 1995', 'email' => 'pelamar@email.com', 'phone' => '0812-3456-7890', 'province' => 'Sulawesi Utara', 'city' => 'Manado' ],
-			'education' => [ [ 'S1 Manajemen Bisnis', 'Universitas Sam Ratulangi', 'IPK 3.42', 'Lulus 2018' ] ],
-			'experience' => [ [ 'Sales Representative', 'PT Auto Motor Manado', '2019 – 2023', 'Penjualan kendaraan roda dua, pencapaian target 110% selama 3 tahun.' ], [ 'Sales Supervisor', 'CV Mitra Niaga', '2023 – 2026', 'Supervisi tim sales 5 orang, laporan bulanan ke manajemen.' ] ],
-			'documents' => [ 'CV / Resume', 'KTP', 'Ijazah S1', 'Transkrip Nilai' ],
-			'selection' => [ [ 'Administrasi', 'Lolos', '5 Sep 2026', 'is-green' ], [ 'Psikotes', 'Lolos · 82/100', '10 Sep 2026', 'is-green' ], [ 'Wawancara HR', 'Lolos · Sangat Direkomendasikan', '15 Sep 2026', 'is-green' ], [ 'Wawancara User', 'Dipertimbangkan', '24 Sep 2026', 'is-amber' ] ],
-		],
-	],
-];
 $selected_interview = null;
 $selected_interview_code = sanitize_text_field( wp_unslash( $_GET['candidate_code'] ?? $_POST['candidate_code'] ?? '' ) );
 foreach ( $interviews as $interview ) {
@@ -376,14 +348,6 @@ foreach ( $interviews as $interview ) {
 		break;
 	}
 }
-$applicants = [
-	[ 'name' => 'Sari Dewi Putri', 'code' => 'DW-2026-0761', 'position' => 'Customer Service', 'dealer' => 'DAW Airmadidi', 'date' => '15 Sep 2026', 'hr_result' => 'Sangat Baik', 'user_result' => 'Sangat Baik', 'status' => 'Diterima' ],
-	[ 'name' => 'Rizal Fauzy', 'code' => 'DW-2026-0755', 'position' => 'Customer Service', 'dealer' => 'DAW Manado', 'date' => '14 Sep 2026', 'hr_result' => 'Baik', 'user_result' => 'Dipertimbangkan', 'status' => 'Ditolak' ],
-	[ 'name' => 'Mega Lestari', 'code' => 'DW-2026-0749', 'position' => 'Sales Supervisor', 'dealer' => 'DAW Kotamobagu', 'date' => '12 Sep 2026', 'hr_result' => 'Baik', 'user_result' => 'Baik', 'status' => 'Pending' ],
-	[ 'name' => 'Doni Prasetyo', 'code' => 'DW-2026-0731', 'position' => 'Sales Executive', 'dealer' => 'DAW Airmadidi', 'date' => '8 Sep 2026', 'hr_result' => 'Sangat Baik', 'user_result' => 'Dipilih', 'status' => 'Diterima' ],
-	[ 'name' => 'Budi Santoso', 'code' => 'DW-2026-0781', 'position' => 'Sales Executive', 'dealer' => 'DAW Manado', 'date' => '22 Sep 2026', 'hr_result' => 'Baik', 'user_result' => 'Belum dinilai', 'status' => 'Proses' ],
-	[ 'name' => 'Aiko Hanako', 'code' => 'DW-2026-0774', 'position' => 'Sales Executive', 'dealer' => 'DAW Kotamobagu', 'date' => '22 Sep 2026', 'hr_result' => 'Sangat Baik', 'user_result' => 'Belum dinilai', 'status' => 'Proses' ],
-];
 $applicants = array_map(
 	static function ( array $interview ): array {
 		$status = (string) ( $interview['selection_status'] ?? '' );
@@ -402,30 +366,6 @@ $applicants = array_map(
 	},
 	$interviews
 );
-if ( 'profile' === $view && ! $selected_interview ) {
-	foreach ( $applicants as $applicant ) {
-		if ( $applicant['code'] === $selected_interview_code ) {
-			$selected_interview = [
-				'name' => $applicant['name'],
-				'code' => $applicant['code'],
-				'position' => $applicant['position'],
-				'dealer' => $applicant['dealer'],
-				'date' => $applicant['date'],
-				'hr_result' => $applicant['hr_result'],
-				'status' => $applicant['status'],
-				'score' => '',
-			];
-			break;
-		}
-	}
-}
-$results = [
-	[ 'name' => 'Sari Dewi Putri', 'code' => 'DW-2026-0761', 'position' => 'Customer Service', 'date' => '20 Sep 2026', 'score' => 87, 'recommendation' => 'Terima', 'decision' => 'Diterima' ],
-	[ 'name' => 'Rizal Fauzy', 'code' => 'DW-2026-0755', 'position' => 'Customer Service', 'date' => '19 Sep 2026', 'score' => 62, 'recommendation' => 'Pertimbangkan', 'decision' => 'Ditolak' ],
-	[ 'name' => 'Mega Lestari', 'code' => 'DW-2026-0749', 'position' => 'Sales Supervisor', 'date' => '18 Sep 2026', 'score' => 79, 'recommendation' => 'Terima', 'decision' => 'Pending' ],
-	[ 'name' => 'Doni Prasetyo', 'code' => 'DW-2026-0731', 'position' => 'Sales Executive', 'date' => '12 Sep 2026', 'score' => 91, 'recommendation' => 'Terima', 'decision' => 'Diterima' ],
-	[ 'name' => 'Fitri Handayani', 'code' => 'DW-2026-0720', 'position' => 'Sales Executive', 'date' => '8 Sep 2026', 'score' => 55, 'recommendation' => 'Tolak', 'decision' => 'Ditolak' ],
-];
 $interview_result_rows = $department_assigned ? $interview_database->get_user_interview_results( $department ) : [];
 if ( $interview_database->has_error() ) {
 	$interview_load_error = 'Data hasil wawancara belum dapat dimuat dari Oracle. Silakan coba kembali.';
@@ -444,6 +384,14 @@ $results = array_map(
 	},
 	$interview_result_rows
 );
+$selected_department_profile = null;
+$profile_load_error = '';
+if ( in_array( $view, [ 'profile', 'interview-detail' ], true ) && $selected_interview && $department_assigned ) {
+	$selected_department_profile = $interview_database->get_user_department_candidate_detail( $department, $selected_interview_code );
+	if ( $interview_database->has_error() ) {
+		$profile_load_error = 'Sebagian data profil dan lamaran belum dapat dimuat dari Oracle. Silakan coba kembali.';
+	}
+}
 
 $request_statuses = array_fill_keys( [ 'Draft', 'Menunggu Review HR', 'Perlu Revisi', 'Disetujui', 'Lowongan Dibuka' ], 0 );
 foreach ( $requests as $request ) {
@@ -565,22 +513,115 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 					</section>
 				</section>
 			<?php elseif ( 'profile' === $view ) : ?>
-				<?php if ( ! $selected_interview ) : ?>
-					<section class="daw-ud-profile-overlay"><article class="daw-ud-profile-sheet"><p>Profil pelamar tidak ditemukan.</p><a class="button" href="<?= esc_url( $view_url( 'applicants' ) ) ?>">Kembali</a></article></section>
+				<?php if ( ! $selected_interview || ! $selected_department_profile ) : ?>
+					<section class="daw-ud-profile-overlay"><article class="daw-ud-profile-sheet"><p><?= esc_html( $profile_load_error ?: 'Profil pelamar tidak ditemukan atau tidak tersedia untuk departemen ini.' ) ?></p><a class="button" href="<?= esc_url( $view_url( 'applicants' ) ) ?>">Kembali</a></article></section>
 				<?php else : ?>
 					<?php
-					$profile = $candidate_profiles[ $selected_interview['code'] ] ?? [
-						'gender' => 'Belum tersedia', 'birth' => 'Belum tersedia', 'email' => 'Belum tersedia', 'phone' => 'Belum tersedia', 'city' => $selected_interview['dealer'],
-						'education' => [ 'Informasi pendidikan belum tersedia', '—', '—' ],
-						'experience' => [],
+					$application = $selected_department_profile['application'];
+					$profile = $selected_department_profile['profile'];
+					$profile_details = is_array( $profile['profile_details'] ?? null ) ? $profile['profile_details'] : [];
+					$answer_values = [];
+					foreach ( (array) ( $profile_details['application_answers'] ?? [] ) as $answer_key => $answer_value ) {
+						if ( is_scalar( $answer_value ) ) {
+							$answer_values[ (string) $answer_key ] = (string) $answer_value;
+						}
+					}
+					foreach ( (array) $selected_department_profile['answers'] as $answer ) {
+						$key = (string) ( $answer['field_key'] ?? '' );
+						$value = trim( (string) ( $answer['file_name'] ?? '' ) );
+						if ( '' === $value ) {
+							$value = trim( (string) ( $answer['answer_value'] ?? '' ) );
+						}
+						if ( '' !== $key && '' !== $value ) {
+							$answer_values[ $key ] = $value;
+						}
+					}
+					$education_level = (string) ( $profile_details['education_level'] ?? $answer_values['pendidikan_formal_1_tingkat'] ?? $profile['education'] ?? '' );
+					$institution = (string) ( $profile_details['institution'] ?? $answer_values['pendidikan_formal_1_nama_sekolah'] ?? '' );
+					$major = (string) ( $profile_details['major'] ?? $answer_values['pendidikan_formal_1_program_studi'] ?? '' );
+					$gpa = (string) ( $profile_details['gpa'] ?? $answer_values['pendidikan_formal_1_ipk'] ?? '' );
+					$graduation_year = (string) ( $profile_details['graduation_year'] ?? $answer_values['pendidikan_formal_1_tahun_lulus'] ?? '' );
+					$education_rows = ( '' !== $education_level || '' !== $institution || '' !== $major || '' !== $gpa || '' !== $graduation_year )
+						? [ [ trim( $education_level . ( '' !== $major ? ' ' . $major : '' ) ), $institution, $gpa, $graduation_year ] ]
+						: [];
+					$experience_rows = [];
+					foreach ( (array) ( $profile_details['work_experiences'] ?? [] ) as $experience ) {
+						if ( ! is_array( $experience ) ) {
+							continue;
+						}
+						$experience_rows[] = [
+							(string) ( $experience['position'] ?? '' ),
+							(string) ( $experience['company'] ?? '' ),
+							(string) ( $experience['period'] ?? '' ),
+							(string) ( $experience['description'] ?? '' ),
+						];
+					}
+					$document_labels = [ 'profile_photo' => 'Foto Profil', 'resume' => 'CV / Resume', 'portfolio' => 'Portofolio' ];
+					$document_rows = [];
+					foreach ( $document_labels as $document_key => $document_label ) {
+						$document = $profile_details['documents'][ $document_key ] ?? null;
+						if ( is_array( $document ) && '' !== (string) ( $document['name'] ?? '' ) ) {
+							$document_rows[] = $document_label . ' — ' . (string) $document['name'];
+						}
+					}
+					$history_rows = array_reverse( (array) $selected_department_profile['history'] );
+					$selection_rows = [];
+					$stage_labels = [
+						'ADMINISTRASI' => 'Seleksi Administrasi',
+						'PSIKOTES' => 'Psikotes',
+						'INTERVIEW_HR' => 'Wawancara HR',
+						'INTERVIEW_USER' => 'Wawancara User',
+						'FINAL' => 'Keputusan Akhir',
 					];
-					$full_profile = $profile['full'] ?? [
-						'application_date' => '—',
-						'identity' => [ 'gender' => $profile['gender'], 'birthplace' => $profile['city'], 'birthdate' => $profile['birth'], 'email' => $profile['email'], 'phone' => $profile['phone'], 'province' => '—', 'city' => $profile['city'] ],
-						'education' => [ [ $profile['education'][0], $profile['education'][1], '—', $profile['education'][2] ] ],
-						'experience' => array_map( static function ( array $experience ): array { return [ $experience[0], $experience[1], $experience[2], $experience[3] ]; }, $profile['experience'] ),
-						'documents' => [ 'CV / Resume', 'KTP', 'Ijazah S1', 'Transkrip Nilai' ],
-						'selection' => [ [ 'Administrasi', 'Lolos', '—', 'is-green' ], [ 'Psikotes', 'Lolos · 82/100', '—', 'is-green' ], [ 'Wawancara HR', $selected_interview['hr_result'], '—', 'is-green' ], [ 'Wawancara User', $selected_interview['status'], $selected_interview['date'], 'is-amber' ] ],
+					$status_labels = [
+						'SUBMITTED' => 'Lamaran diterima',
+						'SCREENING' => 'Dalam seleksi',
+						'PSIKOTES' => 'Dalam psikotes',
+						'INTERVIEW_HR' => 'Lolos ke wawancara HR',
+						'INTERVIEW_USER' => 'Diteruskan ke departemen',
+						'DITERIMA' => 'Diterima',
+						'DITOLAK' => 'Tidak lolos',
+					];
+					foreach ( $history_rows as $history ) {
+						$stage_key = strtoupper( (string) ( $history['stage'] ?? '' ) );
+						$status_key = strtoupper( (string) ( $history['status'] ?? '' ) );
+						$history_time = strtotime( (string) ( $history['date'] ?? '' ) );
+						$selection_rows[] = [
+							$stage_labels[ $stage_key ] ?? ucwords( strtolower( str_replace( '_', ' ', $stage_key ) ) ),
+							$status_labels[ $status_key ] ?? ucwords( strtolower( str_replace( '_', ' ', $status_key ) ) ),
+							false !== $history_time ? date_i18n( 'j M Y', $history_time ) : '—',
+							'DITERIMA' === $status_key ? 'is-green' : ( 'DITOLAK' === $status_key ? 'is-red' : 'is-amber' ),
+						];
+					}
+					$application_time = strtotime( (string) ( $application['application_date'] ?? '' ) );
+					$answer_rows = [];
+					foreach ( $answer_values as $answer_key => $answer_value ) {
+						$answer_title = '';
+						foreach ( (array) $selected_department_profile['answers'] as $answer ) {
+							if ( $answer_key === (string) ( $answer['field_key'] ?? '' ) ) {
+								$answer_title = (string) ( $answer['field_title'] ?? '' );
+								break;
+							}
+						}
+						$answer_rows[] = [ '' !== $answer_title ? $answer_title : ucwords( str_replace( '_', ' ', $answer_key ) ), $answer_value ];
+					}
+					$full_profile = [
+						'application_date' => false !== $application_time ? date_i18n( 'j M Y', $application_time ) : '—',
+						'application_id' => (string) ( $application['application_id'] ?? '—' ),
+						'identity' => [
+							'gender' => (string) ( $profile['gender'] ?: 'Belum tersedia' ),
+							'birthplace' => (string) ( $profile['birth_place'] ?: 'Belum tersedia' ),
+							'birthdate' => (string) ( $profile['birth_date'] ?: 'Belum tersedia' ),
+							'email' => (string) ( $profile['email'] ?: 'Belum tersedia' ),
+							'phone' => (string) ( $profile['phone'] ?: 'Belum tersedia' ),
+							'province' => (string) ( $profile['province'] ?: 'Belum tersedia' ),
+							'city' => (string) ( $profile['city'] ?: 'Belum tersedia' ),
+						],
+						'education' => $education_rows,
+						'experience' => $experience_rows,
+						'documents' => $document_rows,
+						'selection' => $selection_rows,
+						'answers' => $answer_rows,
 					];
 					$return_view = sanitize_key( wp_unslash( $_GET['return'] ?? 'interviews' ) );
 					if ( ! in_array( $return_view, [ 'interviews', 'interview-detail', 'applicants' ], true ) ) {
@@ -591,6 +632,7 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 						$return_args['candidate_code'] = $selected_interview['code'];
 					}
 					?>
+					<?php if ( '' !== $profile_load_error ) : ?><p class="daw-ud-alert" role="alert"><?= esc_html( $profile_load_error ) ?></p><?php endif; ?>
 					<section class="daw-ud-profile-overlay" aria-label="Profil lengkap pelamar">
 						<article class="daw-ud-profile-sheet" data-candidate-profile data-candidate-code="<?= esc_attr( $selected_interview['code'] ) ?>">
 							<header class="daw-ud-profile-sheet__header"><div><h2>Profil Lengkap Pelamar</h2><small><?= esc_html( $selected_interview['code'] ) ?></small></div><div><button class="daw-ud-profile-download" type="button" data-print-profile><span class="dashicons dashicons-download" aria-hidden="true"></span>Download Profil</button><a class="daw-ud-profile-close" href="<?= esc_url( add_query_arg( $return_args, $page_url ) ) ?>" aria-label="Tutup profil">&times;</a></div></header>
@@ -600,11 +642,12 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 									<div><small>Email</small><strong><?= esc_html( $full_profile['identity']['email'] ) ?></strong></div><div><small>No. Telepon</small><strong><?= esc_html( $full_profile['identity']['phone'] ) ?></strong></div>
 									<div><small>Provinsi</small><strong><?= esc_html( $full_profile['identity']['province'] ) ?></strong></div><div><small>Kota</small><strong><?= esc_html( $full_profile['identity']['city'] ) ?></strong></div>
 								</div></div></section>
-							<section class="daw-ud-profile-section"><h3>Data Lamaran</h3><div class="daw-ud-profile-application"><div><small>Kode Lamaran</small><strong><?= esc_html( $selected_interview['code'] ) ?></strong></div><div><small>Posisi Dilamar</small><strong><?= esc_html( $selected_interview['position'] ) ?></strong></div><div><small>Dealer</small><strong><?= esc_html( $selected_interview['dealer'] ) ?></strong></div><div><small>Tgl Lamaran</small><strong><?= esc_html( $full_profile['application_date'] ) ?></strong></div></div></section>
-							<section class="daw-ud-profile-section"><h3>Pendidikan</h3><?php foreach ( $full_profile['education'] as $education ) : ?><article class="daw-ud-profile-education"><div><strong><?= esc_html( $education[0] ) ?></strong><span><?= esc_html( $education[1] ) ?></span><small><?= esc_html( $education[3] ) ?></small></div><b><?= esc_html( $education[2] ) ?></b></article><?php endforeach; ?></section>
+							<section class="daw-ud-profile-section"><h3>Data Lamaran</h3><div class="daw-ud-profile-application"><div><small>Kode Lamaran</small><strong><?= esc_html( $full_profile['application_id'] ) ?></strong></div><div><small>Posisi Dilamar</small><strong><?= esc_html( $selected_interview['position'] ) ?></strong></div><div><small>Dealer</small><strong><?= esc_html( $selected_interview['dealer'] ) ?></strong></div><div><small>Tgl Lamaran</small><strong><?= esc_html( $full_profile['application_date'] ) ?></strong></div><div><small>Status</small><strong><?= esc_html( (string) ( $application['application_status'] ?? 'Belum tersedia' ) ) ?></strong></div></div></section>
+							<section class="daw-ud-profile-section"><h3>Pendidikan</h3><?php if ( empty( $full_profile['education'] ) ) : ?><p class="daw-ud-profile-empty">Data pendidikan belum tersedia.</p><?php endif; ?><?php foreach ( $full_profile['education'] as $education ) : ?><article class="daw-ud-profile-education"><div><strong><?= esc_html( $education[0] ?: 'Pendidikan' ) ?></strong><span><?= esc_html( $education[1] ?: 'Institusi belum tersedia' ) ?></span><small><?= esc_html( $education[3] ?: 'Tahun lulus belum tersedia' ) ?></small></div><b><?= esc_html( $education[2] ?: '—' ) ?></b></article><?php endforeach; ?></section>
+							<section class="daw-ud-profile-section"><h3>Jawaban Lamaran</h3><?php if ( empty( $full_profile['answers'] ) ) : ?><p class="daw-ud-profile-empty">Jawaban formulir lamaran belum tersedia.</p><?php else : ?><div class="daw-ud-profile-application"><?php foreach ( $full_profile['answers'] as $answer ) : ?><div><small><?= esc_html( $answer[0] ) ?></small><strong><?= esc_html( $answer[1] ) ?></strong></div><?php endforeach; ?></div><?php endif; ?></section>
 							<section class="daw-ud-profile-section"><h3>Pengalaman Kerja</h3><?php if ( empty( $full_profile['experience'] ) ) : ?><p class="daw-ud-profile-empty">Data pengalaman kerja belum tersedia.</p><?php endif; ?><?php foreach ( $full_profile['experience'] as $experience ) : ?><article class="daw-ud-profile-experience"><div><strong><?= esc_html( $experience[0] ) ?></strong><small><?= esc_html( $experience[2] ) ?></small></div><span><?= esc_html( $experience[1] ) ?></span><p><?= esc_html( $experience[3] ) ?></p></article><?php endforeach; ?></section>
-							<section class="daw-ud-profile-section"><h3>Dokumen Lamaran</h3><div class="daw-ud-profile-documents"><?php foreach ( $full_profile['documents'] as $document ) : ?><div><span class="dashicons dashicons-media-document" aria-hidden="true"></span><strong><?= esc_html( $document ) ?></strong><small>File belum tersedia</small></div><?php endforeach; ?></div></section>
-							<section class="daw-ud-profile-section"><h3>Riwayat Seleksi</h3><div class="daw-ud-profile-history"><?php foreach ( $full_profile['selection'] as $stage ) : ?><div><i class="<?= esc_attr( $stage[3] ) ?>"></i><strong><?= esc_html( $stage[0] ) ?></strong><span><?= esc_html( $stage[1] ) ?></span><small><?= esc_html( $stage[2] ) ?></small></div><?php endforeach; ?></div><p class="daw-ud-profile-assignment">Direkomendasikan HR ke Departemen: <?= esc_html( $department ) ?> · <?= esc_html( $display_name ) ?></p></section>
+							<section class="daw-ud-profile-section"><h3>Dokumen Lamaran</h3><?php if ( empty( $full_profile['documents'] ) ) : ?><p class="daw-ud-profile-empty">Metadata dokumen belum tersedia.</p><?php else : ?><div class="daw-ud-profile-documents"><?php foreach ( $full_profile['documents'] as $document ) : ?><div><span class="dashicons dashicons-media-document" aria-hidden="true"></span><strong><?= esc_html( $document ) ?></strong><small>File privat pada profil kandidat</small></div><?php endforeach; ?></div><?php endif; ?></section>
+							<section class="daw-ud-profile-section"><h3>Riwayat Seleksi</h3><?php if ( empty( $full_profile['selection'] ) ) : ?><p class="daw-ud-profile-empty">Riwayat seleksi belum tersedia.</p><?php else : ?><div class="daw-ud-profile-history"><?php foreach ( $full_profile['selection'] as $stage ) : ?><div><i class="<?= esc_attr( $stage[3] ) ?>"></i><strong><?= esc_html( $stage[0] ) ?></strong><span><?= esc_html( $stage[1] ) ?></span><small><?= esc_html( $stage[2] ) ?></small></div><?php endforeach; ?></div><?php endif; ?><p class="daw-ud-profile-assignment">Direkomendasikan HR ke Departemen: <?= esc_html( $department ) ?> · <?= esc_html( $display_name ) ?></p></section>
 						</article>
 					</section>
 				<?php endif; ?>
@@ -682,10 +725,40 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 					<a class="daw-ud-back-link" href="<?= esc_url( $view_url( 'interviews' ) ) ?>">&larr; Kembali</a><p class="daw-ud-empty">Kandidat wawancara tidak ditemukan.</p>
 				<?php else : ?>
 					<?php
-					$profile = $candidate_profiles[ $selected_interview['code'] ] ?? [
-						'gender' => 'Tidak dicantumkan', 'birth' => 'Data belum tersedia', 'email' => 'kandidat@example.test', 'phone' => '—', 'city' => $selected_interview['dealer'],
-						'education' => [ 'Informasi pendidikan', 'Belum tersedia', '—' ],
-						'experience' => [ [ 'Pengalaman kerja', 'Belum tersedia', '—', 'Informasi pengalaman kerja belum tersedia.' ] ],
+					$profile = $selected_department_profile['profile'] ?? [];
+					$profile_details = is_array( $profile['profile_details'] ?? null ) ? $profile['profile_details'] : [];
+					$profile_answers = is_array( $profile_details['application_answers'] ?? null ) ? $profile_details['application_answers'] : [];
+					$profile_education = (string) ( $profile_details['education_level'] ?? $profile_answers['pendidikan_formal_1_tingkat'] ?? $profile['education'] ?? '' );
+					$profile_major = (string) ( $profile_details['major'] ?? $profile_answers['pendidikan_formal_1_program_studi'] ?? '' );
+					$profile_gpa = (string) ( $profile_details['gpa'] ?? $profile_answers['pendidikan_formal_1_ipk'] ?? '' );
+					$profile_year = (string) ( $profile_details['graduation_year'] ?? $profile_answers['pendidikan_formal_1_tahun_lulus'] ?? '' );
+					$profile_experiences = [];
+					foreach ( (array) ( $profile_details['work_experiences'] ?? [] ) as $experience ) {
+						if ( is_array( $experience ) ) {
+							$profile_experiences[] = [
+								(string) ( $experience['position'] ?? '' ),
+								(string) ( $experience['company'] ?? '' ),
+								(string) ( $experience['period'] ?? '' ),
+								(string) ( $experience['description'] ?? '' ),
+							];
+						}
+					}
+					$profile_documents = [];
+					foreach ( [ 'profile_photo' => 'Foto Profil', 'resume' => 'CV / Resume', 'portfolio' => 'Portofolio' ] as $document_key => $document_label ) {
+						$document = $profile_details['documents'][ $document_key ] ?? null;
+						if ( is_array( $document ) && '' !== (string) ( $document['name'] ?? '' ) ) {
+							$profile_documents[] = $document_label . ' — ' . (string) $document['name'];
+						}
+					}
+					$profile['gender'] = (string) ( $profile['gender'] ?? 'Belum tersedia' );
+					$profile['birth'] = trim( (string) ( $profile['birth_place'] ?? '' ) . ' ' . (string) ( $profile['birth_date'] ?? '' ) ) ?: 'Belum tersedia';
+					$profile['email'] = (string) ( $profile['email'] ?? 'Belum tersedia' );
+					$profile['phone'] = (string) ( $profile['phone'] ?? 'Belum tersedia' );
+					$profile['city'] = trim( (string) ( $profile['city'] ?? '' ) . ( '' !== (string) ( $profile['province'] ?? '' ) ? ', ' . $profile['province'] : '' ) ) ?: 'Belum tersedia';
+					$profile['education'] = [
+						trim( $profile_education . ( '' !== $profile_major ? ' ' . $profile_major : '' ) ) ?: 'Data pendidikan belum tersedia',
+						(string) ( $profile_details['institution'] ?? $profile_answers['pendidikan_formal_1_nama_sekolah'] ?? 'Institusi belum tersedia' ),
+						trim( ( '' !== $profile_gpa ? 'IPK ' . $profile_gpa : '' ) . ( '' !== $profile_year ? ' · Lulus ' . $profile_year : '' ) ) ?: '—',
 					];
 					$is_saved = 'Sudah Dinilai' === $selected_interview['status'];
 					$decision_locked = '' !== (string) ( $selected_interview['final_decision'] ?? '' );
@@ -696,6 +769,7 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 					?>
 					<a class="daw-ud-back-link" href="<?= esc_url( $view_url( 'interviews' ) ) ?>">&larr; Kembali</a>
 					<section class="daw-ud-detail-heading"><div><strong><?= esc_html( $selected_interview['name'] ) ?></strong><span><?= esc_html( $selected_interview['position'] ) ?> · <?= esc_html( $selected_interview['dealer'] ) ?> · <?= esc_html( $selected_interview['code'] ) ?></span></div><nav aria-label="Tahap wawancara"><span class="<?= 'Menunggu Jadwal' === $selected_interview['status'] ? 'is-current' : '' ?>">Menunggu</span><span class="<?= 'Terjadwal' === $selected_interview['status'] ? 'is-current' : '' ?>">Terjadwal</span><span class="<?= $is_saved ? 'is-current' : '' ?>">Dinilai</span><span class="daw-ud-status <?= esc_attr( sanitize_title( $selected_interview['status'] ) ) ?>"><?= esc_html( $selected_interview['status'] ) ?></span></nav></section>
+					<?php if ( '' !== $profile_load_error ) : ?><p class="daw-ud-alert" role="alert"><?= esc_html( $profile_load_error ) ?></p><?php endif; ?>
 					<?php if ( $interview_saved ) : ?><p class="daw-ud-success" role="status">Hasil wawancara berhasil disimpan.</p><?php endif; ?>
 					<?php if ( '' !== $interview_save_error ) : ?><p class="daw-ud-alert" role="alert"><?= esc_html( $interview_save_error ) ?></p><?php endif; ?>
 					<div class="daw-ud-detail-layout">
@@ -725,9 +799,9 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 						<aside class="daw-ud-profile-panel"><div class="daw-ud-profile-title"><span class="daw-ud-candidate-avatar"><?= esc_html( strtoupper( substr( preg_replace( '/[^A-Za-z]/', '', $selected_interview['name'] ), 0, 2 ) ) ) ?></span><div><strong><?= esc_html( $selected_interview['name'] ) ?></strong><small><?= esc_html( $selected_interview['code'] ) ?><br><?= esc_html( $selected_interview['position'] ) ?> · <?= esc_html( $selected_interview['dealer'] ) ?></small></div></div>
 								<h3>Data Diri</h3><dl class="daw-ud-profile-facts"><div><dt>Jenis Kelamin</dt><dd><?= esc_html( $profile['gender'] ) ?></dd></div><div><dt>Tempat/Tgl Lahir</dt><dd><?= esc_html( $profile['birth'] ) ?></dd></div><div><dt>Email</dt><dd><?= esc_html( $profile['email'] ) ?></dd></div><div><dt>Telepon</dt><dd><?= esc_html( $profile['phone'] ) ?></dd></div><div><dt>Kota</dt><dd><?= esc_html( $profile['city'] ) ?></dd></div></dl>
 								<h3>Pendidikan</h3><div class="daw-ud-profile-box"><strong><?= esc_html( $profile['education'][0] ) ?></strong><span><?= esc_html( $profile['education'][1] ) ?></span><small><?= esc_html( $profile['education'][2] ) ?></small></div>
-								<h3>Pengalaman Kerja</h3><?php foreach ( $profile['experience'] as $experience ) : ?><div class="daw-ud-profile-box"><strong><?= esc_html( $experience[0] ) ?></strong><span><?= esc_html( $experience[1] ) ?></span><small><?= esc_html( $experience[2] ) ?></small><p><?= esc_html( $experience[3] ) ?></p></div><?php endforeach; ?>
-								<h3>Dokumen</h3><div class="daw-ud-doc-list"><?php foreach ( [ 'CV / Resume', 'KTP', 'Ijazah S1' ] as $document ) : ?><a href="#document-<?= esc_attr( sanitize_title( $document ) ) ?>"><span class="dashicons dashicons-media-document" aria-hidden="true"></span><?= esc_html( $document ) ?><b>Buka</b></a><?php endforeach; ?></div>
-								<h3>Riwayat Seleksi</h3><ul class="daw-ud-selection-history"><li><span>Administrasi</span><strong>Lolos</strong></li><li><span>Psikotes</span><strong>Lolos · 82/100</strong></li><li><span>Wawancara HR</span><strong><?= esc_html( $selected_interview['hr_result'] ) ?></strong></li><li><span>Wawancara User</span><strong class="<?= $is_saved ? 'is-green' : 'is-orange' ?>"><?= esc_html( $selected_interview['status'] ) ?></strong></li></ul><div class="daw-ud-profile-callout">Direkomendasikan HR ke Departemen: <?= esc_html( $department ) ?></div><a class="daw-ud-profile-action" href="<?= esc_url( add_query_arg( [ 'view' => 'profile', 'candidate_code' => $selected_interview['code'], 'return' => 'interview-detail' ], $page_url ) ) ?>">Lihat Profil Lengkap</a><a class="daw-ud-profile-action" href="<?= esc_url( add_query_arg( [ 'view' => 'profile', 'candidate_code' => $selected_interview['code'], 'return' => 'interview-detail', 'print' => '1' ], $page_url ) ) ?>">Download Profil Pelamar (PDF)</a>
+								<h3>Pengalaman Kerja</h3><?php if ( empty( $profile_experiences ) ) : ?><p>Data pengalaman belum tersedia.</p><?php endif; ?><?php foreach ( $profile_experiences as $experience ) : ?><div class="daw-ud-profile-box"><strong><?= esc_html( $experience[0] ?: 'Posisi' ) ?></strong><span><?= esc_html( $experience[1] ?: 'Perusahaan belum tersedia' ) ?></span><small><?= esc_html( $experience[2] ?: 'Periode belum tersedia' ) ?></small><p><?= esc_html( $experience[3] ) ?></p></div><?php endforeach; ?>
+								<h3>Dokumen</h3><?php if ( empty( $profile_documents ) ) : ?><p>Metadata dokumen belum tersedia.</p><?php else : ?><div class="daw-ud-doc-list"><?php foreach ( $profile_documents as $document ) : ?><div><span class="dashicons dashicons-media-document" aria-hidden="true"></span><?= esc_html( $document ) ?><small>File privat pada profil kandidat</small></div><?php endforeach; ?></div><?php endif; ?>
+								<h3>Riwayat Seleksi</h3><?php if ( empty( $selected_department_profile['history'] ) ) : ?><p>Riwayat seleksi belum tersedia.</p><?php else : ?><ul class="daw-ud-selection-history"><?php foreach ( array_reverse( $selected_department_profile['history'] ) as $history ) : ?><li><span><?= esc_html( (string) ( $history['stage'] ?? '' ) ) ?></span><strong><?= esc_html( (string) ( $history['status'] ?? '' ) ) ?></strong></li><?php endforeach; ?></ul><?php endif; ?><div class="daw-ud-profile-callout">Direkomendasikan HR ke Departemen: <?= esc_html( $department ) ?></div><a class="daw-ud-profile-action" href="<?= esc_url( add_query_arg( [ 'view' => 'profile', 'candidate_code' => $selected_interview['code'], 'return' => 'interview-detail' ], $page_url ) ) ?>">Lihat Profil Lengkap</a><a class="daw-ud-profile-action" href="<?= esc_url( add_query_arg( [ 'view' => 'profile', 'candidate_code' => $selected_interview['code'], 'return' => 'interview-detail', 'print' => '1' ], $page_url ) ) ?>">Download Profil Pelamar (PDF)</a>
 							</aside>
 					</div>
 				<?php endif; ?>

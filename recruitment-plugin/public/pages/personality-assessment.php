@@ -42,6 +42,7 @@ $progress_label = 'papi' === $test_key ? 'pasang terjawab' : 'nomor terjawab';
                     <a class="daw-psych-test-button" href="<?= esc_url( $psychotest_home_url ) ?>">Kembali ke daftar tes</a>
                 </section>
             <?php else : ?>
+                <?php require recruitment_get_plugin_path( 'public/components/psychotest-proctoring-watch.php' ); ?>
                 <section
                     class="daw-psych-test-card daw-personality-assessment"
                     data-personality-assessment
