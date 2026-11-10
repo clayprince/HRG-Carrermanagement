@@ -31,21 +31,52 @@ $device_url = recruitment_get_public_url( 'psychotest-device', $consent_argument
                 <div class="daw-recruitment__psychotest-step is-active"><span>4</span><small>Persetujuan</small></div>
             </div>
             <section class="daw-recruitment__psychotest-card">
-                <h1>Persetujuan Tes <?= esc_html( $test_labels[ $test_key ] ) ?></h1>
-                <p>Jawaban dan waktu pengerjaan akan dicatat dan disimpan untuk proses seleksi. Untuk pemeriksaan identitas dan keamanan tes, sistem akan menyimpan satu foto selfie sambil memegang sisi depan KTP serta paling banyak lima snapshot peringatan untuk seluruh sesi tes. Anda dapat memilih “Periksa Mikrofon” saat tes untuk memeriksa izin dan ketersediaan perangkat; hanya status tersedia/tidak tersedia yang dicatat. Audio tidak direkam atau disimpan, kamera dan mikrofon hanya digunakan untuk pemeriksaan perangkat di browser, dan gambar tidak dianalisis dengan OCR atau pencocokan wajah.</p>
-                <ul>
-                    <li>Peringatan dapat dicatat saat Anda berpindah tab atau kamera terputus. Peringatan menjadi bahan tinjauan manusia dan tidak otomatis menggagalkan tes.</li>
-                    <li>Jika kamera tidak tersedia, Anda dapat meminta verifikasi identitas manual oleh HR.</li>
-                    <li>Gambar hanya dapat diakses melalui akun WordPress Administrator, dicatat saat diakses, dan dihapus otomatis paling lambat satu tahun setelah tes selesai. Jika tes tidak selesai, masa simpan dihitung sejak persetujuan diberikan.</li>
-                </ul>
-                <form method="post" action="<?= esc_url( recruitment_get_public_url( 'psychotest-consent', $consent_arguments ) ) ?>">
+                <header class="daw-consent__header">
+                    <span class="daw-consent__eyebrow">Persetujuan dan privasi</span>
+                    <h1>Persetujuan Tes <?= esc_html( $test_labels[ $test_key ] ) ?></h1>
+                    <p>Sebelum melanjutkan, tinjau informasi tentang data yang digunakan selama tes dan cara data tersebut dilindungi.</p>
+                </header>
+
+                <section class="daw-consent__section" aria-labelledby="daw-consent-data-title">
+                    <h2 id="daw-consent-data-title">Informasi yang perlu Anda ketahui</h2>
+                    <div class="daw-consent__facts">
+                        <article class="daw-consent__fact">
+                            <h3>Jawaban tes</h3>
+                            <p>Jawaban dan waktu pengerjaan dicatat dan disimpan untuk proses seleksi.</p>
+                        </article>
+                        <article class="daw-consent__fact">
+                            <h3>Foto identitas</h3>
+                            <p>Satu foto selfie sambil memegang sisi depan KTP disimpan untuk pemeriksaan identitas.</p>
+                        </article>
+                        <article class="daw-consent__fact">
+                            <h3>Pemeriksaan kamera</h3>
+                            <p>Browser memeriksa secara lokal jika wajah tidak terlihat beberapa saat atau lebih dari satu wajah terdeteksi. Video tidak dikirim untuk analisis. Maksimal lima snapshot peringatan dapat disimpan untuk seluruh sesi.</p>
+                        </article>
+                        <article class="daw-consent__fact">
+                            <h3>Pemeriksaan mikrofon</h3>
+                            <p>Anda dapat memeriksa izin dan ketersediaan mikrofon. Hanya status yang dicatat; audio tidak direkam atau disimpan.</p>
+                        </article>
+                    </div>
+                    <p class="daw-consent__note">Sistem tidak melakukan pencocokan identitas wajah atau analisis OCR. Snapshot dikirim hanya saat peringatan dan disimpan secara privat untuk tinjauan HR.</p>
+                </section>
+
+                <section class="daw-consent__section daw-consent__section--review" aria-labelledby="daw-consent-review-title">
+                    <h2 id="daw-consent-review-title">Penggunaan dan perlindungan data</h2>
+                    <ul class="daw-consent__list">
+                        <li>Peringatan dapat dicatat saat wajah tidak terlihat beberapa saat, lebih dari satu wajah terdeteksi, Anda berpindah tab, atau kamera terputus. Deteksi dapat keliru; setiap peringatan ditinjau oleh manusia dan tidak otomatis menggagalkan tes.</li>
+                        <li>Jika kamera tidak tersedia, Anda dapat meminta verifikasi identitas manual oleh HR.</li>
+                        <li>Gambar hanya dapat diakses melalui akun WordPress Administrator, dan setiap akses dicatat. Gambar dihapus otomatis paling lambat satu tahun setelah tes selesai. Jika tes tidak selesai, masa simpan dihitung sejak persetujuan diberikan.</li>
+                    </ul>
+                </section>
+
+                <form class="daw-consent__form" method="post" action="<?= esc_url( recruitment_get_public_url( 'psychotest-consent', $consent_arguments ) ) ?>">
                     <?php wp_nonce_field( 'recruitment_psychotest_consent' ); ?>
                     <input type="hidden" name="test" value="<?= esc_attr( $test_key ) ?>">
-                    <label>
+                    <label class="daw-consent__checkbox">
                         <input type="checkbox" name="consent" value="1" required>
-                        Saya memahami dan menyetujui pengambilan serta penyimpanan foto identitas dan snapshot peringatan serta pencatatan status ketersediaan mikrofon sesuai penjelasan di atas. Saya memahami bahwa audio tidak direkam dan jalur verifikasi manual tersedia bila kamera tidak dapat digunakan.
+                        <span>Saya telah membaca dan memahami informasi di atas, termasuk pemrosesan lokal wajah serta pengambilan dan penyimpanan foto identitas dan snapshot peringatan. Saya memahami bahwa audio tidak direkam dan verifikasi manual dapat diminta jika kamera tidak tersedia.</span>
                     </label>
-                    <button class="daw-recruitment__button daw-recruitment__button--full" type="submit">Setuju dan lanjutkan verifikasi identitas</button>
+                    <button class="daw-recruitment__button" type="submit">Setuju dan lanjutkan</button>
                 </form>
             </section>
         </div>

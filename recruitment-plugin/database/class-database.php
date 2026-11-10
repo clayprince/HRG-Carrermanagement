@@ -3064,6 +3064,9 @@ class Recruitment_Database {
             'TAB_HIDDEN',
             'CAMERA_STOPPED',
             'CAMERA_UNAVAILABLE',
+            'FACE_NOT_DETECTED',
+            'MULTIPLE_FACES',
+            'FACE_DETECTION_UNAVAILABLE',
             'MICROPHONE_AVAILABLE',
             'MICROPHONE_UNAVAILABLE',
         ];
@@ -3103,7 +3106,10 @@ class Recruitment_Database {
             if ( null !== $file_key ) {
                 $count = $connection->prepare(
                     'SELECT COUNT(*) FROM HRS_PSY_PROCTOR_EVENTS
-                     WHERE SESSION_ID = :session_id AND EVENT_TYPE IN (\'TAB_HIDDEN\', \'CAMERA_STOPPED\', \'CAMERA_UNAVAILABLE\')
+                     WHERE SESSION_ID = :session_id AND EVENT_TYPE IN (
+                        \'TAB_HIDDEN\', \'CAMERA_STOPPED\', \'CAMERA_UNAVAILABLE\',
+                        \'FACE_NOT_DETECTED\', \'MULTIPLE_FACES\'
+                     )
                        AND FILE_KEY IS NOT NULL'
                 );
                 $count->execute( [ 'session_id' => $session_id ] );

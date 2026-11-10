@@ -137,15 +137,19 @@ their SQL is compatible with the current Oracle database.
   public media URL. Deployments using Nginx or another server must block direct
   web access to this directory.
 - The capture stage records one identity photo and allows no more than five
-  alert snapshots total per applicant session. The initial browser alerts
-  cover tab changes and camera disconnection/unavailability only; face count,
-  gaze direction, and phone/device detection are not implemented. An optional
-  microphone check logs only availability/permission status; no audio is
-  captured. The HR results page exposes evidence only to users with
-  `manage_options`; evidence access is logged. Completed sessions expire one
-  year after completion, while abandoned sessions expire one year after
-  consent. Image reads are denied after the deadline and daily file cleanup is
-  scheduled. Configure a host-level scheduler to run WordPress cron daily so
+  alert snapshots total per applicant session. Face absence and multiple-face
+  alerts are analyzed locally in the browser; video frames are not sent for
+  model processing. Snapshots are uploaded only for an alert and retained as
+  private evidence. Alerts require human review and do not automatically fail
+  an assessment. Gaze direction and phone/device detection are not
+  implemented. An optional microphone check logs only availability/permission
+  status; no audio is recorded. These event types use the existing
+  `EVENT_TYPE VARCHAR2(32)` field and do not require another Oracle migration.
+  The HR results page exposes evidence only to users with `manage_options`;
+  evidence access is logged. Completed sessions expire one year after
+  completion, while abandoned sessions expire one year after consent. Image
+  reads are denied after the deadline and daily file cleanup is scheduled.
+  Configure a host-level scheduler to run WordPress cron daily so
   physical deletion is not delayed on a low-traffic site.
 - HR can add and edit IQ, Pauli, DISC, and PAPI questions. IQ remains divided
   into four subtests with the existing fixed time limits; additional questions

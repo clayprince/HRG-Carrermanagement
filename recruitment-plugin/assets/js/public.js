@@ -1137,6 +1137,7 @@
     }
     const video = watch.querySelector("[data-proctoring-watch-video]");
     const status = watch.querySelector("[data-proctoring-watch-status]");
+    const faceStatus = watch.querySelector("[data-proctoring-face-status]");
     const ajaxUrl = watch.dataset.ajaxUrl;
     const nonce = watch.dataset.nonce;
     const cameraMode = watch.dataset.cameraMode;
@@ -1144,6 +1145,7 @@
       return;
     }
     let stream = null;
+    let stopFaceMonitor = null;
     const lastAlertAt = new Map();
 
     const sendEvent = async function sendEvent(eventType, withSnapshot) {
@@ -1177,11 +1179,6 @@
         if (image) {
           body.set("snapshot", image, "alert.jpg");
         }
-      }
-      if (navigator.sendBeacon && navigator.sendBeacon(ajaxUrl, body)) {
-        status.textContent =
-          "Peringatan sedang dikirim untuk ditinjau. Maksimal lima snapshot disimpan untuk seluruh sesi tes.";
-        return true;
       }
       try {
         const response = await fetch(ajaxUrl, {
@@ -1272,11 +1269,17 @@
     if (!window.isSecureContext) {
       status.textContent =
         "Kamera memerlukan HTTPS atau localhost. Tidak ada audio yang direkam.";
+      if (faceStatus) {
+        faceStatus.textContent = "Deteksi wajah memerlukan HTTPS atau localhost.";
+      }
       sendEvent("CAMERA_UNAVAILABLE", false);
       return;
     }
     if (!navigator.mediaDevices?.getUserMedia) {
       status.textContent = "Kamera tidak didukung. Identitas perlu diperiksa manual oleh HR.";
+      if (faceStatus) {
+        faceStatus.textContent = "Deteksi wajah tidak tersedia pada browser ini.";
+      }
       sendEvent("CAMERA_UNAVAILABLE", false);
       return;
     }
@@ -1285,22 +1288,66 @@
         video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
         audio: false,
       })
-      .then(function startAssessmentCamera(mediaStream) {
+      .then(async function startAssessmentCamera(mediaStream) {
         stream = mediaStream;
         video.srcObject = mediaStream;
         status.textContent = "Kamera aktif. Tidak ada audio yang direkam.";
         stream.getVideoTracks().forEach((track) => {
           track.addEventListener("ended", function recordCameraStopped() {
+            stopFaceMonitor?.();
+            stopFaceMonitor = null;
+            if (faceStatus) {
+              faceStatus.textContent = "Deteksi wajah dihentikan karena kamera terputus.";
+            }
             status.textContent = "Kamera terputus. Peringatan dikirim untuk tinjauan HR.";
             sendEvent("CAMERA_STOPPED", false);
           });
         });
+        if (!faceStatus) {
+          return;
+        }
+        try {
+          const { startPsychotestFaceMonitor } = await import(
+            "./psychotest-face-monitor.js"
+          );
+          if (stream !== mediaStream) {
+            return;
+          }
+          stopFaceMonitor = await startPsychotestFaceMonitor({
+            video,
+            runtimeUrl: watch.dataset.faceRuntimeUrl,
+            assetsRoot: watch.dataset.faceAssetsRoot,
+            onStatus: (message) => {
+              faceStatus.textContent = message;
+            },
+            onAlert: (eventType) => sendEvent(eventType, true),
+            onError: async () => {
+              faceStatus.textContent =
+                "Deteksi wajah gagal berjalan. Peristiwa dilaporkan untuk ditinjau HR.";
+              if (false === (await sendEvent("FACE_DETECTION_UNAVAILABLE", false))) {
+                faceStatus.textContent =
+                  "Deteksi wajah gagal dan statusnya belum berhasil dilaporkan. Periksa koneksi.";
+              }
+            },
+          });
+        } catch {
+          faceStatus.textContent =
+            "Model deteksi wajah tidak dapat dimuat. Status dilaporkan untuk ditinjau HR.";
+          if (false === (await sendEvent("FACE_DETECTION_UNAVAILABLE", false))) {
+            faceStatus.textContent =
+              "Model deteksi wajah tidak dapat dimuat dan statusnya belum berhasil dilaporkan.";
+          }
+        }
       })
       .catch(function reportCameraUnavailable() {
         status.textContent = "Kamera tidak tersedia. Peristiwa dicatat untuk tinjauan manual HR.";
+        if (faceStatus) {
+          faceStatus.textContent = "Deteksi wajah tidak berjalan karena kamera tidak tersedia.";
+        }
         sendEvent("CAMERA_UNAVAILABLE", false);
       });
     window.addEventListener("pagehide", function stopAssessmentCamera() {
+      stopFaceMonitor?.();
       stream?.getTracks().forEach((track) => track.stop());
     });
   }

@@ -4752,6 +4752,149 @@ body:has(.daw-account-auth) .daw-account-auth__main {
   font-size: 10px;
   text-align: center;
 }
+.daw-recruitment--psychotest-consent .daw-recruitment__psychotest-main {
+  background: #f5f6f8;
+  padding-bottom: 64px;
+  padding-top: 40px;
+}
+.daw-recruitment--psychotest-consent .daw-recruitment__psychotest-shell--narrow {
+  max-width: 820px;
+}
+.daw-recruitment--psychotest-consent .daw-recruitment__psychotest-card {
+  border-color: #e5e7eb;
+  border-radius: 16px;
+  margin-bottom: 0;
+  padding: clamp(22px, 4vw, 40px);
+}
+.daw-consent__header {
+  border-bottom: 1px solid #e8e9ed;
+  margin-bottom: 28px;
+  padding-bottom: 24px;
+}
+.daw-consent__eyebrow {
+  color: var(--daw-red);
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+.daw-recruitment--psychotest-consent .daw-consent__header h1 {
+  color: #1c1c1e;
+  font-size: clamp(26px, 4vw, 34px);
+  line-height: 1.2;
+  margin: 0 0 10px;
+}
+.daw-recruitment--psychotest-consent .daw-consent__header p {
+  color: #626873;
+  font-size: 15px;
+  line-height: 1.65;
+  margin: 0;
+  max-width: 620px;
+}
+.daw-consent__section {
+  margin-top: 26px;
+}
+.daw-recruitment--psychotest-consent .daw-consent__section h2 {
+  color: #24262b;
+  font-size: 17px;
+  line-height: 1.4;
+  margin: 0 0 14px;
+}
+.daw-consent__facts {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.daw-consent__fact {
+  background: #fafbfc;
+  border: 1px solid #e7e9ed;
+  border-radius: 10px;
+  padding: 16px;
+}
+.daw-recruitment--psychotest-consent .daw-consent__fact h3 {
+  color: #292c32;
+  font-size: 14px;
+  line-height: 1.4;
+  margin: 0 0 6px;
+}
+.daw-recruitment--psychotest-consent .daw-consent__fact p,
+.daw-recruitment--psychotest-consent .daw-consent__note {
+  color: #626873;
+  font-size: 13px;
+  line-height: 1.65;
+  margin: 0;
+}
+.daw-recruitment--psychotest-consent .daw-consent__note {
+  background: #f8f8fa;
+  border-left: 3px solid #c8102e;
+  border-radius: 0 6px 6px 0;
+  margin-top: 14px;
+  padding: 12px 14px;
+}
+.daw-consent__section--review {
+  background: #fafbfc;
+  border: 1px solid #e7e9ed;
+  border-radius: 10px;
+  padding: 18px;
+}
+.daw-recruitment--psychotest-consent .daw-consent__list {
+  color: #535963;
+  display: grid;
+  font-size: 13px;
+  gap: 10px;
+  line-height: 1.65;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.daw-consent__list li {
+  padding-left: 18px;
+  position: relative;
+}
+.daw-consent__list li::before {
+  background: #c8102e;
+  border-radius: 50%;
+  content: "";
+  height: 6px;
+  left: 2px;
+  position: absolute;
+  top: 8px;
+  width: 6px;
+}
+.daw-consent__form {
+  border-top: 1px solid #e8e9ed;
+  display: grid;
+  gap: 18px;
+  margin-top: 26px;
+  padding-top: 22px;
+}
+.daw-consent__checkbox {
+  align-items: flex-start;
+  background: #fffafa;
+  border: 1px solid #f0d7dc;
+  border-radius: 10px;
+  color: #393c43;
+  cursor: pointer;
+  display: flex;
+  font-size: 13px;
+  gap: 11px;
+  line-height: 1.6;
+  padding: 15px;
+}
+.daw-consent__checkbox input {
+  accent-color: var(--daw-red);
+  flex: 0 0 auto;
+  height: 17px;
+  margin: 2px 0 0;
+  width: 17px;
+}
+.daw-recruitment--psychotest-consent .daw-consent__form > button {
+  justify-self: end;
+  min-height: 44px;
+  padding: 12px 22px;
+}
 .daw-recruitment__psychotest-step.is-active span {
   background: var(--daw-red);
   border-color: var(--daw-red);
@@ -4884,6 +5027,14 @@ body:has(.daw-account-auth) .daw-account-auth__main {
   height: 100%;
   object-fit: cover;
   width: 100%;
+}
+.daw-recruitment__device-camera:not(.is-empty) .daw-recruitment__device-video {
+  display: block;
+}
+.daw-recruitment__device-video[hidden],
+.daw-recruitment__device-empty[hidden],
+.daw-recruitment__device-unsupported[hidden] {
+  display: none !important;
 }
 .daw-recruitment__device-camera.is-empty .daw-recruitment__device-video {
   display: none;
@@ -5063,10 +5214,24 @@ body:has(.daw-account-auth) .daw-account-auth__main {
     padding-left: 12px;
     padding-right: 12px;
   }
+  .daw-recruitment--psychotest-consent .daw-recruitment__psychotest-main {
+    padding-bottom: 40px;
+    padding-top: 24px;
+  }
   .daw-recruitment__psychotest-card,
   .daw-recruitment__psychotest-prep-card {
     padding-left: 14px;
     padding-right: 14px;
+  }
+  .daw-consent__facts {
+    grid-template-columns: 1fr;
+  }
+  .daw-consent__section--review {
+    padding: 14px;
+  }
+  .daw-recruitment--psychotest-consent .daw-consent__form > button {
+    justify-self: stretch;
+    width: 100%;
   }
   .daw-recruitment__psychotest-summary-meta,
   .daw-recruitment__info-box {

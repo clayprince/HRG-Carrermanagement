@@ -12,6 +12,10 @@ migration log.
   access, and reset readiness if the camera disconnects after permission.
 - Added an explicit microphone availability check. Only the permission/device
   status is reported to HR; no audio is recorded or stored.
+- Added on-device face-presence and multiple-face detection during active tests.
+  Alerts include a private snapshot when available, are capped at five per
+  session, and require human review; no video frames are sent to a model
+  service, and an alert does not automatically fail the test.
 - Kept separate camera, tab, and microphone event reporting from suppressing
   one another during the same short interval.
 - Runtime camera validation still requires the local site to be served through
@@ -42,8 +46,8 @@ migration log.
   path, and camera-only monitoring for tab changes and camera disconnects.
 - Added a five-alert-image-per-session limit, Administrator-only evidence
   downloads with access audit, and scheduled one-year retention cleanup.
-- Added Oracle migration 015 for review; it has not been applied. Face-count,
-  gaze, and phone/device detection remain out of scope for this phase.
+- Added Oracle migration 015 for review; it has not been applied. Gaze and
+  phone/device detection remain out of scope for this phase.
 
 ### Recruitment data flow to admin and User Department
 
