@@ -107,6 +107,26 @@ their SQL is compatible with the current Oracle database.
   completed-result links used by assessment writes and result review. It must
   be reviewed and applied by the authorized Oracle owner; the plugin does not
   run it automatically.
+- Proctoring consent, identity-verification status, alert metadata, and the
+  one-year retention deadline are stored in Oracle by
+  `Recruitment_Database`. Migration
+  [`migrations/014_psychotest_proctoring.sql`](migrations/014_psychotest_proctoring.sql)
+  creates the required metadata tables and must be reviewed and applied by the
+  authorized Oracle owner; it has not been run automatically. JPEG evidence is
+  stored in the private `daw-applicant-private` directory, not in Oracle or a
+  public media URL. Deployments using Nginx or another server must block direct
+  web access to this directory.
+- The capture stage records one identity photo and allows no more than five
+  alert snapshots total per applicant session. The initial browser alerts
+  cover tab changes and camera disconnection/unavailability only; face count,
+  gaze direction, and phone/device detection are not implemented. An optional
+  microphone check logs only availability/permission status; no audio is
+  captured. The HR results page exposes evidence only to users with
+  `manage_options`; evidence access is logged. Completed sessions expire one
+  year after completion, while abandoned sessions expire one year after
+  consent. Image reads are denied after the deadline and daily file cleanup is
+  scheduled. Configure a host-level scheduler to run WordPress cron daily so
+  physical deletion is not delayed on a low-traffic site.
 - HR can add and edit IQ, Pauli, DISC, and PAPI questions. IQ remains divided
   into four subtests with the existing fixed time limits; additional questions
   use those same limits. Pauli presents one vertical sum at a time for 60
@@ -277,6 +297,15 @@ The User Department request UI currently stores those records in WordPress
 user meta. Candidate lists and interview ratings use Oracle CRUD only where
 the gateway and target schema are aligned; remaining prototype values must not
 be presented as live recruitment records.
+
+The admin dashboard and applicant screens read application, status, profile,
+and form-answer data from the HRS Oracle tables. HR status changes update the
+application and append its tracking history together. User Department
+candidate details are scoped to the signed-in account's department and
+forwarded/interviewed candidates; profile answers and selection history are
+loaded from Oracle. Private uploads remain private and are not exposed as
+download links on the User Department screen. No schema migration is added by
+these read-flow changes.
 
 Some legacy application and vacancy gateway methods still contain
 `DAW_*`-table operations; they need schema reconciliation before being treated

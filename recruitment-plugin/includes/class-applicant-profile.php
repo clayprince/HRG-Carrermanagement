@@ -7,6 +7,8 @@ class Recruitment_Applicant_Profile {
 
     private const MAX_UPLOAD_SIZE = 5242880;
 
+    private const MAX_PROCTORING_UPLOAD_SIZE = 2097152;
+
     private const EDUCATION_LEVELS = [ 'SMA/SMK', 'D1', 'D2', 'D3', 'D4/S1', 'S2', 'S3' ];
 
     /**
@@ -261,7 +263,7 @@ class Recruitment_Applicant_Profile {
      * @return array<string, string>|null
      */
     public function store_uploaded_document( array $file, string $field ): ?array {
-        if ( ! in_array( $field, [ 'profile_photo', 'resume', 'portfolio' ], true ) ) {
+        if ( ! in_array( $field, [ 'profile_photo', 'resume', 'portfolio', 'proctoring_capture' ], true ) ) {
             throw new RuntimeException( 'Unsupported applicant document field.' );
         }
 
@@ -369,7 +371,8 @@ class Recruitment_Applicant_Profile {
             return null;
         }
         $size = filesize( $temporary_path );
-        if ( false === $size || 0 === $size || self::MAX_UPLOAD_SIZE < $size || ! function_exists( 'finfo_open' ) ) {
+        $max_upload_size = 'proctoring_capture' === $field ? self::MAX_PROCTORING_UPLOAD_SIZE : self::MAX_UPLOAD_SIZE;
+        if ( false === $size || 0 === $size || $max_upload_size < $size || ! function_exists( 'finfo_open' ) ) {
             return null;
         }
         $file_info = finfo_open( FILEINFO_MIME_TYPE );
@@ -381,6 +384,7 @@ class Recruitment_Applicant_Profile {
 
         $allowed = [
             'profile_photo' => [ 'image/jpeg' => 'jpg', 'image/png' => 'png' ],
+            'proctoring_capture' => [ 'image/jpeg' => 'jpg' ],
             'resume' => [
                 'application/pdf' => 'pdf',
                 'application/msword' => 'doc',

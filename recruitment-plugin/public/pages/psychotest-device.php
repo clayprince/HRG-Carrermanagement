@@ -59,25 +59,11 @@ $next_url = recruitment_get_public_url( 'psychotest-consent', [ 'test' => $test_
                                 <small data-device-status-copy>Klik “Izinkan Kamera” untuk memulai pengecekan.</small>
                             </div>
                         </div>
-                        <div class="daw-recruitment__device-status-item is-warning" data-device-status data-device-microphone-status>
-                            <span class="daw-recruitment__device-status-icon" data-device-status-icon aria-hidden="true">•</span>
-                            <div>
-                                <strong data-device-status-title>Mikrofon belum aktif</strong>
-                                <small data-device-status-copy>Izinkan akses mikrofon saat kamera dibuka.</small>
-                            </div>
-                        </div>
-                        <div class="daw-recruitment__device-status-item is-warning" data-device-status data-device-audio-status>
-                            <span class="daw-recruitment__device-status-icon" data-device-status-icon aria-hidden="true">•</span>
-                            <div>
-                                <strong data-device-status-title>Audio belum diperiksa</strong>
-                                <small data-device-status-copy>Volume dan input audio akan dicek saat izin diberikan.</small>
-                            </div>
-                        </div>
                         <div class="daw-recruitment__device-status-item is-warning" data-device-status data-device-browser-status>
                             <span class="daw-recruitment__device-status-icon" data-device-status-icon aria-hidden="true">•</span>
                             <div>
                                 <strong data-device-status-title>Browser sedang mengecek</strong>
-                                <small data-device-status-copy>Memeriksa dukungan browser untuk kamera dan mikrofon.</small>
+                                <small data-device-status-copy>Memeriksa dukungan browser untuk kamera.</small>
                             </div>
                         </div>
                         <div class="daw-recruitment__device-status-item is-warning" data-device-status data-device-connection-status>

@@ -26,10 +26,12 @@ $selected_application_id = absint( $_GET['application_id'] ?? 0 );
 
 $all_statuses = [
     'all' => 'Semua Status',
+    'active' => 'Semua Status Aktif',
     'diterima' => 'Diterima',
     'dalam_proses' => 'Dalam Proses',
     'tidak_diterima' => 'Tidak Diterima',
     'dipertimbangkan_kembali' => 'Dipertimbangkan Kembali',
+    'belum_melamar' => 'Belum Melamar',
 ];
 
 $normalize_stage = static function ( $raw_status ): string {
@@ -81,6 +83,10 @@ $normalize_status_bucket = static function ( $raw_status ): string {
         return 'dipertimbangkan_kembali';
     }
 
+    if ( in_array( $status_key, [ 'not_applied', 'belum_melamar' ], true ) ) {
+        return 'belum_melamar';
+    }
+
     return 'dalam_proses';
 };
 
@@ -97,9 +103,13 @@ foreach ( $vacancies as $vacancy ) {
 }
 
 $latest_candidates = [];
+$applicants_with_applications = [];
 foreach ( $applications as $application ) {
     $application = array_change_key_case( (array) $application, CASE_LOWER );
     $applicant_id = (int) ( $application['applicant_id'] ?? 0 );
+    if ( $applicant_id > 0 ) {
+        $applicants_with_applications[ (string) $applicant_id ] = true;
+    }
     $candidate = $applicant_map[ (string) $applicant_id ] ?? [];
     $vacancy = $vacancy_map[ (string) ( $application['vacancy_id'] ?? 0 ) ] ?? [];
 
@@ -112,8 +122,15 @@ foreach ( $applications as $application ) {
     $position = (string) ( $application['title'] ?? $vacancy['title'] ?? $vacancy['job_title'] ?? $candidate['position'] ?? 'Posisi belum ditentukan' );
     $dealer = (string) ( $vacancy['dealer'] ?? $vacancy['location'] ?? $application['location'] ?? $candidate['dealer'] ?? '-' );
     $region = (string) ( $vacancy['region'] ?? $vacancy['location'] ?? $application['province'] ?? $candidate['region'] ?? '' );
-    $status_bucket = $normalize_status_bucket( $application['status'] ?? $candidate['status'] ?? 'submitted' );
-    $stage_key = $normalize_stage( $application['status'] ?? $candidate['status'] ?? 'submitted' );
+    $effective_status = (string) ( $application['final_status'] ?? '' );
+    if ( '' === trim( $effective_status ) ) {
+        $effective_status = (string) ( $application['hr_final_decision'] ?? '' );
+    }
+    if ( '' === trim( $effective_status ) ) {
+        $effective_status = (string) ( $application['status'] ?? $candidate['status'] ?? 'submitted' );
+    }
+    $status_bucket = $normalize_status_bucket( $effective_status );
+    $stage_key = $normalize_stage( $effective_status );
     $stage_label = [
         'administration' => 'Seleksi Administrasi',
         'psychological_test' => 'Psikotes',
@@ -139,11 +156,46 @@ foreach ( $applications as $application ) {
         'region' => $region,
         'year' => $year,
         'stage' => $stage_label,
-        'raw_status' => strtoupper( (string) ( $application['status'] ?? 'SUBMITTED' ) ),
+        'raw_status' => strtoupper( $effective_status ),
         'status_key' => $status_bucket,
         'status_label' => $all_statuses[ $status_bucket ] ?? 'Dalam Proses',
         'created_at' => $created_at,
         'search' => $search_text,
+        'notes' => '',
+        'social' => [
+            'instagram' => '',
+            'linkedin' => '',
+        ],
+    ];
+}
+
+foreach ( $applicant_map as $applicant_id => $candidate ) {
+    if ( isset( $applicants_with_applications[ (string) $applicant_id ] ) ) {
+        continue;
+    }
+
+    $created_at = (string) ( $candidate['created_at'] ?? '' );
+    $timestamp = '' !== $created_at ? strtotime( $created_at ) : false;
+    $year = false !== $timestamp ? (string) date_i18n( 'Y', $timestamp ) : (string) date_i18n( 'Y' );
+    $code = 'DAW-' . $year . '-' . str_pad( (string) $applicant_id, 3, '0', STR_PAD_LEFT );
+    $applicant_name = (string) ( $candidate['name'] ?? 'Pelamar #' . $applicant_id );
+    $latest_candidates[ 'profile-' . $applicant_id ] = [
+        'id' => (int) $applicant_id,
+        'application_id' => 0,
+        'name' => $applicant_name,
+        'code' => $code,
+        'email' => (string) ( $candidate['email'] ?? '' ),
+        'phone' => (string) ( $candidate['phone'] ?? '' ),
+        'position' => 'Belum ada lamaran',
+        'dealer' => '-',
+        'region' => '',
+        'year' => $year,
+        'stage' => 'Belum Melamar',
+        'raw_status' => 'BELUM_MELAMAR',
+        'status_key' => 'belum_melamar',
+        'status_label' => $all_statuses['belum_melamar'],
+        'created_at' => $created_at,
+        'search' => strtolower( trim( $applicant_name . ' ' . $code . ' ' . (string) ( $candidate['email'] ?? '' ) ) ),
         'notes' => '',
         'social' => [
             'instagram' => '',
@@ -159,7 +211,13 @@ foreach ( $all_candidates as $candidate ) {
     $matches_year = '' === $year_filter || (string) $candidate['year'] === $year_filter;
     $matches_position = '' === $position_filter || strtolower( $candidate['position'] ) === strtolower( $position_filter );
     $matches_dealer = '' === $dealer_filter || strtolower( $candidate['dealer'] ) === strtolower( $dealer_filter );
-    $matches_status = '' === $status_filter || 'all' === $status_filter || $candidate['status_key'] === $status_filter;
+    $matches_status = '' === $status_filter || 'all' === $status_filter;
+    if ( 'active' === $status_filter ) {
+        $matches_status = ! empty( $candidate['application_id'] )
+            && in_array( $candidate['status_key'], [ 'dalam_proses', 'dipertimbangkan_kembali' ], true );
+    } elseif ( '' !== $status_filter && 'all' !== $status_filter ) {
+        $matches_status = $candidate['status_key'] === $status_filter;
+    }
 
     if ( $matches_search && $matches_year && $matches_position && $matches_dealer && $matches_status ) {
         $filtered_candidates[] = $candidate;

@@ -477,6 +477,7 @@ class Recruitment_Admin {
 				[
 					'page' => 'recruitment-applicants',
 					'candidate_id' => absint( $_POST['candidate_id'] ?? 0 ),
+					'application_id' => $application_id,
 					'status_updated' => '1',
 				],
 				admin_url( 'admin.php' )

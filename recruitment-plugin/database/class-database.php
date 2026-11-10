@@ -327,7 +327,7 @@ class Recruitment_Database {
             return [];
         }
         return $this->fetch_all(
-            'SELECT l.lamaran_id AS "id", ' . $token_column . ' AS "token", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", d.nama_departemen AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status", (SELECT MAX(r.tahap_seleksi) KEEP (DENSE_RANK LAST ORDER BY r.tanggal_status, r.riwayat_status_id) FROM HRS_RIWAYAT_STATUS_PELAMAR r WHERE r.lamaran_id = l.lamaran_id) AS "latest_stage" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id ORDER BY NVL(l.created_at, l.tanggal_melamar) DESC, l.lamaran_id DESC',
+            'SELECT l.lamaran_id AS "id", ' . $token_column . ' AS "token", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", NVL(d.nama_departement, k.nama_departemen) AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status", (SELECT MAX(r.tahap_seleksi) KEEP (DENSE_RANK LAST ORDER BY r.tanggal_status, r.riwayat_status_id) FROM HRS_RIWAYAT_STATUS_PELAMAR r WHERE r.lamaran_id = l.lamaran_id) AS "latest_stage" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id ORDER BY NVL(l.created_at, l.tanggal_melamar) DESC, l.lamaran_id DESC',
             [ 'login_id' => $login_id ]
         );
     }
@@ -342,7 +342,7 @@ class Recruitment_Database {
             return null;
         }
         $rows = $this->fetch_all(
-            'SELECT l.lamaran_id AS "id", ' . $token_column . ' AS "token", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", d.nama_departemen AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id AND l.lamaran_id = :application_id',
+            'SELECT l.lamaran_id AS "id", ' . $token_column . ' AS "token", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", NVL(d.nama_departement, k.nama_departemen) AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id AND l.lamaran_id = :application_id',
             [ 'login_id' => $login_id, 'application_id' => $application_id ]
         );
         return $rows[0] ?? null;
@@ -358,7 +358,7 @@ class Recruitment_Database {
             return null;
         }
         $rows = $this->fetch_all(
-            'SELECT l.lamaran_id AS "id", l.application_token AS "token", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", d.nama_departemen AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id AND l.application_token = :application_token',
+            'SELECT l.lamaran_id AS "id", l.application_token AS "token", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", NVL(d.nama_departement, k.nama_departemen) AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id AND l.application_token = :application_token',
             [ 'login_id' => $login_id, 'application_token' => $application_token ]
         );
         return $rows[0] ?? null;
@@ -1610,9 +1610,25 @@ class Recruitment_Database {
         );
     }
 
-    /**
-     * @return array<int, array<string, mixed>>
-     */
+    /** @return int|null */
+    public function get_active_application_count(): ?int {
+        $this->last_error = null;
+        $rows = $this->fetch_all(
+            'SELECT COUNT(*) AS "count"
+             FROM HRS_LAMARAN l
+             WHERE UPPER(TRIM(NVL(l.status_akhir, l.status_terkini))) NOT IN (
+                \'DITERIMA\', \'ACCEPTED\', \'LOLOS\', \'FINAL\', \'COMPLETED\',
+                \'DITOLAK\', \'REJECTED\', \'TIDAK DITERIMA\', \'TIDAK_DITERIMA\',
+                \'TIDAK LOLOS\', \'TIDAK_LOLOS\', \'TOLAK\'
+             )'
+        );
+        if ( $this->has_error() || empty( $rows[0] ) ) {
+            return null;
+        }
+
+        return (int) $rows[0]['count'];
+    }
+
     public function get_user_interview_candidates( string $department ): array {
         $department = trim( $department );
         if ( '' === $department ) {
@@ -1627,9 +1643,9 @@ class Recruitment_Database {
                        NVL(p.email, pkl.email) AS candidate_email,
                        NVL(p.nomor_hp, p.nomor_telepon) AS candidate_phone,
                        d.nama_departemen AS department_name,
-                       MAX(d.judul_pekerjaan) AS position_name,
-                       MAX(k.nama_dealer) AS dealer_name,
-                       MAX(l.status_akhir) AS application_final_status
+                       MAX(d.judul_pekerjaan) KEEP (DENSE_RANK LAST ORDER BY NVL(l.created_at, l.tanggal_melamar), l.lamaran_id) AS position_name,
+                       MAX(k.nama_dealer) KEEP (DENSE_RANK LAST ORDER BY NVL(l.created_at, l.tanggal_melamar), l.lamaran_id) AS dealer_name,
+                       MAX(l.status_akhir) KEEP (DENSE_RANK LAST ORDER BY NVL(l.created_at, l.tanggal_melamar), l.lamaran_id) AS application_final_status
                 FROM HRS_LAMARAN l
                 JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
                 LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id
@@ -1717,6 +1733,92 @@ class Recruitment_Database {
                 static fn ( array $row ): bool => '' !== trim( (string) ( $row['INTERVIEW_STATUS'] ?? '' ) )
             )
         );
+    }
+
+    /**
+     * Load applicant details only for a candidate forwarded to this department.
+     *
+     * @return array{application: array<string, mixed>, profile: array<string, mixed>, answers: array<int, array<string, mixed>>, history: array<int, array<string, mixed>>}|null
+     */
+    public function get_user_department_candidate_detail( string $department, string $candidate_id ): ?array {
+        $department = trim( $department );
+        if ( '' === $department || ! ctype_digit( $candidate_id ) || '0' === $candidate_id ) {
+            return null;
+        }
+
+        $this->last_error = null;
+        $rows = $this->fetch_all(
+            'SELECT l.lamaran_id AS "application_id",
+                    TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "application_date",
+                    l.status_terkini AS "application_status",
+                    l.status_akhir AS "final_status",
+                    d.judul_pekerjaan AS "position",
+                    k.nama_dealer AS "dealer",
+                    p.kandidat_id AS "candidate_id",
+                    NVL(p.nama_lengkap, p.nama_kandidat) AS "candidate_name",
+                    NVL(p.email, pkl.email) AS "candidate_email",
+                    NVL(p.nomor_hp, p.nomor_telepon) AS "candidate_phone",
+                    p.jenis_kelamin AS "gender",
+                    p.tempat_lahir AS "birth_place",
+                    TO_CHAR(p.tanggal_lahir, \'YYYY-MM-DD\') AS "birth_date",
+                    p.alamat_domisili AS "address",
+                    p.kota AS "city",
+                    p.provinsi AS "province",
+                    p.pendidikan AS "education",
+                    pd.data_profil AS "profile_details"
+             FROM HRS_LAMARAN l
+             JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
+             LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id
+             JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
+             JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id
+             LEFT JOIN HRS_PROFIL_KANDIDAT_DETAIL pd ON pd.kandidat_id = p.kandidat_id
+             WHERE p.kandidat_id = :candidate_id
+               AND UPPER(TRIM(d.nama_departemen)) = UPPER(TRIM(:department))
+               AND (
+                    UPPER(TRIM(l.status_terkini)) = \'INTERVIEW_USER\'
+                    OR l.status_akhir IN (\'DITERIMA\', \'DITOLAK\')
+                    OR EXISTS (
+                        SELECT 1
+                        FROM HRS_HASIL_WAWANCARA_USER w
+                        WHERE w.kandidat_id = p.kandidat_id
+                          AND UPPER(TRIM(w.nama_departemen)) = UPPER(TRIM(:result_department))
+                    )
+               )
+             ORDER BY NVL(l.created_at, l.tanggal_melamar) DESC, l.lamaran_id DESC
+             FETCH FIRST 1 ROW ONLY',
+            [
+                'candidate_id' => $candidate_id,
+                'department' => $department,
+                'result_department' => $department,
+            ]
+        );
+        if ( empty( $rows[0] ) ) {
+            return null;
+        }
+
+        $application = $rows[0];
+        $profile_details = $this->decode_applicant_profile_details( $application['profile_details'] ?? '' );
+        unset( $application['profile_details'] );
+        $application_id = (string) ( $application['application_id'] ?? '' );
+
+        return [
+            'application' => $application,
+            'profile' => [
+                'name' => (string) ( $application['candidate_name'] ?? '' ),
+                'email' => (string) ( $application['candidate_email'] ?? '' ),
+                'phone' => (string) ( $application['candidate_phone'] ?? '' ),
+                'gender' => (string) ( $application['gender'] ?? '' ),
+                'birth_place' => (string) ( $application['birth_place'] ?? '' ),
+                'birth_date' => (string) ( $application['birth_date'] ?? '' ),
+                'address' => (string) ( $application['address'] ?? '' ),
+                'city' => (string) ( $application['city'] ?? '' ),
+                'province' => (string) ( $application['province'] ?? '' ),
+                'education' => (string) ( $application['education'] ?? '' ),
+                'profile_details' => $profile_details,
+            ],
+            'answers' => '' !== $application_id ? $this->get_admin_application_answers( $application_id ) : [],
+            'history' => '' !== $application_id ? $this->get_selection_history( $application_id ) : [],
+        ];
     }
 
     /**
@@ -2676,6 +2778,428 @@ class Recruitment_Database {
             return [ 'success' => false, 'error' => 'Data hasil tes tidak dapat dibaca dari Oracle.' ];
         }
         return [ 'success' => true, 'responses' => $responses, 'result' => $result ];
+    }
+
+    public function create_proctoring_session( int $candidate_id, string $session_id ): bool {
+        if ( $candidate_id < 1 || ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id ) ) {
+            return false;
+        }
+
+        $this->last_error = null;
+        try {
+            $statement = $this->get_connection()->prepare(
+                'MERGE INTO HRS_PSY_PROCTOR_SESSIONS target
+                 USING (SELECT :session_id AS session_id FROM DUAL) source
+                 ON (target.SESSION_ID = source.session_id)
+                 WHEN MATCHED THEN UPDATE SET target.CONSENT_VERSION = :matched_consent_version,
+                     target.CONSENT_AT = CURRENT_TIMESTAMP,
+                     target.RETENTION_UNTIL = CASE
+                         WHEN target.COMPLETED_AT IS NOT NULL THEN target.RETENTION_UNTIL
+                         ELSE GREATEST(target.RETENTION_UNTIL, ADD_MONTHS(CURRENT_TIMESTAMP, 12))
+                     END,
+                     target.UPDATED_AT = CURRENT_TIMESTAMP
+                     WHERE target.KANDIDAT_ID = :candidate_id AND target.RETENTION_UNTIL > CURRENT_TIMESTAMP
+                 WHEN NOT MATCHED THEN INSERT (SESSION_ID, KANDIDAT_ID, CONSENT_VERSION, IDENTITY_STATUS, CREATED_AT, RETENTION_UNTIL, UPDATED_AT)
+                     VALUES (:insert_session_id, :insert_candidate_id, :insert_consent_version, \'PENDING\', CURRENT_TIMESTAMP, ADD_MONTHS(CURRENT_TIMESTAMP, 12), CURRENT_TIMESTAMP)'
+            );
+            $statement->execute(
+                [
+                    'session_id' => $session_id,
+                    'candidate_id' => $candidate_id,
+                    'matched_consent_version' => 'proctoring-v1',
+                    'insert_session_id' => $session_id,
+                    'insert_candidate_id' => $candidate_id,
+                    'insert_consent_version' => 'proctoring-v1',
+                ]
+            );
+            $rows = $this->fetch_all(
+                'SELECT SESSION_ID FROM HRS_PSY_PROCTOR_SESSIONS
+                 WHERE SESSION_ID = :session_id AND KANDIDAT_ID = :candidate_id
+                   AND RETENTION_UNTIL > CURRENT_TIMESTAMP',
+                [ 'session_id' => $session_id, 'candidate_id' => $candidate_id ]
+            );
+            return ! $this->has_error() && ! empty( $rows );
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_oracle_failure( 'Psychotest proctoring consent save failed', $exception );
+            return false;
+        }
+    }
+
+    /** @return array<string, mixed>|null */
+    public function get_proctoring_session( int $candidate_id, string $session_id ): ?array {
+        if ( $candidate_id < 1 || ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id ) ) {
+            return null;
+        }
+        $this->last_error = null;
+        $rows = $this->fetch_all(
+            'SELECT SESSION_ID AS "session_id", KANDIDAT_ID AS "candidate_id", IDENTITY_STATUS AS "identity_status",
+                    TO_CHAR(CONSENT_AT, \'YYYY-MM-DD HH24:MI:SS\') AS "consent_at",
+                    TO_CHAR(RETENTION_UNTIL, \'YYYY-MM-DD HH24:MI:SS\') AS "retention_until"
+             FROM HRS_PSY_PROCTOR_SESSIONS
+             WHERE SESSION_ID = :session_id AND KANDIDAT_ID = :candidate_id
+               AND RETENTION_UNTIL > CURRENT_TIMESTAMP',
+            [ 'session_id' => $session_id, 'candidate_id' => $candidate_id ]
+        );
+        return $rows[0] ?? null;
+    }
+
+    public function save_proctoring_identity( int $candidate_id, string $session_id, ?string $file_key, bool $manual_review ): bool {
+        if ( $candidate_id < 1 || ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id )
+            || ( null !== $file_key && ! preg_match( '/\A[a-f0-9]{32}\.jpg\z/', $file_key ) )
+            || ( null === $file_key && ! $manual_review ) ) {
+            return false;
+        }
+
+        $this->last_error = null;
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $lock = $connection->prepare(
+                'SELECT IDENTITY_STATUS FROM HRS_PSY_PROCTOR_SESSIONS
+                 WHERE SESSION_ID = :session_id AND KANDIDAT_ID = :candidate_id
+                   AND RETENTION_UNTIL > CURRENT_TIMESTAMP FOR UPDATE'
+            );
+            $lock->execute( [ 'session_id' => $session_id, 'candidate_id' => $candidate_id ] );
+            if ( 'PENDING' !== (string) $lock->fetchColumn() ) {
+                throw new RuntimeException( 'Proctoring session was not found.' );
+            }
+            $update = $connection->prepare(
+                'UPDATE HRS_PSY_PROCTOR_SESSIONS SET IDENTITY_STATUS = :identity_status, UPDATED_AT = CURRENT_TIMESTAMP
+                 WHERE SESSION_ID = :session_id AND KANDIDAT_ID = :candidate_id'
+            );
+            $update->execute(
+                [
+                    'identity_status' => $manual_review ? 'MANUAL_REVIEW' : 'CAPTURED',
+                    'session_id' => $session_id,
+                    'candidate_id' => $candidate_id,
+                ]
+            );
+            if ( 1 !== $update->rowCount() ) {
+                throw new RuntimeException( 'Proctoring identity status could not be updated.' );
+            }
+            $event = $connection->prepare(
+                'INSERT INTO HRS_PSY_PROCTOR_EVENTS (SESSION_ID, EVENT_TYPE, FILE_KEY, EVENT_AT)
+                 VALUES (:session_id, :event_type, :file_key, CURRENT_TIMESTAMP)'
+            );
+            $event->execute(
+                [
+                    'session_id' => $session_id,
+                    'event_type' => $manual_review ? 'MANUAL_IDENTITY' : 'IDENTITY_CAPTURE',
+                    'file_key' => $file_key,
+                ]
+            );
+            $connection->commit();
+            return true;
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_oracle_failure( 'Psychotest identity evidence save failed', $exception );
+            return false;
+        }
+    }
+
+    /**
+     * Store a signal and, while under the per-session lock, at most five alert images.
+     *
+     * @return array{success: bool, captured: bool}
+     */
+    public function save_proctoring_event( int $candidate_id, string $session_id, string $event_type, ?string $file_key ): array {
+        $allowed_types = [
+            'TAB_HIDDEN',
+            'CAMERA_STOPPED',
+            'CAMERA_UNAVAILABLE',
+            'MICROPHONE_AVAILABLE',
+            'MICROPHONE_UNAVAILABLE',
+        ];
+        if ( $candidate_id < 1 || ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id )
+            || ! in_array( $event_type, $allowed_types, true )
+            || ( null !== $file_key && ! preg_match( '/\A[a-f0-9]{32}\.jpg\z/', $file_key ) ) ) {
+            return [ 'success' => false, 'captured' => false ];
+        }
+
+        $this->last_error = null;
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $lock = $connection->prepare(
+                'SELECT SESSION_ID FROM HRS_PSY_PROCTOR_SESSIONS
+                 WHERE SESSION_ID = :session_id AND KANDIDAT_ID = :candidate_id
+                   AND RETENTION_UNTIL > CURRENT_TIMESTAMP FOR UPDATE'
+            );
+            $lock->execute( [ 'session_id' => $session_id, 'candidate_id' => $candidate_id ] );
+            if ( false === $lock->fetchColumn() ) {
+                throw new RuntimeException( 'Proctoring session was not found.' );
+            }
+            $recent = $connection->prepare(
+                'SELECT COUNT(*) FROM HRS_PSY_PROCTOR_EVENTS
+                 WHERE SESSION_ID = :session_id AND EVENT_TYPE = :event_type
+                   AND EVENT_AT > CURRENT_TIMESTAMP - INTERVAL \'15\' SECOND'
+            );
+            $recent->execute( [ 'session_id' => $session_id, 'event_type' => $event_type ] );
+            if ( 0 < (int) $recent->fetchColumn() ) {
+                $connection->commit();
+                return [ 'success' => true, 'captured' => false ];
+            }
+
+            $captured = false;
+            $stored_file_key = null;
+            if ( null !== $file_key ) {
+                $count = $connection->prepare(
+                    'SELECT COUNT(*) FROM HRS_PSY_PROCTOR_EVENTS
+                     WHERE SESSION_ID = :session_id AND EVENT_TYPE IN (\'TAB_HIDDEN\', \'CAMERA_STOPPED\', \'CAMERA_UNAVAILABLE\')
+                       AND FILE_KEY IS NOT NULL'
+                );
+                $count->execute( [ 'session_id' => $session_id ] );
+                if ( 5 > (int) $count->fetchColumn() ) {
+                    $stored_file_key = $file_key;
+                    $captured = true;
+                }
+            }
+            $event = $connection->prepare(
+                'INSERT INTO HRS_PSY_PROCTOR_EVENTS (SESSION_ID, EVENT_TYPE, FILE_KEY, EVENT_AT)
+                 VALUES (:session_id, :event_type, :file_key, CURRENT_TIMESTAMP)'
+            );
+            $event->execute(
+                [ 'session_id' => $session_id, 'event_type' => $event_type, 'file_key' => $stored_file_key ]
+            );
+            $connection->commit();
+            return [ 'success' => true, 'captured' => $captured ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_oracle_failure( 'Psychotest proctoring event save failed', $exception );
+            return [ 'success' => false, 'captured' => false ];
+        }
+    }
+
+    public function mark_proctoring_completed( int $candidate_id, string $session_id ): bool {
+        if ( $candidate_id < 1 || ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id ) ) {
+            return false;
+        }
+        $this->last_error = null;
+        try {
+            $statement = $this->get_connection()->prepare(
+                'UPDATE HRS_PSY_PROCTOR_SESSIONS
+                 SET COMPLETED_AT = COALESCE(COMPLETED_AT, CURRENT_TIMESTAMP),
+                     RETENTION_UNTIL = ADD_MONTHS(COALESCE(COMPLETED_AT, CURRENT_TIMESTAMP), 12),
+                     UPDATED_AT = CURRENT_TIMESTAMP
+                 WHERE SESSION_ID = :session_id AND KANDIDAT_ID = :candidate_id
+                   AND RETENTION_UNTIL > CURRENT_TIMESTAMP'
+            );
+            $statement->execute( [ 'session_id' => $session_id, 'candidate_id' => $candidate_id ] );
+            return 1 === $statement->rowCount();
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_oracle_failure( 'Psychotest proctoring retention update failed', $exception );
+            return false;
+        }
+    }
+
+    /**
+     * @param array<int, int> $candidate_ids
+     * @return array{sessions: array<int, array<string, mixed>>, events: array<int, array<string, mixed>>}
+     */
+    public function get_proctoring_reports( array $candidate_ids ): array {
+        $candidate_ids = array_values( array_unique( array_filter( array_map( 'absint', $candidate_ids ) ) ) );
+        if ( ! $candidate_ids ) {
+            return [ 'sessions' => [], 'events' => [] ];
+        }
+        $this->last_error = null;
+        $placeholders = [];
+        $parameters = [];
+        foreach ( $candidate_ids as $index => $candidate_id ) {
+            $key = 'candidate_' . $index;
+            $placeholders[] = ':' . $key;
+            $parameters[ $key ] = $candidate_id;
+        }
+        $in_clause = implode( ', ', $placeholders );
+        $sessions = $this->fetch_all(
+            'SELECT SESSION_ID AS "session_id", KANDIDAT_ID AS "candidate_id", IDENTITY_STATUS AS "identity_status",
+                    TO_CHAR(CREATED_AT, \'YYYY-MM-DD HH24:MI:SS\') AS "created_at",
+                    TO_CHAR(COMPLETED_AT, \'YYYY-MM-DD HH24:MI:SS\') AS "completed_at",
+                    TO_CHAR(RETENTION_UNTIL, \'YYYY-MM-DD HH24:MI:SS\') AS "retention_until"
+             FROM HRS_PSY_PROCTOR_SESSIONS
+             WHERE KANDIDAT_ID IN (' . $in_clause . ') AND RETENTION_UNTIL > CURRENT_TIMESTAMP',
+            $parameters
+        );
+        $events = $this->fetch_all(
+            'SELECT e.EVENT_ID AS "event_id", e.SESSION_ID AS "session_id", s.KANDIDAT_ID AS "candidate_id",
+                    e.EVENT_TYPE AS "event_type", e.FILE_KEY AS "file_key",
+                    e.ACTOR_USER_ID AS "actor_user_id", e.TARGET_EVENT_ID AS "target_event_id",
+                    TO_CHAR(e.EVENT_AT, \'YYYY-MM-DD HH24:MI:SS\') AS "event_at"
+             FROM HRS_PSY_PROCTOR_EVENTS e
+             JOIN HRS_PSY_PROCTOR_SESSIONS s ON s.SESSION_ID = e.SESSION_ID
+             WHERE s.KANDIDAT_ID IN (' . $in_clause . ') AND s.RETENTION_UNTIL > CURRENT_TIMESTAMP
+             ORDER BY e.EVENT_AT DESC',
+            $parameters
+        );
+        return [ 'sessions' => $sessions, 'events' => $events ];
+    }
+
+    /** @return array<string, mixed>|null */
+    public function get_proctoring_image_record( int $candidate_id, string $session_id, int $event_id ): ?array {
+        if ( $candidate_id < 1 || $event_id < 1 || ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id ) ) {
+            return null;
+        }
+        $this->last_error = null;
+        $rows = $this->fetch_all(
+            'SELECT e.EVENT_ID AS "event_id", e.SESSION_ID AS "session_id", e.FILE_KEY AS "file_key"
+             FROM HRS_PSY_PROCTOR_EVENTS e
+             JOIN HRS_PSY_PROCTOR_SESSIONS s ON s.SESSION_ID = e.SESSION_ID
+             WHERE e.EVENT_ID = :event_id AND e.SESSION_ID = :session_id
+               AND s.KANDIDAT_ID = :candidate_id AND e.FILE_KEY IS NOT NULL
+               AND s.RETENTION_UNTIL > CURRENT_TIMESTAMP',
+            [ 'event_id' => $event_id, 'session_id' => $session_id, 'candidate_id' => $candidate_id ]
+        );
+        return $rows[0] ?? null;
+    }
+
+    public function log_proctoring_image_access( string $session_id, int $admin_user_id, int $target_event_id ): bool {
+        if ( ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id ) || $admin_user_id < 1 || $target_event_id < 1 ) {
+            return false;
+        }
+        $this->last_error = null;
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $lock = $connection->prepare(
+                'SELECT SESSION_ID FROM HRS_PSY_PROCTOR_SESSIONS
+                 WHERE SESSION_ID = :session_id AND RETENTION_UNTIL > CURRENT_TIMESTAMP FOR UPDATE'
+            );
+            $lock->execute( [ 'session_id' => $session_id ] );
+            if ( false === $lock->fetchColumn() ) {
+                $connection->rollBack();
+                return false;
+            }
+            $target = $connection->prepare(
+                'SELECT EVENT_ID FROM HRS_PSY_PROCTOR_EVENTS
+                 WHERE EVENT_ID = :target_event_id AND SESSION_ID = :target_session_id AND FILE_KEY IS NOT NULL'
+            );
+            $target->execute( [ 'target_event_id' => $target_event_id, 'target_session_id' => $session_id ] );
+            if ( false === $target->fetchColumn() ) {
+                $connection->rollBack();
+                return false;
+            }
+            $statement = $connection->prepare(
+                'INSERT INTO HRS_PSY_PROCTOR_EVENTS (SESSION_ID, EVENT_TYPE, EVENT_AT, ACTOR_USER_ID, TARGET_EVENT_ID)
+                 VALUES (:session_id, \'IMAGE_ACCESS\', CURRENT_TIMESTAMP, :admin_user_id, :target_event_id)'
+            );
+            $statement->execute(
+                [ 'session_id' => $session_id, 'admin_user_id' => $admin_user_id, 'target_event_id' => $target_event_id ]
+            );
+            $connection->commit();
+            return 1 === $statement->rowCount();
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_oracle_failure( 'Psychotest evidence access audit failed', $exception );
+            return false;
+        }
+    }
+
+    public function review_proctoring_identity( int $candidate_id, string $session_id, int $admin_user_id ): bool {
+        if ( $candidate_id < 1 || $admin_user_id < 1 || ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id ) ) {
+            return false;
+        }
+        $this->last_error = null;
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $lock = $connection->prepare(
+                'SELECT IDENTITY_STATUS FROM HRS_PSY_PROCTOR_SESSIONS
+                 WHERE SESSION_ID = :session_id AND KANDIDAT_ID = :candidate_id
+                   AND RETENTION_UNTIL > CURRENT_TIMESTAMP FOR UPDATE'
+            );
+            $lock->execute( [ 'session_id' => $session_id, 'candidate_id' => $candidate_id ] );
+            if ( 'MANUAL_REVIEW' !== (string) $lock->fetchColumn() ) {
+                throw new RuntimeException( 'Proctoring identity is not awaiting manual review.' );
+            }
+            $update = $connection->prepare(
+                'UPDATE HRS_PSY_PROCTOR_SESSIONS SET IDENTITY_STATUS = \'MANUAL_VERIFIED\', UPDATED_AT = CURRENT_TIMESTAMP
+                 WHERE SESSION_ID = :session_id AND KANDIDAT_ID = :candidate_id'
+            );
+            $update->execute( [ 'session_id' => $session_id, 'candidate_id' => $candidate_id ] );
+            if ( 1 !== $update->rowCount() ) {
+                throw new RuntimeException( 'Manual identity status could not be updated.' );
+            }
+            $event = $connection->prepare(
+                'INSERT INTO HRS_PSY_PROCTOR_EVENTS (SESSION_ID, EVENT_TYPE, EVENT_AT, ACTOR_USER_ID)
+                 VALUES (:session_id, \'MANUAL_VERIFIED\', CURRENT_TIMESTAMP, :admin_user_id)'
+            );
+            $event->execute( [ 'session_id' => $session_id, 'admin_user_id' => $admin_user_id ] );
+            $connection->commit();
+            return true;
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_oracle_failure( 'Psychotest manual identity review failed', $exception );
+            return false;
+        }
+    }
+
+    /** @return array<int, array{session_id: string, file_keys: array<int, string>}> */
+    public function get_expired_proctoring_sessions(): array {
+        $this->last_error = null;
+        $sessions = $this->fetch_all(
+            'SELECT SESSION_ID AS "session_id" FROM HRS_PSY_PROCTOR_SESSIONS WHERE RETENTION_UNTIL <= CURRENT_TIMESTAMP'
+        );
+        $expired = [];
+        foreach ( $sessions as $session ) {
+            $session_id = (string) ( $session['session_id'] ?? '' );
+            if ( ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id ) ) {
+                continue;
+            }
+            $events = $this->fetch_all(
+                'SELECT FILE_KEY AS "file_key" FROM HRS_PSY_PROCTOR_EVENTS
+                 WHERE SESSION_ID = :session_id AND FILE_KEY IS NOT NULL',
+                [ 'session_id' => $session_id ]
+            );
+            $expired[] = [
+                'session_id' => $session_id,
+                'file_keys' => array_values( array_map( 'strval', array_column( $events, 'file_key' ) ) ),
+            ];
+        }
+        return $expired;
+    }
+
+    public function delete_expired_proctoring_session( string $session_id ): bool {
+        if ( ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id ) ) {
+            return false;
+        }
+        $this->last_error = null;
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $check = $connection->prepare(
+                'SELECT SESSION_ID FROM HRS_PSY_PROCTOR_SESSIONS
+                 WHERE SESSION_ID = :session_id AND RETENTION_UNTIL <= CURRENT_TIMESTAMP FOR UPDATE'
+            );
+            $check->execute( [ 'session_id' => $session_id ] );
+            if ( false === $check->fetchColumn() ) {
+                $connection->rollBack();
+                return false;
+            }
+            $events = $connection->prepare( 'DELETE FROM HRS_PSY_PROCTOR_EVENTS WHERE SESSION_ID = :session_id' );
+            $events->execute( [ 'session_id' => $session_id ] );
+            $session = $connection->prepare( 'DELETE FROM HRS_PSY_PROCTOR_SESSIONS WHERE SESSION_ID = :session_id' );
+            $session->execute( [ 'session_id' => $session_id ] );
+            $connection->commit();
+            return true;
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_oracle_failure( 'Psychotest proctoring retention cleanup failed', $exception );
+            return false;
+        }
     }
 
     /**

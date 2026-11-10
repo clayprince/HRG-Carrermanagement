@@ -25,6 +25,7 @@ if ( is_readable( __DIR__ . '/vendor/autoload.php' ) ) {
 require_once __DIR__ . '/includes/helpers.php';
 require_once __DIR__ . '/database/class-database.php';
 require_once __DIR__ . '/includes/class-applicant-profile.php';
+require_once __DIR__ . '/includes/class-psychotest-proctoring.php';
 require_once __DIR__ . '/includes/class-application.php';
 require_once __DIR__ . '/includes/class-auth.php';
 require_once __DIR__ . '/includes/class-iq-assessment.php';
@@ -59,4 +60,10 @@ register_activation_hook(
     }
 );
 
-register_deactivation_hook( __FILE__, 'flush_rewrite_rules' );
+register_deactivation_hook(
+    __FILE__,
+    static function (): void {
+        wp_clear_scheduled_hook( 'daw_psychotest_proctoring_cleanup' );
+        flush_rewrite_rules();
+    }
+);

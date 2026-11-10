@@ -15,6 +15,7 @@
   setupApplicantProfileRepeater();
   setupPsychologicalTestProcessing();
   setupPsychotestDeviceCheck();
+  setupPsychotestProctoring();
   setupPsychometricAssessments();
 
   document.addEventListener("click", function handleRecruitmentClick(event) {
@@ -995,6 +996,284 @@
     return result;
   }
 
+  function setupPsychotestProctoring() {
+    const identityCapture = document.querySelector("[data-proctoring-identity]");
+    if (identityCapture) {
+      const video = identityCapture.querySelector(
+        "[data-proctoring-identity-video]",
+      );
+      const canvas = identityCapture.querySelector(
+        "[data-proctoring-identity-canvas]",
+      );
+      const startButton = identityCapture.querySelector(
+        "[data-proctoring-identity-start]",
+      );
+      const captureButton = identityCapture.querySelector(
+        "[data-proctoring-identity-capture]",
+      );
+      const form = document.querySelector("[data-proctoring-identity-form]");
+      const actionInput = form?.querySelector(
+        "[data-proctoring-identity-action]",
+      );
+      const status = identityCapture.querySelector(
+        "[data-proctoring-identity-status]",
+      );
+      const error = form?.querySelector("[data-proctoring-identity-error]");
+      let stream = null;
+
+      if (video && canvas && startButton && captureButton && form && actionInput && status && error) {
+        startButton.addEventListener("click", async function startIdentityCamera() {
+          if (!navigator.mediaDevices?.getUserMedia) {
+            status.textContent = "Browser ini tidak mendukung kamera. Pilih verifikasi manual.";
+            return;
+          }
+          startButton.disabled = true;
+          status.textContent = "Meminta izin kamera...";
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                facingMode: "user",
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+              },
+              audio: false,
+            });
+            video.srcObject = stream;
+            video.hidden = false;
+            captureButton.disabled = false;
+            status.textContent = "Posisikan wajah dan sisi depan KTP di dalam bingkai.";
+          } catch (cameraError) {
+            startButton.disabled = false;
+            status.textContent =
+              cameraError?.name === "NotAllowedError"
+                ? "Izin kamera ditolak. Izinkan kamera atau pilih verifikasi manual."
+                : "Kamera tidak dapat dibuka. Pilih verifikasi manual bila perlu.";
+          }
+        });
+
+        captureButton.addEventListener("click", async function captureIdentity() {
+          if (!stream || !video.videoWidth || !video.videoHeight) {
+            status.textContent = "Kamera belum siap. Tunggu sebentar lalu coba lagi.";
+            return;
+          }
+          captureButton.disabled = true;
+          error.hidden = true;
+          const scale = Math.min(1, 1600 / video.videoWidth);
+          canvas.width = Math.round(video.videoWidth * scale);
+          canvas.height = Math.round(video.videoHeight * scale);
+          canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+          const image = await new Promise((resolve) =>
+            canvas.toBlob(resolve, "image/jpeg", 0.82),
+          );
+          if (!image) {
+            captureButton.disabled = false;
+            status.textContent = "Foto gagal dibuat. Silakan coba kembali.";
+            return;
+          }
+
+          actionInput.value = "capture";
+          const body = new FormData(form);
+          body.set("snapshot", image, "capture.jpg");
+          status.textContent = "Menyimpan foto secara privat...";
+          stream.getTracks().forEach((track) => track.stop());
+          try {
+            const response = await fetch(form.action, {
+              method: "POST",
+              body,
+              credentials: "same-origin",
+            });
+            if (!response.ok || !response.redirected) {
+              throw new Error("Identity upload failed.");
+            }
+            window.location.assign(response.url);
+          } catch {
+            captureButton.disabled = false;
+            error.textContent =
+              "Foto tidak berhasil disimpan. Periksa koneksi dan coba kembali.";
+            error.hidden = false;
+            status.textContent = "Pengiriman foto gagal.";
+          }
+        });
+        window.addEventListener("pagehide", function stopIdentityCamera() {
+          stream?.getTracks().forEach((track) => track.stop());
+        });
+      }
+    }
+
+    const watch = document.querySelector("[data-psychotest-proctoring-watch]");
+    if (!watch) {
+      return;
+    }
+    const video = watch.querySelector("[data-proctoring-watch-video]");
+    const status = watch.querySelector("[data-proctoring-watch-status]");
+    const ajaxUrl = watch.dataset.ajaxUrl;
+    const nonce = watch.dataset.nonce;
+    const cameraMode = watch.dataset.cameraMode;
+    if (!video || !status || !ajaxUrl || !nonce) {
+      return;
+    }
+    let stream = null;
+    const lastAlertAt = new Map();
+
+    const sendEvent = async function sendEvent(eventType, withSnapshot) {
+      const now = Date.now();
+      const lastSentAt = lastAlertAt.get(eventType) || 0;
+      if (10_000 > now - lastSentAt) {
+        return null;
+      }
+      lastAlertAt.set(eventType, now);
+      const body = new FormData();
+      body.set("action", "recruitment_proctoring_event");
+      body.set("nonce", nonce);
+      body.set("event_type", eventType);
+      if (withSnapshot && stream && video.videoWidth && video.videoHeight) {
+        const canvas = document.createElement("canvas");
+        const scale = Math.min(1, 480 / video.videoWidth);
+        canvas.width = Math.round(video.videoWidth * scale);
+        canvas.height = Math.round(video.videoHeight * scale);
+        canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+        let image = await new Promise((resolve) =>
+          canvas.toBlob(resolve, "image/jpeg", 0.45),
+        );
+        if (image && 48_000 < image.size) {
+          canvas.width = Math.round(video.videoWidth * Math.min(1, 320 / video.videoWidth));
+          canvas.height = Math.round(video.videoHeight * Math.min(1, 320 / video.videoWidth));
+          canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+          image = await new Promise((resolve) =>
+            canvas.toBlob(resolve, "image/jpeg", 0.35),
+          );
+        }
+        if (image) {
+          body.set("snapshot", image, "alert.jpg");
+        }
+      }
+      if (navigator.sendBeacon && navigator.sendBeacon(ajaxUrl, body)) {
+        status.textContent =
+          "Peringatan sedang dikirim untuk ditinjau. Maksimal lima snapshot disimpan untuk seluruh sesi tes.";
+        return true;
+      }
+      try {
+        const response = await fetch(ajaxUrl, {
+          method: "POST",
+          body,
+          credentials: "same-origin",
+          keepalive: true,
+        });
+        if (!response.ok) {
+          throw new Error("Proctoring event was not accepted.");
+        }
+        const result = await response.json();
+        if (!result?.success) {
+          throw new Error("Proctoring event was not saved.");
+        }
+        status.textContent = result.data?.captured
+          ? "Peringatan dan snapshot tersimpan untuk ditinjau HR."
+          : "Peringatan tercatat; tidak ada snapshot tambahan yang disimpan.";
+        return true;
+      } catch {
+        lastAlertAt.delete(eventType);
+        status.textContent = "Peringatan belum terkonfirmasi. Periksa koneksi internet.";
+        return false;
+      }
+    };
+
+    const microphoneButton = watch.querySelector(
+      "[data-proctoring-microphone-check]",
+    );
+    const microphoneStatus = watch.querySelector(
+      "[data-proctoring-microphone-status]",
+    );
+    if (microphoneButton && microphoneStatus) {
+      microphoneButton.addEventListener("click", async function checkMicrophone() {
+        if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+          microphoneStatus.textContent =
+            "Mikrofon memerlukan HTTPS atau localhost. Tidak ada audio yang direkam.";
+          sendEvent("MICROPHONE_UNAVAILABLE", false);
+          return;
+        }
+
+        microphoneButton.disabled = true;
+        microphoneStatus.textContent = "Memeriksa izin dan ketersediaan mikrofon...";
+        let microphoneStream = null;
+        try {
+          microphoneStream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+          });
+          const microphoneAvailable = microphoneStream
+            .getAudioTracks()
+            .some((track) => "live" === track.readyState);
+          microphoneStream.getTracks().forEach((track) => track.stop());
+          microphoneStream = null;
+
+          if (!microphoneAvailable) {
+            throw new Error("No live microphone track was returned.");
+          }
+          microphoneStatus.textContent =
+            "Mikrofon tersedia. Hanya status yang dicatat; audio tidak direkam.";
+          if (false === (await sendEvent("MICROPHONE_AVAILABLE", false))) {
+            microphoneStatus.textContent =
+              "Mikrofon tersedia, tetapi statusnya belum berhasil dilaporkan. Coba lagi.";
+          }
+        } catch (microphoneError) {
+          microphoneStream?.getTracks().forEach((track) => track.stop());
+          microphoneStatus.textContent =
+            microphoneError?.name === "NotAllowedError"
+              ? "Izin mikrofon ditolak. Status ini dilaporkan ke HR; audio tidak direkam."
+              : "Mikrofon tidak tersedia. Status ini dilaporkan ke HR; audio tidak direkam.";
+          if (false === (await sendEvent("MICROPHONE_UNAVAILABLE", false))) {
+            microphoneStatus.textContent =
+              "Status mikrofon tidak dapat dilaporkan. Periksa koneksi internet lalu coba lagi.";
+          }
+        } finally {
+          microphoneButton.disabled = false;
+        }
+      });
+    }
+
+    document.addEventListener("visibilitychange", function recordTabChange() {
+      if (document.hidden) {
+        sendEvent("TAB_HIDDEN", "manual" !== cameraMode);
+      }
+    });
+    if ("manual" === cameraMode) {
+      return;
+    }
+    if (!window.isSecureContext) {
+      status.textContent =
+        "Kamera memerlukan HTTPS atau localhost. Tidak ada audio yang direkam.";
+      sendEvent("CAMERA_UNAVAILABLE", false);
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      status.textContent = "Kamera tidak didukung. Identitas perlu diperiksa manual oleh HR.";
+      sendEvent("CAMERA_UNAVAILABLE", false);
+      return;
+    }
+    navigator.mediaDevices
+      .getUserMedia({
+        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+        audio: false,
+      })
+      .then(function startAssessmentCamera(mediaStream) {
+        stream = mediaStream;
+        video.srcObject = mediaStream;
+        status.textContent = "Kamera aktif. Tidak ada audio yang direkam.";
+        stream.getVideoTracks().forEach((track) => {
+          track.addEventListener("ended", function recordCameraStopped() {
+            status.textContent = "Kamera terputus. Peringatan dikirim untuk tinjauan HR.";
+            sendEvent("CAMERA_STOPPED", false);
+          });
+        });
+      })
+      .catch(function reportCameraUnavailable() {
+        status.textContent = "Kamera tidak tersedia. Peristiwa dicatat untuk tinjauan manual HR.";
+        sendEvent("CAMERA_UNAVAILABLE", false);
+      });
+    window.addEventListener("pagehide", function stopAssessmentCamera() {
+      stream?.getTracks().forEach((track) => track.stop());
+    });
+  }
+
   function setupPsychotestDeviceCheck() {
     const deviceCheck = document.querySelector(
       "[data-psychotest-device-check]",
@@ -1004,10 +1283,6 @@
     }
 
     const cameraStatus = document.querySelector("[data-device-camera-status]");
-    const microphoneStatus = document.querySelector(
-      "[data-device-microphone-status]",
-    );
-    const audioStatus = document.querySelector("[data-device-audio-status]");
     const browserStatus = document.querySelector(
       "[data-device-browser-status]",
     );
@@ -1025,8 +1300,6 @@
     );
     if (
       !cameraStatus ||
-      !microphoneStatus ||
-      !audioStatus ||
       !browserStatus ||
       !connectionStatus ||
       !permissionButton ||
@@ -1096,6 +1369,8 @@
       videoElement.hidden = true;
       cameraShell.classList.add("is-empty");
       emptyState.hidden = false;
+      permissionButton.disabled = false;
+      permissionButton.textContent = "Izinkan Kamera";
     };
 
     const handleUnsupportedBrowser = function handleUnsupportedBrowser() {
@@ -1106,14 +1381,14 @@
         cameraRequired ? "Browser tidak mendukung" : "Kamera opsional tidak tersedia",
         cameraRequired
           ? "Gunakan browser modern seperti Chrome atau Edge untuk menjalankan tes."
-          : "Tes ini dapat dilanjutkan tanpa akses kamera dan mikrofon.",
+          : "Tes ini dapat dilanjutkan tanpa akses kamera.",
       );
       updateStatus(
         cameraStatus,
         cameraRequired ? "error" : "warning",
         cameraRequired ? "Kamera tidak tersedia" : "Kamera opsional tidak tersedia",
         cameraRequired
-          ? "Browser ini tidak mendukung akses kamera dan mikrofon."
+          ? "Browser ini tidak mendukung akses kamera."
           : "Tes dapat dilanjutkan tanpa kamera karena pengaturan tes tidak mewajibkannya.",
       );
       permissionButton.disabled = true;
@@ -1145,6 +1420,29 @@
     };
 
     const setBrowserStatus = function setBrowserStatus() {
+      if (!window.isSecureContext) {
+        unsupportedBanner.hidden = false;
+        unsupportedBanner.textContent = "HTTPS diperlukan untuk mengakses kamera";
+        updateStatus(
+          browserStatus,
+          "error",
+          "Akses HTTPS diperlukan",
+          "Browser memblokir kamera pada HTTP. Buka situs melalui HTTPS atau localhost.",
+        );
+        updateStatus(
+          cameraStatus,
+          cameraRequired ? "error" : "warning",
+          cameraRequired ? "Kamera memerlukan HTTPS" : "Kamera opsional tidak tersedia",
+          cameraRequired
+            ? "Gunakan HTTPS atau localhost agar izin kamera dapat diminta."
+            : "Tes dapat dilanjutkan tanpa kamera karena pengaturan tes tidak mewajibkannya.",
+        );
+        permissionButton.disabled = true;
+        permissionButton.textContent = "Perlu HTTPS";
+        setContinueState();
+        return;
+      }
+
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         handleUnsupportedBrowser();
         return;
@@ -1155,7 +1453,7 @@
         browserStatus,
         "success",
         "Browser siap",
-        "Browser mendukung pengecekan kamera dan mikrofon.",
+        "Browser mendukung pengecekan kamera.",
       );
     };
 
@@ -1172,20 +1470,25 @@
         "Kamera aktif",
         "Izin akses kamera telah diberikan.",
       );
-      updateStatus(
-        microphoneStatus,
-        "success",
-        "Mikrofon aktif",
-        "Izin mikrofon telah diberikan.",
-      );
-      updateStatus(
-        audioStatus,
-        "success",
-        "Audio siap",
-        "Audio dan mikrofon terdeteksi dengan baik.",
-      );
       permissionButton.disabled = true;
       permissionButton.textContent = "Kamera Sudah Aktif";
+      mediaStream.getVideoTracks().forEach(function watchCameraTrack(track) {
+        track.addEventListener("ended", function handleCameraTrackEnded() {
+          if (stream !== mediaStream) {
+            return;
+          }
+          stopStream();
+          updateStatus(
+            cameraStatus,
+            "error",
+            "Kamera terputus",
+            "Hubungkan kembali kamera lalu tekan “Izinkan Kamera”.",
+          );
+          permissionButton.disabled = false;
+          permissionButton.textContent = "Izinkan Kamera";
+          setContinueState();
+        });
+      });
       setContinueState();
     };
 
@@ -1196,8 +1499,7 @@
 
       if ("NotAllowedError" === name) {
         title = "Izin dibatalkan";
-        message =
-          "Akses kamera dan mikrofon dibatalkan. Silakan izinkan kembali.";
+        message = "Akses kamera dibatalkan. Silakan izinkan kembali.";
       } else if ("NotFoundError" === name) {
         title = "Kamera tidak ditemukan";
         message = "Hubungkan perangkat kamera lalu coba lagi.";
@@ -1208,22 +1510,10 @@
       } else if ("SecurityError" === name) {
         title = "Akses dibatasi";
         message =
-          "Halaman ini harus diakses melalui localhost atau HTTPS agar kamera dapat dipakai.";
+          "Halaman ini harus diakses melalui HTTPS atau localhost agar kamera dapat dipakai.";
       }
 
       updateStatus(cameraStatus, "error", title, message);
-      updateStatus(
-        microphoneStatus,
-        "warning",
-        "Mikrofon belum aktif",
-        "Izinkan akses mikrofon saat kamera dibuka.",
-      );
-      updateStatus(
-        audioStatus,
-        "warning",
-        "Audio belum diperiksa",
-        "Audio akan diperiksa setelah izin diberikan.",
-      );
       permissionButton.disabled = false;
       permissionButton.textContent = "Izinkan Kamera";
       setContinueState();
@@ -1236,8 +1526,8 @@
     window.addEventListener("offline", setNetworkStatus);
 
     permissionButton.addEventListener("click", function requestCameraAccess() {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        handleUnsupportedBrowser();
+      if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+        setBrowserStatus();
         return;
       }
 
@@ -1255,7 +1545,7 @@
             width: { ideal: 1280 },
             height: { ideal: 720 },
           },
-          audio: true,
+          audio: false,
         })
         .then(handleRequestSuccess)
         .catch(handleRequestError)
@@ -1270,23 +1560,16 @@
     retryButton.addEventListener("click", function retryCameraCheck() {
       stopStream();
       unsupportedBanner.hidden = true;
+      setBrowserStatus();
+      if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+        setContinueState();
+        return;
+      }
       updateStatus(
         cameraStatus,
         "warning",
         "Kamera belum aktif",
         "Klik “Izinkan Kamera” untuk memulai pengecekan.",
-      );
-      updateStatus(
-        microphoneStatus,
-        "warning",
-        "Mikrofon belum aktif",
-        "Izinkan akses mikrofon saat kamera dibuka.",
-      );
-      updateStatus(
-        audioStatus,
-        "warning",
-        "Audio belum diperiksa",
-        "Volume dan input audio akan dicek saat izin diberikan.",
       );
       permissionButton.disabled = false;
       permissionButton.textContent = "Izinkan Kamera";
@@ -1307,8 +1590,15 @@
     document.addEventListener(
       "visibilitychange",
       function onPageVisibilityChanged() {
-        if (document.hidden) {
+        if (document.hidden && stream) {
           stopStream();
+          updateStatus(
+            cameraStatus,
+            "warning",
+            "Kamera dijeda",
+            "Kamera dihentikan saat halaman tidak aktif. Aktifkan kembali sebelum melanjutkan.",
+          );
+          setContinueState();
         }
       },
     );

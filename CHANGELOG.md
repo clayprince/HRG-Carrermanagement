@@ -4,6 +4,47 @@ This file records material, verified project changes and guides future human
 and AI contributors. It is not a substitute for source review or a database
 migration log.
 
+## 2026-11-10
+
+### Psychotest camera and microphone checks
+
+- Made the device check explain when an insecure HTTP origin blocks camera
+  access, and reset readiness if the camera disconnects after permission.
+- Added an explicit microphone availability check. Only the permission/device
+  status is reported to HR; no audio is recorded or stored.
+- Kept separate camera, tab, and microphone event reporting from suppressing
+  one another during the same short interval.
+- Runtime camera validation still requires the local site to be served through
+  HTTPS or localhost.
+
+### Applicant application tracking
+
+- Fixed tracking queries that referenced `NAMA_DEPARTEMEN` on
+  `HRS_DETAIL_INFO_LOWONGAN`; the Oracle schema spells that detail column
+  `NAMA_DEPARTEMENT`. Tracking now reads it with the landing table's department
+  as a fallback.
+
+## 2026-11-09
+
+### Psychotest proctoring foundation
+
+- Added explicit consent, private selfie/KTP capture, a manual identity-review
+  path, and camera-only monitoring for tab changes and camera disconnects.
+- Added a five-alert-image-per-session limit, Administrator-only evidence
+  downloads with access audit, and scheduled one-year retention cleanup.
+- Added Oracle migration 014 for review; it has not been applied. Face-count,
+  gaze, and phone/device detection remain out of scope for this phase.
+
+### Recruitment data flow to admin and User Department
+
+- User Department applicant and interview details now read the scoped Oracle
+  application, profile, form-answer, and selection-history data instead of
+  showing hardcoded candidate examples.
+- HR status updates return to the same application after saving, including
+  when a candidate has multiple applications.
+- No database migration was introduced. Private applicant uploads are not
+  exposed as download links in User Department.
+
 ## 2026-11-08
 
 ### Pauli legacy session handling

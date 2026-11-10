@@ -31,6 +31,7 @@ $psychotest_home_url = recruitment_get_public_url( 'psychotest' );
                 $test = $view['test'];
                 $number_sequence = implode( '', $test['numbers'] );
                 ?>
+                <?php require recruitment_get_plugin_path( 'public/components/psychotest-proctoring-watch.php' ); ?>
                 <section
                     class="daw-psych-test-card daw-pauli-assessment daw-pauli-live"
                     data-pauli-assessment
