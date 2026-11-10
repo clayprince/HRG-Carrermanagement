@@ -7,6 +7,7 @@ $settings_section = sanitize_key( $_GET['section'] ?? 'email' );
 $dashboard_url = recruitment_get_admin_url( 'dashboard' );
 $settings_url = recruitment_get_admin_url( 'settings' );
 $vacancy_view = 'create' === sanitize_key( $_GET['view'] ?? '' ) ? 'create' : ( 'recruitment-applications' === $current_page ? 'requests' : 'list' );
+$active_candidate_count = ( new Recruitment_Database() )->get_active_applicant_count();
 $stage_url = static function ( string $stage ) use ( $dashboard_url ): string {
     return add_query_arg( 'stage', $stage, $dashboard_url );
 };
@@ -48,7 +49,7 @@ $root_links = [
                         : $current_page === $item['page'];
                     $url = $item['url'] ?? $stage_url( $item['stage'] );
                     ?>
-                    <a href="<?= esc_url( $url ) ?>" class="<?= $is_active ? 'is-active' : '' ?>" <?= $is_active ? 'aria-current="page"' : '' ?>><span class="recruitment-dashboard__nav-label"><?= esc_html( $item['label'] ) ?></span><?php if ( 'Semua Kandidat Aktif' === $item['label'] ) : ?><span class="recruitment-dashboard__nav-count">12</span><?php endif; ?></a>
+                    <a href="<?= esc_url( $url ) ?>" class="<?= $is_active ? 'is-active' : '' ?>" <?= $is_active ? 'aria-current="page"' : '' ?>><span class="recruitment-dashboard__nav-label"><?= esc_html( $item['label'] ) ?></span><?php if ( 'Semua Kandidat Aktif' === $item['label'] ) : ?><span class="recruitment-dashboard__nav-count"><?= esc_html( number_format_i18n( $active_candidate_count ) ) ?></span><?php endif; ?></a>
                 <?php endforeach; ?>
             </div>
         </div>

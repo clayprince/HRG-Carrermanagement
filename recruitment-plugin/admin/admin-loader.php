@@ -17,6 +17,9 @@ class Recruitment_Admin {
 		add_action( 'admin_post_daw_save_vacancy', [ $this, 'handle_vacancy_save' ] );
 		add_action( 'admin_post_daw_set_vacancy_status', [ $this, 'handle_vacancy_status' ] );
 		add_action( 'admin_post_daw_update_application_status', [ $this, 'handle_application_status' ] );
+		add_action( 'admin_post_daw_send_application_status_email', [ $this, 'handle_application_status_email' ] );
+		add_action( 'admin_post_daw_update_psychotest_attendance_time', [ $this, 'handle_psychotest_attendance_time_update' ] );
+		add_action( 'admin_post_daw_download_applicant_profile', [ $this, 'handle_applicant_profile_download' ] );
 		add_action( 'admin_menu', [ $this, 'remove_vacancy_post_type_submenu' ], 99 );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
 		add_action( 'in_admin_header', [ $this, 'render_admin_sidebar' ] );
@@ -418,24 +421,211 @@ class Recruitment_Admin {
 
 		$application_id = absint( $_POST['application_id'] ?? 0 );
 		check_admin_referer( 'daw_update_application_status_' . $application_id );
-		$status = sanitize_text_field( wp_unslash( $_POST['status'] ?? '' ) );
-		$stage = sanitize_text_field( wp_unslash( $_POST['stage'] ?? '' ) );
+		$decision = sanitize_key( wp_unslash( $_POST['administrative_result'] ?? '' ) );
+		$next_stage = strtoupper( sanitize_key( wp_unslash( $_POST['next_stage'] ?? '' ) ) );
 		$note = sanitize_textarea_field( wp_unslash( $_POST['note'] ?? '' ) );
+		if ( 'failed' === $decision ) {
+			$status = 'DITOLAK';
+			$stage = 'ADMINISTRASI';
+			$note = trim( 'Seleksi administrasi: tidak lolos. ' . $note );
+		} elseif ( 'passed' === $decision && in_array( $next_stage, [ 'PSIKOTES', 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) ) {
+			$status = $next_stage;
+			$stage = $next_stage;
+			$note = trim( 'Seleksi administrasi: lolos. Tahap berikutnya: ' . $next_stage . '. ' . $note );
+		} else {
+			wp_die( esc_html__( 'Pilih hasil seleksi administrasi dan tahap berikutnya yang valid.', 'recruitment-plugin' ) );
+		}
 		$result = ( new Recruitment_Database() )->update_application_status( (string) $application_id, $status, $stage, $note );
 		if ( empty( $result['success'] ) ) {
 			wp_die( esc_html( $result['error'] ?? 'Status lamaran gagal disimpan.' ) );
+		}
+
+		$pending_key = $this->application_status_email_pending_key( get_current_user_id(), $application_id );
+		set_transient( $pending_key, $status, 15 * MINUTE_IN_SECONDS );
+		wp_safe_redirect(
+			add_query_arg(
+				[
+					'page' => 'recruitment-applicants',
+					'candidate_id' => absint( $_POST['candidate_id'] ?? 0 ),
+					'application_id' => $application_id,
+					'status_updated' => '1',
+					'email_preview' => '1',
+				],
+				admin_url( 'admin.php' )
+			)
+		);
+		exit;
+	}
+
+	public function handle_psychotest_attendance_time_update(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk memperbarui waktu konfirmasi psikotes.', 'recruitment-plugin' ) );
+		}
+
+		$application_id = absint( $_POST['application_id'] ?? 0 );
+		$candidate_id = absint( $_POST['candidate_id'] ?? 0 );
+		check_admin_referer( 'daw_update_psychotest_attendance_time_' . $application_id . '_' . $candidate_id );
+		$confirmed_date = isset( $_POST['confirmed_date'] ) && is_scalar( $_POST['confirmed_date'] )
+			? sanitize_text_field( wp_unslash( (string) $_POST['confirmed_date'] ) )
+			: '';
+		$confirmed_time = isset( $_POST['confirmed_time'] ) && is_scalar( $_POST['confirmed_time'] )
+			? sanitize_text_field( wp_unslash( (string) $_POST['confirmed_time'] ) )
+			: '';
+		$local_datetime = $confirmed_date . 'T' . $confirmed_time;
+		$parsed_datetime = DateTimeImmutable::createFromFormat( '!Y-m-d\TH:i', $local_datetime, wp_timezone() );
+		if (
+			0 >= $application_id
+			|| 0 >= $candidate_id
+			|| ! ( $parsed_datetime instanceof DateTimeImmutable )
+			|| $parsed_datetime->format( 'Y-m-d\TH:i' ) !== $local_datetime
+			|| ! recruitment_is_psychotest_attendance_time_in_window(
+				(array) get_option( 'recruitment_psychotest_settings', [] ),
+				$parsed_datetime
+			)
+		) {
+			$result = [ 'success' => false, 'error' => 'invalid_time' ];
+		} else {
+			$result = ( new Recruitment_Database() )->update_psychotest_attendance_time(
+				(string) $candidate_id,
+				(string) $application_id,
+				$local_datetime
+			);
 		}
 
 		wp_safe_redirect(
 			add_query_arg(
 				[
 					'page' => 'recruitment-applicants',
-					'candidate_id' => absint( $_POST['candidate_id'] ?? 0 ),
-					'status_updated' => '1',
+					'candidate_id' => $candidate_id,
+					'application_id' => $application_id,
+					'attendance_time_result' => ! empty( $result['success'] ) ? 'updated' : ( 'invalid_time' === ( $result['error'] ?? '' ) ? 'invalid' : 'error' ),
 				],
 				admin_url( 'admin.php' )
 			)
 		);
+		exit;
+	}
+
+	public function handle_application_status_email(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengirim pembaruan status lamaran.', 'recruitment-plugin' ) );
+		}
+
+		$application_id = absint( $_POST['application_id'] ?? 0 );
+		$candidate_id = absint( $_POST['candidate_id'] ?? 0 );
+		check_admin_referer( 'daw_send_application_status_email_' . $application_id . '_' . $candidate_id );
+
+		$pending_key = $this->application_status_email_pending_key( get_current_user_id(), $application_id );
+		$pending_status = get_transient( $pending_key );
+		$application = null;
+		foreach ( ( new Recruitment_Database() )->get_applications() as $row ) {
+			if ( (int) ( $row['id'] ?? 0 ) === $application_id && (int) ( $row['applicant_id'] ?? 0 ) === $candidate_id ) {
+				$application = $row;
+				break;
+			}
+		}
+
+		$current_status = strtoupper( trim( (string) ( $application['status'] ?? '' ) ) );
+		if ( ! is_string( $pending_status ) || '' === $pending_status || $pending_status !== $current_status || ! $application ) {
+			wp_die( esc_html__( 'Konfirmasi email sudah kedaluwarsa atau status lamaran telah berubah. Simpan status terbaru kembali untuk membuat pratinjau baru.', 'recruitment-plugin' ) );
+		}
+
+		$recipient = sanitize_email( (string) ( $application['applicant_email'] ?? '' ) );
+		if ( ! is_email( $recipient ) ) {
+			wp_die( esc_html__( 'Email pelamar tidak tersedia atau tidak valid.', 'recruitment-plugin' ) );
+		}
+
+		$applicant_name = (string) ( $application['applicant_name'] ?? 'Pelamar' );
+		$position = (string) ( $application['title'] ?? 'Posisi yang dilamar' );
+		$status = $current_status;
+
+		ob_start();
+		require recruitment_get_plugin_path( 'templates/emails/application-status.php' );
+		$message = (string) ob_get_clean();
+		$sent = wp_mail(
+			$recipient,
+			sanitize_text_field( 'Pembaruan Status Lamaran - ' . $position ),
+			$message,
+			[ 'Content-Type: text/html; charset=UTF-8' ]
+		);
+		$redirect_args = [
+			'page' => 'recruitment-applicants',
+			'candidate_id' => $candidate_id,
+			'application_id' => $application_id,
+			$sent ? 'status_email_sent' : 'status_email_error' => '1',
+		];
+		if ( $sent ) {
+			delete_transient( $pending_key );
+		} else {
+			$redirect_args['email_preview'] = '1';
+		}
+		wp_safe_redirect( add_query_arg( $redirect_args, admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	private function application_status_email_pending_key( int $user_id, int $application_id ): string {
+		return 'daw_app_status_email_' . $user_id . '_' . $application_id;
+	}
+
+	public function handle_applicant_profile_download(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengunduh profil pelamar.', 'recruitment-plugin' ) );
+		}
+
+		$candidate_id = absint( $_POST['candidate_id'] ?? 0 );
+		check_admin_referer( 'daw_download_applicant_profile_' . $candidate_id );
+		$applicant = ( new Recruitment_Database() )->get_admin_applicant( (string) $candidate_id );
+		if ( ! $applicant ) {
+			wp_die( esc_html__( 'Profil pelamar tidak ditemukan.', 'recruitment-plugin' ) );
+		}
+
+		$details = is_array( $applicant['profile_details'] ?? null ) ? $applicant['profile_details'] : [];
+		$identity = [
+			'Nama Lengkap' => $applicant['name'] ?? '',
+			'Email' => $applicant['email'] ?? '',
+			'Nomor Telepon' => $applicant['phone'] ?? '',
+			'Jenis Kelamin' => $applicant['gender'] ?? '',
+			'Tempat Lahir' => $applicant['birth_place'] ?? '',
+			'Tanggal Lahir' => $applicant['birth_date'] ?? '',
+			'Alamat' => $applicant['address'] ?? '',
+			'Kota' => $applicant['city'] ?? '',
+			'Provinsi' => $applicant['province'] ?? '',
+		];
+		$education = [
+			'Jenjang' => $details['education_level'] ?? $applicant['education'] ?? '',
+			'Institusi' => $details['institution'] ?? '',
+			'Jurusan' => $details['major'] ?? '',
+			'IPK / Nilai' => $details['gpa'] ?? '',
+			'Tahun Lulus' => $details['graduation_year'] ?? '',
+		];
+		$experiences = is_array( $details['work_experiences'] ?? null ) ? $details['work_experiences'] : [];
+		$escape = static function ( $value ): string {
+			return esc_html( is_scalar( $value ) ? (string) $value : '' );
+		};
+
+		nocache_headers();
+		header( 'Content-Type: text/html; charset=UTF-8' );
+		header( 'Content-Disposition: attachment; filename="profil-pelamar-' . sanitize_file_name( (string) $candidate_id ) . '.html"' );
+		echo '<!doctype html><html lang="id"><meta charset="utf-8"><title>Profil Pelamar</title><style>body{font:15px/1.5 Arial,sans-serif;max-width:900px;margin:40px auto;color:#172033}h1,h2{color:#111827}table{border-collapse:collapse;width:100%;margin:12px 0 28px}th,td{border:1px solid #d1d5db;padding:9px;text-align:left}th{width:30%;background:#f3f4f6}</style><body><h1>Profil Pelamar</h1><h2>Data Diri</h2><table>';
+		foreach ( $identity as $label => $value ) {
+			echo '<tr><th>' . $escape( $label ) . '</th><td>' . ( '' !== (string) $value ? $escape( $value ) : '—' ) . '</td></tr>';
+		}
+		echo '</table><h2>Pendidikan</h2><table>';
+		foreach ( $education as $label => $value ) {
+			echo '<tr><th>' . $escape( $label ) . '</th><td>' . ( '' !== (string) $value ? $escape( $value ) : '—' ) . '</td></tr>';
+		}
+		echo '</table><h2>Pengalaman Kerja</h2><table><thead><tr><th>Perusahaan</th><th>Posisi</th><th>Periode</th></tr></thead><tbody>';
+		if ( empty( $experiences ) ) {
+			echo '<tr><td colspan="3">Belum ada data pengalaman kerja.</td></tr>';
+		} else {
+			foreach ( $experiences as $experience ) {
+				if ( ! is_array( $experience ) ) {
+					continue;
+				}
+				echo '<tr><td>' . $escape( $experience['company'] ?? '' ) . '</td><td>' . $escape( $experience['position'] ?? '' ) . '</td><td>' . $escape( $experience['period'] ?? '' ) . '</td></tr>';
+			}
+		}
+		echo '</tbody></table></body></html>';
 		exit;
 	}
 

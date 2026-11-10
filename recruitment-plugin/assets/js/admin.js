@@ -2,6 +2,77 @@
 // TODO: Tambahkan interaksi admin seperti konfirmasi delete, filter tabel, dll.
 document.documentElement.classList.add("js");
 
+(function recruitmentPsychotestSettings() {
+  const settings = document.querySelector("[data-psychotest-settings]");
+  if (!settings) {
+    return;
+  }
+
+  const statusToggle = settings.querySelector("[data-psychotest-status-toggle]");
+  const statusLabel = settings.querySelector("[data-psychotest-status-label]");
+  const modeSelect = settings.querySelector('[name="global_settings[mode]"]');
+  const closingDateLabel = settings.querySelector("[data-closing-date-label]");
+  const closingTimeField = settings.querySelector("[data-psychotest-closing-time]");
+  const closingTimeInput = closingTimeField
+    ? closingTimeField.querySelector("input")
+    : null;
+  const sectionTitle = settings.querySelector("[data-psychotest-mode-heading]");
+  const sectionDescription = settings.querySelector("[data-psychotest-mode-description]");
+  const modeBadge = settings.querySelector("[data-psychotest-mode-badge]");
+
+  const updateModeLabels = function updateModeLabels() {
+    const online = modeSelect && "online" === modeSelect.value;
+    if (closingDateLabel) {
+      closingDateLabel.textContent = online
+        ? "Tanggal Psikotes Ditutup"
+        : "Tanggal Akhir Psikotes";
+    }
+    if (closingTimeField) {
+      closingTimeField.hidden = !online;
+    }
+    if (closingTimeInput) {
+      closingTimeInput.required = Boolean(online && statusToggle && statusToggle.checked);
+    }
+    if (sectionTitle) {
+      sectionTitle.textContent = online
+        ? "Jadwal / Informasi Psikotes Online"
+        : "Jadwal / Informasi Psikotes Offline";
+    }
+    if (sectionDescription) {
+      sectionDescription.textContent = online
+        ? "Atur jadwal, tenggat penutupan, dan informasi pelaksanaan online."
+        : "Atur rentang tanggal dan detail pelaksanaan psikotes secara langsung.";
+    }
+    if (modeBadge) {
+      modeBadge.textContent = online ? "Online" : "Offline";
+      modeBadge.classList.toggle("daw-psychotest-settings__badge--online", online);
+      modeBadge.classList.toggle("daw-psychotest-settings__badge--offline", !online);
+    }
+  };
+  if (statusToggle && statusLabel) {
+    const updateStatusLabel = function updateStatusLabel() {
+      statusLabel.textContent = statusToggle.checked ? "Aktif" : "Tidak aktif";
+    };
+    statusToggle.addEventListener("change", function updateStatusAndClosingRequirement() {
+      updateStatusLabel();
+      updateModeLabels();
+    });
+    updateStatusLabel();
+  }
+
+  if (modeSelect) {
+    modeSelect.addEventListener("change", updateModeLabels);
+  }
+  updateModeLabels();
+})();
+
+(function recruitmentEmailConfirmation() {
+  const dialog = document.querySelector(".daw-email-confirmation__dialog");
+  if (dialog) {
+    dialog.focus();
+  }
+})();
+
 (function recruitmentApplicantTabs() {
   const tabContainer = document.querySelector("[data-applicant-tabs]");
   if (!tabContainer) {
@@ -30,6 +101,37 @@ document.documentElement.classList.add("js");
       });
     });
   });
+})();
+
+(function recruitmentAdministrativeDecision() {
+  const form = document.querySelector("[data-administrative-decision-form]");
+  if (!form) {
+    return;
+  }
+
+  const decision = form.querySelector('[name="administrative_result"]');
+  const nextStageContainer = form.querySelector(
+    "[data-administrative-next-stage]",
+  );
+  const nextStage = form.querySelector('[name="next_stage"]');
+  if (!decision || !nextStageContainer || !nextStage) {
+    return;
+  }
+
+  const updateDecisionLayout = function updateDecisionLayout() {
+    const passed = "passed" === decision.value;
+    nextStageContainer.hidden = !passed;
+    nextStage.disabled = !passed;
+    nextStage.required = passed;
+    form.classList.toggle("has-next-stage", passed);
+    form.classList.toggle("is-failed", "failed" === decision.value);
+    if (!passed) {
+      nextStage.value = "";
+    }
+  };
+
+  decision.addEventListener("change", updateDecisionLayout);
+  updateDecisionLayout();
 })();
 
 (function recruitmentDashboardNavigation() {

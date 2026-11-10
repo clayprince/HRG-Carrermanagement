@@ -35,6 +35,13 @@ class Recruitment_Personality_Assessment {
             $this->handle_complete_request( $user_id, $candidate_id, $test_key );
         }
         if ( '1' === sanitize_text_field( wp_unslash( $_GET['start'] ?? '' ) ) ) {
+            $state = recruitment_get_assessment_state( $user_id, self::USER_META_KEY );
+            $test_already_started = is_array( $state )
+                && (int) ( $state['candidate_id'] ?? 0 ) === $candidate_id
+                && in_array( $state['tests'][ $test_key ]['status'] ?? '', [ 'active', 'complete' ], true );
+            if ( ! $test_already_started && ! recruitment_is_psychotest_test_enabled( $test_key ) ) {
+                wp_die( esc_html__( 'Tes kepribadian sedang tidak tersedia untuk sesi online. Silakan periksa jadwal dengan tim HR.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+            }
             $this->start_test( $user_id, $candidate_id, $test_key );
             wp_safe_redirect( recruitment_get_public_url( 'psych-personality', [ 'test' => $test_key ] ) );
             exit;

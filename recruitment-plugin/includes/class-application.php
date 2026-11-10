@@ -787,7 +787,7 @@ class Recruitment_Application {
      * @param array<string, mixed> $files
      * @param array<int, array<string, mixed>> $sections
      * @param array<string, mixed> $vacancy
-     * @return array{errors: array<int, string>, payload: array<string, mixed>, success: bool, application_id?: string, application_token?: string}
+     * @return array{errors: array<int, string>, payload: array<string, mixed>, success: bool, application_id?: string, application_token?: string, already_submitted?: bool}
      */
     public function submit(
         array $request,
@@ -833,6 +833,7 @@ class Recruitment_Application {
             'success'          => true,
             'application_id'    => (string) ( $saved['application_id'] ?? '' ),
             'application_token' => (string) ( $saved['application_token'] ?? '' ),
+            'already_submitted' => ! empty( $saved['already_submitted'] ),
         ];
     }
 

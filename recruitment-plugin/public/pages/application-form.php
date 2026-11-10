@@ -244,6 +244,7 @@ if ( 'POST' === $request_method ) {
                 [
                     'application_id'    => (string) ( $result['application_id'] ?? '' ),
                     'application_token' => (string) ( $result['application_token'] ?? '' ),
+                    'already_submitted' => ! empty( $result['already_submitted'] ),
                 ],
                 5 * MINUTE_IN_SECONDS
             );

@@ -6,11 +6,18 @@ $test_labels = [
     'disc' => 'DISC',
     'papi' => 'PAPI Kostick',
 ];
+$requested_application_id = isset( $_GET['application_id'] ) && is_scalar( $_GET['application_id'] )
+    ? absint( wp_unslash( (string) $_GET['application_id'] ) )
+    : 0;
 if ( ! isset( $test_labels[ $test_key ] ) ) {
     wp_safe_redirect( recruitment_get_public_url( 'psychotest' ) );
     exit;
 }
-$device_url = recruitment_get_public_url( 'psychotest-device', [ 'test' => $test_key ] );
+$consent_arguments = [ 'test' => $test_key ];
+if ( $requested_application_id > 0 ) {
+    $consent_arguments['application_id'] = $requested_application_id;
+}
+$device_url = recruitment_get_public_url( 'psychotest-device', $consent_arguments );
 ?>
 <div class="daw-recruitment daw-recruitment--psychotest-consent">
     <?php require recruitment_get_plugin_path( 'public/components/header.php' ); ?>
@@ -26,7 +33,7 @@ $device_url = recruitment_get_public_url( 'psychotest-device', [ 'test' => $test
             <section class="daw-recruitment__psychotest-card">
                 <h1>Persetujuan Tes <?= esc_html( $test_labels[ $test_key ] ) ?></h1>
                 <p>Jawaban dan waktu pengerjaan akan dicatat dan disimpan untuk proses seleksi. Kamera dan mikrofon digunakan untuk pemeriksaan perangkat di browser; plugin tidak mengunggah rekaman.</p>
-                <form method="post" action="<?= esc_url( recruitment_get_public_url( 'psychotest-consent', [ 'test' => $test_key ] ) ) ?>">
+                <form method="post" action="<?= esc_url( recruitment_get_public_url( 'psychotest-consent', $consent_arguments ) ) ?>">
                     <?php wp_nonce_field( 'recruitment_psychotest_consent' ); ?>
                     <input type="hidden" name="test" value="<?= esc_attr( $test_key ) ?>">
                     <label>

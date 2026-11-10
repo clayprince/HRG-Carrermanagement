@@ -35,6 +35,8 @@ class Recruitment_Plugin {
         add_action( 'init', [ $this, 'register_hr_role' ] );
         add_action( 'init', [ $this, 'register_user_department_role' ] );
         add_action( 'init', [ $this, 'register_applicant_role' ] );
+        add_action( 'init', 'recruitment_ensure_psychotest_closing', 20 );
+        add_action( 'recruitment_close_psychotest', 'recruitment_close_psychotest_if_due' );
         add_action( 'wp_login', [ $this, 'record_account_login' ], 10, 2 );
         add_filter( 'wp_authenticate_user', [ $this, 'reject_inactive_account' ] );
         add_filter( 'wp_authenticate_user', [ $this, 'reject_direct_applicant_login' ], 20 );
@@ -42,6 +44,7 @@ class Recruitment_Plugin {
         add_action( 'template_redirect', [ $this, 'handle_applicant_account' ] );
         add_action( 'template_redirect', [ $this, 'handle_portal_login' ] );
         add_action( 'template_redirect', [ $this, 'handle_psychotest_consent' ], 1 );
+        add_action( 'template_redirect', [ $this, 'handle_psychotest_attendance' ], 1 );
         add_action( 'admin_init', [ $this, 'validate_oracle_portal_session' ] );
         add_action( 'admin_post_daw_logout', [ $this, 'handle_logout' ] );
         add_action( 'admin_post_nopriv_daw_logout', [ $this, 'handle_logout' ] );
@@ -123,6 +126,19 @@ class Recruitment_Plugin {
             exit;
         }
 
+        $requested_application_id = isset( $_GET['application_id'] ) && is_scalar( $_GET['application_id'] )
+            ? absint( wp_unslash( (string) $_GET['application_id'] ) )
+            : 0;
+        $stage_status = recruitment_applicant_psychotest_stage_status(
+            $requested_application_id > 0 ? (string) $requested_application_id : null
+        );
+        if ( null === $stage_status ) {
+            wp_die( esc_html__( 'Status lamaran tidak dapat diverifikasi. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+        }
+        if ( ! $stage_status ) {
+            wp_die( esc_html__( 'Tes psikologi hanya tersedia untuk pelamar yang sedang berada pada tahap psikotes.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+        }
+
         if ( 'POST' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
             return;
         }
@@ -138,6 +154,9 @@ class Recruitment_Plugin {
         if ( ! isset( $test_routes[ $test_key ] ) || empty( $_POST['consent'] ) ) {
             wp_die( esc_html__( 'Persetujuan dan jenis tes harus dipilih sebelum tes dimulai.', 'recruitment-plugin' ), '', [ 'response' => 400 ] );
         }
+        if ( ! recruitment_is_psychotest_test_enabled( $test_key ) ) {
+            wp_die( esc_html__( 'Tes ini sedang tidak tersedia untuk sesi online. Silakan periksa status dan jadwal psikotes dengan tim HR.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+        }
 
         if ( ! recruitment_grant_psychotest_consent( $test_key ) ) {
             wp_die( esc_html__( 'Persetujuan tes tidak dapat disimpan. Muat ulang halaman dan coba kembali.', 'recruitment-plugin' ), '', [ 'response' => 500 ] );
@@ -148,6 +167,198 @@ class Recruitment_Plugin {
             $arguments['test'] = $test_key;
         }
         wp_safe_redirect( recruitment_get_public_url( $test_routes[ $test_key ], $arguments ) );
+        exit;
+    }
+
+    public function handle_psychotest_attendance(): void {
+        $attendance_action = sanitize_key( wp_unslash( $_POST['psychotest_attendance_action'] ?? '' ) );
+        if (
+            'application-process' !== sanitize_key( wp_unslash( $_GET['recruitment_page'] ?? '' ) )
+            || 'POST' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) )
+            || ! in_array( $attendance_action, [ 'confirm_psychotest_attendance', 'update_psychotest_attendance_time' ], true )
+        ) {
+            return;
+        }
+
+        if ( ! recruitment_is_applicant_user() ) {
+            wp_safe_redirect( recruitment_get_public_url( 'applicant-login' ) );
+            exit;
+        }
+
+        $applicant = recruitment_get_current_applicant();
+        $application_id = isset( $_POST['application_id'] ) && is_scalar( $_POST['application_id'] )
+            ? absint( wp_unslash( (string) $_POST['application_id'] ) )
+            : 0;
+        if ( ! $applicant || 0 >= $application_id ) {
+            wp_die( esc_html__( 'Lamaran untuk konfirmasi kehadiran tidak valid.', 'recruitment-plugin' ), '', [ 'response' => 400 ] );
+        }
+
+        $database = new Recruitment_Database();
+        $application = $database->get_applicant_application( (string) $applicant['id'], (string) $application_id );
+        if ( ! $application ) {
+            wp_die( esc_html__( 'Lamaran tidak ditemukan atau bukan milik akun Anda.', 'recruitment-plugin' ), '', [ 'response' => 404 ] );
+        }
+        $timeline = $database->get_applicant_application_timeline( (string) $applicant['id'], (string) $application_id );
+        $latest_stage = $timeline ? (string) $timeline[ count( $timeline ) - 1 ]['stage'] : (string) ( $application['latest_stage'] ?? $application['status'] ?? '' );
+        $stage_key = strtolower( trim( preg_replace( '/[^a-z0-9]+/i', '_', $latest_stage ), '_' ) );
+        $final_status = strtoupper( trim( (string) ( $application['final_status'] ?? '' ) ) );
+        $is_psychotest_stage = (
+            false !== strpos( $stage_key, 'psikotes' )
+            || false !== strpos( $stage_key, 'psycholog' )
+            || 'tes_psikologi' === $stage_key
+        ) && ! in_array( $final_status, [ 'DITERIMA', 'DITOLAK', 'ACCEPTED', 'REJECTED' ], true );
+        if ( ! $is_psychotest_stage ) {
+            wp_die( esc_html__( 'Konfirmasi hanya tersedia saat tahap lamaran berada di psikotes.', 'recruitment-plugin' ), '', [ 'response' => 409 ] );
+        }
+
+        if ( 'update_psychotest_attendance_time' === $attendance_action ) {
+            check_admin_referer( 'daw_edit_psychotest_attendance_' . $application_id );
+            $confirmed_date = isset( $_POST['confirmed_date'] ) && is_scalar( $_POST['confirmed_date'] )
+                ? sanitize_text_field( wp_unslash( (string) $_POST['confirmed_date'] ) )
+                : '';
+            $confirmed_time = isset( $_POST['confirmed_time'] ) && is_scalar( $_POST['confirmed_time'] )
+                ? sanitize_text_field( wp_unslash( (string) $_POST['confirmed_time'] ) )
+                : '';
+            $settings = (array) get_option( 'recruitment_psychotest_settings', [] );
+            $local_datetime = $confirmed_date . 'T' . $confirmed_time;
+            $parsed_datetime = DateTimeImmutable::createFromFormat( '!Y-m-d\TH:i', $local_datetime, wp_timezone() );
+            $valid_datetime = $parsed_datetime instanceof DateTimeImmutable
+                && $parsed_datetime->format( 'Y-m-d\TH:i' ) === $local_datetime
+                && recruitment_is_psychotest_attendance_time_in_window( $settings, $parsed_datetime );
+            $return_args = [
+                'application_id' => $application_id,
+                'show_psychotest_info' => '1',
+                'attendance_result' => 'invalid_time',
+            ];
+            if ( $valid_datetime ) {
+                $result = $database->update_psychotest_attendance_time(
+                    (string) $applicant['id'],
+                    (string) $application_id,
+                    $local_datetime
+                );
+                $return_args['attendance_result'] = empty( $result['success'] ) ? 'time_update_failed' : 'time_updated';
+            }
+            wp_safe_redirect( recruitment_get_public_url( 'application-process', $return_args ) );
+            exit;
+        }
+
+        check_admin_referer( 'daw_confirm_psychotest_attendance' );
+        $settings = (array) get_option( 'recruitment_psychotest_settings', [] );
+        $settings = recruitment_sync_psychotest_closing( $settings );
+        $return_args = [
+            'application_id' => $application_id,
+            'show_psychotest_info' => '1',
+        ];
+        $psychotest_start = recruitment_psychotest_start_timestamp( $settings );
+        $psychotest_closing = recruitment_psychotest_closing_timestamp( $settings );
+        if (
+            'online' === ( $settings['mode'] ?? '' )
+            && 'active' === ( $settings['status'] ?? '' )
+            && null !== $psychotest_start
+            && $psychotest_start <= time()
+            && null !== $psychotest_closing
+            && $psychotest_closing > time()
+        ) {
+            $return_args['attendance_result'] = 'assessment_open';
+            wp_safe_redirect( recruitment_get_public_url( 'application-process', $return_args ) );
+            exit;
+        }
+
+        $attendance = $database->get_psychotest_attendance( (string) $applicant['id'], (string) $application_id );
+        $confirmed = is_array( $attendance ) && ! empty( $attendance['confirmed'] );
+        $retry_reminder = $confirmed
+            && 'online' === ( $settings['mode'] ?? '' )
+            && empty( $attendance['reminder_sent'] );
+        if ( empty( $settings['attendance_confirmation'] ) && ! $retry_reminder ) {
+            $return_args['attendance_result'] = 'disabled';
+        } else {
+            $deadline_raw = (string) ( $settings['confirmation_deadline'] ?? '' );
+            $deadline = DateTimeImmutable::createFromFormat( '!Y-m-d\TH:i', $deadline_raw, wp_timezone() );
+            if (
+                ! $retry_reminder
+                &&
+                '' !== $deadline_raw
+                && (
+                    ! $deadline
+                    || $deadline->format( 'Y-m-d\TH:i' ) !== $deadline_raw
+                    || $deadline->getTimestamp() < time()
+                )
+            ) {
+                $return_args['attendance_result'] = 'expired';
+            } elseif (
+                ! $retry_reminder
+                && (
+                    'active' !== ( $settings['status'] ?? '' )
+                    || ( 'online' === ( $settings['mode'] ?? '' ) && null === recruitment_psychotest_closing_timestamp( $settings ) )
+                )
+            ) {
+                $return_args['attendance_result'] = 'closed';
+            } else {
+                $save_result = $confirmed
+                    ? [ 'success' => true ]
+                    : $database->confirm_psychotest_attendance( (string) $applicant['id'], (string) $application_id );
+
+                if ( empty( $save_result['success'] ) ) {
+                    $return_args['attendance_result'] = 'save_failed';
+                } elseif ( 'online' === ( $settings['mode'] ?? '' ) && empty( $attendance['reminder_sent'] ) ) {
+                    $email = sanitize_email( (string) ( $applicant['email'] ?? '' ) );
+                    if ( ! is_email( $email ) ) {
+                        $return_args['attendance_result'] = 'email_failed';
+                    } else {
+                        $test_date = (string) ( $settings['test_date'] ?? '' );
+                        $display_date = $test_date;
+                        if ( preg_match( '/^\d{4}-\d{2}-\d{2}$/', $test_date ) ) {
+                            $date = DateTimeImmutable::createFromFormat( '!Y-m-d', $test_date, wp_timezone() );
+                            if ( $date ) {
+                                $display_date = wp_date( 'j F Y', $date->getTimestamp() );
+                            }
+                        }
+                        $subject = 'Pengingat Jadwal Psikotes DAW';
+                        $test_labels = [];
+                        $test_label_map = [
+                            'iq' => 'IQ',
+                            'pauli' => 'PAULI',
+                            'personality' => 'DISC dan PAPI Kostick',
+                        ];
+                        foreach ( (array) ( $settings['online_tests'] ?? [] ) as $selected_test ) {
+                            $selected_test = sanitize_key( (string) $selected_test );
+                            if ( isset( $test_label_map[ $selected_test ] ) ) {
+                                $test_labels[] = $test_label_map[ $selected_test ];
+                            }
+                        }
+                        $message = implode(
+                            "\n",
+                            [
+                                'Halo ' . (string) ( $applicant['full_name'] ?? 'Pelamar' ) . ',',
+                                '',
+                                'Konfirmasi kehadiran psikotes Anda telah diterima. Berikut pengingat jadwalnya:',
+                                'Tanggal: ' . $display_date,
+                                'Waktu: ' . (string) ( $settings['start_time'] ?? 'Belum diatur' ) . ' - ' . (string) ( $settings['end_time'] ?? 'Belum diatur' ),
+                                'Metode: Online',
+                                'Kamera: ' . ( ! empty( $settings['camera_required'] ) ? 'Wajib diaktifkan' : 'Tidak diwajibkan' ),
+                                'Tes: ' . ( $test_labels ? implode( ', ', $test_labels ) : 'Sesuai informasi dari HR' ),
+                                '',
+                                trim( (string) ( $settings['instructions'] ?? '' ) ),
+                                '',
+                                'Instruksi akses akan diberikan oleh tim HR.',
+                            ]
+                        );
+                        if ( wp_mail( $email, $subject, $message ) ) {
+                            $mail_record = $database->mark_psychotest_reminder_sent( (string) $applicant['id'], (string) $application_id );
+                            $return_args['attendance_result'] = empty( $mail_record['success'] ) ? 'email_record_failed' : 'confirmed';
+                        } else {
+                            $return_args['attendance_result'] = 'email_failed';
+                        }
+                    }
+                } else {
+                    $return_args['attendance_result'] = $confirmed
+                        ? 'already_confirmed'
+                        : ( 'online' === ( $settings['mode'] ?? '' ) ? 'confirmed' : 'confirmed_offline' );
+                }
+            }
+        }
+
+        wp_safe_redirect( recruitment_get_public_url( 'application-process', $return_args ) );
         exit;
     }
 
@@ -260,8 +471,11 @@ class Recruitment_Plugin {
         }
         check_admin_referer( 'daw_update_hr_profile' );
         $account_id = (string) get_user_meta( $user->ID, 'daw_oracle_account_id', true );
-        $username = sanitize_user( wp_unslash( $_POST['username'] ?? '' ), true );
+        $username = trim( sanitize_text_field( wp_unslash( $_POST['username'] ?? '' ) ) );
         $email = (string) get_user_meta( $user->ID, 'daw_oracle_email', true );
+        if ( '' === $email && ! empty( $user->user_email ) ) {
+            $email = $user->user_email;
+        }
         $result = ( new Recruitment_Database() )->update_hr_profile( $account_id, $username, $email );
         $notice = ! empty( $result['success'] ) ? 'profile_updated' : ( 'duplicate_account' === ( $result['error'] ?? '' ) ? 'duplicate' : 'profile_failed' );
         if ( ! empty( $result['success'] ) ) {

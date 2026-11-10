@@ -42,6 +42,9 @@ class Recruitment_Pauli_Assessment {
         if ( '1' === sanitize_text_field( wp_unslash( $_GET['start'] ?? '' ) ) ) {
             if ( ! in_array( $state['status'] ?? '', [ 'active', 'complete' ], true )
                 || (int) ( $state['candidate_id'] ?? 0 ) !== $candidate_id ) {
+                if ( ! recruitment_is_psychotest_test_enabled( 'pauli' ) ) {
+                    wp_die( esc_html__( 'Tes PAULI sedang tidak tersedia untuk sesi online. Silakan periksa jadwal dengan tim HR.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+                }
                 $this->start_session( $user_id, $candidate_id );
             }
             wp_safe_redirect( recruitment_get_public_url( 'psych-pauli' ) );

@@ -72,6 +72,26 @@ it is not a live-schema verification.
 
 ## Schema alignment and migrations
 
+### Running Oracle migration files
+
+These `.sql` files contain Oracle SQL and PL/SQL. Run one file at a time against
+the intended Oracle schema, using SQL Developer's **Run Script (F5)** or
+SQL*Plus with `@path\to\migration.sql`. Do not run them through phpMyAdmin,
+SQLite, or a runner that wraps statements in SQLite transactions. In SQL
+Developer, **Run Statement (Ctrl+Enter)** is not appropriate for a file with
+multiple PL/SQL blocks; each block is terminated by its own `/` on a separate
+line. `BEGIN IMMEDIATE` is SQLite syntax and does not belong in these Oracle
+migrations.
+
+Review the target schema and obtain the Oracle owner's approval before
+execution. For the tracking-token feature, apply
+`migrations/008_dynamic_application_forms_hrs.sql` before
+`migrations/013_application_tracking_tokens.sql`. The account-management
+migration is separate; do not apply
+`migrations/008_full_account_management.sql` together with
+`migrations/007_department_account_management.sql` without reconciling their
+overlapping changes.
+
 The current Oracle schema uses tables such as `PROFIL_KANDIDAT`,
 `DETAIL_INFO_LOWONGAN`, `HRS_ROLE_AKSES`, `HRS_USERS_AD`, and `HRS_DEPARTEMEN`. Some existing
 vacancy/application methods in `class-database.php` still query legacy
@@ -125,6 +145,13 @@ their SQL is compatible with the current Oracle database.
 - Active assessment sessions keep their original question order when HR adds
   questions; new questions are included in sessions started afterward.
 - Psychometric routes require an authenticated applicant portal session.
+- HR psychotest scheduling and the active online-test checklist are WordPress
+  options. Online schedules close at the configured date and time through
+  WP-Cron, with an additional expiry check on page requests. Candidate
+  attendance confirmations are stored per Oracle application in
+  `HRS_KONFIRMASI_PSIKOTES`; review and apply
+  `migrations/014_psychotest_attendance_confirmation.sql` before enabling
+  applicant confirmations. The plugin does not apply this migration.
 
 ## Schema alignment and migrations
 
@@ -146,10 +173,13 @@ using the form builder or applying any migration.
 The current `HRS_*` ERD does not include the dynamic-form tables or the
 section `IS_ACTIVE` column. Migration
 `migrations/008_dynamic_application_forms_hrs.sql` adds those objects for that
-schema. It was applied to the connected local Oracle schema on 2026-11-04 with
-the database owner's approval. The migration is idempotent for the added
-column and tables; this does not prove it exists in another target schema. It
-does not update or delete applicant records.
+schema. With explicit approval, it was run against the connected local Oracle
+schema on 2026-11-09. The four form tables were already present; the run added
+the missing `HRS_BAGIAN_PENDAFTARAN.IS_ACTIVE` column and its check constraint.
+Read-only verification confirmed the column is non-null with default `1`, the
+constraint is enabled, and existing section rows satisfy it. The migration is
+idempotent for the added column and tables; this does not prove it exists in
+another target schema. It does not update or delete applicant records.
 
 Migration `migrations/009_hr_vacancy_form_details.sql` adds
 `HRS_REQUEST_LOWONGAN.HR_FORM_DETAILS` as a CLOB for form values that do not
@@ -238,14 +268,18 @@ failing the entire page.
 
 The active token flow requires
 `migrations/013_application_tracking_tokens.sql`. It backfills tokens for
-existing HRS applications and adds the optional submission link. With explicit
-approval, this migration was applied to the Oracle schema connected to this
-workspace on 2026-11-08 and verified to leave no HRS applications without a
-token. It is not applied automatically to other target schemas; review and
-apply it there before accepting new tokenized submissions. Oracle DDL commits
-implicitly. Before applying it elsewhere, older applications remain visible
-but cannot display or be searched by token. Existing form snapshots remain
-unlinked and are handled by the legacy lookup.
+existing HRS applications and adds the optional submission link. Although an
+earlier note recorded this migration as applied on 2026-11-08, a live schema
+check on 2026-11-09 found that its columns were absent. With the user's
+approval, it was applied to the connected Oracle schema on 2026-11-09.
+Read-only verification confirmed `HRS_LAMARAN.APPLICATION_TOKEN` is non-null,
+both unique indexes and the submission foreign key are enabled, and all
+existing applications have unique tokens. There were no existing form
+submissions to link. It is not applied automatically to other target schemas;
+review and apply it there before accepting new tokenized submissions. Oracle
+DDL commits implicitly. Before applying it elsewhere, older applications
+remain visible but cannot display or be searched by token. Existing form
+snapshots remain unlinked and are handled by the legacy lookup.
 
 ## Adding database functionality
 

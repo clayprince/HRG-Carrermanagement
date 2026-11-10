@@ -5,6 +5,9 @@ $global_defaults = [
     'status' => 'active',
     'mode' => 'offline',
     'test_date' => '2026-09-21',
+    'closing_date' => '',
+    'closing_time' => '',
+    'confirmation_deadline' => '',
     'start_time' => '08:00',
     'end_time' => '11:00',
     'location' => 'PT Daya Adicipta Wisesa',
@@ -13,6 +16,7 @@ $global_defaults = [
     'dress_code' => 'Formal / Smart Casual',
     'max_participants' => 30,
     'attendance_confirmation' => true,
+    'online_tests' => [ 'iq', 'pauli', 'personality' ],
     'documents' => [ 'ktp', 'writing_tools' ],
     'instructions' => '',
 ];
@@ -24,6 +28,7 @@ $test_defaults = [
     'papi' => [ 'name' => 'PAPI KOSTICK', 'duration' => 10, 'question_count' => 8, 'passing_score' => 0, 'active' => true, 'shuffle' => true ],
 ];
 $global_settings = wp_parse_args( (array) get_option( 'recruitment_psychotest_settings', [] ), $global_defaults );
+$global_settings = recruitment_sync_psychotest_closing( $global_settings );
 $test_settings = (array) get_option( 'recruitment_psychotest_tests', [] );
 foreach ( $test_defaults as $test_key => $defaults ) {
     $test_settings[ $test_key ] = wp_parse_args( (array) ( $test_settings[ $test_key ] ?? [] ), $defaults );
@@ -54,6 +59,9 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['psychotest_settings
             'status' => in_array( $posted['status'] ?? '', [ 'active', 'inactive' ], true ) ? $posted['status'] : 'inactive',
             'mode' => in_array( $posted['mode'] ?? '', [ 'online', 'offline' ], true ) ? $posted['mode'] : 'offline',
             'test_date' => sanitize_text_field( $posted['test_date'] ?? '' ),
+            'closing_date' => sanitize_text_field( $posted['closing_date'] ?? '' ),
+            'closing_time' => sanitize_text_field( $posted['closing_time'] ?? '' ),
+            'confirmation_deadline' => sanitize_text_field( $posted['confirmation_deadline'] ?? '' ),
             'start_time' => sanitize_text_field( $posted['start_time'] ?? '' ),
             'end_time' => sanitize_text_field( $posted['end_time'] ?? '' ),
             'location' => sanitize_text_field( $posted['location'] ?? '' ),
@@ -62,10 +70,22 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['psychotest_settings
             'dress_code' => sanitize_text_field( $posted['dress_code'] ?? '' ),
             'max_participants' => max( 1, absint( $posted['max_participants'] ?? 1 ) ),
             'attendance_confirmation' => ! empty( $posted['attendance_confirmation'] ),
+            'online_tests' => isset( $posted['online_tests'] ) && is_array( $posted['online_tests'] )
+                ? array_values( array_intersect( array_map( static fn ( $test ): string => sanitize_key( (string) $test ), array_filter( $posted['online_tests'], 'is_scalar' ) ), [ 'iq', 'pauli', 'personality' ] ) )
+                : [],
             'documents' => array_values( array_intersect( $documents, [ 'ktp', 'writing_tools', 'application_letter', 'other' ] ) ),
             'instructions' => sanitize_textarea_field( $posted['instructions'] ?? '' ),
         ];
+        if ( 'online' === $global_settings['mode'] && 'active' === $global_settings['status'] ) {
+            if ( null === recruitment_psychotest_start_timestamp( $global_settings ) ) {
+                wp_die( esc_html__( 'Tanggal dan jam mulai wajib diisi dengan benar sebelum psikotes online dapat diaktifkan.', 'recruitment-plugin' ), '', [ 'response' => 400 ] );
+            }
+            if ( null === recruitment_psychotest_closing_timestamp( $global_settings ) ) {
+                wp_die( esc_html__( 'Tanggal dan jam penutupan wajib diisi dengan benar sebelum psikotes online dapat diaktifkan.', 'recruitment-plugin' ), '', [ 'response' => 400 ] );
+            }
+        }
         update_option( 'recruitment_psychotest_settings', $global_settings );
+        recruitment_schedule_psychotest_closing( $global_settings );
         $notice = 'Konfigurasi global berhasil disimpan.';
     } elseif ( 'save_test' === $action ) {
         $test_key = sanitize_key( $_POST['test_key'] ?? '' );
@@ -104,13 +124,15 @@ $test_order = [ 'iq', 'pauli', 'personality', 'disc', 'papi' ];
             <div class="daw-psychotest-settings__global-row">
                 <label class="daw-psychotest-settings__switch"><span><strong>Kamera Wajib (Global)</strong><small>Peserta wajib menggunakan kamera selama tes.</small></span><input type="checkbox" name="global_settings[camera_required]" value="1" <?= checked( $global_settings['camera_required'], true, false ) ?>><span class="daw-psychotest-settings__switch-ui" aria-hidden="true"></span></label>
                 <label class="daw-psychotest-settings__switch"><span><strong>Acak Soal</strong><small>Urutan soal diacak per sesi.</small></span><input type="checkbox" name="global_settings[shuffle_questions]" value="1" <?= checked( $global_settings['shuffle_questions'], true, false ) ?>><span class="daw-psychotest-settings__switch-ui" aria-hidden="true"></span></label>
-                <label class="daw-psychotest-settings__field"><span>Status Tes</span><select name="global_settings[status]"><option value="active" <?= selected( $global_settings['status'], 'active', false ) ?>>Aktif</option><option value="inactive" <?= selected( $global_settings['status'], 'inactive', false ) ?>>Nonaktif</option></select></label>
+                <label class="daw-psychotest-settings__switch daw-psychotest-settings__status-toggle"><span><strong>Status Tes</strong><small data-psychotest-status-label><?= 'active' === $global_settings['status'] ? 'Aktif' : 'Tidak aktif' ?></small></span><input type="checkbox" name="global_settings[status]" value="active" data-psychotest-status-toggle <?= checked( $global_settings['status'], 'active', false ) ?>><span class="daw-psychotest-settings__switch-ui" aria-hidden="true"></span></label>
             </div>
 
-            <div class="daw-psychotest-settings__section-heading"><div><h3>Jadwal / Informasi Psikotes Offline</h3><p>Konfigurasi jadwal dan detail pelaksanaan secara langsung (offline).</p></div><span class="daw-psychotest-settings__badge daw-psychotest-settings__badge--offline">Offline</span></div>
+            <div class="daw-psychotest-settings__section-heading"><div><h3 data-psychotest-mode-heading>Jadwal / Informasi Psikotes <?= 'online' === $global_settings['mode'] ? 'Online' : 'Offline' ?></h3><p data-psychotest-mode-description><?= 'online' === $global_settings['mode'] ? 'Atur jadwal, tenggat penutupan, dan informasi pelaksanaan online.' : 'Atur rentang tanggal dan detail pelaksanaan psikotes secara langsung.' ?></p></div><span class="daw-psychotest-settings__badge daw-psychotest-settings__mode-badge daw-psychotest-settings__badge--<?= esc_attr( $global_settings['mode'] ) ?>" data-psychotest-mode-badge><?= 'online' === $global_settings['mode'] ? 'Online' : 'Offline' ?></span></div>
             <div class="daw-psychotest-settings__fields daw-psychotest-settings__fields--schedule">
                 <label class="daw-psychotest-settings__field"><span>Metode Psikotes</span><select name="global_settings[mode]"><option value="offline" <?= selected( $global_settings['mode'], 'offline', false ) ?>>Offline</option><option value="online" <?= selected( $global_settings['mode'], 'online', false ) ?>>Online</option></select></label>
                 <label class="daw-psychotest-settings__field"><span>Tanggal</span><input type="date" name="global_settings[test_date]" value="<?= esc_attr( $global_settings['test_date'] ) ?>"></label>
+                <label class="daw-psychotest-settings__field"><span data-closing-date-label><?= 'online' === $global_settings['mode'] ? 'Tanggal Psikotes Ditutup' : 'Tanggal Akhir Psikotes' ?></span><input type="date" name="global_settings[closing_date]" value="<?= esc_attr( $global_settings['closing_date'] ) ?>"></label>
+                <label class="daw-psychotest-settings__field" data-psychotest-closing-time <?= 'offline' === $global_settings['mode'] ? 'hidden' : '' ?>><span>Jam Psikotes Ditutup</span><input type="time" name="global_settings[closing_time]" value="<?= esc_attr( $global_settings['closing_time'] ) ?>"></label>
                 <label class="daw-psychotest-settings__field"><span>Waktu Mulai</span><input type="time" name="global_settings[start_time]" value="<?= esc_attr( $global_settings['start_time'] ) ?>"></label>
                 <label class="daw-psychotest-settings__field"><span>Waktu Selesai</span><input type="time" name="global_settings[end_time]" value="<?= esc_attr( $global_settings['end_time'] ) ?>"></label>
                 <label class="daw-psychotest-settings__field"><span>Lokasi</span><input name="global_settings[location]" value="<?= esc_attr( $global_settings['location'] ) ?>"></label>
@@ -119,7 +141,9 @@ $test_order = [ 'iq', 'pauli', 'personality', 'disc', 'papi' ];
                 <label class="daw-psychotest-settings__field"><span>Maks. Peserta</span><input type="number" min="1" name="global_settings[max_participants]" value="<?= esc_attr( (string) $global_settings['max_participants'] ) ?>"></label>
                 <label class="daw-psychotest-settings__switch daw-psychotest-settings__switch--inline"><span><strong>Perlu Konfirmasi Kehadiran</strong><small>Peserta harus konfirmasi.</small></span><input type="checkbox" name="global_settings[attendance_confirmation]" value="1" <?= checked( $global_settings['attendance_confirmation'], true, false ) ?>><span class="daw-psychotest-settings__switch-ui" aria-hidden="true"></span></label>
             </div>
+            <label class="daw-psychotest-settings__field daw-psychotest-settings__deadline"><span>Batas Konfirmasi Kehadiran</span><input type="datetime-local" name="global_settings[confirmation_deadline]" value="<?= esc_attr( $global_settings['confirmation_deadline'] ) ?>"><small>Tanggal dan jam terakhir pelamar dapat mengonfirmasi hadir.</small></label>
             <fieldset class="daw-psychotest-settings__documents"><legend>Dokumen yang Dibawa</legend><?php foreach ( $document_labels as $document_key => $document_label ) : ?><label><input type="checkbox" name="global_settings[documents][]" value="<?= esc_attr( $document_key ) ?>" <?= checked( in_array( $document_key, $global_settings['documents'], true ), true, false ) ?>> <?= esc_html( $document_label ) ?></label><?php endforeach; ?></fieldset>
+            <fieldset class="daw-psychotest-settings__documents daw-psychotest-settings__online-tests"><legend>Tes yang Diaktifkan untuk Psikotes Online</legend><?php foreach ( [ 'iq' => 'Tes IQ', 'pauli' => 'Tes PAULI', 'personality' => 'Tes Kepribadian (DISC & PAPI Kostick)' ] as $test_key => $test_label ) : ?><label><input type="checkbox" name="global_settings[online_tests][]" value="<?= esc_attr( $test_key ) ?>" <?= checked( in_array( $test_key, $global_settings['online_tests'], true ), true, false ) ?>> <?= esc_html( $test_label ) ?></label><?php endforeach; ?><small>Pilih juga tes yang sudah diaktifkan pada pengaturan masing-masing jenis tes.</small></fieldset>
             <label class="daw-psychotest-settings__field"><span>Informasi Tambahan</span><textarea rows="3" name="global_settings[instructions]" placeholder="Instruksi atau informasi tambahan untuk peserta..."><?= esc_textarea( $global_settings['instructions'] ) ?></textarea></label>
             <div class="daw-psychotest-settings__actions"><button type="submit" class="button button-primary">Simpan Konfigurasi Global</button></div>
         </form>
