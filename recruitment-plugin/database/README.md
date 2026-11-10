@@ -248,20 +248,23 @@ prefixes are not unique, and the plugin does not execute these files.
   implicit commits before applying any migration.
 
 Public vacancy listings and the admin create/status controls use the Oracle
-vacancy tables. `STATUS_KOLOM` maps 0 to Draft and 1 to Published. Do not treat
-legacy `DAW_*` queries or WordPress vacancy posts as the active source for the
-public application flow.
+vacancy tables. `STATUS_KOLOM` maps 0 to Draft and 1 to Published. Published
+WordPress vacancy posts are also shown as a fallback source with synthetic IDs;
+application submission must resolve those IDs back to the original post and
+department metadata.
 
-In the connected schema, `HRS_DETAIL_INFO_LOWONGAN` names the department
-column `NAMA_DEPARTEMEN` and does not contain a location column; the linked
-`HRS_KOLOM_LANDING_PENDAFTARAN.NAMA_DEALER` supplies the displayed location.
-Keep this mapping distinct from `NAMA_DEPARTEMENT` on
-`HRS_REKAPAN_KEPUTUSAN_HR`.
+In the connected schema, `HRS_DETAIL_INFO_LOWONGAN` names its department
+columns `DEPARTEMENT_ID` and `NAMA_DEPARTEMENT`, while `HRS_DEPARTEMEN` uses
+`DEPARTEMEN_ID` and `NAMA_DEPARTEMEN`. The landing table's department name is
+`NAMA_DEPARTEMEN`. Match each identifier to its exact table definition; do not
+normalize the `DEPARTEMENT`/`DEPARTEMEN` spellings.
+The detail table does not contain the displayed dealer/location; the linked
+`HRS_KOLOM_LANDING_PENDAFTARAN.NAMA_DEALER` supplies it.
 
 HR-managed WordPress vacancies store geography in `_daw_region` and the
 Oracle department ID/name in `_daw_department_id` and `_daw_department`.
 Application submission resolves the ID against active `HRS_DEPARTEMEN` rows
-before writing `HRS_DETAIL_INFO_LOWONGAN.NAMA_DEPARTEMEN`; never use region as
+before writing `HRS_DETAIL_INFO_LOWONGAN.NAMA_DEPARTEMENT`; never use region as
 the department.
 
 When HR approves a User Department request, the plugin creates and publishes

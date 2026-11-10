@@ -11,6 +11,7 @@ require_once __DIR__ . '/connection/class-oracle-connection.php';
 class Recruitment_Database {
 
     private const MAX_PSYCHOTEST_IMPORT_QUESTIONS = 200;
+    private const WORDPRESS_VACANCY_ID_OFFSET = 1000000000000;
 
     private Recruitment_Oracle_Connection $oracle;
     private ?string $last_error = null;
@@ -1410,10 +1411,17 @@ class Recruitment_Database {
             $vacancy_check = $connection->prepare( 'SELECT DETAIL_LOWONGAN_ID FROM HRS_DETAIL_INFO_LOWONGAN WHERE DETAIL_LOWONGAN_ID = :vacancy_id' );
             $vacancy_check->execute( [ 'vacancy_id' => $vacancy_id ] );
             $has_oracle_vacancy = false !== $vacancy_check->fetchColumn();
-            $wp_post = function_exists( 'get_post' ) ? get_post( (int) $vacancy_id ) : null;
+            $wp_post = null;
+            $wp_post_id = (int) $vacancy_id - self::WORDPRESS_VACANCY_ID_OFFSET;
+            if ( function_exists( 'get_post' ) && $wp_post_id > 0 ) {
+                $candidate_post = get_post( $wp_post_id );
+                if ( $candidate_post && 'daw_vacancy' === $candidate_post->post_type ) {
+                    $wp_post = $candidate_post;
+                }
+            }
             $wp_department_id = '';
             $wp_dept = '';
-            if ( $wp_post && 'daw_vacancy' === $wp_post->post_type ) {
+            if ( ! $has_oracle_vacancy && $wp_post ) {
                 $wp_department_id = (string) get_post_meta( $wp_post->ID, '_daw_department_id', true );
                 if ( ! ctype_digit( $wp_department_id ) || '0' === $wp_department_id ) {
                     throw new InvalidArgumentException( 'Vacancy department is invalid.' );
@@ -1427,12 +1435,6 @@ class Recruitment_Database {
                     throw new InvalidArgumentException( 'Vacancy department is invalid.' );
                 }
                 $wp_dept = (string) $department_name;
-                if ( $has_oracle_vacancy ) {
-                    $update_department = $connection->prepare(
-                        'UPDATE HRS_DETAIL_INFO_LOWONGAN SET NAMA_DEPARTEMEN = :department WHERE DETAIL_LOWONGAN_ID = :vacancy_id'
-                    );
-                    $update_department->execute( [ 'department' => $wp_dept, 'vacancy_id' => $vacancy_id ] );
-                }
             }
             if ( ! $has_oracle_vacancy && '' === $wp_dept ) {
                 throw new InvalidArgumentException( 'Vacancy department is invalid.' );
@@ -1469,7 +1471,7 @@ class Recruitment_Database {
 
                 $deadline_val = ( ! empty( $wp_deadline ) && preg_match( '/^\d{4}-\d{2}-\d{2}$/', $wp_deadline ) ) ? $wp_deadline : null;
                 $ins_detail = $connection->prepare(
-                    'INSERT INTO HRS_DETAIL_INFO_LOWONGAN (DETAIL_LOWONGAN_ID, KOLOM_PENDAFTARAN_ID, JUDUL_PEKERJAAN, DESKRIPSI_PEKERJAAN, LOKASI_PENEMPATAN, NAMA_DEPARTEMEN, KATEGORI_KJ, BATAS_LAMARAN, REQUEST_AT) VALUES (:detail_id, :kolom_id, :title, :description, :location, :department, :job_type, CASE WHEN :deadline IS NULL THEN NULL ELSE TO_DATE(:deadline_val, \'YYYY-MM-DD\') END, CURRENT_TIMESTAMP)'
+                    'INSERT INTO HRS_DETAIL_INFO_LOWONGAN (DETAIL_LOWONGAN_ID, KOLOM_PENDAFTARAN_ID, JUDUL_PEKERJAAN, DESKRIPSI_PEKERJAAN, LOKASI_PENEMPATAN, DEPARTEMENT_ID, NAMA_DEPARTEMENT, KATEGORI_KJ, BATAS_LAMARAN, REQUEST_AT) VALUES (:detail_id, :kolom_id, :title, :description, :location, :department_id, :department, :job_type, CASE WHEN :deadline IS NULL THEN NULL ELSE TO_DATE(:deadline_val, \'YYYY-MM-DD\') END, CURRENT_TIMESTAMP)'
                 );
                 $ins_detail->execute( [
                     'detail_id'    => $vacancy_id,
@@ -1477,10 +1479,11 @@ class Recruitment_Database {
                     'title'        => substr( $wp_title, 0, 1000 ),
                     'description'  => $wp_desc,
                     'location'     => substr( $wp_loc ?: $wp_dealer, 0, 1000 ),
-                    'department'   => substr( $wp_dept, 0, 1000 ),
-                    'job_type'     => substr( $wp_type, 0, 1000 ),
-                    'deadline'     => $deadline_val,
-                    'deadline_val' => $deadline_val,
+                    'department_id' => $wp_department_id,
+                    'department'    => substr( $wp_dept, 0, 1000 ),
+                    'job_type'      => substr( $wp_type, 0, 1000 ),
+                    'deadline'      => $deadline_val,
+                    'deadline_val'  => $deadline_val,
                 ] );
             }
 
@@ -1699,7 +1702,7 @@ class Recruitment_Database {
      */
     public function get_vacancies(): array {
         return $this->fetch_all(
-            'SELECT d.detail_lowongan_id AS "id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", k.nama_dealer AS "dealer", d.kategori_kj AS "job_type", d.deskripsi_pekerjaan AS "description", d.pendidikan_minimum AS "education", TO_CHAR(d.batas_lamaran, \'YYYY-MM-DD\') AS "deadline", d.nama_departemen AS "department", TO_CHAR(d.request_at, \'YYYY-MM-DD\') AS "posted_at" FROM HRS_DETAIL_INFO_LOWONGAN d JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE k.status_kolom = :status AND (d.batas_lamaran IS NULL OR d.batas_lamaran >= CURRENT_DATE) ORDER BY d.detail_lowongan_id DESC',
+            'SELECT d.detail_lowongan_id AS "id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", k.nama_dealer AS "dealer", d.kategori_kj AS "job_type", d.deskripsi_pekerjaan AS "description", d.pendidikan_minimum AS "education", TO_CHAR(d.batas_lamaran, \'YYYY-MM-DD\') AS "deadline", NVL(d.nama_departement, k.nama_departemen) AS "department", TO_CHAR(d.request_at, \'YYYY-MM-DD\') AS "posted_at" FROM HRS_DETAIL_INFO_LOWONGAN d JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE k.status_kolom = :status AND (d.batas_lamaran IS NULL OR d.batas_lamaran >= CURRENT_DATE) ORDER BY d.detail_lowongan_id DESC',
             [ 'status' => 1 ]
         );
     }

@@ -17,12 +17,22 @@ migration log.
 - Runtime camera validation still requires the local site to be served through
   HTTPS or localhost.
 
-### Applicant application tracking
+### Oracle department schema
 
-- Fixed tracking queries that referenced `NAMA_DEPARTEMEN` on
-  `HRS_DETAIL_INFO_LOWONGAN`; the Oracle schema spells that detail column
-  `NAMA_DEPARTEMENT`. Tracking now reads it with the landing table's department
-  as a fallback.
+- Documented that `HRS_DETAIL_INFO_LOWONGAN` uses `DEPARTEMENT_ID` and
+  `NAMA_DEPARTEMENT`, distinct from `HRS_DEPARTEMEN` and the landing table's
+  `DEPARTEMEN` spelling. Application tracking and listing queries use the
+  verified detail-table name.
+
+### Public vacancy listing and application submission
+
+- Corrected public vacancy queries and inserts to use the verified Oracle
+  detail-table department columns, restoring Oracle-published vacancies to the
+  careers page.
+- Decoded synthetic WordPress vacancy IDs before resolving the post and
+  department during application submission.
+- Made partial Oracle listing failures visible while retaining available
+  WordPress vacancy cards as a fallback.
 
 ## 2026-11-09
 
@@ -32,7 +42,7 @@ migration log.
   path, and camera-only monitoring for tab changes and camera disconnects.
 - Added a five-alert-image-per-session limit, Administrator-only evidence
   downloads with access audit, and scheduled one-year retention cleanup.
-- Added Oracle migration 014 for review; it has not been applied. Face-count,
+- Added Oracle migration 015 for review; it has not been applied. Face-count,
   gaze, and phone/device detection remain out of scope for this phase.
 
 ### Recruitment data flow to admin and User Department
