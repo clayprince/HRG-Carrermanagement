@@ -14,8 +14,10 @@ $personality_active_test = is_array( $personality_state ) ? sanitize_key( (strin
 $personality_next_test = 'papi' === $personality_active_test || $disc_complete ? 'papi' : 'disc';
 $personality_active = in_array( $personality_active_test, [ 'disc', 'papi' ], true )
     && 'active' === ( $personality_tests[ $personality_active_test ]['status'] ?? '' );
-$completed_count = count( array_filter( [ $iq_complete, $pauli_complete, $personality_complete ] ) );
-$progress = (int) round( $completed_count / 3 * 100 );
+$psychotest_settings = recruitment_sync_psychotest_closing( (array) get_option( 'recruitment_psychotest_settings', [] ) );
+$iq_enabled = recruitment_is_psychotest_test_enabled( 'iq' );
+$pauli_enabled = recruitment_is_psychotest_test_enabled( 'pauli' );
+$personality_enabled = recruitment_is_psychotest_test_enabled( 'disc' ) && recruitment_is_psychotest_test_enabled( 'papi' );
 $assessment_database = new Recruitment_Database();
 $pauli_assessments = $assessment_database->get_pauli_assessment();
 $pauli_question_count = count( (array) ( $pauli_assessments[0]['questions'] ?? [] ) );
@@ -72,6 +74,22 @@ $tests = [
         'test' => $personality_active ? $personality_active_test : $personality_next_test,
     ],
 ];
+$tests = array_values(
+    array_filter(
+        $tests,
+        static function ( array $test ) use ( $iq_enabled, $pauli_enabled, $personality_enabled ): bool {
+            return match ( $test['test'] ) {
+                'iq' => $iq_enabled,
+                'pauli' => $pauli_enabled,
+                'disc', 'papi' => $personality_enabled,
+                default => false,
+            };
+        }
+    )
+);
+$completed_count = count( array_filter( $tests, static fn ( array $test ): bool => $test['complete'] ) );
+$test_count = count( $tests );
+$progress = 0 < $test_count ? (int) round( $completed_count / $test_count * 100 ) : 0;
 ?>
 <div class="daw-recruitment daw-recruitment--psychotest-home">
     <?php require recruitment_get_plugin_path( 'public/components/header.php' ); ?>
@@ -83,10 +101,10 @@ $tests = [
                 <div class="daw-recruitment__psychotest-header-copy">
                     <span class="daw-recruitment__eyebrow daw-recruitment__eyebrow--red">TES PSIKOLOGI ONLINE</span>
                     <h1>Tes Psikologi</h1>
-                    <p>Selesaikan tiga tahap secara berurutan. Tahap Kepribadian terdiri dari DISC dan PAPI Kostick; jawaban tersimpan saat Anda mengerjakannya.</p>
+                    <p>Kerjakan tes yang diaktifkan oleh HR. Tahap Kepribadian terdiri dari DISC dan PAPI Kostick; jawaban tersimpan saat Anda mengerjakannya.</p>
                 </div>
                 <div class="daw-recruitment__psychotest-counter" aria-label="Progress tes psikologi">
-                    <span class="daw-recruitment__muted-small"><?= esc_html( (string) $completed_count ) ?> / 3</span>
+                    <span class="daw-recruitment__muted-small"><?= esc_html( (string) $completed_count ) ?> / <?= esc_html( (string) $test_count ) ?></span>
                     <strong>Tahap Selesai</strong>
                 </div>
             </header>
@@ -100,7 +118,7 @@ $tests = [
                     <span style="width: <?= esc_attr( (string) $progress ) ?>%"></span>
                 </div>
                 <div class="daw-recruitment__psychotest-summary-meta">
-                    <span><?= esc_html( (string) $completed_count ) ?> dari 3 tahap selesai</span>
+                    <span><?= esc_html( (string) $completed_count ) ?> dari <?= esc_html( (string) $test_count ) ?> tahap selesai</span>
                     <span><?= esc_html( (string) $progress ) ?>%</span>
                 </div>
             </section>
@@ -110,7 +128,7 @@ $tests = [
                     <div class="daw-recruitment__info-box-icon" aria-hidden="true">i</div>
                     <div>
                         <strong>Sebelum memulai</strong>
-                        <p>Gunakan perangkat yang nyaman, koneksi internet stabil, dan tempat yang tenang. Tes Pauli berdurasi <?= esc_html( $pauli_duration_label ) ?>; DISC dan PAPI tidak dibatasi waktu dan hanya menampilkan pengingat.</p>
+                        <p><?= 0 < $test_count ? 'Gunakan perangkat yang nyaman, koneksi internet stabil, dan tempat yang tenang. Tes Pauli berdurasi ' . esc_html( $pauli_duration_label ) . '; DISC dan PAPI tidak dibatasi waktu dan hanya menampilkan pengingat.' : 'Tes online sedang tidak tersedia atau belum diaktifkan oleh HR. Silakan periksa kembali jadwal di Tracking Lamaran atau hubungi HR.' ?></p>
                     </div>
                 </div>
             </section>

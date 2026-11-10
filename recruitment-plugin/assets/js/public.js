@@ -13,6 +13,7 @@
   setupApplicantAccountMenu();
   setupAccountConfirmationRedirect();
   setupApplicantProfileRepeater();
+  setupPsychotestInfo();
   setupPsychologicalTestProcessing();
   setupPsychotestDeviceCheck();
   setupPsychotestProctoring();
@@ -121,6 +122,36 @@
 
     if ("true" === forgotModal.dataset.autoOpen) {
       forgotModal.showModal();
+    }
+  }
+
+  function setupPsychotestInfo() {
+    const dialog = document.querySelector("[data-psychotest-info-dialog]");
+    if (!dialog || typeof dialog.showModal !== "function") {
+      return;
+    }
+
+    document.addEventListener("click", function handlePsychotestInfoClick(event) {
+      const openButton = event.target.closest("[data-open-psychotest-info]");
+      if (openButton) {
+        dialog.showModal();
+        return;
+      }
+
+      const closeButton = event.target.closest("[data-close-psychotest-info]");
+      if (closeButton) {
+        dialog.close();
+      }
+    });
+
+    dialog.addEventListener("click", function closePsychotestInfoOnBackdrop(event) {
+      if (event.target === dialog) {
+        dialog.close();
+      }
+    });
+
+    if ("true" === dialog.dataset.autoOpen) {
+      dialog.showModal();
     }
   }
 

@@ -3,9 +3,9 @@ $target = 'user_department' === ( $target ?? '' ) ? 'user_department' : 'hr';
 $mode = 'reset-password' === ( $page ?? '' ) ? 'reset-password' : 'login';
 $is_department_login = 'user_department' === $target;
 $public_url = recruitment_get_public_url( 'careers' );
-$forgot_hr_url = recruitment_get_public_url( 'forgot-password', [ 'target' => 'hr' ] );
+$forgot_hr_url = recruitment_get_public_url( 'forgot-password', [ 'target' => 'hr', 'forgot' => '1' ] );
 $forgot_department_url = recruitment_get_department_login_url(
-    [ 'recruitment_page' => 'forgot-password', 'target' => 'user_department' ]
+    [ 'recruitment_page' => 'forgot-password', 'target' => 'user_department', 'forgot' => '1' ]
 );
 $token = sanitize_text_field( wp_unslash( $_GET['token'] ?? '' ) );
 $error = (string) ( $error ?? '' );

@@ -1,13 +1,29 @@
 <?php
 $test_key = sanitize_key( wp_unslash( $_GET['test'] ?? 'iq' ) );
 $test_key = in_array( $test_key, [ 'iq', 'pauli', 'disc', 'papi' ], true ) ? $test_key : 'iq';
+$requested_application_id = isset( $_GET['application_id'] ) && is_scalar( $_GET['application_id'] )
+    ? absint( wp_unslash( (string) $_GET['application_id'] ) )
+    : 0;
+$stage_status = recruitment_applicant_psychotest_stage_status(
+    $requested_application_id > 0 ? (string) $requested_application_id : null
+);
+if ( null === $stage_status ) {
+    wp_die( esc_html__( 'Status lamaran tidak dapat diverifikasi. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+}
+if ( ! $stage_status || ! recruitment_is_psychotest_test_enabled( $test_key ) ) {
+    wp_die( esc_html__( 'Pemeriksaan perangkat hanya tersedia saat tahap psikotes aktif dan tes dibuka oleh HR.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+}
 $global_settings = (array) get_option( 'recruitment_psychotest_settings', [] );
 $test_settings = (array) get_option( 'recruitment_psychotest_tests', [] );
 $camera_required = isset( $test_settings[ $test_key ]['camera_required'] )
     ? ! empty( $test_settings[ $test_key ]['camera_required'] )
     : ! empty( $global_settings['camera_required'] ?? true );
-$back_url = recruitment_get_public_url( 'psychotest-preparation', [ 'test' => $test_key ] );
-$next_url = recruitment_get_public_url( 'psychotest-consent', [ 'test' => $test_key ] );
+$device_arguments = [ 'test' => $test_key ];
+if ( $requested_application_id > 0 ) {
+    $device_arguments['application_id'] = $requested_application_id;
+}
+$back_url = recruitment_get_public_url( 'psychotest-preparation', $device_arguments );
+$next_url = recruitment_get_public_url( 'psychotest-consent', $device_arguments );
 ?>
 <div class="daw-recruitment daw-recruitment--psychotest-device">
     <?php require recruitment_get_plugin_path( 'public/components/header.php' ); ?>

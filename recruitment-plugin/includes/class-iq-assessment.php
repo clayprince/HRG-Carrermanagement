@@ -33,6 +33,9 @@ class Recruitment_IQ_Assessment {
 
         if ( '1' === sanitize_text_field( wp_unslash( $_GET['start'] ?? '' ) ) ) {
             if ( ! is_array( $state ) || empty( $state['status'] ) ) {
+                if ( ! recruitment_is_psychotest_test_enabled( 'iq' ) ) {
+                    wp_die( esc_html__( 'Tes IQ sedang tidak tersedia untuk sesi online. Silakan periksa jadwal dengan tim HR.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+                }
                 $this->start_session( $user_id, $candidate_id );
             }
             wp_safe_redirect( recruitment_get_public_url( 'psych-iq' ) );

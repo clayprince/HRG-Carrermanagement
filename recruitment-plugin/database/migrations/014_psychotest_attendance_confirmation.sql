@@ -1,0 +1,25 @@
+-- Run only after the Oracle owner reviews and approves the target schema.
+DECLARE
+    table_count NUMBER;
+BEGIN
+    SELECT COUNT(*) INTO table_count
+    FROM USER_TABLES
+    WHERE TABLE_NAME = 'HRS_KONFIRMASI_PSIKOTES';
+
+    IF table_count = 0 THEN
+        EXECUTE IMMEDIATE '
+            CREATE TABLE HRS_KONFIRMASI_PSIKOTES (
+                LAMARAN_ID NUMBER(19,0) NOT NULL,
+                PROFILE_KANDIDAT_ID NUMBER(19,0) NOT NULL,
+                ATTENDANCE_CONFIRMED CHAR(1) DEFAULT ''Y'' NOT NULL,
+                CONFIRMED_AT TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+                EMAIL_REMINDER_SENT_AT TIMESTAMP NULL,
+                CONSTRAINT PK_HRS_KONF_PSIKOTES PRIMARY KEY (LAMARAN_ID),
+                CONSTRAINT FK_HRS_KONF_PSIKOTES_LAMARAN
+                    FOREIGN KEY (LAMARAN_ID) REFERENCES HRS_LAMARAN (LAMARAN_ID),
+                CONSTRAINT CK_HRS_KONF_PSIKOTES_ATT
+                    CHECK (ATTENDANCE_CONFIRMED IN (''Y'', ''N''))
+            )';
+    END IF;
+END;
+/
