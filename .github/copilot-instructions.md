@@ -35,3 +35,16 @@ Aturan ini wajib dipatuhi pada setiap permintaan perubahan di workspace ini.
 ## Aturan persetujuan
 
 Jika ada keraguan apakah suatu perubahan termasuk scope, anggap perubahan tersebut di luar scope dan minta persetujuan pengguna. Tidak boleh memperluas pekerjaan berdasarkan asumsi.
+
+## Pemeriksaan update GitHub dan database
+
+Setiap kali menarik, menggabungkan, atau menerapkan update dari GitHub, periksa perubahan upstream sebelum menyelesaikan merge. Jika perubahan menyentuh database, migrasi, atau alur CRUD, lakukan pemeriksaan berikut:
+
+- Periksa seluruh diff upstream untuk operasi baca/tulis, perubahan kolom atau tabel, migrasi, data backfill, serta pemanggil dan konsumen datanya. Jangan hanya mengandalkan pesan commit atau nama file.
+- Bandingkan asumsi skema di kode dan migrasi dengan skema Oracle serta pola akses yang sudah digunakan proyek. Telusuri alur CRUD dari handler/route melalui service hingga `Recruitment_Database`, termasuk validasi input, query berparameter, transaksi untuk penulisan multi-record, dan penanganan error.
+- Pastikan migrasi yang masuk memiliki nomor/nama unik dan urutan yang benar; periksa prasyarat skema, kemungkinan benturan dengan migrasi lokal atau upstream lain, kompatibilitas dengan data yang sudah ada, serta dampaknya pada versi kode sebelum dan sesudah update. Jangan menyelesaikan benturan migrasi dengan sekadar memilih satu sisi.
+- Gabungkan perubahan dengan mempertahankan perilaku yang diperlukan dari kedua sisi. Jika skema, tujuan migrasi, status penerapan di lingkungan, atau kompatibilitas data tidak dapat dipastikan dari repository, hentikan perubahan database yang berisiko dan minta klarifikasi atau verifikasi pemilik skema.
+- Jalankan pemeriksaan sintaks dan test yang relevan untuk CRUD serta migrasi jika tersedia. Laporkan asumsi, konflik, dan pemeriksaan yang belum dapat dilakukan.
+- Jangan menjalankan migrasi atau DDL terhadap database lokal bersama, staging, atau produksi tanpa persetujuan eksplisit. Jangan membaca, menyalin, mencetak, atau meng-commit kredensial database.
+
+Jika update tidak menyentuh database atau alur CRUD, jangan menambah atau mengubah migrasi tanpa kebutuhan yang jelas.
