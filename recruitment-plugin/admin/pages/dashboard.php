@@ -108,12 +108,24 @@ $pipeline_rows = [
 ];
 ?>
 <div class="wrap recruitment-admin recruitment-dashboard" data-recruitment-dashboard>
-    <?php $admin_user = wp_get_current_user(); ?>
+    <?php
+    $admin_user = wp_get_current_user();
+    $hr_identity = recruitment_get_current_hr_identity();
+    ?>
     <aside class="recruitment-dashboard__sidebar" aria-label="Navigasi dashboard">
         <a class="recruitment-dashboard__brand" href="<?= esc_url( recruitment_get_admin_url( 'dashboard' ) ) ?>" aria-label="DAW Admin, Dashboard">
             <span class="recruitment-dashboard__brand-mark" aria-hidden="true">D</span>
             <span class="recruitment-dashboard__brand-name">DAW Admin</span>
         </a>
+        <div class="recruitment-dashboard__sidebar-user daw-sidebar-user-card" style="border-bottom:1px solid rgba(255,255,255,0.08);padding:10px 12px 12px;">
+            <a href="<?= esc_url( admin_url( 'admin.php?page=recruitment-hr-profile' ) ) ?>" class="daw-sidebar-user-link" title="Buka Profil Admin HR" style="display:flex;align-items:center;gap:10px;text-decoration:none;padding:6px 8px;border-radius:8px;transition:background 0.15s ease;">
+                <span class="recruitment-dashboard__sidebar-avatar" style="width:32px;height:32px;border-radius:50%;background:#c8102e;color:#fff;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;"><?= esc_html( $hr_identity['avatar'] ) ?></span>
+                <div class="recruitment-dashboard__sidebar-user-info" style="min-width:0;flex:1;overflow:hidden;">
+                    <strong class="recruitment-dashboard__sidebar-user-name" style="display:block;font-size:12px;font-weight:700;color:#f3f4f6;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?= esc_html( $hr_identity['name'] ) ?></strong>
+                    <span class="recruitment-dashboard__sidebar-user-email" style="display:block;font-size:11px;color:#9ca3af;line-height:1.3;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?= esc_html( $hr_identity['email'] ?: $hr_identity['role'] ) ?></span>
+                </div>
+            </a>
+        </div>
         <nav class="recruitment-dashboard__navigation">
             <a class="is-active" href="<?= esc_url( recruitment_get_admin_url( 'dashboard' ) ) ?>" aria-current="page" title="Dashboard"><span class="dashicons dashicons-dashboard" aria-hidden="true"></span><span class="recruitment-dashboard__nav-label">Dashboard</span></a>
             <a href="#candidate-list-title" data-dashboard-stage="all" title="Recruitment"><span class="dashicons dashicons-groups" aria-hidden="true"></span><span class="recruitment-dashboard__nav-label">Recruitment</span></a>
@@ -138,8 +150,8 @@ $pipeline_rows = [
         <header class="recruitment-dashboard__topbar">
             <p class="recruitment-dashboard__breadcrumb">DAW Admin <span>/</span> Dashboard</p>
             <div class="recruitment-dashboard__profile">
-                <span class="recruitment-dashboard__profile-avatar" aria-hidden="true">HR</span>
-                <span class="recruitment-dashboard__profile-copy"><strong><?= esc_html( $admin_user->display_name ) ?></strong><small><?= esc_html( $admin_user->user_email ) ?></small></span>
+                <span class="recruitment-dashboard__profile-avatar" aria-hidden="true"><?= esc_html( $hr_identity['avatar'] ) ?></span>
+                <span class="recruitment-dashboard__profile-copy"><strong><?= esc_html( $hr_identity['name'] ) ?></strong><small><?= esc_html( $hr_identity['email'] ) ?></small></span>
                 <?= recruitment_logout_form( 'Keluar', home_url( '/' ), 'recruitment-dashboard__logout' ) ?>
             </div>
         </header>

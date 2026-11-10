@@ -25,6 +25,7 @@ $page_url = static function ( int $page ): string {
 };
 $test_labels = [ 'disc' => 'DISC', 'papi' => 'PAPI Kostick' ];
 $admin_user = wp_get_current_user();
+$hr_identity = recruitment_get_current_hr_identity();
 ?>
 <div class="wrap daw-personality-results">
     <header class="daw-psychotest-settings__header">
@@ -35,8 +36,8 @@ $admin_user = wp_get_current_user();
                 <p>Jawaban dan hasil tes dibaca dari Oracle, lalu dipetakan ke akun pelamar menggunakan ID user WordPress. Skema Oracle tidak diubah.</p>
             </div>
             <div class="daw-psychotest-settings__header-account">
-                <span class="daw-psychotest-settings__avatar" aria-hidden="true">HR</span>
-                <span><strong><?= esc_html( $admin_user->display_name ) ?></strong><small><?= esc_html( $admin_user->user_email ) ?></small></span>
+                <span class="daw-psychotest-settings__avatar" aria-hidden="true"><?= esc_html( $hr_identity['avatar'] ) ?></span>
+                <span><strong><?= esc_html( $hr_identity['name'] ) ?></strong><small><?= esc_html( $hr_identity['email'] ) ?></small></span>
             </div>
         </div>
     </header>

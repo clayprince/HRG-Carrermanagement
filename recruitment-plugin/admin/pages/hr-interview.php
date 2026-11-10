@@ -1,7 +1,8 @@
 <?php
 $user = wp_get_current_user();
-$display_name = $user && ! empty( $user->display_name ) ? $user->display_name : 'Admin HR';
-$user_email = $user && ! empty( $user->user_email ) ? $user->user_email : 'hr@daw.co.id';
+$hr_identity = recruitment_get_current_hr_identity();
+$display_name = $hr_identity['name'];
+$user_email = $hr_identity['email'] ?: 'hr@daw.co.id';
 $logout_form = recruitment_logout_form( 'Keluar', home_url( '/' ), 'daw-user-interview__logout' );
 
 $database = new Recruitment_Database();
@@ -58,7 +59,7 @@ foreach ( $applications as $app ) {
             <strong>Wawancara HR</strong>
         </nav>
         <div class="daw-user-interview__account">
-            <span class="daw-user-interview__avatar" aria-hidden="true">HR</span>
+            <span class="daw-user-interview__avatar" aria-hidden="true"><?= esc_html( $hr_identity['avatar'] ) ?></span>
             <span class="daw-user-interview__account-name"><strong><?= esc_html( $display_name ) ?></strong><small><?= esc_html( $user_email ) ?></small></span>
             <?= $logout_form ?>
         </div>

@@ -603,10 +603,15 @@ function recruitment_psychotest_attendance_window( array $settings ): ?array {
     if (
         ! preg_match( $date_pattern, $start_date )
         || ! preg_match( $date_pattern, $end_date )
-        || ! preg_match( $time_pattern, $start_time )
-        || ! preg_match( $time_pattern, $end_time )
     ) {
         return null;
+    }
+
+    if ( ! preg_match( $time_pattern, $start_time ) ) {
+        $start_time = '00:00';
+    }
+    if ( ! preg_match( $time_pattern, $end_time ) ) {
+        $end_time = '23:59';
     }
 
     $start_day = DateTimeImmutable::createFromFormat( '!Y-m-d', $start_date, wp_timezone() );
@@ -617,7 +622,6 @@ function recruitment_psychotest_attendance_window( array $settings ): ?array {
         || $start_day->format( 'Y-m-d' ) !== $start_date
         || $end_day->format( 'Y-m-d' ) !== $end_date
         || $end_date < $start_date
-        || $end_time < $start_time
     ) {
         return null;
     }
@@ -637,12 +641,10 @@ function recruitment_is_psychotest_attendance_time_in_window( array $settings, D
     }
 
     $date = $datetime->format( 'Y-m-d' );
-    $time = $datetime->format( 'H:i' );
 
+    // Gausah pake limitasi untuk yang dijamnya aja (validasi hanya rentang tanggal)
     return $date >= $window['start_date']
-        && $date <= $window['end_date']
-        && $time >= $window['start_time']
-        && $time <= $window['end_time'];
+        && $date <= $window['end_date'];
 }
 
 /**
@@ -889,15 +891,400 @@ function recruitment_get_admin_url( string $slug = 'dashboard' ): string {
     }
 
     $pages = [
-        'dashboard'    => 'recruitment-dashboard',
-        'applicants'   => 'recruitment-applicants',
-        'applications' => 'recruitment-applications',
-        'user-interview' => 'recruitment-user-interview',
+        'dashboard'           => 'recruitment-dashboard',
+        'applicants'          => 'recruitment-applicants',
+        'applications'        => 'recruitment-applications',
+        'user-interview'      => 'recruitment-user-interview',
+        'hr-interview'        => 'recruitment-hr-interview',
+        'final-decision'      => 'recruitment-final-decision',
+        'interview-schedule'  => 'recruitment-interview-schedule',
+        'user-management'     => 'recruitment-user-management',
+        'hr-profile'          => 'recruitment-hr-profile',
         'psychotest-settings' => 'recruitment-psychotest-settings',
-        'psychotest-results' => 'recruitment-psychotest-results',
-        'question-bank' => 'recruitment-question-bank',
-        'settings'     => 'recruitment-settings',
+        'psychotest-results'  => 'recruitment-psychotest-results',
+        'question-bank'       => 'recruitment-question-bank',
+        'settings'            => 'recruitment-settings',
     ];
 
     return add_query_arg( 'page', $pages[ $slug ] ?? 'recruitment-dashboard', admin_url( 'admin.php' ) );
+}
+
+/**
+ * Retrieve the current active HR administrator's verified profile (name, email, role).
+ *
+ * @return array{name: string, email: string, role: string, avatar: string}
+ */
+function recruitment_get_current_hr_identity(): array {
+    $current_user = wp_get_current_user();
+    if ( ! $current_user instanceof WP_User || ! $current_user->exists() ) {
+        return [
+            'name'   => 'Admin HR',
+            'email'  => '',
+            'role'   => 'Administrator HR',
+            'avatar' => 'HR',
+        ];
+    }
+
+    $oracle_account_id = (string) get_user_meta( $current_user->ID, 'daw_oracle_account_id', true );
+    $name = '';
+    $email = '';
+
+    // Priority 1: Query Oracle Database directly for live data
+    if ( ctype_digit( $oracle_account_id ) && '0' !== $oracle_account_id ) {
+        try {
+            $database = new Recruitment_Database();
+            $hr_profile = $database->get_hr_profile( $oracle_account_id );
+            if ( ! empty( $hr_profile['email'] ) ) {
+                $email = (string) $hr_profile['email'];
+            }
+            if ( ! empty( $hr_profile['username'] ) ) {
+                $name = (string) $hr_profile['username'];
+            }
+        } catch ( Throwable $e ) {
+            // Fallback to meta
+        }
+    }
+
+    // Priority 2: Fallback to user meta
+    if ( '' === $email ) {
+        $email = (string) get_user_meta( $current_user->ID, 'daw_oracle_email', true );
+    }
+    if ( '' === $name ) {
+        $name = (string) get_user_meta( $current_user->ID, 'daw_oracle_username', true );
+    }
+
+    // Priority 3: Fallback to WordPress user fields (exclude internal bridge email)
+    if ( '' === $email ) {
+        $user_email = (string) $current_user->user_email;
+        if ( false === strpos( $user_email, '@oracle-bridge.invalid' ) ) {
+            $email = $user_email;
+        }
+    }
+    if ( '' === $name ) {
+        $name = $current_user->display_name ?: $current_user->user_login;
+    }
+
+    // If name is an email address and differs from the active email, sync name to active email
+    if ( is_email( $name ) && '' !== $email && strtolower( $name ) !== strtolower( $email ) ) {
+        $name = $email;
+    }
+
+    // If name is an email address and email is empty, use name as email
+    if ( '' === $email && is_email( $name ) ) {
+        $email = $name;
+    }
+
+    // If name is empty, use email or 'Admin HR'
+    if ( '' === $name ) {
+        $name = '' !== $email ? $email : 'Admin HR';
+    }
+
+    // Generate avatar initials
+    $avatar = 'HR';
+    if ( '' !== $name ) {
+        $clean_name = trim( explode( '@', $name )[0] );
+        $parts = preg_split( '/[\s._-]+/', $clean_name );
+        if ( ! empty( $parts[0] ) ) {
+            $first = strtoupper( mb_substr( $parts[0], 0, 1 ) );
+            $second = ! empty( $parts[1] ) ? strtoupper( mb_substr( $parts[1], 0, 1 ) ) : ( mb_strlen( $parts[0] ) > 1 ? strtoupper( mb_substr( $parts[0], 1, 1 ) ) : '' );
+            if ( ctype_alnum( $first ) ) {
+                $avatar = $first . $second;
+            }
+        }
+    }
+
+    return [
+        'name'   => $name,
+        'email'  => $email,
+        'role'   => 'Administrator HR',
+        'avatar' => $avatar ?: 'HR',
+    ];
+}
+
+/**
+ * Return default email templates for recruitment notifications.
+ *
+ * @return array<string, array{id: string, title: string, category: string, stage: string, subject: string, body: string, is_default: bool}>
+ */
+function recruitment_get_default_email_templates(): array {
+    return [
+        'konfirmasi_lamaran' => [
+            'id'         => 'konfirmasi_lamaran',
+            'title'      => 'Konfirmasi Lamaran',
+            'category'   => 'lamaran',
+            'stage'      => 'ADMINISTRASI',
+            'subject'    => 'Konfirmasi Penerimaan Lamaran - {{posisi}} - PT Daya Adicipta Wisesa',
+            'body'       => "Halo {{nama}},\n\nTerima kasih telah melamar posisi {{posisi}} di PT Daya Adicipta Wisesa ({{dealer}}). Lamaran Anda telah kami terima dan saat ini sedang dalam proses peninjauan oleh tim rekrutmen kami.\n\nSilakan masuk ke fitur Tracking Lamaran untuk melihat perkembangan proses seleksi Anda.\n\nSalam,\nTim Rekrutmen DAW",
+            'is_default' => true,
+        ],
+        'lolos_administrasi' => [
+            'id'         => 'lolos_administrasi',
+            'title'      => 'Lolos Seleksi Administrasi',
+            'category'   => 'administrasi',
+            'stage'      => 'PSIKOTES',
+            'subject'    => 'Selamat! Anda Lolos Seleksi Administrasi - {{posisi}} - PT Daya Adicipta Wisesa',
+            'body'       => "Halo {{nama}},\n\nSelamat! Berdasarkan hasil seleksi berkas administrasi untuk posisi {{posisi}} di {{dealer}}, Anda dinyatakan LOLOS ke tahapan seleksi berikutnya (Psikotes).\n\nInformasi mengenai jadwal dan petunjuk tahapan selanjutnya akan kami sampaikan melalui portal karir rekrutmen DAW.\n\nSalam,\nTim Rekrutmen DAW",
+            'is_default' => true,
+        ],
+        'tidak_lolos_administrasi' => [
+            'id'         => 'tidak_lolos_administrasi',
+            'title'      => 'Tidak Lolos Seleksi Administrasi',
+            'category'   => 'administrasi hasil',
+            'stage'      => 'ADMINISTRASI',
+            'subject'    => 'Informasi Hasil Seleksi Administrasi - {{posisi}} - PT Daya Adicipta Wisesa',
+            'body'       => "Halo {{nama}},\n\nTerima kasih atas partisipasi dan minat Anda melamar posisi {{posisi}} di PT Daya Adicipta Wisesa ({{dealer}}).\n\nSetelah melakukan peninjauan menyeluruh terhadap kualifikasi, saat ini kami belum dapat melanjutkan proses lamaran Anda ke tahapan berikutnya. Data profil Anda akan tetap tersimpan dalam database kami untuk kesempatan mendatang.\n\nSalam,\nTim Rekrutmen DAW",
+            'is_default' => true,
+        ],
+        'undangan_psikotes' => [
+            'id'         => 'undangan_psikotes',
+            'title'      => 'Undangan Psikotes',
+            'category'   => 'psikotes',
+            'stage'      => 'PSIKOTES',
+            'subject'    => 'Undangan Tes Psikologi - {{posisi}} - PT Daya Adicipta Wisesa',
+            'body'       => "Halo {{nama}},\n\nAnda diundang untuk mengikuti tahapan Tes Psikologi untuk posisi {{posisi}} di PT Daya Adicipta Wisesa ({{dealer}}).\n\nSilakan masuk ke portal karir rekrutmen untuk mengonfirmasi kehadiran dan memilih sesi waktu yang tersedia.\n\nSalam,\nTim Rekrutmen DAW",
+            'is_default' => true,
+        ],
+        'lolos_psikotes' => [
+            'id'         => 'lolos_psikotes',
+            'title'      => 'Lolos Tes Psikologi',
+            'category'   => 'psikotes',
+            'stage'      => 'INTERVIEW_HR',
+            'subject'    => 'Selamat! Anda Lolos Tes Psikologi - {{posisi}} - PT Daya Adicipta Wisesa',
+            'body'       => "Halo {{nama}},\n\nSelamat! Anda telah menyelesaikan Tes Psikologi untuk posisi {{posisi}} di {{dealer}} dan dinyatakan LOLOS ke tahapan berikutnya yaitu Wawancara HR.\n\nJadwal dan detail wawancara akan kami perbarui pada portal karir Anda.\n\nSalam,\nTim Rekrutmen DAW",
+            'is_default' => true,
+        ],
+        'tidak_lolos_psikotes' => [
+            'id'         => 'tidak_lolos_psikotes',
+            'title'      => 'Tidak Lolos Tes Psikologi',
+            'category'   => 'psikotes hasil',
+            'stage'      => 'PSIKOTES',
+            'subject'    => 'Informasi Hasil Tes Psikologi - {{posisi}} - PT Daya Adicipta Wisesa',
+            'body'       => "Halo {{nama}},\n\nTerima kasih atas partisipasi dan waktu yang Anda luangkan dalam mengikuti tahapan Tes Psikologi untuk posisi {{posisi}} di PT Daya Adicipta Wisesa.\n\nBerdasarkan hasil evaluasi, saat ini kami belum dapat memproses lamaran Anda ke tahapan berikutnya. Kami sangat mengapresiasi minat dan kompetensi yang telah Anda tunjukkan.\n\nSalam,\nTim Rekrutmen DAW",
+            'is_default' => true,
+        ],
+        'pengingat_psikotes' => [
+            'id'         => 'pengingat_psikotes',
+            'title'      => 'Pengingat Psikotes',
+            'category'   => 'reminder psikotes',
+            'stage'      => 'PSIKOTES',
+            'subject'    => 'Pengingat: Tes Psikologi Besok - {{posisi}} - PT Daya Adicipta Wisesa',
+            'body'       => "Halo {{nama}},\n\nIni adalah pengingat bahwa jadwal Tes Psikologi Anda untuk posisi {{posisi}} akan dilaksanakan besok sesuai konfirmasi Anda.\n\nPastikan Anda mempersiapkan perangkat dan hadir tepat waktu sesuai konfirmasi yang telah Anda lakukan.\n\nSalam,\nTim Rekrutmen DAW",
+            'is_default' => true,
+        ],
+        'undangan_wawancara_hr' => [
+            'id'         => 'undangan_wawancara_hr',
+            'title'      => 'Undangan Wawancara HR',
+            'category'   => 'wawancara',
+            'stage'      => 'INTERVIEW_HR',
+            'subject'    => 'Undangan Wawancara HR - {{posisi}} - PT Daya Adicipta Wisesa',
+            'body'       => "Halo {{nama}},\n\nKami mengundang Anda untuk mengikuti tahapan Wawancara HR untuk posisi {{posisi}} di PT Daya Adicipta Wisesa ({{dealer}}).\n\nSilakan cek jadwal wawancara Anda di portal karir rekrutmen DAW untuk melihat informasi waktu dan tautan/lokasi wawancara.\n\nSalam,\nTim Rekrutmen DAW",
+            'is_default' => true,
+        ],
+        'lolos_wawancara_hr' => [
+            'id'         => 'lolos_wawancara_hr',
+            'title'      => 'Lolos Wawancara HR',
+            'category'   => 'wawancara',
+            'stage'      => 'INTERVIEW_USER',
+            'subject'    => 'Selamat! Anda Lolos Wawancara HR - {{posisi}} - PT Daya Adicipta Wisesa',
+            'body'       => "Halo {{nama}},\n\nSelamat! Berdasarkan hasil sesi Wawancara HR untuk posisi {{posisi}} di {{dealer}}, Anda dinyatakan LOLOS ke tahapan berikutnya yaitu Wawancara User (Departemen Terkait).\n\nInformasi mengenai jadwal wawancara user akan segera diinformasikan melalui portal rekrutmen DAW.\n\nSalam,\nTim Rekrutmen DAW",
+            'is_default' => true,
+        ],
+        'tidak_lolos_wawancara_hr' => [
+            'id'         => 'tidak_lolos_wawancara_hr',
+            'title'      => 'Tidak Lolos Wawancara HR',
+            'category'   => 'wawancara hasil',
+            'stage'      => 'INTERVIEW_HR',
+            'subject'    => 'Informasi Hasil Wawancara HR - {{posisi}} - PT Daya Adicipta Wisesa',
+            'body'       => "Halo {{nama}},\n\nTerima kasih telah meluangkan waktu untuk hadir dalam sesi Wawancara HR posisi {{posisi}} di PT Daya Adicipta Wisesa.\n\nSetelah mempertimbangkan kesesuaian profil dan kualifikasi saat ini, kami mohon maaf belum dapat melanjutkan proses seleksi Anda ke tahap berikutnya. Kami mendoakan yang terbaik untuk perjalanan karir Anda selanjutnya.\n\nSalam,\nTim Rekrutmen DAW",
+            'is_default' => true,
+        ],
+        'undangan_wawancara_user' => [
+            'id'         => 'undangan_wawancara_user',
+            'title'      => 'Undangan Wawancara User',
+            'category'   => 'wawancara',
+            'stage'      => 'INTERVIEW_USER',
+            'subject'    => 'Undangan Wawancara User - {{posisi}} - PT Daya Adicipta Wisesa',
+            'body'       => "Halo {{nama}},\n\nAnda diundang untuk mengikuti sesi Wawancara User bersama tim User Manager/Departemen untuk posisi {{posisi}} di PT Daya Adicipta Wisesa ({{dealer}}).\n\nDetail teknis dan waktu wawancara dapat Anda lihat melalui menu Tracking Lamaran Anda di portal rekrutmen DAW.\n\nSalam,\nTim Rekrutmen DAW",
+            'is_default' => true,
+        ],
+        'lolos_wawancara_user' => [
+            'id'         => 'lolos_wawancara_user',
+            'title'      => 'Lolos Wawancara User',
+            'category'   => 'wawancara',
+            'stage'      => 'FINAL',
+            'subject'    => 'Selamat! Anda Lolos Wawancara User - {{posisi}} - PT Daya Adicipta Wisesa',
+            'body'       => "Halo {{nama}},\n\nSelamat! Anda telah menyelesaikan Wawancara User untuk posisi {{posisi}} di {{dealer}} dengan hasil baik dan dinyatakan LOLOS ke tahapan Keputusan Akhir.\n\nTim HR kami akan memproses tahap finalisasi dan offering.\n\nSalam,\nTim Rekrutmen DAW",
+            'is_default' => true,
+        ],
+        'pengumuman_diterima' => [
+            'id'         => 'pengumuman_diterima',
+            'title'      => 'Pengumuman Diterima',
+            'category'   => 'hasil',
+            'stage'      => 'DITERIMA',
+            'subject'    => 'Selamat! Anda Diterima Bergabung di PT Daya Adicipta Wisesa - {{posisi}}',
+            'body'       => "Halo {{nama}},\n\nSelamat! Berdasarkan seluruh rangkaian proses seleksi yang telah Anda lalui, dengan bangga kami informasikan bahwa Anda dinyatakan DITERIMA untuk bergabung dengan keluarga besar PT Daya Adicipta Wisesa pada posisi {{posisi}} ({{dealer}}).\n\nDokumen penawaran kerja (Offering Letter) dan informasi kelengkapan berkas orientasi akan dikirimkan lebih lanjut oleh tim HR.\n\nSelamat bergabung dan mari bertumbuh bersama DAW!\n\nSalam hormat,\nTim Rekrutmen DAW",
+            'is_default' => true,
+        ],
+        'pengumuman_ditolak' => [
+            'id'         => 'pengumuman_ditolak',
+            'title'      => 'Informasi Hasil Akhir',
+            'category'   => 'hasil',
+            'stage'      => 'DITOLAK',
+            'subject'    => 'Informasi Hasil Akhir Seleksi - {{posisi}} - PT Daya Adicipta Wisesa',
+            'body'       => "Halo {{nama}},\n\nTerima kasih yang sebesar-besarnya atas komitmen, antusiasme, dan waktu yang telah Anda berikan selama mengikuti rangkaian seleksi posisi {{posisi}} di PT Daya Adicipta Wisesa.\n\nSetelah pertimbangan mendalam di antara para kandidat, saat ini kami memutuskan untuk belum dapat menawarkan posisi tersebut kepada Anda. Profil Anda akan tetap menjadi bagian dari database kami untuk peluang mendatang.\n\nSalam sukses,\nTim Rekrutmen DAW",
+            'is_default' => true,
+        ],
+    ];
+}
+
+/**
+ * Retrieve all email templates (defaults merged with custom/edited templates).
+ *
+ * @return array<string, array{id: string, title: string, category: string, stage: string, subject: string, body: string, is_default: bool}>
+ */
+function recruitment_get_email_templates(): array {
+    $custom = get_option( 'recruitment_email_templates', null );
+    $defaults = recruitment_get_default_email_templates();
+    if ( ! is_array( $custom ) ) {
+        return $defaults;
+    }
+    return array_merge( $defaults, $custom );
+}
+
+/**
+ * Save (create or update) an email template.
+ *
+ * @param array<string, mixed> $data
+ * @return bool
+ */
+function recruitment_save_email_template( array $data ): bool {
+    $id = sanitize_key( (string) ( $data['id'] ?? '' ) );
+    if ( '' === $id ) {
+        $id = 'tpl_' . time() . '_' . wp_rand( 100, 999 );
+    }
+
+    $title    = sanitize_text_field( (string) ( $data['title'] ?? 'Template Baru' ) );
+    $category = sanitize_text_field( (string) ( $data['category'] ?? 'lamaran' ) );
+    $stage    = strtoupper( sanitize_key( (string) ( $data['stage'] ?? 'ADMINISTRASI' ) ) );
+    $subject  = sanitize_text_field( (string) ( $data['subject'] ?? '' ) );
+    $body     = sanitize_textarea_field( (string) ( $data['body'] ?? '' ) );
+
+    $current_templates = get_option( 'recruitment_email_templates', [] );
+    if ( ! is_array( $current_templates ) ) {
+        $current_templates = [];
+    }
+
+    $defaults = recruitment_get_default_email_templates();
+    $is_default = isset( $defaults[ $id ] );
+
+    $current_templates[ $id ] = [
+        'id'         => $id,
+        'title'      => $title,
+        'category'   => $category,
+        'stage'      => $stage,
+        'subject'    => $subject,
+        'body'       => $body,
+        'is_default' => $is_default,
+    ];
+
+    return update_option( 'recruitment_email_templates', $current_templates );
+}
+
+/**
+ * Delete a custom email template. Default templates cannot be deleted.
+ *
+ * @param string $template_id
+ * @return bool
+ */
+function recruitment_delete_email_template( string $template_id ): bool {
+    $id = sanitize_key( $template_id );
+    $defaults = recruitment_get_default_email_templates();
+    if ( isset( $defaults[ $id ] ) ) {
+        // Reset default template by removing override from option
+        $custom = get_option( 'recruitment_email_templates', [] );
+        if ( is_array( $custom ) && isset( $custom[ $id ] ) ) {
+            unset( $custom[ $id ] );
+            return update_option( 'recruitment_email_templates', $custom );
+        }
+        return false;
+    }
+
+    $current = get_option( 'recruitment_email_templates', [] );
+    if ( is_array( $current ) && isset( $current[ $id ] ) ) {
+        unset( $current[ $id ] );
+        return update_option( 'recruitment_email_templates', $current );
+    }
+
+    return false;
+}
+
+/**
+ * Replace template placeholder tags with actual candidate/vacancy values.
+ *
+ * @param string $text
+ * @param array<string, string> $vars
+ * @return string
+ */
+function recruitment_replace_template_placeholders( string $text, array $vars ): string {
+    $replacements = [
+        '{{nama}}'    => $vars['nama'] ?? $vars['name'] ?? 'Pelamar',
+        '{{posisi}}'  => $vars['posisi'] ?? $vars['position'] ?? $vars['title'] ?? 'Posisi Terkait',
+        '{{dealer}}'  => $vars['dealer'] ?? $vars['location'] ?? 'PT Daya Adicipta Wisesa',
+        '{{tahap}}'   => $vars['tahap'] ?? $vars['stage'] ?? '',
+        '{{tanggal}}' => $vars['tanggal'] ?? wp_date( 'j F Y' ),
+    ];
+
+    return str_replace( array_keys( $replacements ), array_values( $replacements ), $text );
+}
+
+/**
+ * Build a complete DAW-branded HTML email message.
+ *
+ * @param string $subject
+ * @param string $body
+ * @param string $stage_badge
+ * @return string
+ */
+function recruitment_build_status_email_html( string $subject, string $body, string $stage_badge = '' ): string {
+    $body_html = nl2br( esc_html( $body ) );
+    $badge_html = '';
+    if ( '' !== trim( $stage_badge ) ) {
+        $badge_html = '<div style="margin-bottom:20px;padding:12px 16px;background:#fef2f2;border-left:4px solid #c8102e;border-radius:6px;">'
+            . '<span style="font-size:12px;font-weight:700;color:#c8102e;text-transform:uppercase;letter-spacing:0.5px;">Status Lamaran:</span> '
+            . '<strong style="font-size:14px;color:#111827;">' . esc_html( $stage_badge ) . '</strong>'
+            . '</div>';
+    }
+    $tracking_url = home_url( '/career/?recruitment_page=applicant-tracking' );
+
+    return '<!doctype html>
+<html lang="id">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' . esc_html( $subject ) . '</title></head>
+<body style="margin:0;padding:32px 16px;background:#f3f4f6;color:#111827;font-family:Arial,Helvetica,sans-serif;-webkit-font-smoothing:antialiased;">
+    <table role="presentation" style="width:100%;max-width:620px;margin:0 auto;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);">
+        <tr>
+            <td style="padding:22px 28px;background:#c8102e;color:#fff;">
+                <div style="font-size:18px;font-weight:800;letter-spacing:.04em;display:inline-block;">DAW <span style="color:#fee2e2;font-weight:400;font-size:14px;">| REKRUTMEN</span></div>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:32px 28px 24px;">
+                ' . $badge_html . '
+                <div style="font-size:14px;line-height:1.7;color:#374151;">
+                    ' . $body_html . '
+                </div>
+                <div style="margin-top:28px;padding-top:20px;border-top:1px solid #f3f4f6;text-align:center;">
+                    <a href="' . esc_url( $tracking_url ) . '" style="display:inline-block;background:#c8102e;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 28px;border-radius:8px;box-shadow:0 2px 4px rgba(200,16,46,0.25);">Masuk ke Tracking Lamaran</a>
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:18px 28px;background:#f9fafb;border-top:1px solid #e5e7eb;color:#6b7280;font-size:12px;line-height:1.5;">
+                <strong>PT Daya Adicipta Wisesa</strong><br>
+                Jl. Raya Manado-Bitung KM 9.5, Watutumou II, Kalawat, Minahasa Utara, Sulawesi Utara.<br>
+                <span style="color:#9ca3af;font-size:11px;">Email ini dikirim otomatis terkait proses seleksi Anda. Mohon tidak membalas email ini secara langsung.</span>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>';
 }

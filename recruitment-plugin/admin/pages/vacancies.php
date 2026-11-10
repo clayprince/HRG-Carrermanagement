@@ -1,7 +1,8 @@
 <?php
 $user = function_exists( 'wp_get_current_user' ) ? wp_get_current_user() : null;
-$display_name = $user && ! empty( $user->display_name ) ? $user->display_name : 'Admin HR';
-$user_email = $user && ! empty( $user->user_email ) ? $user->user_email : 'hr@daw.co.id';
+$hr_identity = recruitment_get_current_hr_identity();
+$display_name = $hr_identity['name'];
+$user_email = $hr_identity['email'] ?: 'hr@daw.co.id';
 $logout_form = recruitment_logout_form( 'Keluar', home_url( '/' ) );
 $list_url = recruitment_get_admin_url( 'vacancies' );
 $create_url = add_query_arg( 'view', 'create', $list_url );
@@ -92,7 +93,7 @@ $status_labels = [ 'published' => 'Published', 'draft' => 'Draft', 'closed' => '
         <header class="daw-vacancies__header">
             <nav aria-label="Breadcrumb"><a href="<?= esc_url( $list_url ) ?>">Lowongan</a><i aria-hidden="true">/</i><strong><?= $is_create_view ? ( $editing_vacancy ? 'Edit' : 'Tambah' ) : 'Semua Lowongan' ?></strong></nav>
             <div class="daw-vacancies__account">
-                <span class="daw-vacancies__avatar" aria-hidden="true">HR</span>
+                <span class="daw-vacancies__avatar" aria-hidden="true"><?= esc_html( $hr_identity['avatar'] ) ?></span>
                 <span><strong><?= esc_html( $display_name ) ?></strong><small><?= esc_html( $user_email ) ?></small></span>
                 <?= $logout_form ?>
             </div>

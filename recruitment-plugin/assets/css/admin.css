@@ -1900,6 +1900,75 @@ body:has(.recruitment-dashboard) {
   font-size: 12px;
   font-weight: 700;
 }
+.daw-sidebar-user-card {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px 12px 12px;
+}
+.daw-sidebar-user-link {
+  align-items: center;
+  border-radius: 8px;
+  color: #fff;
+  display: flex;
+  gap: 10px;
+  padding: 6px 8px;
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+.daw-sidebar-user-link:hover,
+.daw-sidebar-user-link:focus-visible {
+  background-color: rgba(255, 255, 255, 0.07);
+}
+.recruitment-dashboard__sidebar-avatar {
+  align-items: center;
+  background-color: #c8102e;
+  border-radius: 50%;
+  color: #fff;
+  display: inline-flex;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+.recruitment-dashboard__sidebar-user-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.recruitment-dashboard__sidebar-user-name {
+  color: #f3f4f6;
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recruitment-dashboard__sidebar-user-email {
+  color: #9ca3af;
+  display: block;
+  font-size: 11px;
+  line-height: 1.3;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+body.daw-recruitment-sidebar-collapsed .recruitment-dashboard__sidebar-user-info,
+.recruitment-dashboard[data-sidebar-collapsed="true"] .recruitment-dashboard__sidebar-user-info {
+  display: none !important;
+}
+body.daw-recruitment-sidebar-collapsed .daw-sidebar-user-card,
+.recruitment-dashboard[data-sidebar-collapsed="true"] .daw-sidebar-user-card {
+  padding: 8px 4px !important;
+}
+body.daw-recruitment-sidebar-collapsed .daw-sidebar-user-link,
+.recruitment-dashboard[data-sidebar-collapsed="true"] .daw-sidebar-user-link {
+  justify-content: center !important;
+  padding: 4px 0 !important;
+}
 .recruitment-dashboard__navigation {
   display: grid;
   gap: 4px;

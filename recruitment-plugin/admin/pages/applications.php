@@ -118,11 +118,12 @@ $review_error_messages = [
 	'link_failed' => 'Lowongan sudah diterbitkan, tetapi status pengajuan tidak berhasil diperbarui. Periksa lowongan Oracle sebelum mencoba lagi.',
 ];
 $reviewed = '1' === sanitize_text_field( wp_unslash( $_GET['reviewed'] ?? '' ) );
+$hr_identity = recruitment_get_current_hr_identity();
 ?>
 <div class="wrap daw-requests-page">
 	<header class="daw-requests__header">
 		<nav aria-label="Breadcrumb"><a href="<?= esc_url( recruitment_get_admin_url( 'dashboard' ) ) ?>">DAW Admin</a><span>/</span><strong><?= $selected_request ? 'Detail Pengajuan FPTK' : 'Pengajuan Lowongan' ?></strong></nav>
-		<div class="daw-requests__account"><span class="daw-requests__avatar" aria-hidden="true">HR</span><span><strong><?= esc_html( $current_user->display_name ) ?></strong><small><?= esc_html( $current_user->user_email ) ?></small></span><?= recruitment_logout_form( 'Keluar', home_url( '/' ) ) ?></div>
+		<div class="daw-requests__account"><span class="daw-requests__avatar" aria-hidden="true"><?= esc_html( $hr_identity['avatar'] ) ?></span><span><strong><?= esc_html( $hr_identity['name'] ) ?></strong><small><?= esc_html( $hr_identity['email'] ) ?></small></span><?= recruitment_logout_form( 'Keluar', home_url( '/' ) ) ?></div>
 	</header>
 	<main class="daw-requests__main">
 		<?php if ( $selected_request ) : ?>

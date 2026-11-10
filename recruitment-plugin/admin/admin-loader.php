@@ -19,6 +19,12 @@ class Recruitment_Admin {
 		add_action( 'admin_post_daw_update_application_status', [ $this, 'handle_application_status' ] );
 		add_action( 'admin_post_daw_send_application_status_email', [ $this, 'handle_application_status_email' ] );
 		add_action( 'admin_post_daw_update_psychotest_attendance_time', [ $this, 'handle_psychotest_attendance_time_update' ] );
+		add_action( 'admin_post_daw_update_applicant_email', [ $this, 'handle_applicant_email_update' ] );
+		add_action( 'admin_post_daw_save_email_settings', [ $this, 'handle_save_email_settings' ] );
+		add_action( 'admin_post_daw_save_email_template', [ $this, 'handle_save_email_template' ] );
+		add_action( 'admin_post_daw_delete_email_template', [ $this, 'handle_delete_email_template' ] );
+		add_action( 'admin_post_daw_send_test_email', [ $this, 'handle_send_test_email' ] );
+		add_action( 'admin_post_daw_send_composed_email', [ $this, 'handle_send_composed_email' ] );
 		add_action( 'admin_post_daw_download_applicant_profile', [ $this, 'handle_applicant_profile_download' ] );
 		add_action( 'admin_menu', [ $this, 'remove_vacancy_post_type_submenu' ], 99 );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
@@ -114,7 +120,8 @@ class Recruitment_Admin {
 		add_submenu_page( 'recruitment-dashboard', 'Setting Psikotes', 'Setting Psikotes', 'manage_recruitment', 'recruitment-psychotest-settings', [ $this, 'render_psychotest_settings' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Hasil Psikotes', 'Hasil Psikotes', 'manage_recruitment', 'recruitment-psychotest-results', [ $this, 'render_psychotest_results' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Bank Soal', 'Bank Soal', 'manage_recruitment', 'recruitment-question-bank', [ $this, 'render_question_bank' ] );
-		add_submenu_page( 'recruitment-dashboard', 'Pengaturan', 'Pengaturan', 'manage_recruitment', 'recruitment-settings', [ $this, 'render_settings' ] );
+		add_submenu_page( 'recruitment-dashboard', 'Pengaturan Email', 'Pengaturan Email', 'manage_recruitment', 'recruitment-settings', [ $this, 'render_settings' ] );
+		add_options_page( 'Email Recruitment DAW', 'Email Recruitment', 'manage_recruitment', 'recruitment-settings', [ $this, 'render_settings' ] );
 	}
 
 	public function remove_vacancy_post_type_submenu(): void {
@@ -456,35 +463,64 @@ class Recruitment_Admin {
 
 		$application_id = absint( $_POST['application_id'] ?? 0 );
 		check_admin_referer( 'daw_update_application_status_' . $application_id );
-		$decision = sanitize_key( wp_unslash( $_POST['administrative_result'] ?? '' ) );
+		$candidate_id = absint( $_POST['candidate_id'] ?? 0 );
+		$current_stage = strtoupper( sanitize_key( wp_unslash( $_POST['current_stage'] ?? '' ) ) );
+		$decision = sanitize_key( wp_unslash( $_POST['selection_decision'] ?? $_POST['administrative_result'] ?? '' ) );
 		$next_stage = strtoupper( sanitize_key( wp_unslash( $_POST['next_stage'] ?? '' ) ) );
 		$note = sanitize_textarea_field( wp_unslash( $_POST['note'] ?? '' ) );
-		if ( 'failed' === $decision ) {
+		$template_id = sanitize_key( wp_unslash( $_POST['template_id'] ?? '' ) );
+
+		if ( in_array( $decision, [ 'failed', 'rejected', 'ditolak', 'tidak_lolos' ], true ) ) {
 			$status = 'DITOLAK';
-			$stage = 'ADMINISTRASI';
-			$note = trim( 'Seleksi administrasi: tidak lolos. ' . $note );
-		} elseif ( 'passed' === $decision && in_array( $next_stage, [ 'PSIKOTES', 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) ) {
-			$status = $next_stage;
-			$stage = $next_stage;
-			$note = trim( 'Seleksi administrasi: lolos. Tahap berikutnya: ' . $next_stage . '. ' . $note );
+			$stage = ! empty( $current_stage ) ? $current_stage : 'ADMINISTRASI';
+			$note = trim( 'Hasil seleksi: tidak lolos. ' . $note );
+		} elseif ( in_array( $decision, [ 'passed', 'accepted', 'lolos', 'diterima' ], true ) ) {
+			if ( in_array( $next_stage, [ 'DITERIMA', 'FINAL' ], true ) ) {
+				$status = 'DITERIMA';
+				$stage = 'FINAL';
+				$note = trim( 'Hasil seleksi akhir: Diterima. ' . $note );
+			} elseif ( in_array( $next_stage, [ 'PSIKOTES', 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) ) {
+				$status = $next_stage;
+				$stage = $next_stage;
+				$note = trim( 'Lolos ke tahap ' . $next_stage . '. ' . $note );
+			} else {
+				$stage_transitions = [
+					'ADMINISTRASI'   => 'PSIKOTES',
+					'SCREENING'      => 'PSIKOTES',
+					'SUBMITTED'      => 'PSIKOTES',
+					'PSIKOTES'       => 'INTERVIEW_HR',
+					'INTERVIEW_HR'   => 'INTERVIEW_USER',
+					'INTERVIEW_USER' => 'FINAL',
+					'FINAL'          => 'DITERIMA',
+				];
+				$target = $stage_transitions[ $current_stage ] ?? 'PSIKOTES';
+				$status = 'FINAL' === $target ? 'DITERIMA' : $target;
+				$stage = $target;
+				$note = trim( 'Lolos ke tahap ' . $stage . '. ' . $note );
+			}
 		} else {
-			wp_die( esc_html__( 'Pilih hasil seleksi administrasi dan tahap berikutnya yang valid.', 'recruitment-plugin' ) );
+			wp_die( esc_html__( 'Pilih hasil keputusan seleksi yang valid.', 'recruitment-plugin' ) );
 		}
+
 		$result = ( new Recruitment_Database() )->update_application_status( (string) $application_id, $status, $stage, $note );
 		if ( empty( $result['success'] ) ) {
 			wp_die( esc_html( $result['error'] ?? 'Status lamaran gagal disimpan.' ) );
 		}
 
 		$pending_key = $this->application_status_email_pending_key( get_current_user_id(), $application_id );
-		set_transient( $pending_key, $status, 15 * MINUTE_IN_SECONDS );
+		set_transient( $pending_key, $status, 30 * MINUTE_IN_SECONDS );
+		if ( '' !== $template_id ) {
+			set_transient( $pending_key . '_tpl', $template_id, 30 * MINUTE_IN_SECONDS );
+		}
+
 		wp_safe_redirect(
 			add_query_arg(
 				[
-					'page' => 'recruitment-applicants',
-					'candidate_id' => absint( $_POST['candidate_id'] ?? 0 ),
+					'page'           => 'recruitment-applicants',
+					'candidate_id'   => $candidate_id,
 					'application_id' => $application_id,
 					'status_updated' => '1',
-					'email_preview' => '1',
+					'email_preview'  => '1',
 				],
 				admin_url( 'admin.php' )
 			)
@@ -525,6 +561,11 @@ class Recruitment_Admin {
 				(string) $application_id,
 				$local_datetime
 			);
+			if ( ! empty( $result['success'] ) ) {
+				$plugin = new Recruitment_Plugin();
+				$plugin->schedule_attendance_reminders( $application_id, $local_datetime );
+				$plugin->send_attendance_confirmation_email( $application_id, $local_datetime );
+			}
 		}
 
 		wp_safe_redirect(
@@ -552,54 +593,337 @@ class Recruitment_Admin {
 
 		$pending_key = $this->application_status_email_pending_key( get_current_user_id(), $application_id );
 		$pending_status = get_transient( $pending_key );
+		$database = new Recruitment_Database();
+
 		$application = null;
-		foreach ( ( new Recruitment_Database() )->get_applications() as $row ) {
-			if ( (int) ( $row['id'] ?? 0 ) === $application_id && (int) ( $row['applicant_id'] ?? 0 ) === $candidate_id ) {
+		foreach ( $database->get_applications() as $row ) {
+			if ( (int) ( $row['id'] ?? 0 ) === $application_id ) {
 				$application = $row;
 				break;
 			}
 		}
 
-		$current_status = strtoupper( trim( (string) ( $application['status'] ?? '' ) ) );
-		if ( ! is_string( $pending_status ) || '' === $pending_status || $pending_status !== $current_status || ! $application ) {
-			wp_die( esc_html__( 'Konfirmasi email sudah kedaluwarsa atau status lamaran telah berubah. Simpan status terbaru kembali untuk membuat pratinjau baru.', 'recruitment-plugin' ) );
+		$current_status = strtoupper( trim( (string) ( $application['status'] ?? ( is_string( $pending_status ) ? $pending_status : '' ) ) ) );
+
+		$posted_recipient = sanitize_email( wp_unslash( $_POST['recipient_email'] ?? '' ) );
+		if ( is_email( $posted_recipient ) ) {
+			$recipient = $posted_recipient;
+			if ( $candidate_id > 0 ) {
+				$database->update_candidate_email( $candidate_id, $recipient );
+			}
+		} else {
+			$recipient = sanitize_email( (string) ( $application['applicant_email'] ?? '' ) );
+			if ( ! is_email( $recipient ) && $candidate_id > 0 ) {
+				$profile = $database->get_admin_applicant( (string) $candidate_id );
+				if ( ! empty( $profile['email'] ) && is_email( $profile['email'] ) ) {
+					$recipient = sanitize_email( $profile['email'] );
+				}
+			}
 		}
 
-		$recipient = sanitize_email( (string) ( $application['applicant_email'] ?? '' ) );
 		if ( ! is_email( $recipient ) ) {
-			wp_die( esc_html__( 'Email pelamar tidak tersedia atau tidak valid.', 'recruitment-plugin' ) );
+			wp_safe_redirect( add_query_arg( [
+				'page'               => 'recruitment-applicants',
+				'candidate_id'       => $candidate_id,
+				'application_id'     => $application_id,
+				'status_email_error' => '1',
+				'mail_error_msg'     => rawurlencode( 'Alamat email pelamar tidak valid atau tidak ditemukan.' ),
+			], admin_url( 'admin.php' ) ) );
+			exit;
 		}
 
 		$applicant_name = (string) ( $application['applicant_name'] ?? 'Pelamar' );
-		$position = (string) ( $application['title'] ?? 'Posisi yang dilamar' );
-		$status = $current_status;
+		$position       = (string) ( $application['title'] ?? 'Posisi yang Dilamar' );
+		$dealer         = (string) ( $application['dealer'] ?? $application['location'] ?? 'PT Daya Adicipta Wisesa' );
 
-		ob_start();
-		require recruitment_get_plugin_path( 'templates/emails/application-status.php' );
-		$message = (string) ob_get_clean();
+		$subject = sanitize_text_field( wp_unslash( $_POST['email_subject'] ?? '' ) );
+		$body = sanitize_textarea_field( wp_unslash( $_POST['email_body'] ?? '' ) );
+
+		$placeholders = [
+			'nama'    => $applicant_name,
+			'posisi'  => $position,
+			'dealer'  => $dealer,
+			'tahap'   => $current_status,
+			'tanggal' => wp_date( 'j F Y' ),
+		];
+
+		if ( '' === $subject || '' === $body ) {
+			$saved_tpl = get_transient( $pending_key . '_tpl' );
+			$template_id = sanitize_key( wp_unslash( $_POST['selected_template_id'] ?? ( is_string( $saved_tpl ) ? $saved_tpl : '' ) ) );
+			$templates = recruitment_get_email_templates();
+			$template = $templates[ $template_id ] ?? null;
+
+			if ( ! $template ) {
+				if ( 'DITOLAK' === $current_status ) {
+					$template = $templates['tidak_lolos_administrasi'] ?? $templates['pengumuman_ditolak'] ?? null;
+				} elseif ( 'DITERIMA' === $current_status ) {
+					$template = $templates['pengumuman_diterima'] ?? null;
+				} elseif ( 'PSIKOTES' === $current_status ) {
+					$template = $templates['undangan_psikotes'] ?? $templates['lolos_administrasi'] ?? null;
+				} elseif ( 'INTERVIEW_HR' === $current_status ) {
+					$template = $templates['undangan_wawancara_hr'] ?? $templates['lolos_psikotes'] ?? null;
+				} elseif ( 'INTERVIEW_USER' === $current_status ) {
+					$template = $templates['undangan_wawancara_user'] ?? $templates['lolos_wawancara_hr'] ?? null;
+				}
+			}
+
+			if ( '' === $subject ) {
+				$subject = $template ? $template['subject'] : ( 'Pembaruan Status Lamaran: ' . $position . ' - PT Daya Adicipta Wisesa' );
+			}
+			if ( '' === $body ) {
+				$body = $template ? $template['body'] : ( "Halo {{nama}},\n\nStatus lamaran Anda untuk posisi {{posisi}} telah diperbarui menjadi: " . $current_status . ".\n\nSilakan cek portal rekrutmen DAW untuk melihat informasi terkini.\n\nSalam,\nTim Rekrutmen DAW" );
+			}
+		}
+
+		$subject = recruitment_replace_template_placeholders( $subject, $placeholders );
+		$body = recruitment_replace_template_placeholders( $body, $placeholders );
+		$html_message = recruitment_build_status_email_html( $subject, $body, $current_status );
+
+		$email_settings = ( new Recruitment_Plugin() )->get_email_settings();
+		$headers = [ 'Content-Type: text/html; charset=UTF-8' ];
+		if ( ! empty( $email_settings['from_email'] ) && is_email( $email_settings['from_email'] ) ) {
+			$from_name = ! empty( $email_settings['from_name'] ) ? $email_settings['from_name'] : 'Rekrutmen PT Daya Adicipta Wisesa';
+			$headers[] = 'From: ' . $from_name . ' <' . $email_settings['from_email'] . '>';
+			$headers[] = 'Reply-To: ' . $email_settings['from_email'];
+		}
+
+		$mail_error_msg = '';
+		$error_catcher = static function( $wp_error ) use ( &$mail_error_msg ) {
+			if ( is_wp_error( $wp_error ) ) {
+				$mail_error_msg = $wp_error->get_error_message();
+			}
+		};
+		add_action( 'wp_mail_failed', $error_catcher );
+
 		$sent = wp_mail(
 			$recipient,
-			sanitize_text_field( 'Pembaruan Status Lamaran - ' . $position ),
-			$message,
-			[ 'Content-Type: text/html; charset=UTF-8' ]
+			$subject,
+			$html_message,
+			$headers
 		);
+
+		remove_action( 'wp_mail_failed', $error_catcher );
+
 		$redirect_args = [
-			'page' => 'recruitment-applicants',
-			'candidate_id' => $candidate_id,
+			'page'           => 'recruitment-applicants',
+			'candidate_id'   => $candidate_id,
 			'application_id' => $application_id,
-			$sent ? 'status_email_sent' : 'status_email_error' => '1',
 		];
 		if ( $sent ) {
 			delete_transient( $pending_key );
+			delete_transient( $pending_key . '_tpl' );
+			$redirect_args['status_email_sent'] = '1';
+			$redirect_args['sent_to'] = rawurlencode( $recipient );
 		} else {
-			$redirect_args['email_preview'] = '1';
+			$redirect_args['status_email_error'] = '1';
+			if ( '' !== $mail_error_msg ) {
+				$redirect_args['mail_error_msg'] = rawurlencode( $mail_error_msg );
+			}
 		}
 		wp_safe_redirect( add_query_arg( $redirect_args, admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
+	public function handle_save_email_template(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengelola template email.', 'recruitment-plugin' ) );
+		}
+		check_admin_referer( 'daw_save_email_template' );
+
+		$id = sanitize_key( wp_unslash( $_POST['template_id'] ?? '' ) );
+		$title = sanitize_text_field( wp_unslash( $_POST['template_title'] ?? '' ) );
+		$category = sanitize_text_field( wp_unslash( $_POST['template_category'] ?? 'lamaran' ) );
+		$stage = strtoupper( sanitize_key( wp_unslash( $_POST['template_stage'] ?? 'ADMINISTRASI' ) ) );
+		$subject = sanitize_text_field( wp_unslash( $_POST['template_subject'] ?? '' ) );
+		$body = sanitize_textarea_field( wp_unslash( $_POST['template_body'] ?? '' ) );
+
+		if ( '' === $title || '' === $subject || '' === $body ) {
+			wp_safe_redirect( add_query_arg( [ 'page' => 'recruitment-settings', 'tpl_result' => 'empty_fields' ], admin_url( 'admin.php' ) ) );
+			exit;
+		}
+
+		$saved = recruitment_save_email_template( [
+			'id'       => $id,
+			'title'    => $title,
+			'category' => $category,
+			'stage'    => $stage,
+			'subject'  => $subject,
+			'body'     => $body,
+		] );
+
+		wp_safe_redirect( add_query_arg( [ 'page' => 'recruitment-settings', 'tpl_result' => $saved ? 'saved' : 'error' ], admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	public function handle_delete_email_template(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk menghapus template email.', 'recruitment-plugin' ) );
+		}
+		check_admin_referer( 'daw_delete_email_template' );
+
+		$id = sanitize_key( wp_unslash( $_POST['template_id'] ?? '' ) );
+		$deleted = recruitment_delete_email_template( $id );
+
+		wp_safe_redirect( add_query_arg( [ 'page' => 'recruitment-settings', 'tpl_result' => $deleted ? 'deleted' : 'error' ], admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
 	private function application_status_email_pending_key( int $user_id, int $application_id ): string {
 		return 'daw_app_status_email_' . $user_id . '_' . $application_id;
+	}
+
+	public function handle_applicant_email_update(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengubah email akun pelamar.', 'recruitment-plugin' ) );
+		}
+		check_admin_referer( 'daw_update_applicant_email' );
+
+		$full_name = sanitize_text_field( wp_unslash( $_POST['applicant_full_name'] ?? '' ) );
+		$old_email = sanitize_email( wp_unslash( $_POST['applicant_old_email'] ?? '' ) );
+		$new_email = sanitize_email( wp_unslash( $_POST['applicant_new_email'] ?? '' ) );
+		$result = [ 'success' => false, 'error' => 'invalid_email_change' ];
+
+		if ( ! empty( $_POST['confirm_applicant_email_change'] ) && is_email( $old_email ) && is_email( $new_email ) ) {
+			$result = ( new Recruitment_Database() )->update_applicant_account_email( $full_name, $old_email, $new_email );
+		}
+
+		$result_code = ! empty( $result['success'] )
+			? 'success'
+			: sanitize_key( (string) ( $result['error'] ?? 'service_unavailable' ) );
+		wp_safe_redirect(
+			add_query_arg(
+				[
+					'page' => 'recruitment-settings',
+					'applicant_email_result' => $result_code,
+				],
+				admin_url( 'admin.php' )
+			)
+		);
+		exit;
+	}
+
+	public function handle_save_email_settings(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengelola pengaturan email.', 'recruitment-plugin' ) );
+		}
+		check_admin_referer( 'daw_save_email_settings' );
+
+		$settings = [
+			'is_enabled'      => ! empty( $_POST['is_enabled'] ) ? '1' : '0',
+			'smtp_host'       => sanitize_text_field( wp_unslash( $_POST['smtp_host'] ?? 'smtp.gmail.com' ) ),
+			'smtp_port'       => absint( $_POST['smtp_port'] ?? 587 ),
+			'smtp_encryption' => sanitize_key( wp_unslash( $_POST['smtp_encryption'] ?? 'tls' ) ),
+			'smtp_auth'       => '1',
+			'smtp_user'       => sanitize_text_field( wp_unslash( $_POST['smtp_user'] ?? '' ) ),
+			'smtp_pass'       => (string) wp_unslash( $_POST['smtp_pass'] ?? '' ),
+			'from_email'      => sanitize_email( wp_unslash( $_POST['from_email'] ?? '' ) ),
+			'from_name'       => sanitize_text_field( wp_unslash( $_POST['from_name'] ?? 'Rekrutmen PT Daya Adicipta Wisesa' ) ),
+		];
+
+		if ( '' === $settings['smtp_pass'] ) {
+			$existing = (array) get_option( 'recruitment_email_settings', [] );
+			$settings['smtp_pass'] = (string) ( $existing['smtp_pass'] ?? '' );
+		}
+
+		update_option( 'recruitment_email_settings', $settings, false );
+
+		wp_safe_redirect( add_query_arg( [ 'page' => 'recruitment-settings', 'section' => 'email', 'updated' => '1' ], admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	public function handle_send_test_email(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengirim email uji coba.', 'recruitment-plugin' ) );
+		}
+		check_admin_referer( 'daw_send_test_email' );
+
+		$recipient = sanitize_email( wp_unslash( $_POST['test_email_recipient'] ?? '' ) );
+		if ( ! is_email( $recipient ) ) {
+			wp_safe_redirect( add_query_arg( [ 'page' => 'recruitment-settings', 'section' => 'email', 'test_result' => 'invalid_email' ], admin_url( 'admin.php' ) ) );
+			exit;
+		}
+
+		delete_transient( 'daw_last_mail_error' );
+
+		$subject = 'Uji Coba Pengiriman Email Recruitment DAW - Berhasil';
+		$message = '<div style="font-family:Arial,sans-serif;padding:24px;border:1px solid #e5e7eb;border-radius:10px;max-width:560px;">'
+			. '<h2 style="color:#065f46;margin-top:0;">Konfigurasi Email Berhasil!</h2>'
+			. '<p style="color:#374151;line-height:1.6;">Email ini dikirim dari portal <strong>Rekrutmen PT Daya Adicipta Wisesa</strong> untuk memverifikasi bahwa konfigurasi SMTP/API email sistem rekrutmen Anda telah terhubung dan aktif dengan sukses.</p>'
+			. '<hr style="border:none;border-top:1px solid #e5e7eb;margin:16px 0;">'
+			. '<p style="color:#6b7280;font-size:12px;">Waktu pengiriman: ' . esc_html( current_time( 'mysql' ) ) . ' WIB</p>'
+			. '</div>';
+
+		$sent = wp_mail(
+			$recipient,
+			$subject,
+			$message,
+			[ 'Content-Type: text/html; charset=UTF-8' ]
+		);
+
+		if ( $sent ) {
+			wp_safe_redirect( add_query_arg( [ 'page' => 'recruitment-settings', 'section' => 'email', 'test_result' => 'success' ], admin_url( 'admin.php' ) ) );
+		} else {
+			$last_error = (string) get_transient( 'daw_last_mail_error' );
+			wp_safe_redirect( add_query_arg( [ 'page' => 'recruitment-settings', 'section' => 'email', 'test_result' => 'failed', 'error_msg' => rawurlencode( $last_error ) ], admin_url( 'admin.php' ) ) );
+		}
+		exit;
+	}
+
+	public function handle_send_composed_email(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengirim email recruitment.', 'recruitment-plugin' ) );
+		}
+		check_admin_referer( 'daw_send_composed_email' );
+
+		$recipients_str = sanitize_text_field( wp_unslash( $_POST['to_recipients'] ?? '' ) );
+		$cc_email = sanitize_email( wp_unslash( $_POST['cc_email'] ?? '' ) );
+		$bcc_email = sanitize_email( wp_unslash( $_POST['bcc_email'] ?? '' ) );
+		$subject = sanitize_text_field( wp_unslash( $_POST['subject'] ?? '' ) );
+		$message = wp_kses_post( wp_unslash( $_POST['message'] ?? '' ) );
+
+		if ( '' === $subject || '' === $message ) {
+			wp_safe_redirect( add_query_arg( [ 'page' => 'recruitment-settings', 'send_result' => 'empty_fields' ], admin_url( 'admin.php' ) ) );
+			exit;
+		}
+
+		$recipients = array_filter( array_map( 'trim', explode( ',', $recipients_str ) ) );
+		if ( empty( $recipients ) && ! empty( $_POST['selected_recipients'] ) && is_array( $_POST['selected_recipients'] ) ) {
+			$recipients = array_filter( array_map( 'sanitize_email', $_POST['selected_recipients'] ) );
+		}
+
+		if ( empty( $recipients ) ) {
+			wp_safe_redirect( add_query_arg( [ 'page' => 'recruitment-settings', 'send_result' => 'no_recipients' ], admin_url( 'admin.php' ) ) );
+			exit;
+		}
+
+		$headers = [ 'Content-Type: text/html; charset=UTF-8' ];
+		if ( is_email( $cc_email ) ) {
+			$headers[] = 'Cc: ' . $cc_email;
+		}
+		if ( is_email( $bcc_email ) ) {
+			$headers[] = 'Bcc: ' . $bcc_email;
+		}
+
+		$html_body = '<div style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937;max-width:600px;margin:0 auto;padding:20px;border:1px solid #e5e7eb;border-radius:8px;">'
+			. nl2br( esc_html( $message ) )
+			. '</div>';
+
+		$sent_count = 0;
+		foreach ( $recipients as $recipient ) {
+			if ( is_email( $recipient ) ) {
+				$sent = wp_mail( $recipient, $subject, $html_body, $headers );
+				if ( $sent ) {
+					$sent_count++;
+				}
+			}
+		}
+
+		wp_safe_redirect( add_query_arg( [
+			'page' => 'recruitment-settings',
+			'send_result' => $sent_count > 0 ? 'success' : 'failed',
+			'sent_count' => $sent_count,
+		], admin_url( 'admin.php' ) ) );
+		exit;
 	}
 
 	public function handle_applicant_profile_download(): void {
@@ -845,6 +1169,9 @@ class Recruitment_Admin {
 			);
 			if ( ! empty( $result['success'] ) ) {
 				WP_Session_Tokens::get_instance( get_current_user_id() )->destroy_others( wp_get_session_token() );
+				wp_set_password( $new_password, get_current_user_id() );
+				wp_set_current_user( get_current_user_id() );
+				wp_set_auth_cookie( get_current_user_id(), true );
 				$notice = 'password_updated';
 			} else {
 				$error = (string) ( $result['error'] ?? '' );
@@ -855,7 +1182,7 @@ class Recruitment_Admin {
 			}
 		}
 
-		wp_safe_redirect( add_query_arg( 'password_notice', $notice, admin_url( 'admin.php?page=recruitment-hr-profile' ) ) );
+		wp_safe_redirect( admin_url( 'admin.php?page=recruitment-hr-profile&password_notice=' . urlencode( $notice ) . '#ganti-password' ) );
 		exit;
 	}
 

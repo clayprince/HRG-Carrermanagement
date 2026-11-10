@@ -242,10 +242,11 @@ $active_count = count( array_filter( $questions, static function ( $question ) {
     return 'active' === ( $question['status'] ?? 'inactive' );
 } ) );
 $admin_user = wp_get_current_user();
+$hr_identity = recruitment_get_current_hr_identity();
 $logout_form = recruitment_logout_form( 'Keluar', home_url( '/' ) );
 ?>
 <div class="wrap daw-question-bank" data-question-bank data-filter-test="<?= esc_attr( isset( $test_labels[ $filter_test ] ) ? $filter_test : '' ) ?>">
-    <header class="daw-question-bank__header"><div><p class="daw-question-bank__breadcrumb"><a href="<?= esc_url( recruitment_get_admin_url( 'psychotest-settings' ) ) ?>">Setting Psikotes</a><span>/</span>Bank Soal</p><h1>Bank Soal Psikotes</h1><p>Tambah atau perbarui soal IQ, Pauli, DISC, dan PAPI yang digunakan tes online.</p></div><span class="daw-question-bank__profile"><span>HR</span><span class="daw-question-bank__profile-copy"><strong><?= esc_html( $admin_user->display_name ) ?></strong><small><?= esc_html( $admin_user->user_email ) ?></small></span><?= $logout_form ?></span></header>
+    <header class="daw-question-bank__header"><div><p class="daw-question-bank__breadcrumb"><a href="<?= esc_url( recruitment_get_admin_url( 'psychotest-settings' ) ) ?>">Setting Psikotes</a><span>/</span>Bank Soal</p><h1>Bank Soal Psikotes</h1><p>Tambah atau perbarui soal IQ, Pauli, DISC, dan PAPI yang digunakan tes online.</p></div><span class="daw-question-bank__profile"><span><?= esc_html( $hr_identity['avatar'] ) ?></span><span class="daw-question-bank__profile-copy"><strong><?= esc_html( $hr_identity['name'] ) ?></strong><small><?= esc_html( $hr_identity['email'] ) ?></small></span><?= $logout_form ?></span></header>
     <?php if ( '' !== $notice ) : ?><div class="notice notice-success is-dismissible"><p><?= esc_html( $notice ) ?></p></div><?php endif; ?>
     <?php if ( '' !== $error ) : ?><div class="notice notice-error"><p><?= esc_html( $error ) ?></p></div><?php endif; ?>
     <section class="daw-question-bank__stats" aria-label="Jumlah soal per tes">

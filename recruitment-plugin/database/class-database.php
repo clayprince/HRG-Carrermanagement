@@ -207,6 +207,133 @@ class Recruitment_Database {
     }
 
     /**
+     * Change an applicant login email and keep its linked profile email in sync.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    public function update_applicant_account_email( string $full_name, string $old_email, string $new_email ): array {
+        $full_name = trim( $full_name );
+        $old_email = strtolower( trim( $old_email ) );
+        $new_email = strtolower( trim( $new_email ) );
+        if ( '' === $full_name || 255 < strlen( $full_name ) || ! filter_var( $old_email, FILTER_VALIDATE_EMAIL ) || 50 < strlen( $new_email ) || ! filter_var( $new_email, FILTER_VALIDATE_EMAIL ) || $old_email === $new_email ) {
+            return [ 'success' => false, 'error' => 'invalid_email_change' ];
+        }
+
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $lookup = $connection->prepare(
+                'SELECT l.PROFILE_KANDIDAT_LOGIN AS "login_id", l.KANDIDAT_ID AS "profile_id" FROM HRS_PROFILE_KANDIDAT_LOGIN l JOIN HRS_PROFIL_KANDIDAT p ON p.KANDIDAT_ID = l.KANDIDAT_ID WHERE LOWER(TRIM(l.EMAIL)) = :old_email AND UPPER(TRIM(NVL(p.NAMA_LENGKAP, p.NAMA_KANDIDAT))) = :full_name FOR UPDATE OF l.EMAIL, p.EMAIL'
+            );
+            $lookup->execute(
+                [
+                    'old_email' => $old_email,
+                    'full_name' => strtoupper( $full_name ),
+                ]
+            );
+            $accounts = $lookup->fetchAll( PDO::FETCH_ASSOC );
+            if ( 0 === count( $accounts ) ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'applicant_not_found' ];
+            }
+            if ( 1 !== count( $accounts ) ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'applicant_ambiguous' ];
+            }
+
+            $login_id = (string) $accounts[0]['login_id'];
+            $profile_id = (string) $accounts[0]['profile_id'];
+            $duplicate = $connection->prepare(
+                'SELECT COUNT(*) FROM HRS_PROFILE_KANDIDAT_LOGIN WHERE LOWER(TRIM(EMAIL)) = :new_email AND PROFILE_KANDIDAT_LOGIN <> :login_id'
+            );
+            $duplicate->execute(
+                [
+                    'new_email' => $new_email,
+                    'login_id' => $login_id,
+                ]
+            );
+            if ( 0 < (int) $duplicate->fetchColumn() ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'email_exists' ];
+            }
+
+            $update_login = $connection->prepare(
+                'UPDATE HRS_PROFILE_KANDIDAT_LOGIN SET EMAIL = :email, UPDATED_AT = CURRENT_TIMESTAMP WHERE PROFILE_KANDIDAT_LOGIN = :login_id AND LOWER(TRIM(EMAIL)) = :old_email'
+            );
+            $update_login->execute(
+                [
+                    'email' => $new_email,
+                    'login_id' => $login_id,
+                    'old_email' => $old_email,
+                ]
+            );
+            if ( 1 !== $update_login->rowCount() ) {
+                throw new RuntimeException( 'Applicant login email changed while the update was in progress.' );
+            }
+
+            $update_profile = $connection->prepare(
+                'UPDATE HRS_PROFIL_KANDIDAT SET EMAIL = :email, DIPERBARUI_PADA = CURRENT_TIMESTAMP WHERE KANDIDAT_ID = :profile_id'
+            );
+            $update_profile->execute(
+                [
+                    'email' => $new_email,
+                    'profile_id' => $profile_id,
+                ]
+            );
+            if ( 1 !== $update_profile->rowCount() ) {
+                throw new RuntimeException( 'Applicant profile email could not be updated.' );
+            }
+
+            $connection->commit();
+            return [ 'success' => true ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            if ( $exception instanceof PDOException && $this->is_unique_violation( $exception ) ) {
+                return [ 'success' => false, 'error' => 'email_exists' ];
+            }
+            $this->log_error( 'Applicant Oracle email update failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /**
+     * Directly update a candidate's email address by candidate_id in both profile and login tables.
+     *
+     * @param int $candidate_id
+     * @param string $new_email
+     * @return array{success: bool, error?: string}
+     */
+    public function update_candidate_email( int $candidate_id, string $new_email ): array {
+        $new_email = strtolower( trim( $new_email ) );
+        if ( $candidate_id <= 0 || ! filter_var( $new_email, FILTER_VALIDATE_EMAIL ) ) {
+            return [ 'success' => false, 'error' => 'invalid_input' ];
+        }
+
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+
+            $stmt1 = $connection->prepare( 'UPDATE HRS_PROFIL_KANDIDAT SET EMAIL = :email WHERE KANDIDAT_ID = :id' );
+            $stmt1->execute( [ 'email' => $new_email, 'id' => $candidate_id ] );
+
+            $stmt2 = $connection->prepare( 'UPDATE HRS_PROFILE_KANDIDAT_LOGIN SET EMAIL = :email WHERE KANDIDAT_ID = :id' );
+            $stmt2->execute( [ 'email' => $new_email, 'id' => $candidate_id ] );
+
+            $connection->commit();
+            return [ 'success' => true ];
+        } catch ( Throwable $e ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            return [ 'success' => false, 'error' => $e->getMessage() ];
+        }
+    }
+
+    /**
      * Update candidate profile fields and their extended profile details.
      *
      * @param array<string, mixed> $profile
@@ -489,6 +616,73 @@ class Recruitment_Database {
     }
 
     /**
+     * Get details for attendance reminder email.
+     *
+     * @return array{application_id: string, applicant_id: string, applicant_name: string, applicant_email: string, title: string, location: string, confirmed_at: string}|null
+     */
+    public function get_attendance_reminder_details( string $application_id ): ?array {
+        if ( ! ctype_digit( $application_id ) || '0' === $application_id ) {
+            return null;
+        }
+
+        try {
+            $rows = $this->fetch_all(
+                'SELECT c.lamaran_id AS "application_id",
+                        c.profile_kandidat_id AS "applicant_id",
+                        NVL(p.nama_lengkap, p.nama_kandidat) AS "applicant_name",
+                        NVL(p.email, pkl.email) AS "applicant_email",
+                        NVL(d.judul_pekerjaan, k.judul_pekerjaan) AS "title",
+                        NVL(k.nama_dealer, d.lokasi_penempatan) AS "location",
+                        TO_CHAR(c.confirmed_at, \'YYYY-MM-DD HH24:MI:SS\') AS "confirmed_at"
+                 FROM HRS_KONFIRMASI_PSIKOTES c
+                 JOIN HRS_LAMARAN l ON l.lamaran_id = c.lamaran_id
+                 LEFT JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
+                 LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id
+                 LEFT JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
+                 LEFT JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = NVL(pkl.kandidat_id, c.profile_kandidat_id)
+                 WHERE c.lamaran_id = :application_id
+                   AND c.attendance_confirmed = \'Y\'
+                   AND c.confirmed_at IS NOT NULL',
+                [ 'application_id' => $application_id ]
+            );
+            return $rows[0] ?? null;
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_oracle_failure( 'Attendance reminder details lookup failed', $exception );
+            return null;
+        }
+    }
+
+    /**
+     * Get all confirmed psychotest attendances that have a valid confirmed_at timestamp.
+     *
+     * @return array<int, array{application_id: string, applicant_id: string, applicant_name: string, applicant_email: string, title: string, location: string, confirmed_at: string}>
+     */
+    public function get_confirmed_psychotest_attendances(): array {
+        try {
+            return $this->fetch_all(
+                'SELECT c.lamaran_id AS "application_id",
+                        c.profile_kandidat_id AS "applicant_id",
+                        NVL(p.nama_lengkap, p.nama_kandidat) AS "applicant_name",
+                        NVL(p.email, pkl.email) AS "applicant_email",
+                        NVL(d.judul_pekerjaan, k.judul_pekerjaan) AS "title",
+                        NVL(k.nama_dealer, d.lokasi_penempatan) AS "location",
+                        TO_CHAR(c.confirmed_at, \'YYYY-MM-DD HH24:MI:SS\') AS "confirmed_at"
+                 FROM HRS_KONFIRMASI_PSIKOTES c
+                 JOIN HRS_LAMARAN l ON l.lamaran_id = c.lamaran_id
+                 LEFT JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
+                 LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id
+                 LEFT JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
+                 LEFT JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = NVL(pkl.kandidat_id, c.profile_kandidat_id)
+                 WHERE c.attendance_confirmed = \'Y\'
+                   AND c.confirmed_at IS NOT NULL'
+            );
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_oracle_failure( 'Confirmed psychotest attendances lookup failed', $exception );
+            return [];
+        }
+    }
+
+    /**
      * Verify a portal account stored in HRS_ROLE_AKSES.
      *
      * @return array{success: bool, account?: array{type: string, id: string, email: string, username: string, display_name: string, department_id: string, department: string}, error?: string}
@@ -660,6 +854,43 @@ class Recruitment_Database {
             ];
         } catch ( PDOException | RuntimeException $exception ) {
             $this->log_error( 'HR Oracle password reset lookup failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /**
+     * Find an active applicant account for a password-reset request.
+     *
+     * @return array{success: bool, account?: array{id: string, profile_id: string, email: string, full_name: string}, error?: string}
+     */
+    public function get_active_applicant_by_email( string $email ): array {
+        $email = strtolower( trim( $email ) );
+        if ( ! filter_var( $email, FILTER_VALIDATE_EMAIL ) ) {
+            return [ 'success' => false, 'error' => 'account_not_found' ];
+        }
+
+        try {
+            $statement = $this->get_connection()->prepare(
+                'SELECT l.profile_kandidat_login AS "id", l.kandidat_id AS "profile_id", l.email AS "email", NVL(p.nama_lengkap, p.nama_kandidat) AS "full_name", l.status_akun AS "status" FROM HRS_PROFILE_KANDIDAT_LOGIN l LEFT JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = l.kandidat_id WHERE LOWER(TRIM(l.email)) = :email AND (l.status_akun = \'ACTIVE\' OR l.status_akun IS NULL)'
+            );
+            $statement->execute( [ 'email' => $email ] );
+            $rows = $statement->fetchAll( PDO::FETCH_ASSOC );
+            if ( empty( $rows ) ) {
+                return [ 'success' => false, 'error' => 'account_not_found' ];
+            }
+
+            $row = $rows[0];
+            return [
+                'success' => true,
+                'account' => [
+                    'id'         => (string) $row['id'],
+                    'profile_id' => (string) ( $row['profile_id'] ?? '' ),
+                    'email'      => (string) $row['email'],
+                    'full_name'  => (string) ( $row['full_name'] ?? 'Pelamar' ),
+                ],
+            ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_error( 'Applicant Oracle password reset lookup failed', $exception );
             return [ 'success' => false, 'error' => 'service_unavailable' ];
         }
     }
@@ -873,24 +1104,86 @@ class Recruitment_Database {
      *
      * @return array{success: bool, error?: string}
      */
+    /**
+     * Update HR administrator email in Oracle HRS_ROLE_AKSES.
+     *
+     * @param string $account_id
+     * @param string $email
+     * @return array{success: bool, error?: string}
+     */
+    public function update_hr_email( string $account_id, string $email ): array {
+        $account_id = trim( (string) $account_id );
+        $email      = strtolower( trim( (string) $email ) );
+
+        if ( ! ctype_digit( $account_id ) || '0' === $account_id || ! filter_var( $email, FILTER_VALIDATE_EMAIL ) ) {
+            return [ 'success' => false, 'error' => 'invalid_email' ];
+        }
+
+        try {
+            $connection = $this->get_connection();
+
+            // Check if another account in HRS_ROLE_AKSES already uses this email
+            $duplicate = $connection->prepare(
+                'SELECT COUNT(*) FROM hrs_role_akses WHERE LOWER(email) = :email AND role_akses_id <> :account_id'
+            );
+            $duplicate->execute( [ 'email' => $email, 'account_id' => $account_id ] );
+            if ( 0 < (int) $duplicate->fetchColumn() ) {
+                return [ 'success' => false, 'error' => 'duplicate_email' ];
+            }
+
+            // Update email
+            $update = $connection->prepare(
+                'UPDATE hrs_role_akses SET email = :email WHERE role_akses_id = :account_id'
+            );
+            $update->execute( [ 'email' => $email, 'account_id' => $account_id ] );
+
+            // If username is empty or contains an email address, keep it in sync with the new email
+            $check = $connection->prepare(
+                'SELECT username FROM hrs_role_akses WHERE role_akses_id = :account_id'
+            );
+            $check->execute( [ 'account_id' => $account_id ] );
+            $curr_user = $check->fetchColumn();
+            if ( false !== $curr_user && ( null === $curr_user || '' === trim( (string) $curr_user ) || false !== strpos( (string) $curr_user, '@' ) ) ) {
+                $upd_user = $connection->prepare(
+                    'UPDATE hrs_role_akses SET username = :username WHERE role_akses_id = :account_id'
+                );
+                $upd_user->execute( [ 'username' => $email, 'account_id' => $account_id ] );
+            }
+
+            return [ 'success' => true ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_error( 'HR Oracle email update failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
     public function update_hr_profile( string $account_id, string $username, string $email ): array {
-        if ( ! ctype_digit( $account_id ) || '0' === $account_id || '' === $username || ! filter_var( $email, FILTER_VALIDATE_EMAIL ) ) {
+        $account_id = trim( (string) $account_id );
+        $username   = trim( (string) $username );
+        $email      = strtolower( trim( (string) $email ) );
+
+        if ( ! ctype_digit( $account_id ) || '0' === $account_id || ! filter_var( $email, FILTER_VALIDATE_EMAIL ) ) {
             return [ 'success' => false, 'error' => 'invalid_profile_data' ];
         }
+
+        if ( '' === $username ) {
+            $username = $email;
+        }
+
         try {
             $connection = $this->get_connection();
             $duplicate = $connection->prepare(
                 'SELECT COUNT(*) FROM hrs_role_akses WHERE (LOWER(username) = :username OR LOWER(email) = :email) AND role_akses_id <> :account_id'
             );
-            $duplicate->execute( [ 'username' => strtolower( $username ), 'email' => strtolower( $email ), 'account_id' => $account_id ] );
+            $duplicate->execute( [ 'username' => strtolower( $username ), 'email' => $email, 'account_id' => $account_id ] );
             if ( 0 < (int) $duplicate->fetchColumn() ) {
                 return [ 'success' => false, 'error' => 'duplicate_account' ];
             }
             $update = $connection->prepare(
-                'UPDATE hrs_role_akses SET username = :username, email = :email WHERE role_akses_id = :account_id AND peran = :role'
+                'UPDATE hrs_role_akses SET username = :username, email = :email WHERE role_akses_id = :account_id'
             );
-            $update->execute( [ 'username' => $username, 'email' => strtolower( $email ), 'account_id' => $account_id, 'role' => 'ADMIN_HR' ] );
-            return 1 === $update->rowCount() ? [ 'success' => true ] : [ 'success' => false, 'error' => 'account_not_found' ];
+            $update->execute( [ 'username' => $username, 'email' => $email, 'account_id' => $account_id ] );
+            return [ 'success' => true ];
         } catch ( PDOException | RuntimeException $exception ) {
             $this->log_error( 'HR Oracle profile update failed', $exception );
             return [ 'success' => false, 'error' => 'service_unavailable' ];
@@ -908,9 +1201,9 @@ class Recruitment_Database {
         }
         try {
             $statement = $this->get_connection()->prepare(
-                'SELECT role_akses_id AS "id", username AS "username", email AS "email", status_akun AS "status" FROM hrs_role_akses WHERE role_akses_id = :account_id AND peran = :role'
+                'SELECT role_akses_id AS "id", username AS "username", email AS "email", status_akun AS "status" FROM hrs_role_akses WHERE role_akses_id = :account_id'
             );
-            $statement->execute( [ 'account_id' => $account_id, 'role' => 'ADMIN_HR' ] );
+            $statement->execute( [ 'account_id' => $account_id ] );
             $row = $statement->fetch( PDO::FETCH_ASSOC );
             return $row ?: null;
         } catch ( PDOException | RuntimeException $exception ) {
@@ -954,9 +1247,9 @@ class Recruitment_Database {
         try {
             $connection = $this->get_connection();
             $lookup = $connection->prepare(
-                'SELECT kata_sandi FROM hrs_role_akses WHERE role_akses_id = :account_id AND peran = :role'
+                'SELECT kata_sandi FROM hrs_role_akses WHERE role_akses_id = :account_id'
             );
-            $lookup->execute( [ 'account_id' => $account_id, 'role' => 'ADMIN_HR' ] );
+            $lookup->execute( [ 'account_id' => $account_id ] );
             $current_hash = $lookup->fetchColumn();
             if ( false === $current_hash || ! password_verify( $current_password, (string) $current_hash ) ) {
                 return [ 'success' => false, 'error' => 'invalid_current_password' ];
@@ -968,12 +1261,9 @@ class Recruitment_Database {
             }
 
             $update = $connection->prepare(
-                'UPDATE hrs_role_akses SET kata_sandi = :password_hash WHERE role_akses_id = :account_id AND peran = :role'
+                'UPDATE hrs_role_akses SET kata_sandi = :password_hash WHERE role_akses_id = :account_id'
             );
-            $update->execute( [ 'password_hash' => $new_hash, 'account_id' => $account_id, 'role' => 'ADMIN_HR' ] );
-            if ( 1 !== $update->rowCount() ) {
-                return [ 'success' => false, 'error' => 'account_not_found' ];
-            }
+            $update->execute( [ 'password_hash' => $new_hash, 'account_id' => $account_id ] );
 
             return [ 'success' => true ];
         } catch ( PDOException | RuntimeException $exception ) {
@@ -1083,14 +1373,45 @@ class Recruitment_Database {
             }
 
             $statement = $this->get_connection()->prepare(
-                'UPDATE hrs_role_akses SET kata_sandi = :password_hash WHERE role_akses_id = :account_id AND peran = :role AND status_akun = :status'
+                'UPDATE hrs_role_akses SET kata_sandi = :password_hash WHERE role_akses_id = :account_id'
             );
             $statement->execute(
                 [
                     'password_hash' => $password_hash,
                     'account_id'    => $account_id,
-                    'role'          => 'ADMIN_HR',
-                    'status'        => 'ACTIVE',
+                ]
+            );
+
+            return [ 'success' => true ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_error( 'HR Oracle password reset failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /**
+     * Reset applicant password using a verified reset token.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    public function reset_applicant_password( string $login_id, string $new_password ): array {
+        if ( ! ctype_digit( $login_id ) || '0' === $login_id || strlen( $new_password ) < 8 ) {
+            return [ 'success' => false, 'error' => 'invalid_password_data' ];
+        }
+
+        try {
+            $password_hash = password_hash( $new_password, PASSWORD_BCRYPT );
+            if ( false === $password_hash ) {
+                throw new RuntimeException( 'Applicant reset password could not be hashed.' );
+            }
+
+            $statement = $this->get_connection()->prepare(
+                'UPDATE HRS_PROFILE_KANDIDAT_LOGIN SET KATA_SANDI = :password_hash, UPDATED_AT = CURRENT_TIMESTAMP WHERE PROFILE_KANDIDAT_LOGIN = :login_id AND (STATUS_AKUN = \'ACTIVE\' OR STATUS_AKUN IS NULL)'
+            );
+            $statement->execute(
+                [
+                    'password_hash' => $password_hash,
+                    'login_id'      => $login_id,
                 ]
             );
             if ( 1 !== $statement->rowCount() ) {
@@ -1099,7 +1420,7 @@ class Recruitment_Database {
 
             return [ 'success' => true ];
         } catch ( PDOException | RuntimeException $exception ) {
-            $this->log_error( 'HR Oracle password reset failed', $exception );
+            $this->log_error( 'Applicant Oracle password reset failed', $exception );
             return [ 'success' => false, 'error' => 'service_unavailable' ];
         }
     }
@@ -3691,34 +4012,34 @@ class Recruitment_Database {
             return [ 'success' => false, 'error' => 'Status lamaran tidak valid.' ];
         }
         $normalized = strtoupper( trim( $status ) );
-        if ( in_array( $normalized, [ 'ACCEPTED', 'LOLOS' ], true ) ) {
+        if ( in_array( $normalized, [ 'ACCEPTED', 'LOLOS', 'DITERIMA' ], true ) ) {
             $normalized = 'DITERIMA';
-        } elseif ( in_array( $normalized, [ 'REJECTED', 'TIDAK_LOLOS' ], true ) ) {
+        } elseif ( in_array( $normalized, [ 'REJECTED', 'TIDAK_LOLOS', 'FAILED', 'DITOLAK' ], true ) ) {
             $normalized = 'DITOLAK';
+        } elseif ( in_array( $normalized, [ 'ADMINISTRASI', 'SCREENING', 'SUBMITTED' ], true ) ) {
+            $normalized = 'ADMINISTRASI';
         }
-        $allowed_statuses = [ 'SUBMITTED', 'SCREENING', 'PSIKOTES', 'INTERVIEW_HR', 'INTERVIEW_USER', 'DITERIMA', 'DITOLAK' ];
+        $allowed_statuses = [ 'SUBMITTED', 'SCREENING', 'ADMINISTRASI', 'PSIKOTES', 'INTERVIEW_HR', 'INTERVIEW_USER', 'FINAL', 'DITERIMA', 'DITOLAK' ];
         if ( ! in_array( $normalized, $allowed_statuses, true ) ) {
             return [ 'success' => false, 'error' => 'Status lamaran tidak dikenal.' ];
         }
-        if ( in_array( $normalized, [ 'DITERIMA', 'DITOLAK' ], true ) ) {
-            return [ 'success' => false, 'error' => 'Simpan keputusan Diterima atau Tidak Lolos melalui menu Keputusan Akhir agar hasil HR, departemen, dan tracking tetap sinkron.' ];
-        }
-        $stage = [
-            'SUBMITTED' => 'ADMINISTRASI',
-            'SCREENING' => 'ADMINISTRASI',
-            'PSIKOTES' => 'PSIKOTES',
-            'INTERVIEW_HR' => 'INTERVIEW_HR',
+
+        $stage_map = [
+            'SUBMITTED'      => 'ADMINISTRASI',
+            'SCREENING'      => 'ADMINISTRASI',
+            'ADMINISTRASI'   => 'ADMINISTRASI',
+            'PSIKOTES'       => 'PSIKOTES',
+            'INTERVIEW_HR'   => 'INTERVIEW_HR',
             'INTERVIEW_USER' => 'INTERVIEW_USER',
-            'DITERIMA' => 'FINAL',
-            'DITOLAK' => 'FINAL',
-        ][ $normalized ];
+            'FINAL'          => 'FINAL',
+            'DITERIMA'       => 'FINAL',
+            'DITOLAK'        => 'FINAL',
+        ];
+        $effective_stage = '' !== trim( $stage ) ? strtoupper( trim( $stage ) ) : ( $stage_map[ $normalized ] ?? 'ADMINISTRASI' );
+
         $note = trim( $note );
-        if ( 'INTERVIEW_USER' === $normalized ) {
-            $next_step_note = 'Lolos HR; lanjut wawancara departemen. Jadwal diinformasikan departemen.';
-            $available_note_length = max( 0, 100 - strlen( $next_step_note ) - 1 );
-            $note = '' === $note
-                ? $next_step_note
-                : substr( $note, 0, $available_note_length ) . ' ' . $next_step_note;
+        if ( 'INTERVIEW_USER' === $normalized && '' === $note ) {
+            $note = 'Lolos HR; lanjut wawancara departemen. Jadwal diinformasikan departemen.';
         }
         $connection = null;
         try {
@@ -3731,10 +4052,6 @@ class Recruitment_Database {
             $current_status = $current_status_query->fetchColumn();
             if ( false === $current_status ) {
                 throw new InvalidArgumentException( 'Application not found.' );
-            }
-            if ( ! in_array( $current_status, [ 'SUBMITTED', 'SCREENING' ], true ) ) {
-                $connection->rollBack();
-                return [ 'success' => false, 'error' => 'Seleksi administrasi untuk lamaran ini sudah diputuskan.' ];
             }
             $update = $connection->prepare(
                 'UPDATE HRS_LAMARAN SET STATUS_TERKINI = :status_value, STATUS_AKHIR = CASE WHEN :is_final = 1 THEN :final_status ELSE STATUS_AKHIR END, UPDATED_AT = CURRENT_TIMESTAMP WHERE LAMARAN_ID = :application_id'
@@ -3750,7 +4067,7 @@ class Recruitment_Database {
             $history->execute(
                 [
                     'application_id' => $application_id,
-                    'stage' => strtoupper( function_exists( 'sanitize_text_field' ) ? sanitize_text_field( $stage ) : trim( strip_tags( $stage ) ) ),
+                    'stage' => strtoupper( function_exists( 'sanitize_text_field' ) ? sanitize_text_field( $effective_stage ) : trim( strip_tags( $effective_stage ) ) ),
                     'status' => $normalized,
                     'note' => function_exists( 'sanitize_textarea_field' ) ? sanitize_textarea_field( $note ) : trim( strip_tags( $note ) ),
                 ]

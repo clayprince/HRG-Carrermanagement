@@ -13,6 +13,7 @@ class Recruitment_Router {
         'application-confirmation' => 'public/pages/application-confirmation.php',
         'applicant-login'    => 'public/pages/applicant-login.php',
         'applicant-register' => 'public/pages/applicant-register.php',
+        'applicant-reset-password' => 'public/pages/applicant-reset-password.php',
         'applicant-dashboard' => 'public/pages/applicant-dashboard.php',
         'account-confirmation' => 'public/pages/account-confirmation.php',
         'account-profile'    => 'public/pages/account-profile.php',

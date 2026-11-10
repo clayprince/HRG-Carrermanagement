@@ -323,24 +323,60 @@ $selected_documents = is_array( $selected_profile['profile_details']['documents'
 $profile_photo_url = ! empty( $selected_documents['profile_photo'] )
     ? recruitment_get_public_url( 'applicant-file', [ 'candidate_id' => $selected_candidate['id'], 'document' => 'profile_photo' ] )
     : '';
-$can_review_administration = in_array( $selected_candidate['raw_status'] ?? '', [ 'SUBMITTED', 'SCREENING' ], true );
 $email_preview_html = '';
 $email_recipient = (string) ( $selected_candidate['email'] ?? '' );
-$email_preview_status = (string) ( $selected_candidate['raw_status'] ?? '' );
 $pending_email_status = $selected_candidate
     ? get_transient( 'daw_app_status_email_' . get_current_user_id() . '_' . (int) $selected_candidate['application_id'] )
     : false;
-$email_confirmation_pending = is_string( $pending_email_status )
-    && $pending_email_status === ( $selected_candidate['raw_status'] ?? null );
-$show_email_preview = '1' === (string) ( $_GET['email_preview'] ?? '' ) && $email_confirmation_pending;
-if ( $show_email_preview ) {
-    $applicant_name = (string) $selected_candidate['name'];
-    $position = (string) $selected_candidate['position'];
-    $status = (string) $email_preview_status;
-    ob_start();
-    require recruitment_get_plugin_path( 'templates/emails/application-status.php' );
-    $email_preview_html = (string) ob_get_clean();
+$email_confirmation_pending = is_string( $pending_email_status ) && '' !== $pending_email_status;
+$show_email_preview = ( '1' === (string) ( $_GET['email_preview'] ?? '' ) || '1' === (string) ( $_GET['status_updated'] ?? '' ) ) && $email_confirmation_pending;
+
+$all_email_templates = recruitment_get_email_templates();
+$candidate_vars = [
+    'nama'    => (string) ( $selected_candidate['name'] ?? 'Pelamar' ),
+    'posisi'  => (string) ( $selected_candidate['position'] ?? 'Posisi Terkait' ),
+    'dealer'  => (string) ( $selected_candidate['dealer'] ?? 'PT Daya Adicipta Wisesa' ),
+    'tahap'   => (string) ( $pending_email_status ?: ( $selected_candidate['raw_status'] ?? '' ) ),
+    'tanggal' => wp_date( 'j F Y' ),
+];
+
+$prepared_templates = [];
+foreach ( $all_email_templates as $tid => $tpl ) {
+    $prepared_templates[ $tid ] = [
+        'id'       => $tpl['id'],
+        'title'    => $tpl['title'],
+        'category' => $tpl['category'],
+        'stage'    => $tpl['stage'],
+        'subject'  => recruitment_replace_template_placeholders( $tpl['subject'], $candidate_vars ),
+        'body'     => recruitment_replace_template_placeholders( $tpl['body'], $candidate_vars ),
+    ];
 }
+
+$default_template_id = $selected_candidate
+    ? (string) get_transient( 'daw_app_status_email_' . get_current_user_id() . '_' . (int) $selected_candidate['application_id'] . '_tpl' )
+    : '';
+
+if ( '' === $default_template_id || ! isset( $prepared_templates[ $default_template_id ] ) ) {
+    $st = strtoupper( (string) ( $pending_email_status ?: ( $selected_candidate['raw_status'] ?? '' ) ) );
+    if ( 'DITOLAK' === $st ) {
+        $default_template_id = 'tidak_lolos_administrasi';
+    } elseif ( 'DITERIMA' === $st ) {
+        $default_template_id = 'pengumuman_diterima';
+    } elseif ( 'PSIKOTES' === $st ) {
+        $default_template_id = 'undangan_psikotes';
+    } elseif ( 'INTERVIEW_HR' === $st ) {
+        $default_template_id = 'undangan_wawancara_hr';
+    } elseif ( 'INTERVIEW_USER' === $st ) {
+        $default_template_id = 'undangan_wawancara_user';
+    } else {
+        $default_template_id = 'konfirmasi_lamaran';
+    }
+}
+
+$active_template = $prepared_templates[ $default_template_id ] ?? reset( $prepared_templates );
+$initial_subject = $active_template['subject'] ?? 'Pembaruan Status Lamaran';
+$initial_body    = $active_template['body'] ?? '';
+$email_preview_html = recruitment_build_status_email_html( $initial_subject, $initial_body, (string) ( $pending_email_status ?: ( $selected_candidate['raw_status'] ?? '' ) ) );
 
 $answers_map = [];
 foreach ( $selected_answers as $ans_item ) {
@@ -484,8 +520,8 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
                 : '';
             ?>
             <?php if ( 'updated' === $attendance_time_result ) : ?><div class="notice notice-success inline"><p>Waktu konfirmasi psikotes berhasil diperbarui.</p></div><?php elseif ( in_array( $attendance_time_result, [ 'invalid', 'error' ], true ) ) : ?><div class="notice notice-error inline"><p>Waktu konfirmasi psikotes tidak berhasil diperbarui. Periksa tanggal dan jam, lalu coba lagi.</p></div><?php endif; ?>
-            <?php if ( '1' === (string) ( $_GET['status_email_sent'] ?? '' ) ) : ?><div class="notice notice-success inline"><p>Email pembaruan status berhasil dikirim ke pelamar.</p></div><?php endif; ?>
-            <?php if ( '1' === (string) ( $_GET['status_email_error'] ?? '' ) ) : ?><div class="notice notice-error inline"><p>Email belum berhasil dikirim. Periksa konfigurasi email lalu coba ACC kembali.</p></div><?php endif; ?>
+            <?php if ( '1' === (string) ( $_GET['status_email_sent'] ?? '' ) ) : ?><div class="notice notice-success inline" style="padding:10px 14px;border-left:4px solid #10b981;background:#ecfdf5;margin:12px 0;border-radius:6px;"><p style="margin:0;font-size:13px;color:#065f46;font-weight:600;">✓ Email pembaruan status berhasil dikirim ke <strong><?= esc_html( ! empty( $_GET['sent_to'] ) ? urldecode( (string) $_GET['sent_to'] ) : ( $email_recipient ?: 'pelamar' ) ) ?></strong>. Silakan periksa kotak masuk (Inbox) atau folder Spam.</p></div><?php endif; ?>
+            <?php if ( '1' === (string) ( $_GET['status_email_error'] ?? '' ) ) : ?><div class="notice notice-error inline" style="padding:10px 14px;border-left:4px solid #ef4444;background:#fef2f2;margin:12px 0;border-radius:6px;"><p style="margin:0;font-size:13px;color:#991b1b;font-weight:600;">⚠ Email belum berhasil dikirim. <?= ! empty( $_GET['mail_error_msg'] ) ? esc_html( urldecode( (string) $_GET['mail_error_msg'] ) ) : 'Periksa konfigurasi email lalu coba ACC kembali.' ?></p></div><?php endif; ?>
             <?php if ( $email_confirmation_pending && ! $show_email_preview ) : ?><div class="notice notice-info inline"><p>Status sudah tersimpan tetapi email belum dikirim. <a href="<?= esc_url( add_query_arg( 'email_preview', '1' ) ) ?>">Buka kembali pratinjau email</a>.</p></div><?php endif; ?>
             <?php if ( is_array( $selected_attendance ) && ! empty( $selected_attendance['confirmed'] ) ) :
                 $attendance_datetime_raw = (string) ( $selected_attendance['confirmed_at'] ?? '' );
@@ -499,7 +535,7 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
                     <h2 id="daw-psychotest-attendance-edit-title">Konfirmasi Kehadiran Psikotes</h2>
                     <?php if ( $attendance_datetime_valid ) : ?>
                         <p>Waktu konfirmasi saat ini: <strong><?= esc_html( wp_date( 'j F Y', $attendance_datetime->getTimestamp() ) . ' pukul ' . wp_date( 'H:i', $attendance_datetime->getTimestamp() ) ) ?></strong></p>
-                        <p>Perubahan hanya untuk catatan waktu konfirmasi lamaran ini dan harus berada dalam jadwal HR: <?= null !== $psychotest_attendance_window ? esc_html( $psychotest_attendance_window['start_date'] . ' sampai ' . $psychotest_attendance_window['end_date'] . ', pukul ' . $psychotest_attendance_window['start_time'] . ' sampai ' . $psychotest_attendance_window['end_time'] ) : 'jadwal tanggal dan jam belum lengkap atau tidak valid' ?>.</p>
+                        <p>Perubahan hanya untuk catatan waktu konfirmasi lamaran ini dan harus berada dalam rentang tanggal jadwal HR: <?= null !== $psychotest_attendance_window ? esc_html( $psychotest_attendance_window['start_date'] . ' sampai ' . $psychotest_attendance_window['end_date'] ) : 'jadwal tanggal belum lengkap atau tidak valid' ?>.</p>
                         <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" class="daw-psychotest-attendance__edit-form">
                             <input type="hidden" name="action" value="daw_update_psychotest_attendance_time">
                             <input type="hidden" name="application_id" value="<?= esc_attr( (int) $selected_candidate['application_id'] ) ?>">
@@ -509,7 +545,7 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
                                 <label for="daw-admin-psychotest-confirmed-date">Edit tanggal konfirmasi</label>
                                 <input id="daw-admin-psychotest-confirmed-date" type="date" name="confirmed_date" min="<?= esc_attr( $psychotest_attendance_window['start_date'] ) ?>" max="<?= esc_attr( $psychotest_attendance_window['end_date'] ) ?>" value="<?= esc_attr( $attendance_datetime->format( 'Y-m-d' ) ) ?>" required>
                                 <label for="daw-admin-psychotest-confirmed-time">Edit jam konfirmasi</label>
-                                <input id="daw-admin-psychotest-confirmed-time" type="time" name="confirmed_time" min="<?= esc_attr( $psychotest_attendance_window['start_time'] ) ?>" max="<?= esc_attr( $psychotest_attendance_window['end_time'] ) ?>" value="<?= esc_attr( $attendance_datetime->format( 'H:i' ) ) ?>" required>
+                                <input id="daw-admin-psychotest-confirmed-time" type="time" name="confirmed_time" value="<?= esc_attr( $attendance_datetime->format( 'H:i' ) ) ?>" required>
                                 <button type="submit" class="button button-primary">Simpan Perubahan</button>
                             <?php endif; ?>
                         </form>
@@ -520,70 +556,240 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
             <?php elseif ( $selected_attendance_lookup_failed ) : ?>
                 <div class="notice notice-error inline"><p>Data konfirmasi psikotes belum dapat dimuat dari Oracle.</p></div>
             <?php endif; ?>
+            <?php
+            $raw_status = strtoupper( trim( (string) ( $selected_candidate['raw_status'] ?? 'SUBMITTED' ) ) );
+            $current_stage_key = 'ADMINISTRASI';
+            if ( in_array( $raw_status, [ 'PSIKOTES' ], true ) ) {
+                $current_stage_key = 'PSIKOTES';
+            } elseif ( in_array( $raw_status, [ 'INTERVIEW_HR' ], true ) ) {
+                $current_stage_key = 'INTERVIEW_HR';
+            } elseif ( in_array( $raw_status, [ 'INTERVIEW_USER' ], true ) ) {
+                $current_stage_key = 'INTERVIEW_USER';
+            } elseif ( in_array( $raw_status, [ 'FINAL', 'DITERIMA', 'DITOLAK' ], true ) ) {
+                $current_stage_key = 'FINAL';
+            }
+
+            $stage_configs = [
+                'ADMINISTRASI' => [
+                    'pass_label'  => 'Lolos Seleksi Administrasi',
+                    'fail_label'  => 'Tidak Lolos Seleksi Administrasi',
+                    'default_nxt' => 'PSIKOTES',
+                    'next_stages' => [
+                        'PSIKOTES'       => 'Psikotes (Tes Psikologi)',
+                        'INTERVIEW_HR'   => 'Wawancara HR',
+                        'INTERVIEW_USER' => 'Wawancara User (Departemen)',
+                    ],
+                ],
+                'PSIKOTES' => [
+                    'pass_label'  => 'Lolos Tes Psikologi',
+                    'fail_label'  => 'Tidak Lolos Tes Psikologi',
+                    'default_nxt' => 'INTERVIEW_HR',
+                    'next_stages' => [
+                        'INTERVIEW_HR'   => 'Wawancara HR',
+                        'INTERVIEW_USER' => 'Wawancara User (Departemen)',
+                        'FINAL'          => 'Keputusan Akhir (Offering)',
+                    ],
+                ],
+                'INTERVIEW_HR' => [
+                    'pass_label'  => 'Lolos Wawancara HR',
+                    'fail_label'  => 'Tidak Lolos Wawancara HR',
+                    'default_nxt' => 'INTERVIEW_USER',
+                    'next_stages' => [
+                        'INTERVIEW_USER' => 'Wawancara User (Departemen)',
+                        'FINAL'          => 'Keputusan Akhir (Offering)',
+                    ],
+                ],
+                'INTERVIEW_USER' => [
+                    'pass_label'  => 'Lolos Wawancara User',
+                    'fail_label'  => 'Tidak Lolos Wawancara User',
+                    'default_nxt' => 'FINAL',
+                    'next_stages' => [
+                        'FINAL'    => 'Keputusan Akhir (Offering)',
+                        'DITERIMA' => 'Diterima Bergabung Langsung',
+                    ],
+                ],
+                'FINAL' => [
+                    'pass_label'  => 'Diterima Bergabung di DAW (Offering)',
+                    'fail_label'  => 'Tidak Lolos Seleksi Akhir (Ditolak)',
+                    'default_nxt' => 'DITERIMA',
+                    'next_stages' => [
+                        'DITERIMA' => 'Diterima Bergabung (Offering Letter)',
+                        'DITOLAK'  => 'Ditolak / Belum Memenuhi Syarat',
+                    ],
+                ],
+            ];
+
+            $cfg = $stage_configs[ $current_stage_key ] ?? $stage_configs['ADMINISTRASI'];
+            ?>
             <section class="daw-documents-panel daw-application-decision">
                 <h2>Perbarui Status Lamaran</h2>
-                <div class="daw-application-decision__current">
-                    <span>Tahap Saat Ini</span>
-                    <strong><?= esc_html( $selected_candidate['stage'] ) ?></strong>
+                <div class="daw-application-decision__current" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                    <div>
+                        <span style="font-size:12px;color:#6b7280;display:block;">Tahap Seleksi Saat Ini</span>
+                        <strong style="font-size:16px;color:#111827;"><?= esc_html( $selected_candidate['stage'] ) ?></strong>
+                    </div>
+                    <div>
+                        <span class="daw-status-badge daw-status-badge--<?= esc_attr( $selected_candidate['status_key'] ) ?>"><?= esc_html( $selected_candidate['status_label'] ) ?></span>
+                    </div>
                 </div>
-                <?php if ( $can_review_administration ) : ?>
+
                 <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" class="daw-application-decision__form" data-administrative-decision-form>
                     <input type="hidden" name="action" value="daw_update_application_status">
                     <input type="hidden" name="application_id" value="<?= esc_attr( (int) $selected_candidate['application_id'] ) ?>">
                     <input type="hidden" name="candidate_id" value="<?= esc_attr( (int) $selected_candidate['id'] ) ?>">
+                    <input type="hidden" name="current_stage" value="<?= esc_attr( $current_stage_key ) ?>">
                     <?php wp_nonce_field( 'daw_update_application_status_' . (int) $selected_candidate['application_id'] ); ?>
-                    <p class="daw-application-decision__field"><label>Hasil Seleksi Administrasi<br>
-                        <select name="administrative_result" required>
-                            <option value="">Pilih hasil seleksi</option>
-                            <option value="passed">Lolos seleksi administrasi</option>
-                            <option value="failed">Tidak lolos seleksi administrasi</option>
+
+                    <p class="daw-application-decision__field"><label>Hasil Keputusan Seleksi<br>
+                        <select name="administrative_result" id="daw-selection-decision-select" required style="width:100%;height:38px;padding:6px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                            <option value="">Pilih keputusan untuk tahap ini</option>
+                            <option value="passed"><?= esc_html( $cfg['pass_label'] ) ?></option>
+                            <option value="failed"><?= esc_html( $cfg['fail_label'] ) ?></option>
                         </select>
                     </label></p>
-                    <p class="daw-application-decision__field" data-administrative-next-stage hidden><label>Tahap berikutnya<br>
-                        <select name="next_stage" disabled>
+
+                    <p class="daw-application-decision__field" data-administrative-next-stage hidden><label>Tahap Berikutnya<br>
+                        <select name="next_stage" id="daw-selection-next-stage-select" disabled style="width:100%;height:38px;padding:6px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
                             <option value="">Pilih tahap berikutnya</option>
-                            <option value="PSIKOTES">Psikotes</option>
-                            <option value="INTERVIEW_HR">Wawancara HR</option>
-                            <option value="INTERVIEW_USER">Wawancara User</option>
+                            <?php foreach ( $cfg['next_stages'] as $stg_val => $stg_lbl ) : ?>
+                                <option value="<?= esc_attr( $stg_val ) ?>" <?= $stg_val === $cfg['default_nxt'] ? 'selected' : '' ?>>
+                                    <?= esc_html( $stg_lbl ) ?>
+                                </option>
+                            <?php endforeach; ?>
                         </select>
                     </label></p>
-                    <p class="daw-application-decision__field daw-application-decision__field--note"><label>Catatan untuk pelamar<br><textarea name="note" rows="2"></textarea></label></p>
-                    <button type="submit" class="button button-primary daw-application-decision__submit">Simpan Status</button>
+
+                    <p class="daw-application-decision__field daw-application-decision__field--note"><label>Catatan untuk pelamar (opsional)<br>
+                        <textarea name="note" rows="2" placeholder="Tulis catatan jika ada..." style="width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;"></textarea>
+                    </label></p>
+
+                    <button type="submit" class="button button-primary daw-application-decision__submit" style="background:#c8102e;border-color:#b00e28;color:#fff;padding:8px 20px;font-weight:600;border-radius:6px;cursor:pointer;">
+                        Simpan Status &amp; Siapkan Email
+                    </button>
                 </form>
-                <?php else : ?>
-                    <p class="daw-documents-panel__hint">Seleksi administrasi sudah diputuskan. Tahap lamaran tidak dapat diubah kembali dari formulir ini.</p>
-                <?php endif; ?>
             </section>
         <?php endif; ?>
 
         <?php if ( $show_email_preview ) : ?>
             <div class="daw-email-confirmation" role="presentation">
-                <section class="daw-email-confirmation__dialog" role="dialog" aria-modal="true" aria-labelledby="daw-email-confirmation-title" tabindex="-1">
-                    <div class="daw-email-confirmation__header">
+                <section class="daw-email-confirmation__dialog" role="dialog" aria-modal="true" aria-labelledby="daw-email-confirmation-title" tabindex="-1" style="max-width:700px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);">
+                    <div class="daw-email-confirmation__header" style="padding:18px 24px 12px;border-bottom:1px solid #e5e7eb;">
                         <div>
-                            <span class="daw-email-confirmation__eyebrow">Status sudah tersimpan</span>
-                            <h2 id="daw-email-confirmation-title">Konfirmasi email pelamar</h2>
-                            <p>Periksa template berikut. Email hanya dikirim setelah Anda menekan tombol ACC.</p>
+                            <span class="daw-email-confirmation__eyebrow" style="color:#059669;font-weight:700;font-size:11px;letter-spacing:0.5px;">STATUS SUDAH TERSIMPAN</span>
+                            <h2 id="daw-email-confirmation-title" style="margin:4px 0 6px;font-size:20px;font-weight:700;color:#111827;">Konfirmasi email pelamar</h2>
+                            <p style="margin:0;font-size:13px;color:#6b7280;">Periksa template dan sesuaikan pesan jika diperlukan. Email hanya dikirim setelah Anda menekan tombol ACC.</p>
                         </div>
-                        <a class="daw-email-confirmation__close" href="<?= esc_url( remove_query_arg( 'email_preview' ) ) ?>" aria-label="Tutup pratinjau email">&times;</a>
+                        <a class="daw-email-confirmation__close" href="<?= esc_url( remove_query_arg( [ 'email_preview', 'status_updated' ] ) ) ?>" aria-label="Tutup pratinjau email" style="font-size:24px;text-decoration:none;color:#9ca3af;line-height:1;">&times;</a>
                     </div>
-                    <div class="daw-email-confirmation__recipient">
-                        <span>Penerima</span>
-                        <strong><?= esc_html( $email_recipient ?: 'Alamat email belum tersedia' ) ?></strong>
-                    </div>
-                    <iframe class="daw-email-confirmation__preview" title="Pratinjau isi email pembaruan status" sandbox="" srcdoc="<?= esc_attr( $email_preview_html ) ?>"></iframe>
-                    <div class="daw-email-confirmation__actions">
-                        <a class="button daw-email-confirmation__cancel" href="<?= esc_url( remove_query_arg( 'email_preview' ) ) ?>">Nanti saja</a>
-                        <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>">
-                            <input type="hidden" name="action" value="daw_send_application_status_email">
-                            <input type="hidden" name="application_id" value="<?= esc_attr( (int) $selected_candidate['application_id'] ) ?>">
-                            <input type="hidden" name="candidate_id" value="<?= esc_attr( (int) $selected_candidate['id'] ) ?>">
-                            <?php wp_nonce_field( 'daw_send_application_status_email_' . (int) $selected_candidate['application_id'] . '_' . (int) $selected_candidate['id'] ); ?>
-                            <button type="submit" class="button button-primary daw-email-confirmation__approve" <?= is_email( $email_recipient ) ? '' : 'disabled' ?>>ACC &amp; Kirim Status Terbaru</button>
-                        </form>
-                    </div>
+
+                    <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" id="daw-status-email-form" style="display:flex;flex-direction:column;flex:1;min-height:0;margin:0;">
+                        <input type="hidden" name="action" value="daw_send_application_status_email">
+                        <input type="hidden" name="application_id" value="<?= esc_attr( (int) $selected_candidate['application_id'] ) ?>">
+                        <input type="hidden" name="candidate_id" value="<?= esc_attr( (int) $selected_candidate['id'] ) ?>">
+                        <?php wp_nonce_field( 'daw_send_application_status_email_' . (int) $selected_candidate['application_id'] . '_' . (int) $selected_candidate['id'] ); ?>
+
+                        <div style="padding:18px 24px;overflow-y:auto;flex:1;">
+                            <div class="daw-email-confirmation__recipient" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:12px 14px;margin-bottom:16px;">
+                                <label for="daw-modal-recipient-input" style="font-size:11px;color:#374151;display:block;text-transform:uppercase;font-weight:700;letter-spacing:0.5px;margin-bottom:6px;">
+                                    Email Penerima / Tujuan *
+                                </label>
+                                <input type="email" id="daw-modal-recipient-input" name="recipient_email" value="<?= esc_attr( $email_recipient ) ?>" required style="width:100%;height:38px;padding:6px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;color:#111827;background:#fff;">
+                                <small style="display:block;color:#6b7280;font-size:11px;margin-top:4px;">Pastikan email penerima benar. Anda dapat mengedit alamat email tujuan pengiriman di sini.</small>
+                            </div>
+
+                            <div style="margin-bottom:14px;">
+                                <label for="daw-modal-template-select" style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:5px;">
+                                    Template Email (dari Email Recruitment)
+                                </label>
+                                <select id="daw-modal-template-select" name="selected_template_id" style="width:100%;height:38px;padding:6px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;color:#111827;background:#fff;">
+                                    <?php foreach ( $prepared_templates as $tid => $tpl ) : ?>
+                                        <option value="<?= esc_attr( $tid ) ?>" <?= $tid === $default_template_id ? 'selected' : '' ?>>
+                                            [<?= esc_html( strtoupper( $tpl['category'] ) ) ?>] <?= esc_html( $tpl['title'] ) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+
+                            <div style="margin-bottom:14px;">
+                                <label for="daw-modal-email-subject" style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:5px;">
+                                    Subjek Email
+                                </label>
+                                <input type="text" id="daw-modal-email-subject" name="email_subject" value="<?= esc_attr( $initial_subject ) ?>" required style="width:100%;height:38px;padding:6px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;color:#111827;">
+                            </div>
+
+                            <div style="margin-bottom:14px;">
+                                <label for="daw-modal-email-body" style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:5px;">
+                                    Isi Pesan Email
+                                </label>
+                                <textarea id="daw-modal-email-body" name="email_body" rows="6" required style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;color:#111827;line-height:1.6;resize:vertical;"><?= esc_textarea( $initial_body ) ?></textarea>
+                            </div>
+
+                            <div style="margin-bottom:8px;">
+                                <span style="display:block;font-size:12px;font-weight:600;color:#6b7280;margin-bottom:5px;">Pratinjau Tampilan Email:</span>
+                                <iframe id="daw-status-preview-frame" class="daw-email-confirmation__preview" title="Pratinjau isi email pembaruan status" sandbox="" srcdoc="<?= esc_attr( $email_preview_html ) ?>" style="width:100%;height:190px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;"></iframe>
+                            </div>
+                        </div>
+
+                        <div class="daw-email-confirmation__actions" style="padding:14px 24px;border-top:1px solid #e5e7eb;background:#f9fafb;display:flex;justify-content:flex-end;gap:12px;align-items:center;">
+                            <a class="button daw-email-confirmation__cancel" href="<?= esc_url( remove_query_arg( [ 'email_preview', 'status_updated' ] ) ) ?>" style="border-radius:6px;padding:8px 18px;font-size:13px;text-decoration:none;color:#4b5563;border:1px solid #d1d5db;background:#fff;">Nanti saja</a>
+                            <button type="submit" id="daw-status-email-submit-btn" class="button button-primary daw-email-confirmation__approve" style="background:#2563eb;border-color:#1d4ed8;padding:8px 22px;font-weight:600;color:#fff;border-radius:6px;cursor:pointer;font-size:13px;">
+                                ACC &amp; Kirim Status Terbaru
+                            </button>
+                        </div>
+                    </form>
                 </section>
             </div>
+
+            <script>
+            (function() {
+                const templates = <?= wp_json_encode( $prepared_templates ) ?>;
+                const select = document.getElementById('daw-modal-template-select');
+                const subjInput = document.getElementById('daw-modal-email-subject');
+                const bodyInput = document.getElementById('daw-modal-email-body');
+                const frame = document.getElementById('daw-status-preview-frame');
+                const form = document.getElementById('daw-status-email-form');
+                const submitBtn = document.getElementById('daw-status-email-submit-btn');
+                const trackingUrl = <?= wp_json_encode( home_url( '/career/?recruitment_page=applicant-tracking' ) ) ?>;
+                const stageBadge = <?= wp_json_encode( (string) ( $pending_email_status ?: ( $selected_candidate['raw_status'] ?? '' ) ) ) ?>;
+
+                if (form && submitBtn) {
+                    form.addEventListener('submit', function() {
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = 'Mengirim email...';
+                    });
+                }
+
+                function escapeHtml(str) {
+                    return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                }
+
+                function buildPreviewHtml(subject, body) {
+                    const bodyLines = escapeHtml(body).replace(/\n/g, '<br>');
+                    let badgeHtml = '';
+                    if (stageBadge) {
+                        badgeHtml = '<div style="margin-bottom:20px;padding:12px 16px;background:#fef2f2;border-left:4px solid #c8102e;border-radius:6px;"><span style="font-size:12px;font-weight:700;color:#c8102e;text-transform:uppercase;">Status Lamaran:</span> <strong style="font-size:14px;color:#111827;">' + escapeHtml(stageBadge) + '</strong></div>';
+                    }
+                    return '<!doctype html><html lang="id"><body style="margin:0;padding:24px 16px;background:#f3f4f6;font-family:Arial,sans-serif;"><table style="width:100%;max-width:580px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;"><tr><td style="padding:16px 22px;background:#c8102e;color:#fff;font-weight:800;font-size:16px;">DAW <span style="font-weight:400;font-size:13px;color:#fee2e2;">| REKRUTMEN</span></td></tr><tr><td style="padding:24px 22px 18px;">' + badgeHtml + '<div style="font-size:13px;line-height:1.6;color:#374151;">' + bodyLines + '</div><div style="margin-top:20px;text-align:center;"><a href="' + trackingUrl + '" style="display:inline-block;background:#c8102e;color:#fff;padding:10px 22px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600;">Masuk ke Tracking Lamaran</a></div></td></tr><tr><td style="padding:14px 22px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:11px;color:#6b7280;">PT Daya Adicipta Wisesa &bull; Rekrutmen Resmi</td></tr></table></body></html>';
+                }
+
+                if (select) {
+                    select.addEventListener('change', function() {
+                        const chosen = templates[this.value];
+                        if (chosen) {
+                            if (subjInput) subjInput.value = chosen.subject;
+                            if (bodyInput) bodyInput.value = chosen.body;
+                            if (frame) frame.srcdoc = buildPreviewHtml(chosen.subject, chosen.body);
+                        }
+                    });
+                }
+
+                if (bodyInput && frame) {
+                    bodyInput.addEventListener('input', function() {
+                        frame.srcdoc = buildPreviewHtml(subjInput ? subjInput.value : '', this.value);
+                    });
+                }
+            })();
+            </script>
         <?php endif; ?>
 
         <section class="daw-documents-panel daw-applicant-downloads">
