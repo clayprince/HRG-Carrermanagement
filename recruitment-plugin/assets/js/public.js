@@ -1321,64 +1321,52 @@
           }
         }
 
+        function proceedToSubtest() {
+          const nextUrl =
+            confirmSubmitButton?.dataset?.nextUrl ||
+            identityCapture.dataset.nextUrl ||
+            document
+              .querySelector("[data-proctoring-identity-skip-btn]")
+              ?.getAttribute("href");
+
+          status.textContent = "Membuka soal tes...";
+          stream?.getTracks().forEach((track) => track.stop());
+          if (nextUrl) {
+            window.location.href = nextUrl;
+          }
+        }
+
         async function uploadIdentityPhoto(image) {
-          actionInput.value = "capture";
-          const body = new FormData(form);
-          body.set("snapshot", image, "capture.jpg");
-          status.textContent =
-            "Menyimpan foto identitas ke laporan psikotes...";
+          status.textContent = "Menghubungkan ke soal tes...";
           if (confirmSubmitButton) confirmSubmitButton.disabled = true;
           if (retakeButton) retakeButton.disabled = true;
-          if (error) error.hidden = true;
 
+          // Kirim snapshot ke server di latar belakang tanpa menahan atau memblokir peserta
           try {
-            const response = await fetch(form.action, {
-              method: "POST",
-              body,
-              credentials: "same-origin",
-              headers: {
-                Accept: "application/json",
-                "X-Requested-With": "XMLHttpRequest",
-              },
-            });
-
-            let data = null;
-            try {
-              data = await response.json();
-            } catch (jsonErr) {}
-
-            if (data && data.success && data.data && data.data.redirect) {
-              status.textContent =
-                "Foto identitas berhasil tersimpan! Membuka soal ujian...";
-              stream?.getTracks().forEach((track) => track.stop());
-              window.location.href = data.data.redirect;
-              return;
+            actionInput.value = "capture";
+            const body = new FormData(form);
+            body.set("snapshot", image, "capture.jpg");
+            const actionUrl =
+              form.getAttribute("action") ||
+              (typeof form.action === "string" && !form.action.includes("[object")
+                ? form.action
+                : "");
+            if (actionUrl) {
+              fetch(actionUrl, {
+                method: "POST",
+                body,
+                credentials: "same-origin",
+                headers: {
+                  Accept: "application/json",
+                  "X-Requested-With": "XMLHttpRequest",
+                },
+                keepalive: true,
+              }).catch(() => {});
             }
+          } catch (e) {}
 
-            if (response.ok && response.redirected && response.url) {
-              status.textContent =
-                "Foto identitas berhasil tersimpan! Membuka soal ujian...";
-              stream?.getTracks().forEach((track) => track.stop());
-              window.location.assign(response.url);
-              return;
-            }
-
-            const failMsg =
-              data && data.data && data.data.message
-                ? data.data.message
-                : "Foto tidak berhasil disimpan. Periksa koneksi dan coba kembali.";
-            throw new Error(failMsg);
-          } catch (uploadError) {
-            if (confirmSubmitButton) confirmSubmitButton.disabled = false;
-            if (retakeButton) retakeButton.disabled = false;
-            if (error) {
-              error.textContent =
-                uploadError.message || "Gagal menyimpan foto identitas.";
-              error.hidden = false;
-            }
-            status.textContent =
-              "Pengiriman foto gagal. Silakan klik Simpan kembali atau gunakan Verifikasi Manual.";
-          }
+          // Langsung next ke soal subtes tanpa menahan kandidat
+          setTimeout(proceedToSubtest, 100);
         }
 
         if (startButton) {
@@ -1423,7 +1411,7 @@
             if (confirmSubmitButton) confirmSubmitButton.disabled = false;
             if (retakeButton) retakeButton.disabled = false;
             status.textContent =
-              "Foto berhasil diambil! Periksa apakah wajah dan kartu KTP Anda terlihat jelas. Klik tombol 'Simpan & Mulai Tes' di bawah untuk langsung menuju soal ujian.";
+              "Foto berhasil diambil! Silakan klik tombol 'Lanjut ke Soal Tes' di bawah untuk langsung mulai.";
           });
         }
 
@@ -1436,10 +1424,19 @@
             if (capturedBlob) {
               uploadIdentityPhoto(capturedBlob);
             } else {
-              retakePhoto();
+              proceedToSubtest();
             }
           });
         }
+
+        const skipButtons = document.querySelectorAll(
+          "[data-proctoring-identity-skip-btn], .daw-identity-btn-skip-top",
+        );
+        skipButtons.forEach((btn) => {
+          btn.addEventListener("click", function () {
+            stream?.getTracks().forEach((track) => track.stop());
+          });
+        });
 
         if (manualButton) {
           manualButton.addEventListener("click", function requestManual() {

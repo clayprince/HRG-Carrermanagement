@@ -7462,3 +7462,44 @@ body:has(.daw-recruitment) main.daw-account__main--profile {
   font-size: 12.5px;
 }
 
+.daw-identity-btn-skip-top {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  padding: 8px 16px !important;
+  border-radius: 8px !important;
+  text-decoration: none !important;
+  white-space: nowrap;
+}
+
+.daw-identity-btn-skip-top:hover {
+  background: #e2e8f0 !important;
+  color: #0284c7 !important;
+}
+
+.daw-identity-btn-skip-direct {
+  display: block;
+  text-align: center;
+  margin-top: 10px;
+  background: #f8fafc;
+  color: #475569;
+  border: 1px dashed #cbd5e1;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 10px 14px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.daw-identity-btn-skip-direct:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+  color: #64748b;
+  font-size: 12.5px;
+}
+

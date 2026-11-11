@@ -15,6 +15,19 @@ $identity_processed = in_array( $identity_status, [ 'CAPTURED', 'MANUAL_REVIEW',
 $test_labels = [ 'iq' => 'IQ', 'pauli' => 'Pauli', 'disc' => 'DISC', 'papi' => 'PAPI Kostick' ];
 $subtest_name = $test_labels[ $test_key ] ?? 'Psikotes';
 $back_url = recruitment_get_public_url( 'psychotest-preparation', [ 'test' => $test_key ] );
+
+$test_routes = [
+    'iq' => 'psych-iq',
+    'pauli' => 'psych-pauli',
+    'disc' => 'psych-personality',
+    'papi' => 'psych-personality',
+];
+$subtest_args = [ 'start' => '1' ];
+if ( 'psych-personality' === $test_routes[ $test_key ] ) {
+    $subtest_args['test'] = $test_key;
+}
+$next_subtest_url = recruitment_get_public_url( $test_routes[ $test_key ], $subtest_args );
+recruitment_grant_psychotest_consent( $test_key );
 ?>
 <div class="daw-recruitment daw-recruitment--psychotest-identity">
     <?php require recruitment_get_plugin_path( 'public/components/header.php' ); ?>
@@ -41,13 +54,20 @@ $back_url = recruitment_get_public_url( 'psychotest-preparation', [ 'test' => $t
                 </div>
             </div>
 
-            <section class="daw-recruitment__psychotest-card daw-identity-card">
+            <section class="daw-recruitment__psychotest-card daw-identity-card" data-next-url="<?= esc_url( $next_subtest_url ) ?>">
                 <header class="daw-identity-header">
-                    <h1>Verifikasi Identitas: Foto Bersama KTP</h1>
-                    <p>
-                        Untuk memastikan bahwa peserta yang mengisi ujian adalah orang yang benar sesuai dengan berkas lamaran, silakan berfoto selfie memegang KTP Anda. 
-                        Foto ini akan disimpan ke dalam <strong>laporan hasil psikotes</strong> sebagai log aktivitas peserta sebelum langsung diarahkan ke soal tes <strong><?= esc_html( $subtest_name ) ?></strong>.
-                    </p>
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:12px;">
+                        <div>
+                            <h1>Verifikasi Identitas: Foto Bersama KTP</h1>
+                            <p>
+                                Untuk memastikan bahwa peserta yang mengisi ujian adalah orang yang benar sesuai dengan berkas lamaran, silakan berfoto selfie memegang KTP Anda. 
+                                Anda juga dapat langsung lanjut ke soal tes <strong><?= esc_html( $subtest_name ) ?></strong> kapan saja.
+                            </p>
+                        </div>
+                        <a href="<?= esc_url( $next_subtest_url ) ?>" class="daw-recruitment__button daw-identity-btn-skip-top">
+                            Lanjut ke Soal Tes &rarr;
+                        </a>
+                    </div>
                 </header>
 
                 <div class="daw-identity-grid">
@@ -82,28 +102,21 @@ $back_url = recruitment_get_public_url( 'psychotest-preparation', [ 'test' => $t
                                     <path d="M 108 98 Q 115 106 122 98" stroke="#64748b" stroke-width="2.5" fill="none" stroke-linecap="round" />
 
                                     <!-- TANGAN & KARTU KTP -->
-                                    <!-- Bayangan Kartu -->
                                     <rect x="182" y="72" width="115" height="74" rx="7" fill="#000000" opacity="0.08" />
-                                    <!-- Kartu KTP -->
                                     <rect x="180" y="70" width="115" height="74" rx="7" fill="url(#cardGrad)" stroke="#0369a1" stroke-width="1.5" />
-                                    <!-- Garis Header KTP -->
                                     <rect x="188" y="76" width="55" height="6" rx="2" fill="#ffffff" opacity="0.85" />
-                                    <!-- Foto Kecil di KTP -->
                                     <rect x="188" y="88" width="30" height="38" rx="3" fill="#ffffff" opacity="0.9" />
                                     <circle cx="203" cy="99" r="7" fill="#94a3b8" />
                                     <path d="M 193 124 C 193 114, 213 114, 213 124 Z" fill="#64748b" />
-                                    <!-- Garis-Garis Teks KTP -->
                                     <rect x="224" y="90" width="62" height="4" rx="1.5" fill="#ffffff" opacity="0.9" />
                                     <rect x="224" y="98" width="50" height="4" rx="1.5" fill="#ffffff" opacity="0.75" />
                                     <rect x="224" y="106" width="58" height="4" rx="1.5" fill="#ffffff" opacity="0.75" />
                                     <rect x="224" y="114" width="42" height="4" rx="1.5" fill="#ffffff" opacity="0.75" />
                                     <rect x="224" y="122" width="48" height="4" rx="1.5" fill="#ffffff" opacity="0.75" />
 
-                                    <!-- Tangan Memegang Sisi KTP -->
                                     <path d="M 172 155 C 172 135, 185 130, 195 130 C 198 130, 200 133, 200 137 C 195 145, 185 155, 172 165 Z" fill="#cbd5e1" stroke="#94a3b8" stroke-width="1" />
                                     <circle cx="200" cy="136" r="5" fill="#cbd5e1" />
 
-                                    <!-- Badge Centang Hijau -->
                                     <circle cx="295" cy="25" r="14" fill="#22c55e" />
                                     <path d="M 289 25 L 293 29 L 301 20" stroke="#ffffff" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" />
                                 </svg>
@@ -116,22 +129,18 @@ $back_url = recruitment_get_public_url( 'psychotest-preparation', [ 'test' => $t
                                 </li>
                                 <li>
                                     <span class="daw-identity-guide-num">2</span>
-                                    <div><strong>Wajah &amp; kartu terlihat jelas</strong>, tidak terpotong dan jari tidak menutupi nama/NIK.</div>
+                                    <div><strong>Wajah &amp; kartu terlihat</strong>, tidak perlu scan khusus atau validasi rumit.</div>
                                 </li>
                                 <li>
                                     <span class="daw-identity-guide-num">3</span>
-                                    <div><strong>Pencahayaan cukup</strong>, tidak terlalu gelap atau silau pada kartu.</div>
-                                </li>
-                                <li>
-                                    <span class="daw-identity-guide-num">4</span>
-                                    <div><strong>Otomatis ke Soal</strong>, setelah foto disimpan Anda langsung mengerjakan soal <strong><?= esc_html( $subtest_name ) ?></strong>.</div>
+                                    <div><strong>Langsung Lanjut ke Soal</strong>, Anda bisa langsung memulai tes <strong><?= esc_html( $subtest_name ) ?></strong> setelah ini.</div>
                                 </li>
                             </ul>
                         </div>
                     </aside>
 
                     <!-- KOLOM KANAN: AREA KAMERA & CAPTURE -->
-                    <div class="daw-identity-camera-panel" data-proctoring-identity>
+                    <div class="daw-identity-camera-panel" data-proctoring-identity data-next-url="<?= esc_url( $next_subtest_url ) ?>">
                         <div class="daw-identity-viewport" data-proctoring-viewport>
                             <!-- Live Camera Video -->
                             <video class="daw-identity-video" data-proctoring-identity-video autoplay muted playsinline hidden></video>
@@ -162,7 +171,7 @@ $back_url = recruitment_get_public_url( 'psychotest-preparation', [ 'test' => $t
 
                         <!-- Status Keterangan Interaktif -->
                         <div class="daw-identity-status-box" role="status" data-proctoring-identity-status>
-                            Kamera belum aktif. Klik tombol "Buka Kamera" di bawah.
+                            Kamera belum aktif. Klik tombol "Buka Kamera" di bawah atau langsung lanjut ke soal tes.
                         </div>
 
                         <!-- Panel Tombol Aksi -->
@@ -182,10 +191,15 @@ $back_url = recruitment_get_public_url( 'psychotest-preparation', [ 'test' => $t
                                 <button type="button" class="daw-recruitment__button daw-recruitment__button--ghost" data-proctoring-identity-retake>
                                     &#8635; Foto Ulang
                                 </button>
-                                <button type="button" class="daw-recruitment__button daw-recruitment__button--full daw-identity-btn-confirm" data-proctoring-identity-confirm-submit>
-                                    &#10003; Simpan &amp; Mulai Tes <?= esc_html( $subtest_name ) ?>
+                                <button type="button" class="daw-recruitment__button daw-recruitment__button--full daw-identity-btn-confirm" data-proctoring-identity-confirm-submit data-next-url="<?= esc_url( $next_subtest_url ) ?>">
+                                    &#10003; Lanjut ke Soal Tes <?= esc_html( $subtest_name ) ?> &rarr;
                                 </button>
                             </div>
+
+                            <!-- Opsi Langsung Next Tanpa Foto / Lewati -->
+                            <a href="<?= esc_url( $next_subtest_url ) ?>" class="daw-identity-btn-skip-direct" data-proctoring-identity-skip-btn>
+                                &rarr; Lewati &amp; Langsung ke Soal Tes <?= esc_html( $subtest_name ) ?>
+                            </a>
                         </div>
 
                         <!-- Form Pengiriman Backend -->
