@@ -1,12 +1,13 @@
 <?php
 $current_user = wp_get_current_user();
 $display_name = ! empty( $current_user->display_name ) ? $current_user->display_name : 'User Department';
+$department_id = absint( get_user_meta( $current_user->ID, 'daw_department_id', true ) );
 $department = trim( (string) get_user_meta( $current_user->ID, 'daw_department', true ) );
 $department_account_id = absint( get_user_meta( $current_user->ID, 'daw_oracle_account_id', true ) );
 $department_assigned = '' !== $department;
 $department = $department_assigned ? $department : 'Belum diatur';
 $view = sanitize_key( wp_unslash( $_GET['view'] ?? 'dashboard' ) );
-$views = [ 'dashboard', 'requests', 'request-form', 'request-detail', 'interviews', 'interview-detail', 'profile', 'applicants', 'results', 'account-settings' ];
+$views = [ 'dashboard', 'requests', 'request-form', 'request-detail', 'interviews', 'interview-schedule', 'interview-detail', 'profile', 'applicants', 'results', 'account-settings' ];
 if ( ! in_array( $view, $views, true ) ) {
 	$view = 'dashboard';
 }
@@ -41,6 +42,7 @@ $view_titles = [
 	'request-form' => 'Form Request Lowongan',
 	'request-detail' => 'Detail Pengajuan',
 	'interviews' => 'Kandidat Wawancara User',
+	'interview-schedule' => 'Jadwal Wawancara User',
 	'interview-detail' => 'Detail Kandidat',
 	'profile' => 'Profil Lengkap Pelamar',
 	'account-settings' => 'Pengaturan Akun',
@@ -251,12 +253,52 @@ $interview_rows = $department_assigned && $department_account_id > 0 ? $intervie
 $interview_load_error = ! $department_assigned
 	? 'Akun ini belum ditautkan ke departemen.'
 	: ( $department_account_id < 1 || $interview_database->has_error() ? 'Data wawancara belum dapat dimuat dari Oracle. Silakan coba kembali.' : '' );
+$interview_booking_map = [];
+if ( $department_id > 0 && in_array( $view, [ 'interviews', 'interview-detail' ], true ) ) {
+	foreach ( $interview_database->get_user_interview_booking_map( $department_id ) as $booking_row ) {
+		$interview_booking_map[ (string) $booking_row['CANDIDATE_ID'] ] = $booking_row;
+	}
+	if ( $interview_database->has_error() ) {
+		$interview_load_error = 'Data jadwal wawancara belum dapat dimuat dari Oracle. Pastikan migrasi scheduler telah diterapkan.';
+	}
+}
+$schedule_month = sanitize_text_field( wp_unslash( $_GET['month'] ?? wp_date( 'Y-m' ) ) );
+if ( ! preg_match( '/\A\d{4}-(0[1-9]|1[0-2])\z/', $schedule_month ) ) {
+	$schedule_month = wp_date( 'Y-m' );
+}
+$schedule_type = 'INTERVIEW_USER';
+$schedule_enabled = $department_id > 0;
+$schedule_slots = $schedule_enabled && 'interview-schedule' === $view
+	? $interview_database->get_interview_slots_for_month( $schedule_type, $department_id, $schedule_month )
+	: [];
+$schedule_slot_load_error = 'interview-schedule' === $view && $schedule_enabled && $interview_database->has_error();
+$schedule_bookings = $schedule_enabled && 'interview-schedule' === $view
+	? $interview_database->get_interview_bookings_for_month( $schedule_type, $department_id, $schedule_month )
+	: [];
+$schedule_load_error = $schedule_slot_load_error || ( 'interview-schedule' === $view && $schedule_enabled && $interview_database->has_error() );
+$schedule_notice = get_transient( 'daw_interview_schedule_notice_' . get_current_user_id() );
+if ( 'interview-schedule' === $view ) {
+	delete_transient( 'daw_interview_schedule_notice_' . get_current_user_id() );
+}
+$schedule_notice = is_array( $schedule_notice ) ? $schedule_notice : null;
+if ( 'interview-schedule' === $view && ! $schedule_enabled ) {
+	$schedule_notice = [ 'success' => false, 'message' => 'Akun ini belum memiliki ID departemen Oracle untuk membuat jadwal.' ];
+} elseif ( $schedule_load_error ) {
+	$schedule_notice = [ 'success' => false, 'message' => 'Data jadwal belum dapat dimuat. Pastikan migrasi scheduler telah diterapkan.' ];
+}
+$schedule_base_url = add_query_arg( [ 'page' => 'daw-user-department', 'view' => 'interview-schedule' ], admin_url( 'admin.php' ) );
 $interviews = [];
 foreach ( $interview_rows as $row ) {
 	$candidate_id = (int) ( $row['CANDIDATE_ID'] ?? 0 );
 	$application_id = (int) ( $row['APPLICATION_ID'] ?? 0 );
 	if ( $candidate_id < 1 || $application_id < 1 ) {
 		continue;
+	}
+	if ( isset( $interview_booking_map[ (string) $candidate_id ] ) ) {
+		$row['INTERVIEW_DATE'] = $interview_booking_map[ (string) $candidate_id ]['INTERVIEW_DATE'];
+		$row['INTERVIEW_TIME'] = $interview_booking_map[ (string) $candidate_id ]['INTERVIEW_TIME'];
+		$row['INTERVIEW_METHOD'] = $interview_booking_map[ (string) $candidate_id ]['INTERVIEW_METHOD'];
+		$row['INTERVIEW_LOCATION'] = $interview_booking_map[ (string) $candidate_id ]['INTERVIEW_LOCATION'];
 	}
 	$scheduled = ! empty( $row['INTERVIEW_DATE'] );
 	$has_result = '' !== trim( (string) ( $row['INTERVIEW_STATUS'] ?? '' ) );
@@ -494,6 +536,7 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 			<a class="<?= 'dashboard' === $view ? 'is-active' : '' ?>" href="<?= esc_url( $view_url( 'dashboard' ) ) ?>"><span class="dashicons dashicons-dashboard" aria-hidden="true"></span>Dashboard</a>
 			<a class="<?= 'requests' === $view ? 'is-active' : '' ?>" href="<?= esc_url( $view_url( 'requests' ) ) ?>"><span class="dashicons dashicons-clipboard" aria-hidden="true"></span>Request Lowongan</a>
 			<a class="<?= 'interviews' === $view ? 'is-active' : '' ?>" href="<?= esc_url( $view_url( 'interviews' ) ) ?>"><span class="dashicons dashicons-groups" aria-hidden="true"></span><span>Kandidat Wawancara User</span><b><?= esc_html( (string) ( $interview_stats['waiting'] + $interview_stats['scheduled'] ) ) ?></b></a>
+			<a class="<?= 'interview-schedule' === $view ? 'is-active' : '' ?>" href="<?= esc_url( $view_url( 'interview-schedule' ) ) ?>"><span class="dashicons dashicons-calendar-alt" aria-hidden="true"></span>Jadwal Wawancara</a>
 			<a class="<?= 'applicants' === $view ? 'is-active' : '' ?>" href="<?= esc_url( $view_url( 'applicants' ) ) ?>"><span class="dashicons dashicons-database" aria-hidden="true"></span>Data Pelamar</a>
 			<a class="<?= 'results' === $view ? 'is-active' : '' ?>" href="<?= esc_url( $view_url( 'results' ) ) ?>"><span class="dashicons dashicons-list-view" aria-hidden="true"></span>Hasil Wawancara User</a>
 			<a class="<?= 'account-settings' === $view ? 'is-active' : '' ?>" href="<?= esc_url( $view_url( 'account-settings' ) ) ?>"><span class="dashicons dashicons-admin-generic" aria-hidden="true"></span>Pengaturan Akun</a>
@@ -540,6 +583,8 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 						</form>
 					</section>
 				</section>
+			<?php elseif ( 'interview-schedule' === $view ) : ?>
+				<?php require recruitment_get_plugin_path( 'admin/components/interview-schedule-calendar.php' ); ?>
 			<?php elseif ( 'profile' === $view ) : ?>
 				<?php if ( ! $selected_interview || ! $selected_department_profile ) : ?>
 					<section class="daw-ud-profile-overlay"><article class="daw-ud-profile-sheet"><p><?= esc_html( $profile_load_error ?: 'Profil pelamar tidak ditemukan atau tidak tersedia untuk departemen ini.' ) ?></p><a class="button" href="<?= esc_url( $view_url( 'applicants' ) ) ?>">Kembali</a></article></section>

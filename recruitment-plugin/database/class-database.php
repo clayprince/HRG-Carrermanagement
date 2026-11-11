@@ -811,6 +811,10 @@ class Recruitment_Database {
             if ( $this->is_unique_violation( $exception ) ) {
                 return [ 'success' => false, 'error' => 'email_exists' ];
             }
+            if ( $this->is_missing_schema_object( $exception ) ) {
+                $this->log_error( 'HR account creation requires Oracle schema alignment', $exception );
+                return [ 'success' => false, 'error' => 'schema_not_ready' ];
+            }
             $this->log_error( 'HR account creation failed', $exception );
             return [ 'success' => false, 'error' => 'service_unavailable' ];
         } catch ( RuntimeException $exception ) {
@@ -2607,6 +2611,44 @@ class Recruitment_Database {
                 'department' => $department,
                 'account_id' => $account_id,
             ]
+        );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_user_interview_booking_map( int $department_id ): array {
+        if ( $department_id < 1 ) {
+            return [];
+        }
+        $this->last_error = null;
+        return $this->fetch_all(
+            'SELECT candidate_id AS "CANDIDATE_ID",
+                    slot_date AS "INTERVIEW_DATE",
+                    start_time AS "INTERVIEW_TIME",
+                    method AS "INTERVIEW_METHOD",
+                    location AS "INTERVIEW_LOCATION"
+             FROM (
+                SELECT pkl.KANDIDAT_ID AS candidate_id,
+                       TO_CHAR(s.START_AT, \'YYYY-MM-DD\') AS slot_date,
+                       TO_CHAR(s.START_AT, \'HH24:MI\') AS start_time,
+                       s.METODE_WAWANCARA AS method,
+                       CASE WHEN s.METODE_WAWANCARA = \'ONLINE\'
+                            THEN s.LOKASI || \' - \' || s.MEETING_URL
+                            ELSE s.LOKASI
+                       END AS location,
+                       ROW_NUMBER() OVER (PARTITION BY pkl.KANDIDAT_ID ORDER BY s.START_AT, b.BOOKING_INTERVIEW_ID) AS row_num
+                FROM HRS_BOOKING_INTERVIEW b
+                JOIN HRS_SLOT_WAWANCARA s ON s.SLOT_WAWANCARA_ID = b.SLOT_WAWANCARA_ID
+                JOIN HRS_LAMARAN l ON l.LAMARAN_ID = b.LAMARAN_ID
+                JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.DETAIL_LOWONGAN_ID = l.DETAIL_LOWONGAN_ID
+                JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.PROFILE_KANDIDAT_LOGIN = l.PROFILE_KANDIDAT_ID
+                WHERE b.JENIS_WAWANCARA = \'INTERVIEW_USER\'
+                  AND UPPER(TRIM(b.STATUS_PEMESANAN)) = \'CONFIRMED\'
+                  AND s.DEPARTEMEN_ID = :department_id
+             )
+             WHERE row_num = 1',
+            [ 'department_id' => $department_id ]
         );
     }
 
@@ -4813,6 +4855,614 @@ class Recruitment_Database {
             [ 'token' => $token, 'contact_email' => $contact, 'contact_phone' => $contact ]
         );
         return $rows[0] ?? null;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_interview_slots_for_month( string $type, ?int $department_id, string $month ): array {
+        if ( ! in_array( $type, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) || ( 'INTERVIEW_USER' === $type && ( ! $department_id || $department_id < 1 ) ) ) {
+            return [];
+        }
+
+        $month_start = DateTimeImmutable::createFromFormat( '!Y-m-d', $month . '-01', wp_timezone() );
+        if ( ! $month_start || $month_start->format( 'Y-m' ) !== $month ) {
+            return [];
+        }
+
+        $this->last_error = null;
+        return $this->fetch_all(
+            'SELECT s.SLOT_WAWANCARA_ID AS "slot_id",
+                    TO_CHAR(s.START_AT, \'YYYY-MM-DD\') AS "slot_date",
+                    TO_CHAR(s.START_AT, \'HH24:MI\') AS "start_time",
+                    TO_CHAR(s.ENDS_AT, \'HH24:MI\') AS "end_time",
+                    s.ZONA_WAKTU AS "timezone",
+                    s.METODE_WAWANCARA AS "method",
+                    s.LOKASI AS "location",
+                    s.MEETING_URL AS "meeting_url",
+                    s.KAPASITAS AS "capacity",
+                    s.NAMA_PEWAWANCARA AS "interviewer",
+                    COUNT(CASE WHEN UPPER(TRIM(b.STATUS_PEMESANAN)) = \'CONFIRMED\' THEN 1 END) AS "booked"
+             FROM HRS_SLOT_WAWANCARA s
+             LEFT JOIN HRS_BOOKING_INTERVIEW b ON b.SLOT_WAWANCARA_ID = s.SLOT_WAWANCARA_ID
+             WHERE s.JENIS_WAWANCARA = :type
+               AND (s.DEPARTEMEN_ID = :department_id OR (:is_hr = 1 AND s.DEPARTEMEN_ID IS NULL))
+               AND s.START_AT >= TO_TIMESTAMP(:month_start, \'YYYY-MM-DD\')
+               AND s.START_AT < TO_TIMESTAMP(:month_end, \'YYYY-MM-DD\')
+             GROUP BY s.SLOT_WAWANCARA_ID, s.START_AT, s.ENDS_AT, s.ZONA_WAKTU,
+                      s.METODE_WAWANCARA, s.LOKASI, s.MEETING_URL, s.KAPASITAS, s.NAMA_PEWAWANCARA
+             ORDER BY s.START_AT, s.SLOT_WAWANCARA_ID',
+            [
+                'type' => $type,
+                'department_id' => $department_id,
+                'is_hr' => 'INTERVIEW_HR' === $type ? 1 : 0,
+                'month_start' => $month_start->format( 'Y-m-d' ),
+                'month_end' => $month_start->modify( 'first day of next month' )->format( 'Y-m-d' ),
+            ]
+        );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_interview_bookings_for_month( string $type, ?int $department_id, string $month ): array {
+        if ( ! in_array( $type, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) || ( 'INTERVIEW_USER' === $type && ( ! $department_id || $department_id < 1 ) ) ) {
+            return [];
+        }
+        $month_start = DateTimeImmutable::createFromFormat( '!Y-m-d', $month . '-01', wp_timezone() );
+        if ( ! $month_start || $month_start->format( 'Y-m' ) !== $month ) {
+            return [];
+        }
+        $this->last_error = null;
+        return $this->fetch_all(
+            'SELECT s.SLOT_WAWANCARA_ID AS "slot_id",
+                    l.LAMARAN_ID AS "application_id",
+                    NVL(p.NAMA_LENGKAP, p.NAMA_KANDIDAT) AS "candidate_name",
+                    TO_CHAR(b.WAKTU_PEMESANAN, \'YYYY-MM-DD HH24:MI\') AS "booked_at"
+             FROM HRS_BOOKING_INTERVIEW b
+             JOIN HRS_SLOT_WAWANCARA s ON s.SLOT_WAWANCARA_ID = b.SLOT_WAWANCARA_ID
+             JOIN HRS_LAMARAN l ON l.LAMARAN_ID = b.LAMARAN_ID
+             JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.PROFILE_KANDIDAT_LOGIN = l.PROFILE_KANDIDAT_ID
+             JOIN HRS_PROFIL_KANDIDAT p ON p.KANDIDAT_ID = pkl.KANDIDAT_ID
+             WHERE s.JENIS_WAWANCARA = :type
+               AND (s.DEPARTEMEN_ID = :department_id OR (:is_hr = 1 AND s.DEPARTEMEN_ID IS NULL))
+               AND s.START_AT >= TO_TIMESTAMP(:month_start, \'YYYY-MM-DD\')
+               AND s.START_AT < TO_TIMESTAMP(:month_end, \'YYYY-MM-DD\')
+               AND UPPER(TRIM(b.STATUS_PEMESANAN)) = \'CONFIRMED\'
+             ORDER BY s.START_AT, b.WAKTU_PEMESANAN, l.LAMARAN_ID',
+            [
+                'type' => $type,
+                'department_id' => $department_id,
+                'is_hr' => 'INTERVIEW_HR' === $type ? 1 : 0,
+                'month_start' => $month_start->format( 'Y-m-d' ),
+                'month_end' => $month_start->modify( 'first day of next month' )->format( 'Y-m-d' ),
+            ]
+        );
+    }
+
+    /**
+     * @param array<int, string> $dates
+     * @param array<int, array<string, mixed>> $slots
+     * @return array{success: bool, error?: string}
+     */
+    public function create_interview_slots( string $type, ?int $department_id, array $dates, array $slots, string $timezone ): array {
+        if ( ! in_array( $type, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) || ( 'INTERVIEW_USER' === $type && ( ! $department_id || $department_id < 1 ) ) ) {
+            return [ 'success' => false, 'error' => 'Jenis wawancara atau departemen tidak valid.' ];
+        }
+        if ( empty( $dates ) || empty( $slots ) || count( $dates ) > 31 || count( $slots ) > 20 ) {
+            return [ 'success' => false, 'error' => 'Pilih setidaknya satu tanggal dan slot wawancara.' ];
+        }
+
+        $timezone_object = wp_timezone();
+        $now = new DateTimeImmutable( 'now', $timezone_object );
+        $prepared = [];
+        foreach ( array_values( array_unique( $dates ) ) as $date ) {
+            $date_value = DateTimeImmutable::createFromFormat( '!Y-m-d', $date, $timezone_object );
+            if ( ! $date_value || $date_value->format( 'Y-m-d' ) !== $date || $date_value < $now->setTime( 0, 0 ) ) {
+                return [ 'success' => false, 'error' => 'Tanggal wawancara tidak valid atau sudah lewat.' ];
+            }
+            foreach ( $slots as $slot ) {
+                $normalized = $this->normalize_interview_slot( $date, $slot, $timezone_object, $now );
+                if ( ! $normalized ) {
+                    return [ 'success' => false, 'error' => 'Periksa waktu, kapasitas, metode, dan detail setiap slot.' ];
+                }
+                foreach ( $prepared as $existing ) {
+                    if ( $existing['date'] === $date && $normalized['start'] < $existing['end'] && $normalized['end'] > $existing['start'] ) {
+                        return [ 'success' => false, 'error' => 'Slot pada tanggal yang sama tidak boleh bertumpang tindih.' ];
+                    }
+                }
+                $prepared[] = $normalized;
+            }
+        }
+
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $connection->exec( 'LOCK TABLE HRS_SLOT_WAWANCARA IN EXCLUSIVE MODE' );
+            $insert = $connection->prepare(
+                'INSERT INTO HRS_SLOT_WAWANCARA
+                    (START_AT, ENDS_AT, ZONA_WAKTU, METODE_WAWANCARA, LOKASI, KAPASITAS, NAMA_PEWAWANCARA, MEETING_URL, JENIS_WAWANCARA, DEPARTEMEN_ID)
+                 VALUES
+                    (TO_TIMESTAMP(:start_at, \'YYYY-MM-DD HH24:MI:SS\'), TO_TIMESTAMP(:end_at, \'YYYY-MM-DD HH24:MI:SS\'), :timezone, :method, :location, :capacity, :interviewer, :meeting_url, :type, :department_id)'
+            );
+            foreach ( $prepared as $slot ) {
+                if ( $this->interview_slot_overlaps(
+                    $connection,
+                    $type,
+                    $department_id,
+                    $slot['date'] . ' ' . $slot['start'],
+                    $slot['date'] . ' ' . $slot['end'],
+                    0
+                ) ) {
+                    throw new InvalidArgumentException( 'Slot pada tanggal yang sama tidak boleh bertumpang tindih dengan jadwal lain.' );
+                }
+                $insert->execute(
+                    [
+                        'start_at' => $slot['date'] . ' ' . $slot['start'],
+                        'end_at' => $slot['date'] . ' ' . $slot['end'],
+                        'timezone' => $timezone,
+                        'method' => $slot['method'],
+                        'location' => $slot['location'],
+                        'capacity' => $slot['capacity'],
+                        'interviewer' => $slot['interviewer'],
+                        'meeting_url' => $slot['meeting_url'],
+                        'type' => $type,
+                        'department_id' => $department_id,
+                    ]
+                );
+            }
+            $connection->commit();
+            return [ 'success' => true ];
+        } catch ( InvalidArgumentException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            return [ 'success' => false, 'error' => $exception->getMessage() ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_error( 'Interview schedule creation failed', $exception );
+            return [ 'success' => false, 'error' => 'Jadwal wawancara gagal disimpan ke Oracle.' ];
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $slot
+     * @return array{success: bool, error?: string}
+     */
+    public function update_interview_slot( string $slot_id, string $type, ?int $department_id, array $slot ): array {
+        if ( ! ctype_digit( $slot_id ) || '0' === $slot_id
+            || ! in_array( $type, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true )
+            || ( 'INTERVIEW_USER' === $type && ( ! $department_id || $department_id < 1 ) ) ) {
+            return [ 'success' => false, 'error' => 'Slot wawancara tidak valid.' ];
+        }
+        $normalized = $this->normalize_interview_slot(
+            (string) ( $slot['date'] ?? '' ),
+            $slot,
+            wp_timezone(),
+            new DateTimeImmutable( 'now', wp_timezone() )
+        );
+        if ( ! $normalized ) {
+            return [ 'success' => false, 'error' => 'Periksa waktu, kapasitas, metode, dan detail slot.' ];
+        }
+
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $connection->exec( 'LOCK TABLE HRS_SLOT_WAWANCARA IN EXCLUSIVE MODE' );
+            $lock = $connection->prepare(
+                'SELECT SLOT_WAWANCARA_ID FROM HRS_SLOT_WAWANCARA
+                 WHERE SLOT_WAWANCARA_ID = :slot_id AND JENIS_WAWANCARA = :type
+                   AND ((:is_hr = 1 AND DEPARTEMEN_ID IS NULL) OR DEPARTEMEN_ID = :department_id)
+                 FOR UPDATE'
+            );
+            $lock->execute(
+                [
+                    'slot_id' => (int) $slot_id,
+                    'type' => $type,
+                    'is_hr' => 'INTERVIEW_HR' === $type ? 1 : 0,
+                    'department_id' => $department_id,
+                ]
+            );
+            if ( false === $lock->fetchColumn() ) {
+                throw new InvalidArgumentException( 'Slot wawancara tidak ditemukan.' );
+            }
+            if ( $this->interview_slot_booking_count( $connection, (int) $slot_id ) > 0 ) {
+                throw new InvalidArgumentException( 'Slot yang sudah dipesan tidak dapat diubah.' );
+            }
+            if ( $this->interview_slot_overlaps(
+                $connection,
+                $type,
+                $department_id,
+                $normalized['date'] . ' ' . $normalized['start'],
+                $normalized['date'] . ' ' . $normalized['end'],
+                (int) $slot_id
+            ) ) {
+                throw new InvalidArgumentException( 'Slot bertumpang tindih dengan jadwal lain.' );
+            }
+            $update = $connection->prepare(
+                'UPDATE HRS_SLOT_WAWANCARA
+                 SET START_AT = TO_TIMESTAMP(:start_at, \'YYYY-MM-DD HH24:MI:SS\'),
+                     ENDS_AT = TO_TIMESTAMP(:end_at, \'YYYY-MM-DD HH24:MI:SS\'),
+                     ZONA_WAKTU = :timezone, METODE_WAWANCARA = :method, LOKASI = :location,
+                     KAPASITAS = :capacity, NAMA_PEWAWANCARA = :interviewer, MEETING_URL = :meeting_url
+                 WHERE SLOT_WAWANCARA_ID = :slot_id'
+            );
+            $update->execute(
+                [
+                    'start_at' => $normalized['date'] . ' ' . $normalized['start'],
+                    'end_at' => $normalized['date'] . ' ' . $normalized['end'],
+                    'timezone' => wp_timezone_string(),
+                    'method' => $normalized['method'],
+                    'location' => $normalized['location'],
+                    'capacity' => $normalized['capacity'],
+                    'interviewer' => $normalized['interviewer'],
+                    'meeting_url' => $normalized['meeting_url'],
+                    'slot_id' => (int) $slot_id,
+                ]
+            );
+            $connection->commit();
+            return [ 'success' => true ];
+        } catch ( InvalidArgumentException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            return [ 'success' => false, 'error' => $exception->getMessage() ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_error( 'Interview schedule update failed', $exception );
+            return [ 'success' => false, 'error' => 'Jadwal wawancara gagal diperbarui ke Oracle.' ];
+        }
+    }
+
+    /** @return array{success: bool, error?: string} */
+    public function delete_interview_slot( string $slot_id, string $type, ?int $department_id ): array {
+        if ( ! ctype_digit( $slot_id ) || '0' === $slot_id
+            || ! in_array( $type, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true )
+            || ( 'INTERVIEW_USER' === $type && ( ! $department_id || $department_id < 1 ) ) ) {
+            return [ 'success' => false, 'error' => 'Slot wawancara tidak valid.' ];
+        }
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $lock = $connection->prepare(
+                'SELECT SLOT_WAWANCARA_ID FROM HRS_SLOT_WAWANCARA
+                 WHERE SLOT_WAWANCARA_ID = :slot_id AND JENIS_WAWANCARA = :type
+                   AND ((:is_hr = 1 AND DEPARTEMEN_ID IS NULL) OR DEPARTEMEN_ID = :department_id)
+                 FOR UPDATE'
+            );
+            $lock->execute(
+                [
+                    'slot_id' => (int) $slot_id,
+                    'type' => $type,
+                    'is_hr' => 'INTERVIEW_HR' === $type ? 1 : 0,
+                    'department_id' => $department_id,
+                ]
+            );
+            if ( false === $lock->fetchColumn() ) {
+                throw new InvalidArgumentException( 'Slot wawancara tidak ditemukan.' );
+            }
+            if ( $this->interview_slot_booking_count( $connection, (int) $slot_id ) > 0 ) {
+                throw new InvalidArgumentException( 'Slot yang sudah dipesan tidak dapat dihapus.' );
+            }
+            $delete = $connection->prepare( 'DELETE FROM HRS_SLOT_WAWANCARA WHERE SLOT_WAWANCARA_ID = :slot_id' );
+            $delete->execute( [ 'slot_id' => (int) $slot_id ] );
+            $connection->commit();
+            return [ 'success' => true ];
+        } catch ( InvalidArgumentException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            return [ 'success' => false, 'error' => $exception->getMessage() ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_error( 'Interview schedule deletion failed', $exception );
+            return [ 'success' => false, 'error' => 'Jadwal wawancara gagal dihapus dari Oracle.' ];
+        }
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_applicant_interview_applications( string $applicant_id ): array {
+        if ( ! ctype_digit( $applicant_id ) || '0' === $applicant_id ) {
+            return [];
+        }
+        $this->last_error = null;
+        return $this->fetch_all(
+            'SELECT l.LAMARAN_ID AS "application_id",
+                    l.STATUS_TERKINI AS "stage",
+                    l.STATUS_AKHIR AS "final_status",
+                    NVL(d.JUDUL_PEKERJAAN, k.JUDUL_PEKERJAAN) AS "position",
+                    NVL(d.NAMA_DEPARTEMENT, k.NAMA_DEPARTEMEN) AS "department",
+                    CASE UPPER(TRIM(l.STATUS_TERKINI))
+                        WHEN \'INTERVIEW_HR\' THEN \'INTERVIEW_HR\'
+                        WHEN \'INTERVIEW_USER\' THEN \'INTERVIEW_USER\'
+                    END AS "interview_type"
+             FROM HRS_LAMARAN l
+             JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.DETAIL_LOWONGAN_ID = l.DETAIL_LOWONGAN_ID
+             LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.KOLOM_PENDAFTARAN_ID = d.KOLOM_PENDAFTARAN_ID
+             WHERE l.PROFILE_KANDIDAT_ID = :active_applicant_id
+               AND UPPER(TRIM(l.STATUS_TERKINI)) IN (\'INTERVIEW_HR\', \'INTERVIEW_USER\')
+               AND UPPER(TRIM(NVL(l.STATUS_AKHIR, \'IN_PROGRESS\'))) NOT IN
+                    (\'DITERIMA\', \'ACCEPTED\', \'DITOLAK\', \'REJECTED\')
+             UNION
+             SELECT l.LAMARAN_ID AS "application_id",
+                    l.STATUS_TERKINI AS "stage",
+                    l.STATUS_AKHIR AS "final_status",
+                    NVL(d.JUDUL_PEKERJAAN, k.JUDUL_PEKERJAAN) AS "position",
+                    NVL(d.NAMA_DEPARTEMENT, k.NAMA_DEPARTEMEN) AS "department",
+                    b.JENIS_WAWANCARA AS "interview_type"
+             FROM HRS_LAMARAN l
+             JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.DETAIL_LOWONGAN_ID = l.DETAIL_LOWONGAN_ID
+             LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.KOLOM_PENDAFTARAN_ID = d.KOLOM_PENDAFTARAN_ID
+             JOIN HRS_BOOKING_INTERVIEW b ON b.LAMARAN_ID = l.LAMARAN_ID
+             WHERE l.PROFILE_KANDIDAT_ID = :booked_applicant_id
+               AND UPPER(TRIM(b.STATUS_PEMESANAN)) = \'CONFIRMED\'
+             ORDER BY "application_id" DESC',
+            [
+                'active_applicant_id' => (int) $applicant_id,
+                'booked_applicant_id' => (int) $applicant_id,
+            ]
+        );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_applicant_interview_slots( string $applicant_id, string $application_id, string $type ): array {
+        if ( ! ctype_digit( $applicant_id ) || ! ctype_digit( $application_id ) || '0' === $applicant_id || '0' === $application_id || ! in_array( $type, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) ) {
+            return [];
+        }
+        $applications = $this->fetch_all(
+            'SELECT l.STATUS_TERKINI AS "stage", d.DEPARTEMENT_ID AS "department_id"
+             FROM HRS_LAMARAN l
+             JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.DETAIL_LOWONGAN_ID = l.DETAIL_LOWONGAN_ID
+             WHERE l.LAMARAN_ID = :application_id AND l.PROFILE_KANDIDAT_ID = :applicant_id',
+            [ 'application_id' => (int) $application_id, 'applicant_id' => (int) $applicant_id ]
+        );
+        $application = $applications[0] ?? null;
+        if ( ! $application || strtoupper( trim( (string) $application['stage'] ) ) !== $type ) {
+            return [];
+        }
+
+        $this->last_error = null;
+        return $this->fetch_all(
+            'SELECT s.SLOT_WAWANCARA_ID AS "slot_id",
+                    TO_CHAR(s.START_AT, \'YYYY-MM-DD\') AS "slot_date",
+                    TO_CHAR(s.START_AT, \'HH24:MI\') AS "start_time",
+                    TO_CHAR(s.ENDS_AT, \'HH24:MI\') AS "end_time",
+                    s.ZONA_WAKTU AS "timezone",
+                    s.METODE_WAWANCARA AS "method",
+                    s.LOKASI AS "location",
+                    s.MEETING_URL AS "meeting_url",
+                    s.KAPASITAS AS "capacity",
+                    s.NAMA_PEWAWANCARA AS "interviewer",
+                    COUNT(CASE WHEN UPPER(TRIM(b.STATUS_PEMESANAN)) = \'CONFIRMED\' THEN 1 END) AS "booked"
+             FROM HRS_SLOT_WAWANCARA s
+             LEFT JOIN HRS_BOOKING_INTERVIEW b ON b.SLOT_WAWANCARA_ID = s.SLOT_WAWANCARA_ID
+             WHERE s.JENIS_WAWANCARA = :type
+               AND ((:is_hr = 1 AND s.DEPARTEMEN_ID IS NULL) OR s.DEPARTEMEN_ID = :department_id)
+               AND FROM_TZ(s.START_AT, s.ZONA_WAKTU) > SYSTIMESTAMP
+             GROUP BY s.SLOT_WAWANCARA_ID, s.START_AT, s.ENDS_AT, s.ZONA_WAKTU,
+                      s.METODE_WAWANCARA, s.LOKASI, s.MEETING_URL, s.KAPASITAS, s.NAMA_PEWAWANCARA
+             HAVING COUNT(CASE WHEN UPPER(TRIM(b.STATUS_PEMESANAN)) = \'CONFIRMED\' THEN 1 END) < s.KAPASITAS
+             ORDER BY s.START_AT, s.SLOT_WAWANCARA_ID',
+            [
+                'type' => $type,
+                'is_hr' => 'INTERVIEW_HR' === $type ? 1 : 0,
+                'department_id' => 'INTERVIEW_USER' === $type ? (int) $application['department_id'] : 0,
+            ]
+        );
+    }
+
+    /** @return array<string, mixed>|null */
+    public function get_applicant_interview_booking( string $applicant_id, string $application_id, string $type ): ?array {
+        if ( ! ctype_digit( $applicant_id ) || ! ctype_digit( $application_id ) || ! in_array( $type, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) ) {
+            return null;
+        }
+        $this->last_error = null;
+        $rows = $this->fetch_all(
+            'SELECT b.BOOKING_INTERVIEW_ID AS "booking_id",
+                    s.SLOT_WAWANCARA_ID AS "slot_id",
+                    TO_CHAR(s.START_AT, \'YYYY-MM-DD\') AS "slot_date",
+                    TO_CHAR(s.START_AT, \'HH24:MI\') AS "start_time",
+                    TO_CHAR(s.ENDS_AT, \'HH24:MI\') AS "end_time",
+                    s.ZONA_WAKTU AS "timezone",
+                    s.METODE_WAWANCARA AS "method",
+                    s.LOKASI AS "location",
+                    s.MEETING_URL AS "meeting_url",
+                    s.NAMA_PEWAWANCARA AS "interviewer"
+             FROM HRS_BOOKING_INTERVIEW b
+             JOIN HRS_SLOT_WAWANCARA s ON s.SLOT_WAWANCARA_ID = b.SLOT_WAWANCARA_ID
+             JOIN HRS_LAMARAN l ON l.LAMARAN_ID = b.LAMARAN_ID
+             WHERE l.PROFILE_KANDIDAT_ID = :applicant_id
+               AND b.LAMARAN_ID = :application_id
+               AND b.JENIS_WAWANCARA = :type
+               AND UPPER(TRIM(b.STATUS_PEMESANAN)) = \'CONFIRMED\'',
+            [
+                'applicant_id' => (int) $applicant_id,
+                'application_id' => (int) $application_id,
+                'type' => $type,
+            ]
+        );
+        return $rows[0] ?? null;
+    }
+
+    /** @return array{success: bool, error?: string} */
+    public function book_application_interview( string $applicant_id, string $application_id, string $slot_id, string $type ): array {
+        foreach ( [ $applicant_id, $application_id, $slot_id ] as $identifier ) {
+            if ( ! ctype_digit( $identifier ) || '0' === $identifier ) {
+                return [ 'success' => false, 'error' => 'Data lamaran atau jadwal tidak valid.' ];
+            }
+        }
+        if ( ! in_array( $type, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) ) {
+            return [ 'success' => false, 'error' => 'Tahap wawancara tidak valid.' ];
+        }
+
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $application_query = $connection->prepare(
+                'SELECT l.STATUS_TERKINI, l.STATUS_AKHIR, d.DEPARTEMENT_ID
+                 FROM HRS_LAMARAN l
+                 JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.DETAIL_LOWONGAN_ID = l.DETAIL_LOWONGAN_ID
+                 WHERE l.LAMARAN_ID = :application_id AND l.PROFILE_KANDIDAT_ID = :applicant_id
+                 FOR UPDATE OF l.LAMARAN_ID'
+            );
+            $application_query->execute(
+                [ 'application_id' => (int) $application_id, 'applicant_id' => (int) $applicant_id ]
+            );
+            $application = $application_query->fetch( PDO::FETCH_ASSOC );
+            if ( ! $application || strtoupper( trim( (string) $application['STATUS_TERKINI'] ) ) !== $type
+                || in_array( strtoupper( trim( (string) $application['STATUS_AKHIR'] ) ), [ 'DITERIMA', 'ACCEPTED', 'DITOLAK', 'REJECTED' ], true ) ) {
+                throw new InvalidArgumentException( 'Lamaran belum berada pada tahap wawancara ini atau sudah selesai.' );
+            }
+
+            $existing = $connection->prepare(
+                'SELECT COUNT(*) FROM HRS_BOOKING_INTERVIEW WHERE LAMARAN_ID = :application_id AND JENIS_WAWANCARA = :type'
+            );
+            $existing->execute( [ 'application_id' => (int) $application_id, 'type' => $type ] );
+            if ( 0 < (int) $existing->fetchColumn() ) {
+                throw new InvalidArgumentException( 'Lamaran ini sudah memiliki jadwal. Hubungi HR bila perlu bantuan.' );
+            }
+
+            $slot_query = $connection->prepare(
+                'SELECT SLOT_WAWANCARA_ID, KAPASITAS,
+                        CASE WHEN FROM_TZ(START_AT, ZONA_WAKTU) > SYSTIMESTAMP THEN 1 ELSE 0 END AS IS_FUTURE
+                 FROM HRS_SLOT_WAWANCARA
+                 WHERE SLOT_WAWANCARA_ID = :slot_id
+                   AND JENIS_WAWANCARA = :type
+                   AND ((:is_hr = 1 AND DEPARTEMEN_ID IS NULL) OR DEPARTEMEN_ID = :department_id)
+                 FOR UPDATE'
+            );
+            $slot_query->execute(
+                [
+                    'slot_id' => (int) $slot_id,
+                    'type' => $type,
+                    'is_hr' => 'INTERVIEW_HR' === $type ? 1 : 0,
+                    'department_id' => 'INTERVIEW_USER' === $type ? (int) $application['DEPARTEMENT_ID'] : 0,
+                ]
+            );
+            $slot = $slot_query->fetch( PDO::FETCH_ASSOC );
+            if ( ! $slot || 1 !== (int) $slot['IS_FUTURE'] ) {
+                throw new InvalidArgumentException( 'Jadwal tidak tersedia atau sudah lewat.' );
+            }
+
+            $booking_count = $connection->prepare(
+                'SELECT COUNT(*) FROM HRS_BOOKING_INTERVIEW
+                 WHERE SLOT_WAWANCARA_ID = :slot_id AND UPPER(TRIM(STATUS_PEMESANAN)) = :status'
+            );
+            $booking_count->execute( [ 'slot_id' => (int) $slot_id, 'status' => 'CONFIRMED' ] );
+            if ( (int) $booking_count->fetchColumn() >= (int) $slot['KAPASITAS'] ) {
+                throw new InvalidArgumentException( 'Jadwal baru saja penuh. Silakan pilih slot lain.' );
+            }
+
+            $insert = $connection->prepare(
+                'INSERT INTO HRS_BOOKING_INTERVIEW
+                    (LAMARAN_ID, JENIS_WAWANCARA, SLOT_WAWANCARA_ID, STATUS_PEMESANAN, WAKTU_PEMESANAN)
+                 VALUES (:application_id, :type, :slot_id, :status, CURRENT_TIMESTAMP)'
+            );
+            $insert->execute(
+                [
+                    'application_id' => (int) $application_id,
+                    'type' => $type,
+                    'slot_id' => (int) $slot_id,
+                    'status' => 'CONFIRMED',
+                ]
+            );
+            $connection->commit();
+            return [ 'success' => true ];
+        } catch ( InvalidArgumentException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            return [ 'success' => false, 'error' => $exception->getMessage() ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_error( 'Interview booking failed', $exception );
+            return [ 'success' => false, 'error' => 'Booking wawancara gagal disimpan. Silakan coba kembali.' ];
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $slot
+     * @return array{date: string, start: string, end: string, method: string, location: string, meeting_url: string, interviewer: string, capacity: int}|null
+     */
+    private function normalize_interview_slot( string $date, array $slot, DateTimeZone $timezone, DateTimeImmutable $now ): ?array {
+        $start = trim( (string) ( $slot['start'] ?? '' ) );
+        $end = trim( (string) ( $slot['end'] ?? '' ) );
+        $start_at = DateTimeImmutable::createFromFormat( '!Y-m-d H:i', $date . ' ' . $start, $timezone );
+        $end_at = DateTimeImmutable::createFromFormat( '!Y-m-d H:i', $date . ' ' . $end, $timezone );
+        $capacity = filter_var( $slot['capacity'] ?? null, FILTER_VALIDATE_INT );
+        $mode = strtoupper( trim( (string) ( $slot['mode'] ?? '' ) ) );
+        if ( ! $start_at || ! $end_at || $start_at->format( 'Y-m-d H:i' ) !== $date . ' ' . $start
+            || $end_at->format( 'Y-m-d H:i' ) !== $date . ' ' . $end || $end_at <= $start_at
+            || $start_at <= $now || false === $capacity || $capacity < 1 || $capacity > 100
+            || ! in_array( $mode, [ 'ONLINE', 'OFFLINE' ], true ) ) {
+            return null;
+        }
+
+        $location = trim( sanitize_text_field( (string) ( 'ONLINE' === $mode ? ( $slot['platform'] ?? '' ) : ( $slot['location'] ?? '' ) ) ) );
+        $meeting_url = 'ONLINE' === $mode ? esc_url_raw( trim( (string) ( $slot['meeting_url'] ?? '' ) ), [ 'http', 'https' ] ) : '';
+        $interviewer = trim( sanitize_text_field( (string) ( $slot['interviewer'] ?? '' ) ) );
+        if ( '' === $location || 255 < strlen( $location ) || 255 < strlen( $interviewer )
+            || ( 'ONLINE' === $mode && ( '' === $meeting_url || ! wp_http_validate_url( $meeting_url ) ) ) ) {
+            return null;
+        }
+
+        return [
+            'date' => $date,
+            'start' => $start_at->format( 'H:i:00' ),
+            'end' => $end_at->format( 'H:i:00' ),
+            'method' => $mode,
+            'location' => $location,
+            'meeting_url' => $meeting_url,
+            'interviewer' => $interviewer,
+            'capacity' => (int) $capacity,
+        ];
+    }
+
+    private function interview_slot_overlaps( PDO $connection, string $type, ?int $department_id, string $start, string $end, int $exclude_slot_id ): bool {
+        $query = $connection->prepare(
+            'SELECT COUNT(*) FROM HRS_SLOT_WAWANCARA
+             WHERE JENIS_WAWANCARA = :type AND
+                   ((:is_hr = 1 AND DEPARTEMEN_ID IS NULL) OR DEPARTEMEN_ID = :department_id)
+               AND START_AT < TO_TIMESTAMP(:end_at, \'YYYY-MM-DD HH24:MI:SS\')
+               AND ENDS_AT > TO_TIMESTAMP(:start_at, \'YYYY-MM-DD HH24:MI:SS\')
+               AND SLOT_WAWANCARA_ID <> :exclude_slot_id'
+        );
+        $query->execute(
+            [
+                'type' => $type,
+                'is_hr' => 'INTERVIEW_HR' === $type ? 1 : 0,
+                'department_id' => $department_id,
+                'end_at' => $end,
+                'start_at' => $start,
+                'exclude_slot_id' => $exclude_slot_id,
+            ]
+        );
+        return 0 < (int) $query->fetchColumn();
+    }
+
+    private function interview_slot_booking_count( PDO $connection, int $slot_id ): int {
+        $query = $connection->prepare(
+            'SELECT COUNT(*) FROM HRS_BOOKING_INTERVIEW
+             WHERE SLOT_WAWANCARA_ID = :slot_id AND UPPER(TRIM(STATUS_PEMESANAN)) = :status'
+        );
+        $query->execute( [ 'slot_id' => $slot_id, 'status' => 'CONFIRMED' ] );
+        return (int) $query->fetchColumn();
     }
 
     /** @return array<int, array{date: string, status: string, slots: array<int, array<string, string>>}>

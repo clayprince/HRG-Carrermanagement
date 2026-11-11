@@ -1,5 +1,5 @@
 -- Run only after the Oracle owner reviews and approves the target schema.
--- Requires migration 016_hr_interview_department_assignment.sql.
+-- Requires migration 017_hr_interview_department_assignment.sql.
 -- Adds HR interview ratings, recommendations, and append-only note history.
 DECLARE
     object_count NUMBER;
@@ -18,7 +18,7 @@ BEGIN
       AND CONSTRAINT_NAME = 'PK_HRS_HASIL_WAWANCARA_HR'
       AND STATUS = 'ENABLED';
     IF object_count = 0 THEN
-        RAISE_APPLICATION_ERROR(-20072, 'The HR interview assignment primary key from migration 016 is missing or disabled.');
+        RAISE_APPLICATION_ERROR(-20072, 'The HR interview assignment primary key from migration 017 is missing or disabled.');
     END IF;
 
     SELECT COUNT(*) INTO object_count

@@ -7656,6 +7656,49 @@ body:has(.daw-user-interview) {
   line-height: 1.3;
   margin: 0 0 4px;
 }
+.daw-schedule__month-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+.daw-schedule__month-heading h1 {
+  margin-bottom: 4px;
+}
+.daw-schedule__month-nav {
+  display: flex;
+  gap: 4px;
+}
+.daw-schedule__month-nav a {
+  align-items: center;
+  border: 1px solid var(--schedule-border);
+  border-radius: 5px;
+  color: var(--schedule-ink);
+  display: inline-flex;
+  font-size: 19px;
+  height: 28px;
+  justify-content: center;
+  line-height: 1;
+  text-decoration: none;
+  width: 28px;
+}
+.daw-schedule__month-nav a:hover {
+  border-color: var(--schedule-red);
+  color: var(--schedule-red);
+}
+.daw-schedule__notice {
+  border-radius: 7px;
+  font-size: 12px;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+}
+.daw-schedule__notice.is-success {
+  background: #e9fbf1;
+  color: #176b43;
+}
+.daw-schedule__notice.is-error {
+  background: #fff0f1;
+  color: #a11227;
+}
 .daw-schedule__intro p {
   color: var(--schedule-muted);
   font-size: 13px;
@@ -8127,6 +8170,64 @@ body:has(.daw-user-interview) {
   color: #626a75;
   font-size: 11px;
   margin: 0;
+}
+.daw-schedule__empty {
+  color: var(--schedule-muted);
+  font-size: 12px;
+  margin: 0;
+  padding: 14px;
+}
+.daw-schedule__slot-details {
+  border-bottom: 1px solid #eceef1;
+  padding: 8px 0;
+}
+.daw-schedule__slot-details:last-child {
+  border-bottom: 0;
+}
+.daw-schedule__slot-details > summary {
+  color: #424a55;
+  cursor: pointer;
+  font-size: 11px;
+}
+.daw-schedule__booking-list {
+  color: #626a75;
+  font-size: 11px;
+  margin: 8px 0;
+  padding-left: 18px;
+}
+.daw-schedule__edit-form {
+  display: grid;
+  gap: 10px;
+  padding: 10px 0;
+}
+.daw-schedule__edit-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.daw-schedule__edit-grid label {
+  color: var(--schedule-muted);
+  display: grid;
+  font-size: 10px;
+  gap: 4px;
+  min-width: 0;
+}
+.daw-schedule__edit-grid input,
+.daw-schedule__edit-grid select {
+  background: #fff;
+  border: 1px solid #d2d6dc;
+  border-radius: 5px;
+  box-sizing: border-box;
+  color: #3d444e;
+  font: inherit;
+  font-size: 11px;
+  min-height: 32px;
+  max-width: 100%;
+  padding: 5px 7px;
+  width: 100%;
+}
+.daw-schedule__delete-form {
+  text-align: right;
 }
 @media (max-width: 900px) {
   .daw-schedule__layout {

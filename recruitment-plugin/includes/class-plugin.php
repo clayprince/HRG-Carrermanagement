@@ -63,6 +63,8 @@ class Recruitment_Plugin {
         add_action( 'admin_post_nopriv_daw_logout', [ $this, 'handle_logout' ] );
         add_action( 'admin_post_daw_applicant_logout', [ $this, 'handle_applicant_logout' ] );
         add_action( 'admin_post_nopriv_daw_applicant_logout', [ $this, 'handle_applicant_logout' ] );
+        add_action( 'admin_post_daw_book_interview', [ $this, 'handle_applicant_interview_booking' ] );
+        add_action( 'admin_post_nopriv_daw_book_interview', [ $this, 'handle_applicant_interview_booking' ] );
         $iq_assessment = new Recruitment_IQ_Assessment();
         add_action( 'template_redirect', [ $iq_assessment, 'handle_public_request' ], 2 );
         add_action( 'wp_ajax_recruitment_iq_save_answer', [ $iq_assessment, 'save_answer_ajax' ] );
@@ -376,7 +378,21 @@ class Recruitment_Plugin {
             }
             $requested_page = sanitize_key( wp_unslash( $_GET['page'] ?? '' ) );
             $department_page = 'daw-user-department' === $requested_page;
-            if ( ( 'user_department' === $account_type && ! $department_page ) || ( 'hr' === $account_type && $department_page ) ) {
+            $requested_action = isset( $_POST['action'] ) && is_scalar( $_POST['action'] )
+                ? sanitize_key( wp_unslash( (string) $_POST['action'] ) )
+                : '';
+            $department_post_action = 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? '' ) )
+                && in_array(
+                    $requested_action,
+                    [
+                        'daw_save_interview_schedule',
+                        'daw_delete_interview_slot',
+                        'daw_change_department_password',
+                        'daw_logout',
+                    ],
+                    true
+                );
+            if ( ( 'user_department' === $account_type && ! $department_page && ! $department_post_action ) || ( 'hr' === $account_type && $department_page ) ) {
                 wp_logout();
                 $redirect = 'user_department' === $account_type
                     ? recruitment_get_department_login_url( [ 'login_error' => 'no_access' ] )
@@ -438,6 +454,59 @@ class Recruitment_Plugin {
             recruitment_get_public_url( 'careers' )
         );
         wp_safe_redirect( $redirect_to );
+        exit;
+    }
+
+    public function handle_applicant_interview_booking(): void {
+        if ( 'POST' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
+            wp_die( esc_html__( 'Permintaan booking wawancara tidak valid.', 'recruitment-plugin' ), '', [ 'response' => 405 ] );
+        }
+        $applicant = recruitment_get_current_applicant();
+        if ( ! $applicant || empty( $applicant['id'] ) ) {
+            wp_safe_redirect( recruitment_get_public_url( 'applicant-login' ) );
+            exit;
+        }
+        $application_id = isset( $_POST['application_id'] ) && is_scalar( $_POST['application_id'] )
+            ? sanitize_text_field( wp_unslash( (string) $_POST['application_id'] ) )
+            : '';
+        check_admin_referer( 'daw_book_interview_' . $application_id );
+
+        $database = new Recruitment_Database();
+        $applications = $database->get_applicant_interview_applications( (string) $applicant['id'] );
+        $interview_type = '';
+        foreach ( $applications as $application ) {
+            if ( (string) $application_id === (string) ( $application['application_id'] ?? '' ) ) {
+                $interview_type = (string) ( $application['interview_type'] ?? '' );
+                break;
+            }
+        }
+        if ( $database->has_error() ) {
+            $result = [ 'success' => false, 'error' => 'Layanan jadwal wawancara Oracle belum tersedia. Pastikan migrasi scheduler telah diterapkan.' ];
+        } elseif ( '' === $interview_type ) {
+            $result = [ 'success' => false, 'error' => 'Lamaran belum berada pada tahap wawancara yang dapat dijadwalkan.' ];
+        } else {
+            $slot_id = isset( $_POST['slot_id'] ) && is_scalar( $_POST['slot_id'] )
+                ? sanitize_text_field( wp_unslash( (string) $_POST['slot_id'] ) )
+                : '';
+            $result = $database->book_application_interview(
+                (string) $applicant['id'],
+                $application_id,
+                $slot_id,
+                $interview_type
+            );
+        }
+
+        set_transient(
+            'daw_interview_booking_notice_' . (string) $applicant['id'],
+            [
+                'success' => (bool) ( $result['success'] ?? false ),
+                'message' => (string) ( $result['success'] ?? false )
+                    ? 'Jadwal wawancara berhasil dipesan.'
+                    : (string) ( $result['error'] ?? 'Booking wawancara gagal disimpan.' ),
+            ],
+            MINUTE_IN_SECONDS
+        );
+        wp_safe_redirect( recruitment_get_public_url( 'interview-booking' ) );
         exit;
     }
 
@@ -1090,52 +1159,74 @@ class Recruitment_Plugin {
             exit;
         }
 
+        $diagnostic = 'invalid_email';
         $email = strtolower( sanitize_email( wp_unslash( $_POST['email'] ?? '' ) ) );
         if ( is_email( $email ) ) {
             $ip_address = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ?? '' ) );
             $rate_key = 'daw_hr_reset_rate_' . hash( 'sha256', $ip_address );
             $attempts = (int) get_transient( $rate_key );
 
-            if ( $attempts < 5 ) {
+            if ( 5 <= $attempts ) {
+                $diagnostic = 'rate_limited';
+            } else {
                 set_transient( $rate_key, $attempts + 1, 15 * MINUTE_IN_SECONDS );
                 $database = new Recruitment_Database();
                 $account = $database->get_active_hr_account_by_email( $email );
                 if ( ! empty( $account['success'] ) ) {
-                    $token = rtrim( strtr( base64_encode( random_bytes( 32 ) ), '+/', '-_' ), '=' );
-                    $token_hash = hash( 'sha256', $token );
-                    $token_key = 'daw_hr_reset_' . $token_hash;
-                    $account_token_key = 'daw_hr_reset_account_' . (string) $account['account']['id'];
-                    $previous_token_hash = (string) get_transient( $account_token_key );
-                    if ( '' !== $previous_token_hash ) {
-                        delete_transient( 'daw_hr_reset_' . $previous_token_hash );
-                    }
-                    set_transient( $token_key, (string) $account['account']['id'], 30 * MINUTE_IN_SECONDS );
-                    set_transient( $account_token_key, $token_hash, 30 * MINUTE_IN_SECONDS );
-                    $reset_url = recruitment_get_public_url(
-                        'reset-password',
-                        [ 'target' => 'hr', 'token' => $token ]
-                    );
-                    $display_name = (string) ( $account['account']['display_name'] ?? 'Admin HR' );
-                    $expiry_minutes = 30;
-                    ob_start();
-                    require recruitment_get_plugin_path( 'templates/emails/hr-password-reset.php' );
-                    $html_message = (string) ob_get_clean();
+                    $configuration_error = $this->get_email_configuration_error();
+                    if ( '' !== $configuration_error ) {
+                        $diagnostic = 'smtp_configuration';
+                        error_log( 'HR password reset email was not sent: SMTP configuration is incomplete.' );
+                    } else {
+                        $token = rtrim( strtr( base64_encode( random_bytes( 32 ) ), '+/', '-_' ), '=' );
+                        $token_hash = hash( 'sha256', $token );
+                        $token_key = 'daw_hr_reset_' . $token_hash;
+                        $account_token_key = 'daw_hr_reset_account_' . (string) $account['account']['id'];
+                        $previous_token_hash = (string) get_transient( $account_token_key );
+                        if ( '' !== $previous_token_hash ) {
+                            delete_transient( 'daw_hr_reset_' . $previous_token_hash );
+                        }
+                        set_transient( $token_key, (string) $account['account']['id'], 30 * MINUTE_IN_SECONDS );
+                        set_transient( $account_token_key, $token_hash, 30 * MINUTE_IN_SECONDS );
+                        $reset_url = recruitment_get_public_url(
+                            'reset-password',
+                            [ 'target' => 'hr', 'token' => $token ]
+                        );
+                        $display_name = (string) ( $account['account']['display_name'] ?? 'Admin HR' );
+                        $expiry_minutes = 30;
+                        ob_start();
+                        require recruitment_get_plugin_path( 'templates/emails/hr-password-reset.php' );
+                        $html_message = (string) ob_get_clean();
 
-                    $sent = wp_mail(
-                        $account['account']['email'],
-                        'Permintaan Reset Password Admin HR DAW',
-                        $html_message,
-                        [ 'Content-Type: text/html; charset=UTF-8' ]
-                    );
-                    if ( ! $sent ) {
-                        delete_transient( $token_key );
-                        delete_transient( $account_token_key );
-                        error_log( 'HR password reset email could not be sent.' );
+                        delete_transient( 'daw_last_mail_error' );
+                        $sent = wp_mail(
+                            $account['account']['email'],
+                            'Permintaan Reset Password Admin HR DAW',
+                            $html_message,
+                            [ 'Content-Type: text/html; charset=UTF-8' ]
+                        );
+                        if ( $sent ) {
+                            $diagnostic = 'mailer_accepted';
+                        } else {
+                            delete_transient( $token_key );
+                            delete_transient( $account_token_key );
+                            $diagnostic = 'mail_failed';
+                            error_log( 'HR password reset email could not be sent.' );
+                        }
                     }
+                } else {
+                    $diagnostic = 'service_unavailable' === ( $account['error'] ?? '' )
+                        ? 'account_lookup_failed'
+                        : 'account_not_found';
                 }
             }
         }
 
+        set_transient(
+            'daw_hr_reset_email_diagnostic',
+            [ 'status' => $diagnostic, 'timestamp' => current_time( 'mysql' ) ],
+            DAY_IN_SECONDS
+        );
         wp_safe_redirect( recruitment_get_public_url( 'login', [ 'target' => 'hr', 'forgot_notice' => 'submitted' ] ) );
         exit;
     }
@@ -1519,6 +1610,27 @@ class Recruitment_Plugin {
         ];
     }
 
+    public function get_email_configuration_error(): string {
+        $settings = $this->get_email_settings();
+        if ( empty( $settings['is_enabled'] ) ) {
+            return '';
+        }
+        if ( '' === trim( $settings['smtp_host'] ) || 0 >= (int) $settings['smtp_port'] ) {
+            return 'Host SMTP atau port belum dikonfigurasi.';
+        }
+        if (
+            ! empty( $settings['smtp_auth'] )
+            && ( '' === trim( $settings['smtp_user'] ) || '' === $settings['smtp_pass'] )
+        ) {
+            return 'Username atau password SMTP belum dikonfigurasi.';
+        }
+        if ( ! is_email( $settings['from_email'] ) ) {
+            return 'Alamat email pengirim belum valid.';
+        }
+
+        return '';
+    }
+
     /**
      * Hook into phpmailer_init to route emails via configured SMTP Relay.
      *
@@ -1527,7 +1639,7 @@ class Recruitment_Plugin {
     public function configure_smtp( $phpmailer ): void {
         $settings = $this->get_email_settings();
 
-        if ( empty( $settings['is_enabled'] ) || '' === $settings['smtp_host'] || '' === $settings['smtp_user'] ) {
+        if ( empty( $settings['is_enabled'] ) || '' === $settings['smtp_host'] ) {
             return;
         }
 
@@ -1535,9 +1647,11 @@ class Recruitment_Plugin {
             $phpmailer->isSMTP();
             $phpmailer->Host = $settings['smtp_host'];
             $phpmailer->Port = (int) $settings['smtp_port'];
-            $phpmailer->SMTPAuth = true;
-            $phpmailer->Username = $settings['smtp_user'];
-            $phpmailer->Password = $settings['smtp_pass'];
+            $phpmailer->SMTPAuth = ! empty( $settings['smtp_auth'] );
+            if ( $phpmailer->SMTPAuth ) {
+                $phpmailer->Username = $settings['smtp_user'];
+                $phpmailer->Password = $settings['smtp_pass'];
+            }
 
             if ( 'tls' === $settings['smtp_encryption'] ) {
                 $phpmailer->SMTPSecure = 'tls';

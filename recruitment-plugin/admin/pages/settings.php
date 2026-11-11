@@ -83,25 +83,46 @@ $filter_statuses  = array_unique( array_column( $candidates, 'status' ) );
 $filter_positions = array_unique( array_column( $candidates, 'position' ) );
 $filter_dealers   = array_unique( array_column( $candidates, 'dealer' ) );
 
-// SMTP Settings (retained for modal)
-$email_settings   = (array) get_option( 'recruitment_email_settings', [] );
-$is_enabled       = ! empty( $email_settings['is_enabled'] );
-$smtp_host        = (string) ( $email_settings['smtp_host'] ?? ( defined( 'DAW_SMTP_HOST' ) ? DAW_SMTP_HOST : 'smtp.gmail.com' ) );
-$smtp_port        = (int) ( $email_settings['smtp_port'] ?? ( defined( 'DAW_SMTP_PORT' ) ? DAW_SMTP_PORT : 587 ) );
-$smtp_encryption  = (string) ( $email_settings['smtp_encryption'] ?? ( defined( 'DAW_SMTP_ENCRYPTION' ) ? DAW_SMTP_ENCRYPTION : 'tls' ) );
-$smtp_user        = (string) ( $email_settings['smtp_user'] ?? ( defined( 'DAW_SMTP_USER' ) ? DAW_SMTP_USER : '' ) );
-$smtp_pass        = (string) ( $email_settings['smtp_pass'] ?? ( defined( 'DAW_SMTP_PASS' ) ? DAW_SMTP_PASS : '' ) );
-$from_email       = (string) ( $email_settings['from_email'] ?? ( defined( 'DAW_SMTP_FROM_EMAIL' ) ? DAW_SMTP_FROM_EMAIL : '' ) );
-$from_name        = (string) ( $email_settings['from_name'] ?? ( defined( 'DAW_SMTP_FROM_NAME' ) ? DAW_SMTP_FROM_NAME : 'Rekrutmen PT Daya Adicipta Wisesa' ) );
+// Display the same effective configuration used by wp_mail().
+$email_settings   = ( new Recruitment_Plugin() )->get_email_settings();
+$is_enabled       = $email_settings['is_enabled'];
+$smtp_host        = $email_settings['smtp_host'];
+$smtp_port        = $email_settings['smtp_port'];
+$smtp_encryption  = $email_settings['smtp_encryption'];
+$smtp_auth        = $email_settings['smtp_auth'];
+$smtp_user        = $email_settings['smtp_user'];
+$smtp_pass        = $email_settings['smtp_pass'];
+$from_email       = $email_settings['from_email'];
+$from_name        = $email_settings['from_name'];
+$smtp_constants_defined = defined( 'DAW_SMTP_HOST' )
+    || defined( 'DAW_SMTP_PORT' )
+    || defined( 'DAW_SMTP_ENCRYPTION' )
+    || defined( 'DAW_SMTP_USER' )
+    || defined( 'DAW_SMTP_PASS' )
+    || defined( 'DAW_SMTP_FROM_EMAIL' )
+    || defined( 'DAW_SMTP_FROM_NAME' );
+$smtp_error       = ( new Recruitment_Plugin() )->get_email_configuration_error();
+$reset_diagnostic = get_transient( 'daw_hr_reset_email_diagnostic' );
 
 $send_result = sanitize_key( $_GET['send_result'] ?? '' );
 $sent_count  = absint( $_GET['sent_count'] ?? 0 );
 $smtp_updated = '1' === (string) ( $_GET['updated'] ?? '' );
 $test_result = sanitize_key( $_GET['test_result'] ?? '' );
+$smtp_test_error = 'failed' === $test_result
+    ? sanitize_text_field( (string) get_transient( 'daw_last_mail_error' ) )
+    : '';
 $applicant_email_result = sanitize_key( $_GET['applicant_email_result'] ?? '' );
 $tpl_result  = sanitize_key( $_GET['tpl_result'] ?? '' );
-$error_msg   = isset( $_GET['error_msg'] ) ? sanitize_text_field( rawurldecode( (string) $_GET['error_msg'] ) ) : '';
 $email_templates = recruitment_get_email_templates();
+$reset_diagnostic_messages = [
+    'mailer_accepted' => 'Mailer menerima pesan untuk diteruskan. Ini bukan jaminan email sudah masuk ke inbox; periksa Spam/Junk dan log provider email.',
+    'mail_failed' => 'Mailer menolak pesan reset. Lihat detail uji email di bawah dan periksa log SMTP/PHP.',
+    'smtp_configuration' => 'Pengiriman reset dilewati karena konfigurasi SMTP aktif belum lengkap. Perbaiki pengaturan SMTP lalu ajukan reset baru.',
+    'account_not_found' => 'Alamat yang dikirim tidak cocok dengan tepat satu akun Admin HR aktif di Oracle.',
+    'account_lookup_failed' => 'Pencarian akun Admin HR gagal karena layanan database tidak tersedia. Periksa log koneksi Oracle.',
+    'rate_limited' => 'Batas permintaan reset tercapai. Tunggu 15 menit sebelum mencoba kembali.',
+    'invalid_email' => 'Permintaan reset berisi format email yang tidak valid.',
+];
 ?>
 <div class="wrap recruitment-admin daw-email-recruitment-page" style="max-width:1200px;margin:20px auto 40px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Oxygen,Ubuntu,Cantarell,sans-serif;">
 
@@ -164,11 +185,46 @@ $email_templates = recruitment_get_email_templates();
 
     <?php if ( 'success' === $test_result ) : ?>
         <div class="notice notice-success is-dismissible" style="border-radius:8px;margin-bottom:20px;padding:12px 16px;">
-            <p style="margin:0;font-size:14px;color:#065f46;"><strong>Uji coba koneksi SMTP Berhasil!</strong> Email percobaan telah diterima.</p>
+            <p style="margin:0;font-size:14px;color:#065f46;"><strong>Mailer menerima email uji.</strong> Ini mengonfirmasi pesan diteruskan ke mailer, bukan bukti email sudah masuk ke inbox.</p>
         </div>
     <?php elseif ( 'failed' === $test_result ) : ?>
         <div class="notice notice-error is-dismissible" style="border-radius:8px;margin-bottom:20px;padding:12px 16px;">
-            <p style="margin:0;font-size:14px;color:#991b1b;"><strong>Uji coba SMTP Gagal:</strong> <?= esc_html( $error_msg ) ?></p>
+            <p style="margin:0;font-size:14px;color:#991b1b;"><strong>Uji coba email gagal.</strong> Mailer menolak pesan. Periksa host, port, enkripsi, akun SMTP, lalu periksa log server.<?= '' !== $smtp_test_error ? ' Detail mailer: ' . esc_html( substr( $smtp_test_error, 0, 500 ) ) : '' ?></p>
+        </div>
+    <?php elseif ( 'configuration' === $test_result ) : ?>
+        <div class="notice notice-error is-dismissible" style="border-radius:8px;margin-bottom:20px;padding:12px 16px;">
+            <p style="margin:0;font-size:14px;color:#991b1b;"><strong>Konfigurasi SMTP belum lengkap.</strong> <?= esc_html( $smtp_error ) ?></p>
+        </div>
+    <?php elseif ( 'invalid_email' === $test_result ) : ?>
+        <div class="notice notice-error is-dismissible" style="border-radius:8px;margin-bottom:20px;padding:12px 16px;">
+            <p style="margin:0;font-size:14px;color:#991b1b;">Masukkan alamat email penerima uji yang valid.</p>
+        </div>
+    <?php endif; ?>
+
+    <?php if ( '' !== $smtp_error ) : ?>
+        <div class="notice notice-warning" style="border-radius:8px;margin-bottom:20px;padding:12px 16px;">
+            <p style="margin:0;font-size:14px;color:#92400e;"><strong>SMTP aktif tetapi belum siap:</strong> <?= esc_html( $smtp_error ) ?> Email reset tidak akan dikirim melalui konfigurasi ini.</p>
+        </div>
+    <?php elseif ( empty( $is_enabled ) ) : ?>
+        <div class="notice notice-info" style="border-radius:8px;margin-bottom:20px;padding:12px 16px;">
+            <p style="margin:0;font-size:14px;color:#374151;"><strong>SMTP sedang nonaktif.</strong> Email menggunakan transport bawaan WordPress/server. Di lingkungan lokal, transport tersebut harus dikonfigurasi agar email dapat terkirim.</p>
+        </div>
+    <?php endif; ?>
+
+    <?php if ( $smtp_constants_defined ) : ?>
+        <div class="notice notice-info" style="border-radius:8px;margin-bottom:20px;padding:12px 16px;">
+            <p style="margin:0;font-size:14px;color:#374151;"><strong>Konfigurasi server terdeteksi.</strong> Nilai SMTP dari konfigurasi server dapat mengesampingkan nilai yang tersimpan di WordPress. Form ini menampilkan konfigurasi efektif yang digunakan saat mengirim.</p>
+        </div>
+    <?php endif; ?>
+
+    <?php
+    $reset_diagnostic_status = is_array( $reset_diagnostic )
+        ? sanitize_key( (string) ( $reset_diagnostic['status'] ?? '' ) )
+        : '';
+    if ( isset( $reset_diagnostic_messages[ $reset_diagnostic_status ] ) ) :
+        ?>
+        <div class="notice <?= 'mailer_accepted' === $reset_diagnostic_status ? 'notice-info' : 'notice-warning' ?>" style="border-radius:8px;margin-bottom:20px;padding:12px 16px;">
+            <p style="margin:0;font-size:14px;"><strong>Diagnostik reset terakhir (<?= esc_html( (string) ( $reset_diagnostic['timestamp'] ?? '' ) ) ?>):</strong> <?= esc_html( $reset_diagnostic_messages[ $reset_diagnostic_status ] ) ?></p>
         </div>
     <?php endif; ?>
 
@@ -492,13 +548,19 @@ $email_templates = recruitment_get_email_templates();
         </div>
         <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" style="padding:24px;">
             <input type="hidden" name="action" value="daw_save_email_settings">
-            <input type="hidden" name="smtp_auth" value="1">
             <?php wp_nonce_field( 'daw_save_email_settings' ); ?>
 
             <div style="margin-bottom:16px;">
                 <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#111827;cursor:pointer;">
                     <input type="checkbox" name="is_enabled" value="1" <?= checked( $is_enabled, true, false ) ?>>
                     <span>Aktifkan Pengiriman Email via SMTP DAW</span>
+                </label>
+            </div>
+
+            <div style="margin-bottom:16px;">
+                <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#111827;cursor:pointer;">
+                    <input type="checkbox" name="smtp_auth" value="1" <?= checked( $smtp_auth, true, false ) ?>>
+                    <span>Gunakan autentikasi SMTP</span>
                 </label>
             </div>
 
@@ -523,7 +585,7 @@ $email_templates = recruitment_get_email_templates();
                 </div>
                 <div>
                     <label style="display:block;font-size:12px;font-weight:600;color:#4b5563;margin-bottom:4px;">Username / Email Akun</label>
-                    <input type="text" name="smtp_user" value="<?= esc_attr( $smtp_user ) ?>" required style="width:100%;height:36px;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                    <input type="text" name="smtp_user" value="<?= esc_attr( $smtp_user ) ?>" <?= $smtp_auth ? 'required' : '' ?> style="width:100%;height:36px;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
                 </div>
             </div>
 
@@ -547,6 +609,16 @@ $email_templates = recruitment_get_email_templates();
                 <button type="button" onclick="document.getElementById('daw-smtp-modal').close()" style="background:#fff;border:1px solid #d1d5db;border-radius:6px;padding:8px 16px;font-size:13px;cursor:pointer;">Tutup</button>
                 <button type="submit" style="background:#c8102e;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;">Simpan Pengaturan</button>
             </div>
+        </form>
+        <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" style="border-top:1px solid #e5e7eb;padding:18px 24px 22px;">
+            <input type="hidden" name="action" value="daw_send_test_email">
+            <?php wp_nonce_field( 'daw_send_test_email' ); ?>
+            <label for="daw-test-email-recipient" style="display:block;font-size:12px;font-weight:600;color:#4b5563;margin-bottom:6px;">Kirim email uji ke</label>
+            <div style="display:flex;gap:10px;">
+                <input id="daw-test-email-recipient" name="test_email_recipient" type="email" required placeholder="alamat-email@contoh.com" style="flex:1;min-width:0;height:38px;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                <button type="submit" style="background:#374151;color:#fff;border:0;border-radius:6px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;">Kirim Uji</button>
+            </div>
+            <p style="color:#6b7280;font-size:11px;line-height:1.5;margin:8px 0 0;">Simpan pengaturan terlebih dahulu. Pesan sukses hanya berarti mailer menerima permintaan, bukan jaminan email masuk ke inbox.</p>
         </form>
     </dialog>
 

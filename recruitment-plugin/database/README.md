@@ -42,14 +42,19 @@ it is not a live-schema verification.
   `PERAN` must be `ADMIN_HR` or `KEPALA_DEPARTEMEN`; email and username are
   stored in the same account row.
 - The first HR account can be created from the WordPress administrator-only
-  setup form under Recruitment > Pengelolaan Akun User. The entered password
-  is hashed before it is written to `HRS_ROLE_AKSES`; no default credential is
-  committed to the repository.
+  setup form under Recruitment > Pengelolaan Akun User. The form collects a
+  username, full name, email, department, and password; the password is hashed
+  before it is written to `HRS_ROLE_AKSES`. The account schema migrations must
+  be reviewed and applied by the Oracle owner before account creation; no
+  default credential is committed to the repository.
 - Department accounts use `DEPARTEMEN_ID` and `NAMA_DEPARTEMEN` in the same
   `HRS_ROLE_AKSES` row.
 - New account passwords use PHP `password_hash()` and are checked with
   `password_verify()`. WordPress users are restricted session/capability
   bridges, not copies of Oracle passwords.
+- Department account creation requires an Admin HR-set password and
+  confirmation. Invitation emails never contain the password; share it with
+  the account owner through a separate secure channel.
 - Applicant signup and edit-profile store extended education, work history,
   family, interests, and private document metadata in
   `HRS_PROFIL_KANDIDAT_DETAIL`. With explicit user approval, migration
@@ -116,6 +121,25 @@ their SQL is compatible with the current Oracle database.
   the current Oracle applicant portal. Applicant login and registration use
   `HRS_PROFILE_KANDIDAT_LOGIN` and require migration
   `009_candidate_account_auth.sql`.
+
+## Interview scheduling
+
+- Migration [`migrations/016_interview_scheduler.sql`](migrations/016_interview_scheduler.sql)
+  adds stage and department scoping to interview slots and links bookings to
+  `HRS_LAMARAN.LAMARAN_ID`. With user approval, it was applied to the local
+  Oracle XE `XEPDB1` database under the `APPS` schema on 2026-11-11. It remains
+  unapplied in other environments; review the target schema and obtain its
+  owner's approval before applying it there. The plugin does not run this
+  migration automatically.
+- HR slots are global and apply only to `INTERVIEW_HR`; User Department slots
+  are restricted to the account's assigned department and apply only to
+  `INTERVIEW_USER`. Candidate booking is available only at the matching current
+  application stage. Slot capacity is serialized by locking the slot row;
+  bookings cannot be changed or cancelled by candidates, and slots with
+  bookings cannot be edited or deleted by administrators.
+- Existing legacy slots and bookings are retained but are not automatically
+  linked to application stages. Do not backfill them without confirming the
+  intended candidate/application mapping with the Oracle owner.
 
 ## Psychometric assessment linking
 
@@ -356,26 +380,28 @@ authorization. User interview results are linked to `LAMARAN_ID` so repeated
 applications by one candidate do not share interview data.
 
 These features require migration
-[`migrations/016_hr_interview_department_assignment.sql`](migrations/016_hr_interview_department_assignment.sql).
+[`migrations/017_hr_interview_department_assignment.sql`](migrations/017_hr_interview_department_assignment.sql).
 It creates the HR interview/assignment table and adds the nullable
 application link, foreign key, and unique index to
-`HRS_HASIL_WAWANCARA_USER`. It was applied and verified on the local Oracle
-schema on 2026-11-10; this does not confirm application to any shared or
-production schema. Obtain the Oracle owner's approval and verify the target
-schema before applying it elsewhere. HR and User Department profile downloads
-use Dompdf to generate PDF files. Private applicant uploads remain behind
-authenticated, assignment-checked routes.
+`HRS_HASIL_WAWANCARA_USER`. The schema metadata inspected on 2026-11-11 shows
+that `HRS_HASIL_WAWANCARA_HR` and
+`HRS_HASIL_WAWANCARA_USER.LAMARAN_ID` are absent there. Treat this migration as
+not applied to that target. It does not backfill existing interview results;
+do not link historical results without confirming their application mapping.
+Obtain the Oracle owner's approval and verify the target schema before applying
+it. HR and User Department profile downloads use Dompdf to generate PDF files.
+Private applicant uploads remain behind authenticated, assignment-checked
+routes.
 
 Migration
-[`migrations/017_hr_interview_rating_date.sql`](migrations/017_hr_interview_rating_date.sql)
+[`migrations/018_hr_interview_rating_date.sql`](migrations/018_hr_interview_rating_date.sql)
 adds HR interview dates, ratings, department recommendations, and append-only
-interview note history. With the Oracle owner's approval, it was applied and
-verified on the local Oracle schema on 2026-11-11 after confirming migration
-016's prerequisites. This does not confirm application to any shared or
-production schema; verify and obtain approval before applying it elsewhere.
-The plugin does not apply the migration automatically. The duplicate local
-copy of migration 016 was reconciled by retaining the canonical
-`migrations/016_hr_interview_department_assignment.sql`.
+interview note history. It depends on migration 017 and has not been applied
+to the inspected target. Verify the target schema and obtain the Oracle owner's
+approval before applying it. The plugin does not apply migrations
+automatically. Migration 016 remains
+[`migrations/016_interview_scheduler.sql`](migrations/016_interview_scheduler.sql),
+which adds interview-slot stage and department scoping.
 
 Some legacy application and vacancy gateway methods still contain
 `DAW_*`-table operations; they need schema reconciliation before being treated

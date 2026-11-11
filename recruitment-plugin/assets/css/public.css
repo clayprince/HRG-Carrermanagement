@@ -3866,6 +3866,23 @@ body:has(.daw-account-auth) .daw-account-auth__main {
 .daw-interview-slot strong { font-size: 12px; }
 .daw-interview-slot span { color: #16a34a; font-size: 10px; font-weight: 700; }
 .daw-interview-slot.is-full { background: #f7f7f8; color: #a1a1a8; cursor: not-allowed; }
+.daw-interview-booking__applications { display: grid; gap: 14px; }
+.daw-interview-booking__application { background: #fff; border: 1px solid var(--daw-border); border-radius: 8px; padding: 18px; }
+.daw-interview-booking__application > header { align-items: flex-start; border-bottom: 1px solid var(--daw-border); display: flex; gap: 12px; justify-content: space-between; margin-bottom: 15px; padding-bottom: 12px; }
+.daw-interview-booking__application > header span { color: var(--daw-gray); font-size: 10px; text-transform: uppercase; }
+.daw-interview-booking__application h2 { font-size: 16px; margin: 4px 0 0; }
+.daw-interview-booking__application > header small { color: var(--daw-gray); font-size: 11px; }
+.daw-interview-booking__form { display: grid; gap: 10px; }
+.daw-interview-booking__form label { font-size: 12px; font-weight: 600; }
+.daw-interview-booking__form select { background: #fff; border: 1px solid var(--daw-border); border-radius: 6px; box-sizing: border-box; font: inherit; max-width: 100%; min-height: 42px; padding: 8px 10px; width: 100%; }
+.daw-interview-booking__form p,
+.daw-interview-booking__empty { color: var(--daw-gray); font-size: 11px; margin: 0; }
+.daw-interview-booking__confirmed { background: #f8fafc; border-radius: 6px; padding: 13px; }
+.daw-interview-booking__confirmed p { font-size: 12px; margin: 6px 0; }
+.daw-interview-booking__confirmed small { color: var(--daw-gray); font-size: 10px; }
+.daw-interview-booking__notice { border-radius: 6px; font-size: 12px; margin: 0 0 14px; padding: 10px 12px; }
+.daw-interview-booking__notice.is-success { background: #e9fbf1; color: #176b43; }
+.daw-interview-booking__notice.is-error { background: #fff0f1; color: #a11227; }
 .daw-interview-slot.is-full span { color: #a1a1a8; }
 .daw-interview-selected-date { color: var(--daw-gray); font-size: 11px; margin: -8px 0 14px; }
 .daw-interview-back { color: var(--daw-red); display: inline-block; font-size: 10px; margin-bottom: 16px; }
