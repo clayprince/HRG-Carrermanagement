@@ -388,6 +388,9 @@ that `HRS_HASIL_WAWANCARA_HR` and
 `HRS_HASIL_WAWANCARA_USER.LAMARAN_ID` are absent there. Treat this migration as
 not applied to that target. It does not backfill existing interview results;
 do not link historical results without confirming their application mapping.
+Until the application link exists, the applicant list still loads, but
+per-application User Department interview results are left blank and the admin
+screen reports the missing schema support.
 Obtain the Oracle owner's approval and verify the target schema before applying
 it. HR and User Department profile downloads use Dompdf to generate PDF files.
 Private applicant uploads remain behind authenticated, assignment-checked

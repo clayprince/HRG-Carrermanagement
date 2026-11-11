@@ -2,6 +2,7 @@
 $database = new Recruitment_Database();
 $applications = $database->get_applications();
 $applications_error = $database->has_error();
+$application_interview_link_missing = false === $database->is_application_interview_link_available();
 $applicants = $database->get_applicants();
 $vacancies = $database->get_vacancies();
 if ( function_exists( 'get_posts' ) ) {
@@ -477,6 +478,7 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
 ?>
 <div class="wrap recruitment-admin daw-applicants-page" data-applicants-screen>
     <?php if ( $applications_error ) : ?><div class="notice notice-error inline" role="alert"><p>Data lamaran belum dapat dimuat dari Oracle. Status kandidat tidak ditandai sebagai “Belum Melamar” sampai data berhasil dibaca.</p></div><?php endif; ?>
+    <?php if ( $application_interview_link_missing ) : ?><div class="notice notice-warning inline" role="status"><p>Data lamaran dan profil tetap dimuat. Hasil wawancara User Department per lamaran belum tersedia karena kolom Oracle LAMARAN_ID belum ada; hasil lama tidak dikaitkan otomatis.</p></div><?php endif; ?>
     <?php if ( 'detail' === $view_mode && $selected_candidate ) : ?>
         <div class="daw-applicants__header">
             <p class="daw-applicants__breadcrumb">DAW Admin / Detail Kandidat</p>
