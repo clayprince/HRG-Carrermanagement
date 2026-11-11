@@ -3,6 +3,7 @@
   "type": "wordpress-plugin",
   "require": {
     "php": ">=8.0",
-    "smalot/pdfparser": "^2.12"
+    "smalot/pdfparser": "^2.12",
+    "dompdf/dompdf": "^3.1"
   }
 }

@@ -1,15 +1,30 @@
 <?php
-$is_department_screen = 'daw-user-department' === sanitize_key( wp_unslash( $_GET['page'] ?? '' ) );
-$screen_explorer_preview = '1' === sanitize_text_field( wp_unslash( $_GET['daw_ui_preview'] ?? '' ) ) || ( function_exists( 'current_user_can' ) && ( current_user_can( 'manage_options' ) || current_user_can( 'manage_recruitment' ) || ( $is_department_screen && current_user_can( 'manage_user_department' ) ) ) );
-if ( ! $screen_explorer_preview ) {
-    return;
+$screen_explorer_job_id = 0;
+foreach ( get_posts(
+    [
+        'post_type' => 'daw_vacancy',
+        'post_status' => 'publish',
+        'numberposts' => -1,
+        'orderby' => 'date',
+        'order' => 'DESC',
+    ]
+) as $vacancy_post ) {
+    $vacancy_status = (string) get_post_meta( $vacancy_post->ID, '_daw_vacancy_status', true );
+    $deadline = (string) get_post_meta( $vacancy_post->ID, '_daw_deadline', true );
+    if ( ( '' !== $vacancy_status && 'published' !== $vacancy_status )
+        || ( '' !== $deadline && $deadline < current_time( 'Y-m-d' ) ) ) {
+        continue;
+    }
+
+    $screen_explorer_job_id = 1000000000000 + (int) $vacancy_post->ID;
+    break;
 }
 
 $screen_explorer_items = [
     'Publik' => [
         [ 'label' => 'Career Landing', 'screen' => 'careers' ],
-        [ 'label' => 'Detail Lowongan', 'screen' => 'job-detail', 'args' => [ 'job_id' => 5 ] ],
-        [ 'label' => 'Form Lamaran', 'screen' => 'application', 'args' => [ 'job_id' => 5 ] ],
+        [ 'label' => 'Detail Lowongan', 'screen' => 'job-detail', 'args' => [ 'job_id' => $screen_explorer_job_id ] ],
+        [ 'label' => 'Form Lamaran', 'screen' => 'application-form', 'args' => [ 'job_id' => $screen_explorer_job_id ] ],
     ],
     'Akun Pelamar' => [
         [ 'label' => 'Preview Menu Profil Pelamar', 'screen' => 'careers', 'args' => [ 'daw_ui_preview' => '1' ] ],

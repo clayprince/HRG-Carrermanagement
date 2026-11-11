@@ -17,6 +17,7 @@ class Recruitment_Admin {
 		add_action( 'admin_post_daw_save_vacancy', [ $this, 'handle_vacancy_save' ] );
 		add_action( 'admin_post_daw_set_vacancy_status', [ $this, 'handle_vacancy_status' ] );
 		add_action( 'admin_post_daw_update_application_status', [ $this, 'handle_application_status' ] );
+		add_action( 'admin_post_daw_save_hr_interview', [ $this, 'handle_hr_interview_save' ] );
 		add_action( 'admin_post_daw_send_application_status_email', [ $this, 'handle_application_status_email' ] );
 		add_action( 'admin_post_daw_update_psychotest_attendance_time', [ $this, 'handle_psychotest_attendance_time_update' ] );
 		add_action( 'admin_post_daw_update_applicant_email', [ $this, 'handle_applicant_email_update' ] );
@@ -26,6 +27,8 @@ class Recruitment_Admin {
 		add_action( 'admin_post_daw_send_test_email', [ $this, 'handle_send_test_email' ] );
 		add_action( 'admin_post_daw_send_composed_email', [ $this, 'handle_send_composed_email' ] );
 		add_action( 'admin_post_daw_download_applicant_profile', [ $this, 'handle_applicant_profile_download' ] );
+		add_action( 'admin_post_daw_download_department_profile', [ $this, 'handle_department_profile_download' ] );
+		add_action( 'admin_post_daw_download_department_document', [ $this, 'handle_department_document_download' ] );
 		add_action( 'admin_menu', [ $this, 'remove_vacancy_post_type_submenu' ], 99 );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_admin_assets' ] );
 		add_action( 'in_admin_header', [ $this, 'render_admin_sidebar' ] );
@@ -470,16 +473,25 @@ class Recruitment_Admin {
 		$note = sanitize_textarea_field( wp_unslash( $_POST['note'] ?? '' ) );
 		$template_id = sanitize_key( wp_unslash( $_POST['template_id'] ?? '' ) );
 
+		if ( 'FINAL' === $current_stage || 'DITERIMA' === $next_stage ) {
+			wp_safe_redirect(
+				add_query_arg(
+					[
+						'page'    => 'recruitment-final-decision',
+						'section' => 'decision',
+					],
+					admin_url( 'admin.php' )
+				)
+			);
+			exit;
+		}
+
 		if ( in_array( $decision, [ 'failed', 'rejected', 'ditolak', 'tidak_lolos' ], true ) ) {
 			$status = 'DITOLAK';
 			$stage = ! empty( $current_stage ) ? $current_stage : 'ADMINISTRASI';
 			$note = trim( 'Hasil seleksi: tidak lolos. ' . $note );
 		} elseif ( in_array( $decision, [ 'passed', 'accepted', 'lolos', 'diterima' ], true ) ) {
-			if ( in_array( $next_stage, [ 'DITERIMA', 'FINAL' ], true ) ) {
-				$status = 'DITERIMA';
-				$stage = 'FINAL';
-				$note = trim( 'Hasil seleksi akhir: Diterima. ' . $note );
-			} elseif ( in_array( $next_stage, [ 'PSIKOTES', 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) ) {
+			if ( in_array( $next_stage, [ 'PSIKOTES', 'INTERVIEW_HR', 'INTERVIEW_USER', 'FINAL' ], true ) ) {
 				$status = $next_stage;
 				$stage = $next_stage;
 				$note = trim( 'Lolos ke tahap ' . $next_stage . '. ' . $note );
@@ -490,11 +502,9 @@ class Recruitment_Admin {
 					'SUBMITTED'      => 'PSIKOTES',
 					'PSIKOTES'       => 'INTERVIEW_HR',
 					'INTERVIEW_HR'   => 'INTERVIEW_USER',
-					'INTERVIEW_USER' => 'FINAL',
-					'FINAL'          => 'DITERIMA',
 				];
 				$target = $stage_transitions[ $current_stage ] ?? 'PSIKOTES';
-				$status = 'FINAL' === $target ? 'DITERIMA' : $target;
+				$status = $target;
 				$stage = $target;
 				$note = trim( 'Lolos ke tahap ' . $stage . '. ' . $note );
 			}
@@ -524,6 +534,106 @@ class Recruitment_Admin {
 				],
 				admin_url( 'admin.php' )
 			)
+		);
+		exit;
+	}
+
+	public function handle_hr_interview_save(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk menyimpan hasil wawancara HR.', 'recruitment-plugin' ) );
+		}
+
+		$application_id = absint( $_POST['application_id'] ?? 0 );
+		check_admin_referer( 'daw_save_hr_interview_' . $application_id );
+		$intent = isset( $_POST['intent'] ) && is_scalar( $_POST['intent'] )
+			? sanitize_key( wp_unslash( (string) $_POST['intent'] ) )
+			: '';
+		$result = isset( $_POST['result'] ) && is_scalar( $_POST['result'] )
+			? strtoupper( sanitize_key( wp_unslash( (string) $_POST['result'] ) ) )
+			: '';
+		if ( 'pass' === $intent ) {
+			$result = 'LOLOS';
+		} elseif ( 'fail' === $intent ) {
+			$result = 'TIDAK_LOLOS';
+		}
+		$department_account_id = isset( $_POST['department_account_id'] ) && is_scalar( $_POST['department_account_id'] )
+			? absint( wp_unslash( (string) $_POST['department_account_id'] ) )
+			: 0;
+		if ( 'fail' === $intent ) {
+			$department_account_id = 0;
+		}
+		$interview_date = isset( $_POST['interview_date'] ) && is_scalar( $_POST['interview_date'] )
+			? sanitize_text_field( wp_unslash( (string) $_POST['interview_date'] ) )
+			: '';
+		$rating = isset( $_POST['rating'] ) && is_scalar( $_POST['rating'] )
+			? sanitize_text_field( wp_unslash( (string) $_POST['rating'] ) )
+			: '';
+		$recommendation = isset( $_POST['recommendation'] ) && is_scalar( $_POST['recommendation'] )
+			? sanitize_text_field( wp_unslash( (string) $_POST['recommendation'] ) )
+			: '';
+		$department_name = isset( $_POST['department_name'] ) && is_scalar( $_POST['department_name'] )
+			? sanitize_text_field( wp_unslash( (string) $_POST['department_name'] ) )
+			: '';
+		$notes = isset( $_POST['notes'] ) && is_scalar( $_POST['notes'] )
+			? sanitize_textarea_field( wp_unslash( (string) $_POST['notes'] ) )
+			: '';
+		$department_notes = isset( $_POST['department_notes'] ) && is_scalar( $_POST['department_notes'] )
+			? sanitize_textarea_field( wp_unslash( (string) $_POST['department_notes'] ) )
+			: '';
+		$user = wp_get_current_user();
+		$interviewer = sanitize_text_field( (string) ( $user->display_name ?: $user->user_login ) );
+		$database = new Recruitment_Database();
+		if ( 'save_note' === $intent ) {
+			$save_result = $database->save_hr_interview_note(
+				(string) $application_id,
+				$interview_date,
+				$rating,
+				$recommendation,
+				$interviewer,
+				$notes,
+				$department_name,
+				$department_account_id,
+				$department_notes
+			);
+		} elseif ( in_array( $intent, [ 'pass', 'fail' ], true ) ) {
+			$save_result = $database->save_hr_interview_result(
+				(string) $application_id,
+				$result,
+				$department_account_id,
+				$interviewer,
+				$notes,
+				$interview_date,
+				$rating,
+				$recommendation,
+				$department_name,
+				$department_notes
+			);
+		} else {
+			wp_die( esc_html__( 'Aksi wawancara HR tidak valid.', 'recruitment-plugin' ) );
+		}
+		if ( empty( $save_result['success'] ) ) {
+			wp_safe_redirect(
+				add_query_arg(
+					[
+						'page' => 'recruitment-hr-interview',
+						'application_id' => $application_id,
+						'hr_interview' => 'save_error',
+					],
+					admin_url( 'admin.php' )
+				)
+			);
+			exit;
+		}
+
+		$redirect_args = [ 'page' => 'recruitment-hr-interview' ];
+		if ( 'save_note' === $intent ) {
+			$redirect_args['application_id'] = $application_id;
+			$redirect_args['hr_interview'] = 'note_saved';
+		} else {
+			$redirect_args['hr_interview'] = 'LOLOS' === $result ? 'saved' : 'failed';
+		}
+		wp_safe_redirect(
+			add_query_arg( $redirect_args, admin_url( 'admin.php' ) )
 		);
 		exit;
 	}
@@ -932,59 +1042,213 @@ class Recruitment_Admin {
 		}
 
 		$candidate_id = absint( $_POST['candidate_id'] ?? 0 );
+		$application_id = absint( $_POST['application_id'] ?? 0 );
 		check_admin_referer( 'daw_download_applicant_profile_' . $candidate_id );
-		$applicant = ( new Recruitment_Database() )->get_admin_applicant( (string) $candidate_id );
-		if ( ! $applicant ) {
-			wp_die( esc_html__( 'Profil pelamar tidak ditemukan.', 'recruitment-plugin' ) );
+		$database = new Recruitment_Database();
+		$report = $database->get_admin_application_profile( (string) $application_id );
+		if ( ! $report || (int) ( $report['application']['applicant_id'] ?? 0 ) !== $candidate_id ) {
+			wp_die( esc_html__( 'Lamaran tidak ditemukan atau tidak sesuai dengan pelamar.', 'recruitment-plugin' ) );
 		}
 
-		$details = is_array( $applicant['profile_details'] ?? null ) ? $applicant['profile_details'] : [];
+		$this->stream_applicant_profile_pdf( $report, 'profil-pelamar-' . $application_id . '.pdf' );
+	}
+
+	public function handle_department_profile_download(): void {
+		if ( ! current_user_can( 'manage_user_department' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengunduh profil pelamar.', 'recruitment-plugin' ) );
+		}
+
+		$application_id = absint( $_GET['application_id'] ?? 0 );
+		$account_id = absint( get_user_meta( get_current_user_id(), 'daw_oracle_account_id', true ) );
+		check_admin_referer( 'daw_download_department_profile_' . $application_id );
+		$report = ( new Recruitment_Database() )->get_user_department_candidate_detail( (string) $application_id, $account_id );
+		if ( ! $report ) {
+			wp_die( esc_html__( 'Profil tidak ditemukan atau lamaran ini tidak ditugaskan kepada akun Anda.', 'recruitment-plugin' ) );
+		}
+
+		$this->stream_applicant_profile_pdf( $report, 'profil-pelamar-' . $application_id . '.pdf', true );
+	}
+
+	public function handle_department_document_download(): void {
+		if ( ! current_user_can( 'manage_user_department' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengunduh dokumen pelamar.', 'recruitment-plugin' ) );
+		}
+
+		$application_id = absint( $_GET['application_id'] ?? 0 );
+		$field_key = isset( $_GET['field_key'] ) && is_scalar( $_GET['field_key'] )
+			? sanitize_text_field( wp_unslash( (string) $_GET['field_key'] ) )
+			: '';
+		check_admin_referer( 'daw_download_department_document_' . $application_id . '_' . $field_key );
+		$account_id = absint( get_user_meta( get_current_user_id(), 'daw_oracle_account_id', true ) );
+		$document = ( new Recruitment_Database() )->get_user_department_application_document( (string) $application_id, $account_id, $field_key );
+		if ( ! $document || '' === $document['file_content'] ) {
+			wp_die( esc_html__( 'Dokumen tidak ditemukan atau lamaran ini tidak ditugaskan kepada akun Anda.', 'recruitment-plugin' ) );
+		}
+
+		$allowed_mime_types = [
+			'application/pdf',
+			'application/msword',
+			'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+			'image/jpeg',
+			'image/png',
+		];
+		$content = $document['file_content'];
+		$mime_type = (string) $document['mime_type'];
+		$file_info = finfo_open( FILEINFO_MIME_TYPE );
+		if (
+			! $file_info
+			|| ! in_array( $mime_type, $allowed_mime_types, true )
+			|| finfo_buffer( $file_info, $content ) !== $mime_type
+			|| 0 === strlen( $content )
+			|| 5242880 < strlen( $content )
+		) {
+			if ( $file_info ) {
+				finfo_close( $file_info );
+			}
+			wp_die( esc_html__( 'Format atau ukuran dokumen tidak valid.', 'recruitment-plugin' ) );
+		}
+		finfo_close( $file_info );
+
+		nocache_headers();
+		header( 'X-Content-Type-Options: nosniff' );
+		header( 'Content-Type: ' . $mime_type );
+		header( 'Content-Length: ' . strlen( $content ) );
+		header( 'Content-Disposition: attachment; filename="' . str_replace( '"', '', sanitize_file_name( $document['file_name'] ) ) . '"' );
+		header( 'Cache-Control: private, no-store, max-age=0' );
+		echo $content;
+		exit;
+	}
+
+	/**
+	 * @param array<string, mixed> $report
+	 */
+	private function stream_applicant_profile_pdf( array $report, string $filename, bool $department_scope = false ): void {
+		if ( ! class_exists( \Dompdf\Dompdf::class ) ) {
+			wp_die( esc_html__( 'PDF belum dapat dibuat karena pustaka PDF tidak tersedia.', 'recruitment-plugin' ) );
+		}
+
+		$application = is_array( $report['application'] ?? null ) ? $report['application'] : [];
+		$profile = is_array( $report['profile'] ?? null ) ? $report['profile'] : [];
+		$details = is_array( $profile['profile_details'] ?? null ) ? $profile['profile_details'] : [];
+		$escape = static function ( $value ): string {
+			return htmlspecialchars( is_scalar( $value ) ? (string) $value : '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+		};
+		$rows = static function ( array $values ) use ( $escape ): string {
+			$html = '';
+			foreach ( $values as $label => $value ) {
+				$html .= '<tr><th>' . $escape( $label ) . '</th><td>' . ( '' !== (string) $value ? nl2br( $escape( $value ) ) : '—' ) . '</td></tr>';
+			}
+			return $html;
+		};
 		$identity = [
-			'Nama Lengkap' => $applicant['name'] ?? '',
-			'Email' => $applicant['email'] ?? '',
-			'Nomor Telepon' => $applicant['phone'] ?? '',
-			'Jenis Kelamin' => $applicant['gender'] ?? '',
-			'Tempat Lahir' => $applicant['birth_place'] ?? '',
-			'Tanggal Lahir' => $applicant['birth_date'] ?? '',
-			'Alamat' => $applicant['address'] ?? '',
-			'Kota' => $applicant['city'] ?? '',
-			'Provinsi' => $applicant['province'] ?? '',
+			'Nama Lengkap' => $profile['name'] ?? '',
+			'Email' => $profile['email'] ?? '',
+			'Nomor Telepon' => $profile['phone'] ?? '',
+			'Jenis Kelamin' => $profile['gender'] ?? '',
+			'Tempat Lahir' => $profile['birth_place'] ?? '',
+			'Tanggal Lahir' => $profile['birth_date'] ?? '',
+			'Alamat' => $profile['address'] ?? '',
+			'Kota' => $profile['city'] ?? '',
+			'Provinsi' => $profile['province'] ?? '',
 		];
 		$education = [
-			'Jenjang' => $details['education_level'] ?? $applicant['education'] ?? '',
+			'Jenjang' => $details['education_level'] ?? $profile['education'] ?? '',
 			'Institusi' => $details['institution'] ?? '',
 			'Jurusan' => $details['major'] ?? '',
 			'IPK / Nilai' => $details['gpa'] ?? '',
 			'Tahun Lulus' => $details['graduation_year'] ?? '',
 		];
-		$experiences = is_array( $details['work_experiences'] ?? null ) ? $details['work_experiences'] : [];
-		$escape = static function ( $value ): string {
-			return esc_html( is_scalar( $value ) ? (string) $value : '' );
-		};
 
-		nocache_headers();
-		header( 'Content-Type: text/html; charset=UTF-8' );
-		header( 'Content-Disposition: attachment; filename="profil-pelamar-' . sanitize_file_name( (string) $candidate_id ) . '.html"' );
-		echo '<!doctype html><html lang="id"><meta charset="utf-8"><title>Profil Pelamar</title><style>body{font:15px/1.5 Arial,sans-serif;max-width:900px;margin:40px auto;color:#172033}h1,h2{color:#111827}table{border-collapse:collapse;width:100%;margin:12px 0 28px}th,td{border:1px solid #d1d5db;padding:9px;text-align:left}th{width:30%;background:#f3f4f6}</style><body><h1>Profil Pelamar</h1><h2>Data Diri</h2><table>';
-		foreach ( $identity as $label => $value ) {
-			echo '<tr><th>' . $escape( $label ) . '</th><td>' . ( '' !== (string) $value ? $escape( $value ) : '—' ) . '</td></tr>';
-		}
-		echo '</table><h2>Pendidikan</h2><table>';
-		foreach ( $education as $label => $value ) {
-			echo '<tr><th>' . $escape( $label ) . '</th><td>' . ( '' !== (string) $value ? $escape( $value ) : '—' ) . '</td></tr>';
-		}
-		echo '</table><h2>Pengalaman Kerja</h2><table><thead><tr><th>Perusahaan</th><th>Posisi</th><th>Periode</th></tr></thead><tbody>';
+		$html = '<!doctype html><html lang="id"><meta charset="utf-8"><style>
+			body{font:11px/1.5 DejaVu Sans,sans-serif;color:#172033}
+			h1{font-size:20px;margin:0 0 4px}h2{font-size:14px;color:#17416b;margin:22px 0 8px}
+			p.meta{color:#56657a;margin:0 0 16px}
+			table{border-collapse:collapse;width:100%;margin:8px 0 18px;page-break-inside:auto}
+			tr{page-break-inside:avoid}th,td{border:1px solid #d5dde7;padding:7px;text-align:left;vertical-align:top}
+			th{width:28%;background:#f2f5f9}
+			</style><body><h1>Profil Pelamar</h1><p class="meta">Lamaran #' . $escape( $application['application_id'] ?? '' ) . ' · ' . $escape( $application['position'] ?? '' ) . ' · ' . $escape( $application['department'] ?? '' ) . '</p>';
+		$html .= '<h2>Identitas / Data Diri</h2><table>' . $rows( $identity ) . '</table>';
+		$html .= '<h2>Data Lamaran</h2><table>' . $rows(
+			[
+				'Tanggal Lamaran' => $application['application_date'] ?? '',
+				'Posisi' => $application['position'] ?? '',
+				'Dealer' => $application['dealer'] ?? '',
+				'Departemen' => $application['department'] ?? '',
+				'Status' => $application['application_status'] ?? '',
+			]
+		) . '</table>';
+		$html .= '<h2>Pendidikan</h2><table>' . $rows( $education ) . '</table>';
+
+		$experiences = is_array( $details['work_experiences'] ?? null ) ? $details['work_experiences'] : [];
+		$html .= '<h2>Pengalaman Kerja</h2><table><thead><tr><th>Perusahaan</th><th>Posisi</th><th>Periode</th><th>Deskripsi</th></tr></thead><tbody>';
 		if ( empty( $experiences ) ) {
-			echo '<tr><td colspan="3">Belum ada data pengalaman kerja.</td></tr>';
+			$html .= '<tr><td colspan="4">Belum ada data pengalaman kerja.</td></tr>';
 		} else {
 			foreach ( $experiences as $experience ) {
-				if ( ! is_array( $experience ) ) {
-					continue;
+				if ( is_array( $experience ) ) {
+					$html .= '<tr><td>' . $escape( $experience['company'] ?? '' ) . '</td><td>' . $escape( $experience['position'] ?? '' ) . '</td><td>' . $escape( $experience['period'] ?? '' ) . '</td><td>' . $escape( $experience['description'] ?? '' ) . '</td></tr>';
 				}
-				echo '<tr><td>' . $escape( $experience['company'] ?? '' ) . '</td><td>' . $escape( $experience['position'] ?? '' ) . '</td><td>' . $escape( $experience['period'] ?? '' ) . '</td></tr>';
 			}
 		}
-		echo '</tbody></table></body></html>';
+		$html .= '</tbody></table>';
+		$html .= '<h2>Hasil Tahapan</h2><table>' . $rows(
+			[
+				'Nilai Psikotes' => $application['psychotest_score'] ?? '',
+				'Hasil Wawancara HR' => $application['hr_interview_result'] ?? '',
+				'Rekomendasi HR' => $application['hr_recommendation'] ?? '',
+				'Catatan HR' => $application['hr_interview_notes'] ?? '',
+				'Hasil Wawancara User' => $application['user_interview_result'] ?? '',
+				'Nilai Wawancara User' => $application['user_interview_score'] ?? '',
+				'Rekomendasi User' => $application['user_recommendation'] ?? '',
+				'Catatan User' => $application['user_interview_notes'] ?? '',
+			]
+		) . '</table>';
+
+		$answer_rows = '';
+		$document_rows = '';
+		$profile_documents = is_array( $details['documents'] ?? null ) ? $details['documents'] : [];
+		foreach ( $profile_documents as $document_key => $document ) {
+			if ( ! is_array( $document ) || '' === (string) ( $document['name'] ?? '' ) || ( $department_scope && 'resume' !== $document_key ) ) {
+				continue;
+			}
+			$document_rows .= '<tr><th>' . $escape( $document_key ) . '</th><td>' . $escape( $document['name'] ) . '</td></tr>';
+		}
+		foreach ( (array) ( $report['answers'] ?? [] ) as $answer ) {
+			if ( is_array( $answer ) ) {
+				$value = trim( (string) ( $answer['file_name'] ?? '' ) ) ?: (string) ( $answer['answer_value'] ?? '' );
+				$title = (string) ( $answer['field_title'] ?? $answer['field_key'] ?? '' );
+				if ( $department_scope && 'file' === strtolower( trim( (string) ( $answer['field_type'] ?? '' ) ) ) ) {
+					$document_rows .= '<tr><th>' . $escape( $title ) . '</th><td>' . $escape( $value ) . '</td></tr>';
+				} elseif ( ! $department_scope ) {
+					$answer_rows .= '<tr><th>' . $escape( $title ) . '</th><td>' . ( '' !== $value ? nl2br( $escape( $value ) ) : '—' ) . '</td></tr>';
+				}
+			}
+		}
+		$html .= '<h2>Dokumen Lamaran</h2><table>' . ( '' !== $document_rows ? $document_rows : '<tr><td>Dokumen belum tersedia.</td></tr>' ) . '</table>';
+		if ( ! $department_scope ) {
+			$html .= '<h2>Jawaban Formulir Lamaran</h2><table>' . ( '' !== $answer_rows ? $answer_rows : '<tr><td>Belum ada jawaban tambahan.</td></tr>' ) . '</table>';
+		}
+		$html .= '<h2>Riwayat Seleksi</h2><table><thead><tr><th>Tanggal</th><th>Tahap</th><th>Status</th><th>Catatan</th></tr></thead><tbody>';
+		$history = (array) ( $report['history'] ?? [] );
+		if ( empty( $history ) ) {
+			$html .= '<tr><td colspan="4">Riwayat seleksi belum tersedia.</td></tr>';
+		} else {
+			foreach ( array_reverse( $history ) as $event ) {
+				if ( is_array( $event ) ) {
+					$html .= '<tr><td>' . $escape( $event['date'] ?? '' ) . '</td><td>' . $escape( $event['stage'] ?? '' ) . '</td><td>' . $escape( $event['status'] ?? '' ) . '</td><td>' . $escape( $event['note'] ?? '' ) . '</td></tr>';
+				}
+			}
+		}
+		$html .= '</tbody></table></body></html>';
+
+		$options = new \Dompdf\Options();
+		$options->setIsRemoteEnabled( false );
+		$dompdf = new \Dompdf\Dompdf( $options );
+		$dompdf->loadHtml( $html, 'UTF-8' );
+		$dompdf->setPaper( 'A4', 'portrait' );
+		$dompdf->render();
+		nocache_headers();
+		$dompdf->stream( sanitize_file_name( $filename ), [ 'Attachment' => true ] );
 		exit;
 	}
 

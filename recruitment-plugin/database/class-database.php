@@ -455,7 +455,7 @@ class Recruitment_Database {
             return [];
         }
         return $this->fetch_all(
-            'SELECT l.lamaran_id AS "id", ' . $token_column . ' AS "token", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", NVL(d.nama_departement, k.nama_departemen) AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status", (SELECT MAX(r.tahap_seleksi) KEEP (DENSE_RANK LAST ORDER BY r.tanggal_status, r.riwayat_status_id) FROM HRS_RIWAYAT_STATUS_PELAMAR r WHERE r.lamaran_id = l.lamaran_id) AS "latest_stage" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id ORDER BY NVL(l.created_at, l.tanggal_melamar) DESC, l.lamaran_id DESC',
+            'SELECT l.lamaran_id AS "id", ' . $token_column . ' AS "token", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", NVL(d.nama_departemen, k.nama_departemen) AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status", (SELECT MAX(r.tahap_seleksi) KEEP (DENSE_RANK LAST ORDER BY r.tanggal_status, r.riwayat_status_id) FROM HRS_RIWAYAT_STATUS_PELAMAR r WHERE r.lamaran_id = l.lamaran_id) AS "latest_stage" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id ORDER BY NVL(l.created_at, l.tanggal_melamar) DESC, l.lamaran_id DESC',
             [ 'login_id' => $login_id ]
         );
     }
@@ -470,7 +470,7 @@ class Recruitment_Database {
             return null;
         }
         $rows = $this->fetch_all(
-            'SELECT l.lamaran_id AS "id", ' . $token_column . ' AS "token", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", NVL(d.nama_departement, k.nama_departemen) AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id AND l.lamaran_id = :application_id',
+            'SELECT l.lamaran_id AS "id", ' . $token_column . ' AS "token", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", NVL(d.nama_departemen, k.nama_departemen) AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id AND l.lamaran_id = :application_id',
             [ 'login_id' => $login_id, 'application_id' => $application_id ]
         );
         return $rows[0] ?? null;
@@ -486,7 +486,7 @@ class Recruitment_Database {
             return null;
         }
         $rows = $this->fetch_all(
-            'SELECT l.lamaran_id AS "id", l.application_token AS "token", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", NVL(d.nama_departement, k.nama_departemen) AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id AND l.application_token = :application_token',
+            'SELECT l.lamaran_id AS "id", l.application_token AS "token", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", NVL(d.nama_departemen, k.nama_departemen) AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id AND l.application_token = :application_token',
             [ 'login_id' => $login_id, 'application_token' => $application_token ]
         );
         return $rows[0] ?? null;
@@ -1792,7 +1792,7 @@ class Recruitment_Database {
 
                 $deadline_val = ( ! empty( $wp_deadline ) && preg_match( '/^\d{4}-\d{2}-\d{2}$/', $wp_deadline ) ) ? $wp_deadline : null;
                 $ins_detail = $connection->prepare(
-                    'INSERT INTO HRS_DETAIL_INFO_LOWONGAN (DETAIL_LOWONGAN_ID, KOLOM_PENDAFTARAN_ID, JUDUL_PEKERJAAN, DESKRIPSI_PEKERJAAN, LOKASI_PENEMPATAN, DEPARTEMENT_ID, NAMA_DEPARTEMENT, KATEGORI_KJ, BATAS_LAMARAN, REQUEST_AT) VALUES (:detail_id, :kolom_id, :title, :description, :location, :department_id, :department, :job_type, CASE WHEN :deadline IS NULL THEN NULL ELSE TO_DATE(:deadline_val, \'YYYY-MM-DD\') END, CURRENT_TIMESTAMP)'
+                    'INSERT INTO HRS_DETAIL_INFO_LOWONGAN (DETAIL_LOWONGAN_ID, KOLOM_PENDAFTARAN_ID, JUDUL_PEKERJAAN, DESKRIPSI_PEKERJAAN, LOKASI_PENEMPATAN, DEPARTEMEN_ID, NAMA_DEPARTEMEN, KATEGORI_KJ, BATAS_LAMARAN, REQUEST_AT) VALUES (:detail_id, :kolom_id, :title, :description, :location, :department_id, :department, :job_type, CASE WHEN :deadline IS NULL THEN NULL ELSE TO_DATE(:deadline_val, \'YYYY-MM-DD\') END, CURRENT_TIMESTAMP)'
                 );
                 $ins_detail->execute( [
                     'detail_id'    => $vacancy_id,
@@ -2023,7 +2023,7 @@ class Recruitment_Database {
      */
     public function get_vacancies(): array {
         return $this->fetch_all(
-            'SELECT d.detail_lowongan_id AS "id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", k.nama_dealer AS "dealer", d.kategori_kj AS "job_type", d.deskripsi_pekerjaan AS "description", d.pendidikan_minimum AS "education", TO_CHAR(d.batas_lamaran, \'YYYY-MM-DD\') AS "deadline", NVL(d.nama_departement, k.nama_departemen) AS "department", TO_CHAR(d.request_at, \'YYYY-MM-DD\') AS "posted_at" FROM HRS_DETAIL_INFO_LOWONGAN d JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE k.status_kolom = :status AND (d.batas_lamaran IS NULL OR d.batas_lamaran >= CURRENT_DATE) ORDER BY d.detail_lowongan_id DESC',
+            'SELECT d.detail_lowongan_id AS "id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", k.nama_dealer AS "dealer", d.kategori_kj AS "job_type", d.deskripsi_pekerjaan AS "description", d.pendidikan_minimum AS "education", TO_CHAR(d.batas_lamaran, \'YYYY-MM-DD\') AS "deadline", NVL(d.nama_departemen, k.nama_departemen) AS "department", TO_CHAR(d.request_at, \'YYYY-MM-DD\') AS "posted_at" FROM HRS_DETAIL_INFO_LOWONGAN d JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE k.status_kolom = :status AND (d.batas_lamaran IS NULL OR d.batas_lamaran >= CURRENT_DATE) ORDER BY d.detail_lowongan_id DESC',
             [ 'status' => 1 ]
         );
     }
@@ -2050,6 +2050,423 @@ class Recruitment_Database {
     /**
      * @return array<int, array<string, mixed>>
      */
+    /**
+     * Return applications awaiting an HR interview and their latest psychotest score.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_hr_interview_candidates(): array {
+        $this->last_error = null;
+        return $this->fetch_all(
+            'SELECT l.lamaran_id AS "application_id",
+                    l.profile_kandidat_id AS "applicant_id",
+                    l.status_terkini AS "status",
+                    TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at",
+                    d.judul_pekerjaan AS "position",
+                    d.nama_departemen AS "department",
+                    k.nama_dealer AS "dealer",
+                    p.kandidat_id AS "candidate_id",
+                    NVL(p.nama_lengkap, p.nama_kandidat) AS "candidate_name",
+                    NVL(p.email, pkl.email) AS "candidate_email",
+                    (SELECT h.nilai
+                     FROM HRS_HASIL_TES_PSIKOLOGI h
+                     WHERE h.kandidat_id = p.kandidat_id
+                     ORDER BY h.dikumpulkan_pada DESC NULLS LAST, h.hasil_tes_psikologi_id DESC
+                     FETCH FIRST 1 ROW ONLY) AS "psychotest_score",
+                    (SELECT TO_CHAR(j.tanggal_wawancara, \'YYYY-MM-DD\')
+                     FROM HRS_JADWAL_KANDIDAT j
+                     WHERE j.kandidat_id = p.kandidat_id
+                     ORDER BY j.tanggal_wawancara DESC NULLS LAST, j.jadwal_id DESC
+                     FETCH FIRST 1 ROW ONLY) AS "scheduled_interview_date",
+                    (SELECT j.jam_wawancara
+                     FROM HRS_JADWAL_KANDIDAT j
+                     WHERE j.kandidat_id = p.kandidat_id
+                     ORDER BY j.tanggal_wawancara DESC NULLS LAST, j.jadwal_id DESC
+                     FETCH FIRST 1 ROW ONLY) AS "scheduled_interview_time",
+                    hr.status_hasil AS "hr_result",
+                    hr.rekomendasi AS "hr_recommendation"
+             FROM HRS_LAMARAN l
+             JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
+             LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id
+             JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
+             JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id
+             LEFT JOIN HRS_HASIL_WAWANCARA_HR hr ON hr.lamaran_id = l.lamaran_id
+             WHERE UPPER(TRIM(l.status_terkini)) = \'INTERVIEW_HR\'
+             ORDER BY NVL(l.created_at, l.tanggal_melamar), l.lamaran_id'
+        );
+    }
+
+    /**
+     * Return the saved HR interview notes for a candidate, newest first.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_hr_interview_history( string $application_id ): array {
+        if ( ! ctype_digit( $application_id ) || '0' === $application_id ) {
+            return [];
+        }
+
+        $this->last_error = null;
+        return $this->fetch_all(
+            'SELECT h.riwayat_id AS "history_id",
+                    TO_CHAR(h.tanggal_wawancara, \'YYYY-MM-DD\') AS "interview_date",
+                    h.nama_pewawancara AS "interviewer",
+                    h.penilaian AS "rating",
+                    h.rekomendasi AS "recommendation",
+                    h.nama_departemen_tujuan AS "department",
+                    h.role_akses_id AS "assigned_account_id",
+                    u.username AS "department_user",
+                    h.catatan_wawancara AS "notes",
+                    h.catatan_rekomendasi AS "department_notes",
+                    TO_CHAR(h.dibuat_pada, \'YYYY-MM-DD HH24:MI:SS\') AS "created_at"
+             FROM HRS_RIWAYAT_WAWANCARA_HR h
+             LEFT JOIN HRS_ROLE_AKSES u ON u.role_akses_id = h.role_akses_id
+             WHERE h.lamaran_id = :application_id
+             ORDER BY h.dibuat_pada DESC, h.riwayat_id DESC',
+            [ 'application_id' => $application_id ]
+        );
+    }
+
+    /**
+     * Save an HR note without advancing the application.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    public function save_hr_interview_note(
+        string $application_id,
+        string $interview_date,
+        string $rating,
+        string $recommendation,
+        string $interviewer,
+        string $notes,
+        string $department_name,
+        int $department_account_id,
+        string $department_notes
+    ): array {
+        $validated = $this->validate_hr_interview_note_data(
+            $application_id,
+            $interview_date,
+            $rating,
+            $recommendation,
+            $interviewer,
+            $notes,
+            $department_name,
+            $department_account_id,
+            $department_notes
+        );
+        if ( ! $validated ) {
+            return [ 'success' => false, 'error' => 'Data catatan wawancara HR tidak valid.' ];
+        }
+
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $application = $connection->prepare(
+                'SELECT l.status_terkini
+                 FROM HRS_LAMARAN l
+                 WHERE l.lamaran_id = :application_id
+                 FOR UPDATE OF l.status_terkini'
+            );
+            $application->execute( [ 'application_id' => $application_id ] );
+            $application_row = $application->fetch( PDO::FETCH_ASSOC );
+            if ( ! is_array( $application_row ) ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'Lamaran tidak ditemukan.' ];
+            }
+            if ( 'INTERVIEW_HR' !== strtoupper( trim( (string) $application_row['STATUS_TERKINI'] ) ) ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'Lamaran tidak lagi menunggu wawancara HR.' ];
+            }
+
+            if ( $department_account_id > 0 ) {
+                $this->validate_hr_interview_recipient( $connection, $department_name, $department_account_id );
+            }
+            $this->insert_hr_interview_note_history(
+                $connection,
+                $application_id,
+                $interview_date,
+                $rating,
+                $recommendation,
+                $interviewer,
+                $notes,
+                $department_name,
+                $department_account_id,
+                $department_notes
+            );
+
+            $connection->commit();
+            return [ 'success' => true ];
+        } catch ( InvalidArgumentException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            return [ 'success' => false, 'error' => $exception->getMessage() ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_oracle_failure( 'HR interview note save failed', $exception );
+            return [ 'success' => false, 'error' => 'Catatan wawancara HR gagal disimpan ke Oracle.' ];
+        }
+    }
+
+    /**
+     * Save the HR interview decision, application status, and tracking event atomically.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    public function save_hr_interview_result(
+        string $application_id,
+        string $result,
+        int $department_account_id,
+        string $interviewer,
+        string $notes,
+        string $interview_date,
+        string $rating,
+        string $recommendation,
+        string $department_name,
+        string $department_notes
+    ): array {
+        $result = strtoupper( trim( $result ) );
+        if (
+            ! in_array( $result, [ 'LOLOS', 'TIDAK_LOLOS' ], true )
+            || ( 'LOLOS' === $result && ( $department_account_id < 1 || '' === trim( $department_name ) ) )
+            || ( 'TIDAK_LOLOS' === $result && 0 !== $department_account_id )
+            || ! $this->validate_hr_interview_note_data(
+                $application_id,
+                $interview_date,
+                $rating,
+                $recommendation,
+                $interviewer,
+                $notes,
+                $department_name,
+                $department_account_id,
+                $department_notes
+            )
+        ) {
+            return [ 'success' => false, 'error' => 'Data hasil wawancara HR tidak valid.' ];
+        }
+
+        $interviewer = trim( $interviewer );
+        $notes = trim( $notes );
+        $department_name = trim( $department_name );
+        $department_notes = trim( $department_notes );
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $application = $connection->prepare(
+                'SELECT l.status_terkini
+                 FROM HRS_LAMARAN l
+                 WHERE l.lamaran_id = :application_id
+                 FOR UPDATE OF l.status_terkini'
+            );
+            $application->execute( [ 'application_id' => $application_id ] );
+            $application_row = $application->fetch( PDO::FETCH_ASSOC );
+            if ( ! is_array( $application_row ) ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'Lamaran tidak ditemukan.' ];
+            }
+            if ( 'INTERVIEW_HR' !== strtoupper( trim( (string) $application_row['STATUS_TERKINI'] ) ) ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'Lamaran tidak lagi menunggu wawancara HR.' ];
+            }
+
+            if ( 'LOLOS' === $result ) {
+                $this->validate_hr_interview_recipient( $connection, $department_name, $department_account_id );
+            }
+
+            $recommendation = trim( $recommendation );
+            $insert_result = $connection->prepare(
+                'INSERT INTO HRS_HASIL_WAWANCARA_HR (
+                    LAMARAN_ID, STATUS_HASIL, REKOMENDASI, CATATAN_WAWANCARA,
+                    NAMA_PEWAWANCARA, ROLE_AKSES_ID, TANGGAL_WAWANCARA, PENILAIAN,
+                    CATATAN_REKOMENDASI, NAMA_DEPARTEMEN_TUJUAN, DIBUAT_PADA, DIPERBARUI_PADA
+                ) VALUES (
+                    :application_id, :result, :recommendation, :notes,
+                    :interviewer, :account_id, TO_DATE(:interview_date, \'YYYY-MM-DD\'), :rating,
+                    :department_notes, :department_name, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                )'
+            );
+            $insert_result->execute(
+                [
+                    'application_id' => $application_id,
+                    'result' => $result,
+                    'recommendation' => $recommendation,
+                    'notes' => '' !== $notes ? $notes : null,
+                    'interviewer' => $interviewer,
+                    'account_id' => 'LOLOS' === $result ? $department_account_id : null,
+                    'interview_date' => $interview_date,
+                    'rating' => $rating,
+                    'department_notes' => '' !== $department_notes ? $department_notes : null,
+                    'department_name' => '' !== $department_name ? $department_name : null,
+                ]
+            );
+
+            $this->insert_hr_interview_note_history(
+                $connection,
+                $application_id,
+                $interview_date,
+                $rating,
+                $recommendation,
+                $interviewer,
+                $notes,
+                $department_name,
+                'LOLOS' === $result ? $department_account_id : 0,
+                $department_notes
+            );
+
+            $next_status = 'LOLOS' === $result ? 'INTERVIEW_USER' : 'DITOLAK';
+            $update_application = $connection->prepare(
+                'UPDATE HRS_LAMARAN
+                 SET STATUS_TERKINI = :status,
+                     STATUS_AKHIR = CASE WHEN :is_rejected = 1 THEN :final_status ELSE NULL END,
+                     UPDATED_AT = CURRENT_TIMESTAMP
+                 WHERE LAMARAN_ID = :application_id'
+            );
+            $update_application->execute(
+                [
+                    'status' => $next_status,
+                    'is_rejected' => 'LOLOS' === $result ? 0 : 1,
+                    'final_status' => 'LOLOS' === $result ? null : 'DITOLAK',
+                    'application_id' => $application_id,
+                ]
+            );
+            if ( 1 !== $update_application->rowCount() ) {
+                throw new RuntimeException( 'HR interview application status was not updated.' );
+            }
+
+            $history_note = 'Hasil wawancara HR: ' . $result . '. ' . $recommendation . '.';
+            $history = $connection->prepare(
+                'INSERT INTO HRS_RIWAYAT_STATUS_PELAMAR (
+                    LAMARAN_ID, TAHAP_SELEKSI, STATUS_SELEKSI, TANGGAL_STATUS, KETERANGAN_PELAMAR
+                ) VALUES (
+                    :application_id, :stage, :status, CURRENT_TIMESTAMP, :note
+                )'
+            );
+            $history->execute(
+                [
+                    'application_id' => $application_id,
+                    'stage' => 'LOLOS' === $result ? 'INTERVIEW_USER' : 'INTERVIEW_HR',
+                    'status' => $next_status,
+                    'note' => $history_note,
+                ]
+            );
+
+            $connection->commit();
+            return [ 'success' => true ];
+        } catch ( InvalidArgumentException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            return [ 'success' => false, 'error' => $exception->getMessage() ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_oracle_failure( 'HR interview result save failed', $exception );
+            return [ 'success' => false, 'error' => 'Hasil wawancara HR gagal disimpan ke Oracle.' ];
+        }
+    }
+
+    /**
+     * @return bool
+     */
+    private function validate_hr_interview_note_data(
+        string $application_id,
+        string $interview_date,
+        string $rating,
+        string $recommendation,
+        string $interviewer,
+        string $notes,
+        string $department_name,
+        int $department_account_id,
+        string $department_notes
+    ): bool {
+        $date = DateTime::createFromFormat( '!Y-m-d', $interview_date );
+        $interviewer = trim( $interviewer );
+        $notes = trim( $notes );
+        $department_name = trim( $department_name );
+        $department_notes = trim( $department_notes );
+        $interviewer_length = function_exists( 'mb_strlen' ) ? mb_strlen( $interviewer, 'UTF-8' ) : strlen( $interviewer );
+        $note_length = function_exists( 'mb_strlen' ) ? mb_strlen( $notes, 'UTF-8' ) : strlen( $notes );
+        $department_note_length = function_exists( 'mb_strlen' ) ? mb_strlen( $department_notes, 'UTF-8' ) : strlen( $department_notes );
+        return ctype_digit( $application_id )
+            && '0' !== $application_id
+            && $date instanceof DateTime
+            && $date->format( 'Y-m-d' ) === $interview_date
+            && in_array( $rating, [ 'Sangat Baik', 'Baik', 'Cukup', 'Kurang' ], true )
+            && in_array( $recommendation, [ 'Lanjut ke Tahap Berikutnya', 'Tidak Dilanjutkan' ], true )
+            && '' !== $interviewer
+            && 100 >= $interviewer_length
+            && 2000 >= $note_length
+            && 100 >= ( function_exists( 'mb_strlen' ) ? mb_strlen( $department_name, 'UTF-8' ) : strlen( $department_name ) )
+            && 1000 >= $department_note_length;
+    }
+
+    /**
+     * Ensure the selected recipient is an active User Department account in the chosen department.
+     */
+    private function validate_hr_interview_recipient( PDO $connection, string $department_name, int $department_account_id ): void {
+        $recipient = $connection->prepare(
+            'SELECT u.role_akses_id
+             FROM HRS_ROLE_AKSES u
+             LEFT JOIN HRS_DEPARTEMEN d ON d.departemen_id = u.departemen_id
+             WHERE u.role_akses_id = :account_id
+               AND u.peran = \'KEPALA_DEPARTEMEN\'
+               AND UPPER(TRIM(u.status_akun)) = \'ACTIVE\'
+               AND UPPER(TRIM(NVL(d.nama_departemen, u.nama_departemen))) = UPPER(TRIM(:department))'
+        );
+        $recipient->execute(
+            [
+                'account_id' => $department_account_id,
+                'department' => $department_name,
+            ]
+        );
+        if ( ! $recipient->fetchColumn() ) {
+            throw new InvalidArgumentException( 'Pilih akun User Department aktif yang sesuai dengan departemen tujuan.' );
+        }
+    }
+
+    private function insert_hr_interview_note_history(
+        PDO $connection,
+        string $application_id,
+        string $interview_date,
+        string $rating,
+        string $recommendation,
+        string $interviewer,
+        string $notes,
+        string $department_name,
+        int $department_account_id,
+        string $department_notes
+    ): void {
+        $history = $connection->prepare(
+            'INSERT INTO HRS_RIWAYAT_WAWANCARA_HR (
+                RIWAYAT_ID, LAMARAN_ID, TANGGAL_WAWANCARA, NAMA_PEWAWANCARA, PENILAIAN,
+                REKOMENDASI, NAMA_DEPARTEMEN_TUJUAN, ROLE_AKSES_ID,
+                CATATAN_WAWANCARA, CATATAN_REKOMENDASI, DIBUAT_PADA
+            ) VALUES (
+                SEQ_HRH_RIWAYAT.NEXTVAL, :application_id, TO_DATE(:interview_date, \'YYYY-MM-DD\'),
+                :interviewer, :rating, :recommendation, :department_name, :account_id,
+                :notes, :department_notes, CURRENT_TIMESTAMP
+            )'
+        );
+        $history->execute(
+            [
+                'application_id' => $application_id,
+                'interview_date' => $interview_date,
+                'interviewer' => trim( $interviewer ),
+                'rating' => $rating,
+                'recommendation' => $recommendation,
+                'department_name' => '' !== trim( $department_name ) ? trim( $department_name ) : null,
+                'account_id' => $department_account_id > 0 ? $department_account_id : null,
+                'notes' => '' !== trim( $notes ) ? trim( $notes ) : null,
+                'department_notes' => '' !== trim( $department_notes ) ? trim( $department_notes ) : null,
+            ]
+        );
+    }
+
     public function get_applications(): array {
         return $this->fetch_all(
             'SELECT l.lamaran_id AS "id",
@@ -2062,19 +2479,19 @@ class Recruitment_Database {
                    NVL(k.nama_dealer, d.lokasi_penempatan) AS "location",
                    NVL(k.nama_dealer, d.lokasi_penempatan) AS "dealer",
                    d.kategori_kj AS "category",
-                   d.nama_departement AS "department",
+                   d.nama_departemen AS "department",
                    NVL(p.nama_lengkap, p.nama_kandidat) AS "applicant_name",
                    NVL(p.email, pkl.email) AS "applicant_email",
                    NVL(p.nomor_hp, p.nomor_telepon) AS "applicant_phone",
                    p.provinsi AS "province",
-                   (SELECT s.hasil_hr FROM HRS_STATUS_KANDIDAT s WHERE s.kandidat_id = p.kandidat_id AND UPPER(TRIM(s.nama_departemen)) = UPPER(TRIM(d.nama_departement)) ORDER BY s.status_kandidat_id DESC FETCH FIRST 1 ROW ONLY) AS "hr_result",
-                   (SELECT w.status_seleksi FROM HRS_HASIL_WAWANCARA_USER w WHERE w.kandidat_id = p.kandidat_id AND UPPER(TRIM(w.nama_departemen)) = UPPER(TRIM(d.nama_departement)) ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_selection_status",
-                   (SELECT w.rekomendasi FROM HRS_HASIL_WAWANCARA_USER w WHERE w.kandidat_id = p.kandidat_id AND UPPER(TRIM(w.nama_departemen)) = UPPER(TRIM(d.nama_departement)) ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_recommendation",
-                   (SELECT w.nilai_total FROM HRS_HASIL_WAWANCARA_USER w WHERE w.kandidat_id = p.kandidat_id AND UPPER(TRIM(w.nama_departemen)) = UPPER(TRIM(d.nama_departement)) ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_score",
-                   (SELECT TO_CHAR(w.tanggal_wawancara, \'YYYY-MM-DD\') FROM HRS_HASIL_WAWANCARA_USER w WHERE w.kandidat_id = p.kandidat_id AND UPPER(TRIM(w.nama_departemen)) = UPPER(TRIM(d.nama_departement)) ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_interview_date",
-                   (SELECT w.nama_pewawancara FROM HRS_HASIL_WAWANCARA_USER w WHERE w.kandidat_id = p.kandidat_id AND UPPER(TRIM(w.nama_departemen)) = UPPER(TRIM(d.nama_departement)) ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_interviewer",
-                   (SELECT w.catatan_wawancara FROM HRS_HASIL_WAWANCARA_USER w WHERE w.kandidat_id = p.kandidat_id AND UPPER(TRIM(w.nama_departemen)) = UPPER(TRIM(d.nama_departement)) ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_interview_notes",
-                   (SELECT r.keputusan_akhir FROM HRS_REKAPAN_KEPUTUSAN_HR r WHERE r.kandidat_id = p.kandidat_id AND UPPER(TRIM(r.nama_departement)) = UPPER(TRIM(d.nama_departement)) ORDER BY r.rekapan_keputusan_id DESC FETCH FIRST 1 ROW ONLY) AS "hr_final_decision",
+                   (SELECT s.hasil_hr FROM HRS_STATUS_KANDIDAT s WHERE s.kandidat_id = p.kandidat_id AND UPPER(TRIM(s.nama_departemen)) = UPPER(TRIM(d.nama_departemen)) ORDER BY s.status_kandidat_id DESC FETCH FIRST 1 ROW ONLY) AS "hr_result",
+                   (SELECT w.status_seleksi FROM HRS_HASIL_WAWANCARA_USER w WHERE w.lamaran_id = l.lamaran_id FETCH FIRST 1 ROW ONLY) AS "user_selection_status",
+                   (SELECT w.rekomendasi FROM HRS_HASIL_WAWANCARA_USER w WHERE w.lamaran_id = l.lamaran_id FETCH FIRST 1 ROW ONLY) AS "user_recommendation",
+                   (SELECT w.nilai_total FROM HRS_HASIL_WAWANCARA_USER w WHERE w.lamaran_id = l.lamaran_id FETCH FIRST 1 ROW ONLY) AS "user_score",
+                   (SELECT TO_CHAR(w.tanggal_wawancara, \'YYYY-MM-DD\') FROM HRS_HASIL_WAWANCARA_USER w WHERE w.lamaran_id = l.lamaran_id FETCH FIRST 1 ROW ONLY) AS "user_interview_date",
+                   (SELECT w.nama_pewawancara FROM HRS_HASIL_WAWANCARA_USER w WHERE w.lamaran_id = l.lamaran_id FETCH FIRST 1 ROW ONLY) AS "user_interviewer",
+                   (SELECT w.catatan_wawancara FROM HRS_HASIL_WAWANCARA_USER w WHERE w.lamaran_id = l.lamaran_id FETCH FIRST 1 ROW ONLY) AS "user_interview_notes",
+                   (SELECT r.keputusan_akhir FROM HRS_REKAPAN_KEPUTUSAN_HR r WHERE r.kandidat_id = p.kandidat_id AND UPPER(TRIM(r.nama_departement)) = UPPER(TRIM(d.nama_departemen)) ORDER BY r.rekapan_keputusan_id DESC FETCH FIRST 1 ROW ONLY) AS "hr_final_decision",
                    (SELECT MAX(r.tahap_seleksi) KEEP (DENSE_RANK LAST ORDER BY r.tanggal_status, r.riwayat_status_id) FROM HRS_RIWAYAT_STATUS_PELAMAR r WHERE r.lamaran_id = l.lamaran_id) AS "stage"
             FROM HRS_LAMARAN l
             LEFT JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
@@ -2104,51 +2521,22 @@ class Recruitment_Database {
         return (int) $rows[0]['count'];
     }
 
-    public function get_user_interview_candidates( string $department ): array {
+    public function get_user_interview_candidates( string $department, int $account_id ): array {
         $department = trim( $department );
-        if ( '' === $department ) {
+        if ( '' === $department || $account_id < 1 ) {
             return [];
         }
 
         $this->last_error = null;
         return $this->fetch_all(
-            'WITH scoped_candidates AS (
-                SELECT p.kandidat_id,
-                       NVL(p.nama_lengkap, p.nama_kandidat) AS candidate_name,
-                       NVL(p.email, pkl.email) AS candidate_email,
-                       NVL(p.nomor_hp, p.nomor_telepon) AS candidate_phone,
-                       d.nama_departemen AS department_name,
-                       MAX(d.judul_pekerjaan) KEEP (DENSE_RANK LAST ORDER BY NVL(l.created_at, l.tanggal_melamar), l.lamaran_id) AS position_name,
-                       MAX(k.nama_dealer) KEEP (DENSE_RANK LAST ORDER BY NVL(l.created_at, l.tanggal_melamar), l.lamaran_id) AS dealer_name,
-                       MAX(l.status_akhir) KEEP (DENSE_RANK LAST ORDER BY NVL(l.created_at, l.tanggal_melamar), l.lamaran_id) AS application_final_status
-                FROM HRS_LAMARAN l
-                JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
-                LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id
-                JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
-                JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id
-                WHERE UPPER(TRIM(d.nama_departemen)) = UPPER(TRIM(:department))
-                  AND (
-                    UPPER(TRIM(l.status_terkini)) = \'INTERVIEW_USER\'
-                    OR l.status_akhir IN (\'DITERIMA\', \'DITOLAK\')
-                    OR EXISTS (
-                        SELECT 1
-                        FROM HRS_HASIL_WAWANCARA_USER prior_result
-                        WHERE prior_result.kandidat_id = p.kandidat_id
-                          AND UPPER(TRIM(prior_result.nama_departemen)) = UPPER(TRIM(d.nama_departemen))
-                    )
-                  )
-                GROUP BY p.kandidat_id, NVL(p.nama_lengkap, p.nama_kandidat),
-                         NVL(p.email, pkl.email), NVL(p.nomor_hp, p.nomor_telepon),
-                         d.nama_departemen
-            ),
-            ranked_schedules AS (
+            'WITH ranked_schedules AS (
                 SELECT j.*,
                        ROW_NUMBER() OVER (PARTITION BY j.kandidat_id ORDER BY j.tanggal_wawancara DESC NULLS LAST, j.jadwal_id DESC) AS row_num
                 FROM HRS_JADWAL_KANDIDAT j
             ),
             ranked_results AS (
                 SELECT w.*,
-                       ROW_NUMBER() OVER (PARTITION BY w.kandidat_id, UPPER(TRIM(w.nama_departemen)) ORDER BY w.hasil_user DESC) AS row_num
+                       ROW_NUMBER() OVER (PARTITION BY w.lamaran_id ORDER BY w.hasil_user DESC) AS row_num
                 FROM HRS_HASIL_WAWANCARA_USER w
             ),
             ranked_decisions AS (
@@ -2156,14 +2544,15 @@ class Recruitment_Database {
                        ROW_NUMBER() OVER (PARTITION BY r.kandidat_id, UPPER(TRIM(r.nama_departement)) ORDER BY r.rekapan_keputusan_id DESC) AS row_num
                 FROM HRS_REKAPAN_KEPUTUSAN_HR r
             )
-            SELECT c.kandidat_id AS "CANDIDATE_ID",
-                   c.candidate_name AS "CANDIDATE_NAME",
-                   c.candidate_email AS "CANDIDATE_EMAIL",
-                   c.candidate_phone AS "CANDIDATE_PHONE",
-                   c.position_name AS "POSITION",
-                   c.dealer_name AS "DEALER",
+            SELECT l.lamaran_id AS "APPLICATION_ID",
+                   p.kandidat_id AS "CANDIDATE_ID",
+                   NVL(p.nama_lengkap, p.nama_kandidat) AS "CANDIDATE_NAME",
+                   NVL(p.email, pkl.email) AS "CANDIDATE_EMAIL",
+                   NVL(p.nomor_hp, p.nomor_telepon) AS "CANDIDATE_PHONE",
+                   d.judul_pekerjaan AS "POSITION",
+                   k.nama_dealer AS "DEALER",
                    NVL(w.status_seleksi, \'\') AS "INTERVIEW_STATUS",
-                   CASE UPPER(NVL(r.keputusan_akhir, c.application_final_status))
+                   CASE UPPER(NVL(r.keputusan_akhir, l.status_akhir))
                        WHEN \'DITERIMA\' THEN \'Diterima\'
                        WHEN \'ACCEPTED\' THEN \'Diterima\'
                        WHEN \'DITOLAK\' THEN \'Tidak Diterima\'
@@ -2171,6 +2560,10 @@ class Recruitment_Database {
                        ELSE \'\'
                    END AS "FINAL_DECISION",
                    j.hasil_hr AS "HR_RESULT",
+                   hr.status_hasil AS "HR_INTERVIEW_RESULT",
+                   hr.rekomendasi AS "HR_RECOMMENDATION",
+                   hr.nama_pewawancara AS "HR_INTERVIEWER",
+                   hr.catatan_wawancara AS "HR_INTERVIEW_NOTES",
                    TO_CHAR(j.tanggal_wawancara, \'YYYY-MM-DD\') AS "INTERVIEW_DATE",
                    j.jam_wawancara AS "INTERVIEW_TIME",
                    j.metode_wawancara AS "INTERVIEW_METHOD",
@@ -2189,22 +2582,41 @@ class Recruitment_Database {
                    w.nilai_kerjasama AS "SCORE_TEAMWORK",
                    w.nilai_problemsolving AS "SCORE_PROBLEM_SOLVING",
                    w.nilai_adaptasi AS "SCORE_ADAPTABILITY"
-            FROM scoped_candidates c
-            LEFT JOIN ranked_schedules j ON j.kandidat_id = c.kandidat_id AND j.row_num = 1
-            LEFT JOIN ranked_results w ON w.kandidat_id = c.kandidat_id AND UPPER(TRIM(w.nama_departemen)) = UPPER(TRIM(c.department_name)) AND w.row_num = 1
-            LEFT JOIN ranked_decisions r ON r.kandidat_id = c.kandidat_id AND UPPER(TRIM(r.nama_departement)) = UPPER(TRIM(c.department_name)) AND r.row_num = 1
-            ORDER BY c.candidate_name, c.kandidat_id',
-            [ 'department' => $department ]
+            FROM HRS_LAMARAN l
+            JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
+            LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id
+            JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
+            JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id
+            JOIN HRS_HASIL_WAWANCARA_HR hr ON hr.lamaran_id = l.lamaran_id
+            JOIN HRS_ROLE_AKSES assigned_account ON assigned_account.role_akses_id = hr.role_akses_id
+            LEFT JOIN HRS_DEPARTEMEN assigned_department ON assigned_department.departemen_id = assigned_account.departemen_id
+            LEFT JOIN ranked_schedules j ON j.kandidat_id = p.kandidat_id AND j.row_num = 1
+            LEFT JOIN ranked_results w ON w.lamaran_id = l.lamaran_id AND w.row_num = 1
+            LEFT JOIN ranked_decisions r ON r.kandidat_id = p.kandidat_id AND UPPER(TRIM(r.nama_departement)) = UPPER(TRIM(NVL(assigned_department.nama_departemen, assigned_account.nama_departemen))) AND r.row_num = 1
+            WHERE UPPER(TRIM(NVL(assigned_department.nama_departemen, assigned_account.nama_departemen))) = UPPER(TRIM(:department))
+              AND (
+                    UPPER(TRIM(l.status_terkini)) = \'INTERVIEW_USER\'
+                    OR UPPER(TRIM(l.status_akhir)) IN (\'DITERIMA\', \'ACCEPTED\', \'DITOLAK\', \'REJECTED\')
+              )
+              AND hr.status_hasil = \'LOLOS\'
+              AND hr.role_akses_id = :account_id
+              AND assigned_account.peran = \'KEPALA_DEPARTEMEN\'
+              AND UPPER(TRIM(assigned_account.status_akun)) = \'ACTIVE\'
+            ORDER BY NVL(l.created_at, l.tanggal_melamar) DESC, l.lamaran_id DESC',
+            [
+                'department' => $department,
+                'account_id' => $account_id,
+            ]
         );
     }
 
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function get_user_interview_results( string $department ): array {
+    public function get_user_interview_results( string $department, int $account_id ): array {
         return array_values(
             array_filter(
-                $this->get_user_interview_candidates( $department ),
+                $this->get_user_interview_candidates( $department, $account_id ),
                 static fn ( array $row ): bool => '' !== trim( (string) ( $row['INTERVIEW_STATUS'] ?? '' ) )
             )
         );
@@ -2215,9 +2627,8 @@ class Recruitment_Database {
      *
      * @return array{application: array<string, mixed>, profile: array<string, mixed>, answers: array<int, array<string, mixed>>, history: array<int, array<string, mixed>>}|null
      */
-    public function get_user_department_candidate_detail( string $department, string $candidate_id ): ?array {
-        $department = trim( $department );
-        if ( '' === $department || ! ctype_digit( $candidate_id ) || '0' === $candidate_id ) {
+    public function get_user_department_candidate_detail( string $application_id, int $account_id ): ?array {
+        if ( ! ctype_digit( $application_id ) || '0' === $application_id || $account_id < 1 ) {
             return null;
         }
 
@@ -2240,6 +2651,23 @@ class Recruitment_Database {
                     p.kota AS "city",
                     p.provinsi AS "province",
                     p.pendidikan AS "education",
+                    hr.status_hasil AS "hr_interview_result",
+                    hr.rekomendasi AS "hr_recommendation",
+                    hr.nama_pewawancara AS "hr_interviewer",
+                    hr.catatan_wawancara AS "hr_interview_notes",
+                    assigned_account.username AS "department_account_username",
+                    assigned_account.email AS "department_account_email",
+                    w.status_seleksi AS "user_interview_result",
+                    w.rekomendasi AS "user_recommendation",
+                    w.nilai_total AS "user_interview_score",
+                    w.nama_pewawancara AS "user_interviewer",
+                    w.catatan_wawancara AS "user_interview_notes",
+                    TO_CHAR(w.tanggal_wawancara, \'YYYY-MM-DD\') AS "user_interview_date",
+                    (SELECT h.nilai
+                     FROM HRS_HASIL_TES_PSIKOLOGI h
+                     WHERE h.kandidat_id = p.kandidat_id
+                     ORDER BY h.dikumpulkan_pada DESC NULLS LAST, h.hasil_tes_psikologi_id DESC
+                     FETCH FIRST 1 ROW ONLY) AS "psychotest_score",
                     pd.data_profil AS "profile_details"
              FROM HRS_LAMARAN l
              JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
@@ -2247,24 +2675,18 @@ class Recruitment_Database {
              JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
              JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id
              LEFT JOIN HRS_PROFIL_KANDIDAT_DETAIL pd ON pd.kandidat_id = p.kandidat_id
-             WHERE p.kandidat_id = :candidate_id
-               AND UPPER(TRIM(d.nama_departemen)) = UPPER(TRIM(:department))
-               AND (
-                    UPPER(TRIM(l.status_terkini)) = \'INTERVIEW_USER\'
-                    OR l.status_akhir IN (\'DITERIMA\', \'DITOLAK\')
-                    OR EXISTS (
-                        SELECT 1
-                        FROM HRS_HASIL_WAWANCARA_USER w
-                        WHERE w.kandidat_id = p.kandidat_id
-                          AND UPPER(TRIM(w.nama_departemen)) = UPPER(TRIM(:result_department))
-                    )
-               )
-             ORDER BY NVL(l.created_at, l.tanggal_melamar) DESC, l.lamaran_id DESC
+             JOIN HRS_HASIL_WAWANCARA_HR hr ON hr.lamaran_id = l.lamaran_id
+             JOIN HRS_ROLE_AKSES assigned_account ON assigned_account.role_akses_id = hr.role_akses_id
+             LEFT JOIN HRS_HASIL_WAWANCARA_USER w ON w.lamaran_id = l.lamaran_id
+             WHERE l.lamaran_id = :application_id
+               AND hr.status_hasil = \'LOLOS\'
+               AND hr.role_akses_id = :account_id
+               AND assigned_account.peran = \'KEPALA_DEPARTEMEN\'
+               AND UPPER(TRIM(assigned_account.status_akun)) = \'ACTIVE\'
              FETCH FIRST 1 ROW ONLY',
             [
-                'candidate_id' => $candidate_id,
-                'department' => $department,
-                'result_department' => $department,
+                'application_id' => $application_id,
+                'account_id' => $account_id,
             ]
         );
         if ( empty( $rows[0] ) ) {
@@ -2272,7 +2694,25 @@ class Recruitment_Database {
         }
 
         $application = $rows[0];
-        $profile_details = $this->decode_applicant_profile_details( $application['profile_details'] ?? '' );
+        $decoded_profile_details = $this->decode_applicant_profile_details( $application['profile_details'] ?? '' );
+        $profile_details = array_intersect_key(
+            $decoded_profile_details,
+            array_flip( [ 'education_level', 'institution', 'major', 'gpa', 'graduation_year', 'work_experiences' ] )
+        );
+        $profile_documents = is_array( $decoded_profile_details['documents'] ?? null ) ? $decoded_profile_details['documents'] : [];
+        if ( is_array( $profile_documents['resume'] ?? null ) ) {
+            $profile_details['documents'] = [ 'resume' => $profile_documents['resume'] ];
+        }
+        $profile_answers = is_array( $decoded_profile_details['application_answers'] ?? null ) ? $decoded_profile_details['application_answers'] : [];
+        $profile_details['application_answers'] = array_intersect_key(
+            $profile_answers,
+            array_flip(
+                array_filter(
+                    array_keys( $profile_answers ),
+                    static fn ( $key ): bool => is_string( $key ) && 1 === preg_match( '/\Apendidikan_formal_\d+_(?:tingkat|nama_sekolah|program_studi|ipk|tahun_lulus)\z/i', $key )
+                )
+            )
+        );
         unset( $application['profile_details'] );
         $application_id = (string) ( $application['application_id'] ?? '' );
 
@@ -2291,7 +2731,7 @@ class Recruitment_Database {
                 'education' => (string) ( $application['education'] ?? '' ),
                 'profile_details' => $profile_details,
             ],
-            'answers' => '' !== $application_id ? $this->get_admin_application_answers( $application_id ) : [],
+            'answers' => '' !== $application_id ? $this->get_department_profile_answers( $this->get_admin_application_answers( $application_id ) ) : [],
             'history' => '' !== $application_id ? $this->get_selection_history( $application_id ) : [],
         ];
     }
@@ -2300,7 +2740,7 @@ class Recruitment_Database {
      * @param array<string, mixed> $result
      * @return array{success: bool, error?: string}
      */
-    public function save_user_interview_result( int $candidate_id, array $result ): array {
+    public function save_user_interview_result( int $application_id, int $account_id, array $result ): array {
         $department = trim( (string) ( $result['department'] ?? '' ) );
         $interviewer = trim( (string) ( $result['interviewer'] ?? '' ) );
         $scores = is_array( $result['scores'] ?? null ) ? $result['scores'] : [];
@@ -2311,7 +2751,7 @@ class Recruitment_Database {
         $valid_selection_statuses = [ 'Lolos Wawancara User', 'Tidak Lolos Wawancara User' ];
         $valid_recommendations = [ 'Sangat Baik', 'Baik', 'Dipertimbangkan', 'Tidak Dilanjutkan' ];
 
-        if ( $candidate_id < 1 || '' === $department || '' === $interviewer || ! in_array( $selection_status, $valid_selection_statuses, true ) || ! in_array( $recommendation, $valid_recommendations, true ) ) {
+        if ( $application_id < 1 || $account_id < 1 || '' === $department || '' === $interviewer || ! in_array( $selection_status, $valid_selection_statuses, true ) || ! in_array( $recommendation, $valid_recommendations, true ) ) {
             return [ 'success' => false, 'error' => 'Data hasil wawancara tidak valid.' ];
         }
         foreach ( $score_keys as $key ) {
@@ -2329,41 +2769,35 @@ class Recruitment_Database {
         try {
             $connection = $this->get_connection();
             $connection->beginTransaction();
-            $candidate_lock = $connection->prepare( 'SELECT kandidat_id FROM HRS_PROFIL_KANDIDAT WHERE kandidat_id = :candidate_id FOR UPDATE' );
-            $candidate_lock->execute( [ 'candidate_id' => $candidate_id ] );
-            if ( ! $candidate_lock->fetchColumn() ) {
-                $connection->rollBack();
-                return [ 'success' => false, 'error' => 'Profil kandidat tidak ditemukan.' ];
-            }
-            $eligibility = $connection->prepare(
+            $assignment = $connection->prepare(
                 'SELECT p.kandidat_id
-                 FROM HRS_PROFIL_KANDIDAT p
-                 WHERE p.kandidat_id = :candidate_id
-                   AND EXISTS (
-                       SELECT 1
-                       FROM HRS_LAMARAN l
-                       JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
-                       JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
-                       WHERE pkl.kandidat_id = p.kandidat_id
-                         AND UPPER(TRIM(d.nama_departemen)) = UPPER(TRIM(:application_department))
-                         AND UPPER(TRIM(l.status_terkini)) = \'INTERVIEW_USER\'
-                   )
-                   AND NOT EXISTS (
-                       SELECT 1 FROM HRS_REKAPAN_KEPUTUSAN_HR r
-                       WHERE r.kandidat_id = p.kandidat_id
-                         AND UPPER(TRIM(r.nama_departement)) = UPPER(TRIM(:decision_department))
-                   )'
+                 FROM HRS_LAMARAN l
+                 JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
+                 JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
+                 JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id
+                 JOIN HRS_HASIL_WAWANCARA_HR hr ON hr.lamaran_id = l.lamaran_id
+                 JOIN HRS_ROLE_AKSES u ON u.role_akses_id = hr.role_akses_id
+                 LEFT JOIN HRS_DEPARTEMEN assigned_department ON assigned_department.departemen_id = u.departemen_id
+                 WHERE l.lamaran_id = :application_id
+                   AND UPPER(TRIM(l.status_terkini)) = \'INTERVIEW_USER\'
+                   AND hr.status_hasil = \'LOLOS\'
+                   AND hr.role_akses_id = :account_id
+                   AND u.peran = \'KEPALA_DEPARTEMEN\'
+                   AND UPPER(TRIM(u.status_akun)) = \'ACTIVE\'
+                   AND UPPER(TRIM(NVL(assigned_department.nama_departemen, u.nama_departemen))) = UPPER(TRIM(:department_name))
+                 FOR UPDATE OF l.status_terkini'
             );
-            $eligibility->execute(
+            $assignment->execute(
                 [
-                    'candidate_id' => $candidate_id,
-                    'application_department' => $department,
-                    'decision_department' => $department,
+                    'application_id' => $application_id,
+                    'account_id' => $account_id,
+                    'department_name' => $department,
                 ]
             );
-            if ( ! $eligibility->fetchColumn() ) {
+            $candidate_id = (int) $assignment->fetchColumn();
+            if ( $candidate_id < 1 ) {
                 $connection->rollBack();
-                return [ 'success' => false, 'error' => 'Kandidat tidak berada pada tahap wawancara User untuk departemen akun ini.' ];
+                return [ 'success' => false, 'error' => 'Lamaran tidak diberikan kepada akun User Department ini atau tidak lagi dalam tahap wawancara.' ];
             }
 
             $status_lookup = $connection->prepare(
@@ -2374,7 +2808,8 @@ class Recruitment_Database {
 
             $update = $connection->prepare(
                 'UPDATE HRS_HASIL_WAWANCARA_USER
-                 SET nama_pewawancara = :interviewer, nilai_penampilan = :presentation,
+                 SET lamaran_id = :application_id,
+                     nama_pewawancara = :interviewer, nilai_penampilan = :presentation,
                      nilai_komunikasi = :communication, nilai_motivasi = :motivation,
                      nilai_pengalaman = :experience, nilai_keterampilan = :knowledge,
                      nilai_kerjasama = :teamwork, nilai_problemsolving = :problem_solving,
@@ -2385,11 +2820,11 @@ class Recruitment_Database {
                      nama_kandidat = (SELECT NVL(p.nama_lengkap, p.nama_kandidat) FROM HRS_PROFIL_KANDIDAT p WHERE p.kandidat_id = :candidate_for_name)
                  WHERE hasil_user = (
                      SELECT MAX(hasil_user) FROM HRS_HASIL_WAWANCARA_USER
-                     WHERE kandidat_id = :candidate_for_update
-                       AND UPPER(TRIM(nama_departemen)) = UPPER(TRIM(:department_for_update))
+                     WHERE lamaran_id = :application_for_update
                  )'
             );
             $parameters = [
+                'application_id' => $application_id,
                 'interviewer' => $interviewer,
                 'presentation' => (int) $scores['presentation'],
                 'communication' => (int) $scores['communication'],
@@ -2405,20 +2840,19 @@ class Recruitment_Database {
                 'status_candidate_id' => $status_candidate_id ? (int) $status_candidate_id : null,
                 'selection_status' => $selection_status,
                 'candidate_for_name' => $candidate_id,
-                'candidate_for_update' => $candidate_id,
-                'department_for_update' => $department,
+                'application_for_update' => $application_id,
             ];
             $update->execute( $parameters );
             if ( 0 === $update->rowCount() ) {
                 $insert = $connection->prepare(
                     'INSERT INTO HRS_HASIL_WAWANCARA_USER (
-                        kandidat_id, nama_pewawancara, nama_departemen, nilai_penampilan,
+                        lamaran_id, kandidat_id, nama_pewawancara, nama_departemen, nilai_penampilan,
                         nilai_komunikasi, nilai_motivasi, nilai_pengalaman, nilai_keterampilan,
                         nilai_kerjasama, nilai_problemsolving, nilai_adaptasi, nilai_total,
                         rekomendasi, catatan_wawancara, tanggal_wawancara, submitted_at,
                         status_kandidat_id, status_seleksi, nama_kandidat
                     )
-                    SELECT p.kandidat_id, :interviewer, :department_name, :presentation,
+                    SELECT :application_id, p.kandidat_id, :interviewer, :department_name, :presentation,
                            :communication, :motivation, :experience, :knowledge, :teamwork,
                            :problem_solving, :adaptability, :total_score, :recommendation,
                            :notes, CURRENT_DATE, CURRENT_DATE, :status_candidate_id,
@@ -2427,6 +2861,7 @@ class Recruitment_Database {
                 );
                 $insert->execute(
                     [
+                        'application_id' => $application_id,
                         'interviewer' => $interviewer,
                         'department_name' => $department,
                         'presentation' => (int) $scores['presentation'],
@@ -2462,20 +2897,13 @@ class Recruitment_Database {
 
             $history = $connection->prepare(
                 'INSERT INTO HRS_RIWAYAT_STATUS_PELAMAR (lamaran_id, tahap_seleksi, status_seleksi, tanggal_status, keterangan_pelamar)
-                 SELECT l.lamaran_id, \'INTERVIEW_USER\', :selection_status, CURRENT_DATE, :note
-                 FROM HRS_LAMARAN l
-                 JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
-                 JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
-                 WHERE pkl.kandidat_id = :candidate_id
-                   AND UPPER(TRIM(d.nama_departemen)) = UPPER(TRIM(:department_name))
-                   AND UPPER(TRIM(l.status_terkini)) = \'INTERVIEW_USER\''
+                 VALUES (:application_id, \'INTERVIEW_USER\', :selection_status, CURRENT_DATE, :note)'
             );
             $history->execute(
                 [
+                    'application_id' => $application_id,
                     'selection_status' => $selection_status,
                     'note' => 'Hasil User: ' . $selection_status . '; ' . $recommendation,
-                    'candidate_id' => $candidate_id,
-                    'department_name' => $department,
                 ]
             );
             $connection->commit();
@@ -2552,7 +2980,7 @@ class Recruitment_Database {
                 $connection->rollBack();
                 return [ 'success' => false, 'error' => 'Lamaran tidak ditemukan.' ];
             }
-            if ( ! in_array( (string) $candidate['application_status'], [ 'INTERVIEW_USER', 'DITERIMA', 'DITOLAK' ], true ) ) {
+            if ( ! in_array( (string) $candidate['application_status'], [ 'INTERVIEW_USER', 'FINAL', 'DITERIMA', 'DITOLAK' ], true ) ) {
                 $connection->rollBack();
                 return [ 'success' => false, 'error' => 'Keputusan akhir hanya dapat dibuat setelah kandidat mencapai tahap wawancara departemen.' ];
             }
@@ -3228,7 +3656,7 @@ class Recruitment_Database {
         }
         $responses = [];
         $response_ids = array_values( array_unique( array_filter( array_map( 'absint', $response_ids ) ) ) );
-        if ( $response_ids ) {
+        if ( $response_ids || $result_id > 0 ) {
             $placeholders = [];
             $parameters = [ 'test_id' => $test_id ];
             foreach ( $response_ids as $index => $response_id ) {
@@ -3236,8 +3664,16 @@ class Recruitment_Database {
                 $placeholders[] = ':' . $placeholder;
                 $parameters[ $placeholder ] = $response_id;
             }
+            $response_filters = [];
+            if ( $response_ids ) {
+                $response_filters[] = 'r.RESPON_PSIKOTES_ID IN (' . implode( ', ', $placeholders ) . ')';
+            }
+            if ( $result_id > 0 ) {
+                $response_filters[] = 'r.HASIL_TES_PSIKOLOGI_ID = :result_id';
+                $parameters['result_id'] = $result_id;
+            }
             $responses = $this->fetch_all(
-                'SELECT r.RESPON_PSIKOTES_ID AS "id", r.PERTANYAAN_PSIKOTES_ID AS "question_id", r.HASIL AS "result", r.TEKS_JAWABAN AS "answer", r.NILAI_DIPEROLEH AS "score", TO_CHAR(r.DIJAWAB_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "answered_at" FROM HRS_RESPON_PSIKOTES r JOIN HRS_PERTANYAAN_PSIKOTES q ON q.PERTANYAAN_PSIKOTES_ID = r.PERTANYAAN_PSIKOTES_ID WHERE q.TES_PSIKOLOGI_ID = :test_id AND r.RESPON_PSIKOTES_ID IN (' . implode( ', ', $placeholders ) . ') ORDER BY q.DISPLAY_ORDER, r.RESPON_PSIKOTES_ID',
+                'SELECT r.RESPON_PSIKOTES_ID AS "id", r.PERTANYAAN_PSIKOTES_ID AS "question_id", r.HASIL AS "result", r.TEKS_JAWABAN AS "answer", r.NILAI_DIPEROLEH AS "score", TO_CHAR(r.DIJAWAB_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "answered_at" FROM HRS_RESPON_PSIKOTES r JOIN HRS_PERTANYAAN_PSIKOTES q ON q.PERTANYAAN_PSIKOTES_ID = r.PERTANYAAN_PSIKOTES_ID WHERE q.TES_PSIKOLOGI_ID = :test_id AND (' . implode( ' OR ', $response_filters ) . ') ORDER BY q.DISPLAY_ORDER, r.RESPON_PSIKOTES_ID',
                 $parameters
             );
         }
@@ -3796,30 +4232,55 @@ class Recruitment_Database {
      * @param array<int, int> $numbers
      * @return array{success: bool, response_id?: int, error?: string}
      */
-    public function save_pauli_column_response( int $candidate_id, int $test_id, int $question_id, int $response_id, string $answers, array $numbers ): array {
+    public function save_pauli_column_response( int $candidate_id, int $test_id, int $question_id, int $response_id, string $answers, array $numbers, int $answer_width = 1 ): array {
         $numbers = array_values( array_map( 'absint', $numbers ) );
         $answer_count = count( $numbers ) - 1;
         if ( $candidate_id < 1 || $test_id < 1 || $question_id < 1
-            || $answer_count < 99 || $answer_count > 900
-            || 1 !== preg_match( '/\A[0-9-]{' . $answer_count . '}\z/', $answers )
-            || count( array_filter( $numbers, static fn ( int $number ): bool => $number > 9 ) ) > 0 ) {
+            || 900 !== $answer_count || ! in_array( $answer_width, [ 1, 3 ], true )
+            || self::matches_pauli_answers( $answers, $answer_width, $answer_count ) === false
+            || count( array_filter( $numbers, static fn ( int $number ): bool => $number > ( 1 === $answer_width ? 9 : 99 ) ) ) > 0 ) {
             return [ 'success' => false, 'error' => 'Kolom tes Pauli tidak valid.' ];
         }
         if ( ! $this->question_belongs_to_test( $test_id, $question_id ) ) {
             return [ 'success' => false, 'error' => 'Kolom tidak termasuk dalam tes Pauli.' ];
         }
 
-        $answer_json = wp_json_encode(
-            [ 'numbers' => $numbers, 'answers' => $answers ],
-            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
-        );
+        if ( 1 === $answer_width ) {
+            $answer_json = wp_json_encode(
+                [ 'numbers' => $numbers, 'answers' => $answers ],
+                JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+            );
+        } else {
+            $packed_numbers = '';
+            $packed_answers = '';
+            for ( $index = 0; $index <= $answer_count; $index++ ) {
+                $packed_numbers .= pack( 'C', $numbers[ $index ] );
+                if ( $index < $answer_count ) {
+                    $answer = substr( $answers, $index * $answer_width, $answer_width );
+                    $packed_answers .= pack( 'C', '---' === $answer ? 255 : (int) $answer );
+                }
+            }
+            $answer_json = wp_json_encode(
+                [
+                    'format' => 'pauli-v2',
+                    'numbers' => base64_encode( $packed_numbers ),
+                    'answers' => base64_encode( $packed_answers ),
+                ],
+                JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+            );
+        }
         if ( ! is_string( $answer_json ) ) {
             return [ 'success' => false, 'error' => 'Jawaban tes Pauli tidak dapat diproses.' ];
         }
         $score = 0;
         for ( $index = 0; $index < $answer_count; $index++ ) {
-            if ( ctype_digit( $answers[ $index ] )
-                && (int) $answers[ $index ] === ( $numbers[ $index ] + $numbers[ $index + 1 ] ) % 10 ) {
+            $answer = substr( $answers, $index * $answer_width, $answer_width );
+            $expected = $numbers[ $index ] + $numbers[ $index + 1 ];
+            if ( 1 === $answer_width ) {
+                $expected %= 10;
+            }
+            $answer_value = ctype_digit( $answer ) ? (int) $answer : -1;
+            if ( $answer_value === $expected || ( 3 === $answer_width && $answer_value === $expected % 10 ) ) {
                 $score++;
             }
         }
@@ -3841,6 +4302,22 @@ class Recruitment_Database {
             $this->log_oracle_failure( 'Pauli response save failed', $exception );
             return [ 'success' => false, 'error' => 'Jawaban tes Pauli gagal disimpan ke Oracle.' ];
         }
+    }
+
+    private static function matches_pauli_answers( string $answers, int $answer_width, int $answer_count ): bool {
+        if ( $answer_count * $answer_width !== strlen( $answers ) || 1 !== preg_match( '/\A[0-9-]+\z/', $answers ) ) {
+            return false;
+        }
+        for ( $index = 0; $index < $answer_count; $index++ ) {
+            $answer = substr( $answers, $index * $answer_width, $answer_width );
+            if ( str_repeat( '-', $answer_width ) === $answer ) {
+                continue;
+            }
+            if ( ! ctype_digit( $answer ) || ( 3 === $answer_width && (int) $answer > 198 ) ) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -3918,7 +4395,91 @@ class Recruitment_Database {
         return $candidate;
     }
 
-    /** @return array<int, array<string, string>> */
+    /**
+     * Load an application-specific profile for the authorized HR download route.
+     *
+     * @return array{application: array<string, mixed>, profile: array<string, mixed>, answers: array<int, array<string, mixed>>, history: array<int, array<string, mixed>>}|null
+     */
+    public function get_admin_application_profile( string $application_id ): ?array {
+        if ( ! ctype_digit( $application_id ) || '0' === $application_id ) {
+            return null;
+        }
+
+        $rows = $this->fetch_all(
+            'SELECT l.lamaran_id AS "application_id",
+                    l.profile_kandidat_id AS "applicant_id",
+                    TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "application_date",
+                    l.status_terkini AS "application_status",
+                    l.status_akhir AS "final_status",
+                    d.judul_pekerjaan AS "position",
+                    d.nama_departemen AS "department",
+                    k.nama_dealer AS "dealer",
+                    p.kandidat_id AS "candidate_id",
+                    NVL(p.nama_lengkap, p.nama_kandidat) AS "candidate_name",
+                    NVL(p.email, pkl.email) AS "candidate_email",
+                    NVL(p.nomor_hp, p.nomor_telepon) AS "candidate_phone",
+                    p.jenis_kelamin AS "gender",
+                    p.tempat_lahir AS "birth_place",
+                    TO_CHAR(p.tanggal_lahir, \'YYYY-MM-DD\') AS "birth_date",
+                    p.alamat_domisili AS "address",
+                    p.kota AS "city",
+                    p.provinsi AS "province",
+                    p.pendidikan AS "education",
+                    hr.status_hasil AS "hr_interview_result",
+                    hr.rekomendasi AS "hr_recommendation",
+                    hr.nama_pewawancara AS "hr_interviewer",
+                    hr.catatan_wawancara AS "hr_interview_notes",
+                    (SELECT h.nilai FROM HRS_HASIL_TES_PSIKOLOGI h
+                     WHERE h.kandidat_id = p.kandidat_id
+                     ORDER BY h.dikumpulkan_pada DESC NULLS LAST, h.hasil_tes_psikologi_id DESC
+                     FETCH FIRST 1 ROW ONLY) AS "psychotest_score",
+                    w.status_seleksi AS "user_interview_result",
+                    w.rekomendasi AS "user_recommendation",
+                    w.nilai_total AS "user_interview_score",
+                    w.nama_pewawancara AS "user_interviewer",
+                    w.catatan_wawancara AS "user_interview_notes",
+                    pd.data_profil AS "profile_details"
+             FROM HRS_LAMARAN l
+             JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
+             LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id
+             JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
+             JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id
+             LEFT JOIN HRS_PROFIL_KANDIDAT_DETAIL pd ON pd.kandidat_id = p.kandidat_id
+             LEFT JOIN HRS_HASIL_WAWANCARA_HR hr ON hr.lamaran_id = l.lamaran_id
+             LEFT JOIN HRS_HASIL_WAWANCARA_USER w ON w.lamaran_id = l.lamaran_id
+             WHERE l.lamaran_id = :application_id
+             FETCH FIRST 1 ROW ONLY',
+            [ 'application_id' => $application_id ]
+        );
+        if ( empty( $rows[0] ) ) {
+            return null;
+        }
+
+        $application = $rows[0];
+        $profile_details = $this->decode_applicant_profile_details( $application['profile_details'] ?? '' );
+        unset( $application['profile_details'] );
+
+        return [
+            'application' => $application,
+            'profile' => [
+                'name' => (string) ( $application['candidate_name'] ?? '' ),
+                'email' => (string) ( $application['candidate_email'] ?? '' ),
+                'phone' => (string) ( $application['candidate_phone'] ?? '' ),
+                'gender' => (string) ( $application['gender'] ?? '' ),
+                'birth_place' => (string) ( $application['birth_place'] ?? '' ),
+                'birth_date' => (string) ( $application['birth_date'] ?? '' ),
+                'address' => (string) ( $application['address'] ?? '' ),
+                'city' => (string) ( $application['city'] ?? '' ),
+                'province' => (string) ( $application['province'] ?? '' ),
+                'education' => (string) ( $application['education'] ?? '' ),
+                'profile_details' => $profile_details,
+            ],
+            'answers' => $this->get_admin_application_answers( $application_id ),
+            'history' => $this->get_selection_history( $application_id ),
+        ];
+    }
+
+    /** @return array<int, array<string, mixed>> */
     public function get_admin_application_answers( string $application_id ): array {
         if ( ! ctype_digit( $application_id ) || '0' === $application_id ) {
             return [];
@@ -3926,7 +4487,7 @@ class Recruitment_Database {
 
         // Prefer the direct application link; retain the legacy lookup for older snapshots.
         $answers = $this->fetch_all(
-            'SELECT a.FIELD_KEY AS "field_key", a.FIELD_TITLE AS "field_title", a.ANSWER_VALUE AS "answer_value", a.FILE_NAME AS "file_name" FROM RECRUIT_FORM_ANSWERS a JOIN RECRUIT_FORM_SUBMISSIONS s ON s.SUBMISSION_ID = a.SUBMISSION_ID WHERE s.LAMARAN_ID = :application_id ORDER BY a.SUBMISSION_ID DESC, a.FIELD_KEY',
+            'SELECT a.FIELD_KEY AS "field_key", a.FIELD_TITLE AS "field_title", a.FIELD_TYPE AS "field_type", a.ANSWER_VALUE AS "answer_value", a.FILE_NAME AS "file_name" FROM RECRUIT_FORM_ANSWERS a JOIN RECRUIT_FORM_SUBMISSIONS s ON s.SUBMISSION_ID = a.SUBMISSION_ID WHERE s.LAMARAN_ID = :application_id ORDER BY a.SUBMISSION_ID DESC, a.FIELD_KEY',
             [ 'application_id' => $application_id ]
         );
         if ( ! empty( $answers ) ) {
@@ -3934,7 +4495,7 @@ class Recruitment_Database {
         }
 
         $answers = $this->fetch_all(
-            'SELECT a.FIELD_KEY AS "field_key", a.FIELD_TITLE AS "field_title", a.ANSWER_VALUE AS "answer_value", a.FILE_NAME AS "file_name" FROM RECRUIT_FORM_ANSWERS a JOIN RECRUIT_FORM_SUBMISSIONS s ON s.SUBMISSION_ID = a.SUBMISSION_ID JOIN HRS_LAMARAN l ON l.LAMARAN_ID = :application_id AND s.SOURCE_VACANCY_ID = l.DETAIL_LOWONGAN_ID JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.PROFILE_KANDIDAT_LOGIN = l.PROFILE_KANDIDAT_ID WHERE LOWER(TRIM(s.APPLICANT_EMAIL)) = LOWER(TRIM(pkl.EMAIL)) ORDER BY a.SUBMISSION_ID DESC, a.FIELD_KEY',
+            'SELECT a.FIELD_KEY AS "field_key", a.FIELD_TITLE AS "field_title", a.FIELD_TYPE AS "field_type", a.ANSWER_VALUE AS "answer_value", a.FILE_NAME AS "file_name" FROM RECRUIT_FORM_ANSWERS a JOIN RECRUIT_FORM_SUBMISSIONS s ON s.SUBMISSION_ID = a.SUBMISSION_ID JOIN HRS_LAMARAN l ON l.LAMARAN_ID = :application_id AND s.SOURCE_VACANCY_ID = l.DETAIL_LOWONGAN_ID JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.PROFILE_KANDIDAT_LOGIN = l.PROFILE_KANDIDAT_ID WHERE LOWER(TRIM(s.APPLICANT_EMAIL)) = LOWER(TRIM(pkl.EMAIL)) ORDER BY a.SUBMISSION_ID DESC, a.FIELD_KEY',
             [ 'application_id' => $application_id ]
         );
         if ( ! empty( $answers ) ) {
@@ -3968,6 +4529,7 @@ class Recruitment_Database {
                 $formatted[] = [
                     'field_key'    => (string) ( $ans['key'] ?? '' ),
                     'field_title'  => (string) ( $ans['title'] ?? $ans['key'] ?? '' ),
+                    'field_type'   => (string) ( $ans['type'] ?? 'text' ),
                     'answer_value' => (string) ( $ans['value'] ?? '' ),
                     'file_name'    => ( 'file' === ( $ans['type'] ?? '' ) ) ? (string) ( $ans['value'] ?? '' ) : null,
                 ];
@@ -3981,6 +4543,7 @@ class Recruitment_Database {
                 $formatted[] = [
                     'field_key'    => (string) $k,
                     'field_title'  => ucwords( str_replace( '_', ' ', (string) $k ) ),
+                    'field_type'   => 'text',
                     'answer_value' => is_scalar( $v ) ? (string) $v : ( is_array( $v ) ? json_encode( $v ) : '' ),
                     'file_name'    => null,
                 ];
@@ -3989,6 +4552,91 @@ class Recruitment_Database {
         }
 
         return [];
+    }
+
+    /**
+     * Limit department profile answers to education and requested document fields.
+     *
+     * @param array<int, array<string, mixed>> $answers
+     * @return array<int, array<string, mixed>>
+     */
+    private function get_department_profile_answers( array $answers ): array {
+        return array_values(
+            array_filter(
+                $answers,
+                static function ( array $answer ): bool {
+                    $key = (string) ( $answer['field_key'] ?? '' );
+                    if ( preg_match( '/\Apendidikan_formal_\d+_(?:tingkat|nama_sekolah|program_studi|ipk|tahun_lulus)\z/i', $key ) ) {
+                        return true;
+                    }
+
+                    $title = (string) ( $answer['field_title'] ?? '' );
+                    return 'file' === strtolower( trim( (string) ( $answer['field_type'] ?? '' ) ) )
+                        && preg_match( '/\b(?:CV|curriculum vitae|resume|KTP|ijazah|sertifikat|certificate|transkrip)\b/i', $title );
+                }
+            )
+        );
+    }
+
+    /**
+     * Load one submitted file only when the active department account owns the assignment.
+     *
+     * @return array{file_name: string, mime_type: string, file_size: int, file_content: string}|null
+     */
+    public function get_user_department_application_document( string $application_id, int $account_id, string $field_key ): ?array {
+        if (
+            ! ctype_digit( $application_id )
+            || '0' === $application_id
+            || $account_id < 1
+            || ! preg_match( '/\A[a-zA-Z0-9_]{1,100}\z/', $field_key )
+        ) {
+            return null;
+        }
+
+        $rows = $this->fetch_all(
+            'SELECT a.FILE_NAME AS "file_name",
+                    a.FILE_MIME_TYPE AS "mime_type",
+                    a.FILE_SIZE AS "file_size",
+                    a.FILE_CONTENT AS "file_content"
+             FROM HRS_LAMARAN l
+             JOIN HRS_HASIL_WAWANCARA_HR hr ON hr.lamaran_id = l.lamaran_id
+             JOIN HRS_ROLE_AKSES u ON u.role_akses_id = hr.role_akses_id
+             JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
+             JOIN RECRUIT_FORM_SUBMISSIONS s
+               ON s.lamaran_id = l.lamaran_id
+               OR (
+                    s.lamaran_id IS NULL
+                    AND s.source_vacancy_id = l.detail_lowongan_id
+                    AND LOWER(TRIM(s.applicant_email)) = LOWER(TRIM(pkl.email))
+               )
+             JOIN RECRUIT_FORM_ANSWERS a ON a.submission_id = s.submission_id
+             WHERE l.lamaran_id = :application_id
+               AND hr.status_hasil = \'LOLOS\'
+               AND hr.role_akses_id = :account_id
+               AND u.peran = \'KEPALA_DEPARTEMEN\'
+               AND UPPER(TRIM(u.status_akun)) = \'ACTIVE\'
+               AND a.field_type = \'file\'
+               AND REGEXP_LIKE(a.field_title, \'(CV|CURRICULUM VITAE|RESUME|KTP|IJAZAH|SERTIFIKAT|CERTIFICATE|TRANSKRIP)\', \'i\')
+               AND a.field_key = :field_key
+               AND a.file_content IS NOT NULL
+             ORDER BY CASE WHEN s.lamaran_id = l.lamaran_id THEN 0 ELSE 1 END, s.submission_id DESC
+             FETCH FIRST 1 ROW ONLY',
+            [
+                'application_id' => $application_id,
+                'account_id' => $account_id,
+                'field_key' => $field_key,
+            ]
+        );
+        if ( empty( $rows[0] ) ) {
+            return null;
+        }
+
+        return [
+            'file_name' => (string) ( $rows[0]['file_name'] ?? '' ),
+            'mime_type' => (string) ( $rows[0]['mime_type'] ?? ''),
+            'file_size' => (int) ( $rows[0]['file_size'] ?? 0 ),
+            'file_content' => (string) ( $rows[0]['file_content'] ?? ''),
+        ];
     }
 
     /** @return array<int, array<string, string>> */
@@ -4024,6 +4672,11 @@ class Recruitment_Database {
             return [ 'success' => false, 'error' => 'Status lamaran tidak dikenal.' ];
         }
 
+        $stage = strtoupper( trim( $stage ) );
+        if ( 'DITERIMA' === $normalized || ( 'DITOLAK' === $normalized && 'FINAL' === $stage ) ) {
+            return [ 'success' => false, 'error' => 'Simpan keputusan akhir melalui menu Keputusan Akhir agar hasil HR, departemen, dan tracking tetap sinkron.' ];
+        }
+
         $stage_map = [
             'SUBMITTED'      => 'ADMINISTRASI',
             'SCREENING'      => 'ADMINISTRASI',
@@ -4052,6 +4705,10 @@ class Recruitment_Database {
             $current_status = $current_status_query->fetchColumn();
             if ( false === $current_status ) {
                 throw new InvalidArgumentException( 'Application not found.' );
+            }
+            if ( ! in_array( $current_status, [ 'SUBMITTED', 'SCREENING', 'ADMINISTRASI', 'PSIKOTES', 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'Tahap seleksi lamaran ini sudah diputuskan.' ];
             }
             $update = $connection->prepare(
                 'UPDATE HRS_LAMARAN SET STATUS_TERKINI = :status_value, STATUS_AKHIR = CASE WHEN :is_final = 1 THEN :final_status ELSE STATUS_AKHIR END, UPDATED_AT = CURRENT_TIMESTAMP WHERE LAMARAN_ID = :application_id'

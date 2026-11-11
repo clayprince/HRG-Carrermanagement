@@ -532,16 +532,18 @@ function recruitment_grant_psychotest_consent( string $test_key ): bool {
     if ( recruitment_get_assessment_user_id() < 1 ) {
         return false;
     }
-    return set_transient( recruitment_psychotest_consent_key( $test_key ), true, 10 * MINUTE_IN_SECONDS );
+    $consent_key = recruitment_psychotest_consent_key( $test_key );
+    return set_transient( $consent_key, true, 10 * MINUTE_IN_SECONDS )
+        || true === get_transient( $consent_key );
 }
 
 function recruitment_consume_psychotest_consent( string $test_key ): bool {
     $consent_key = recruitment_psychotest_consent_key( $test_key );
-    if ( ! get_transient( $consent_key ) ) {
-        return false;
+    if ( get_transient( $consent_key ) ) {
+        delete_transient( $consent_key );
+        return true;
     }
-    delete_transient( $consent_key );
-    return true;
+    return ( new Recruitment_Psychotest_Proctoring() )->has_current_consent();
 }
 
 /**
@@ -565,7 +567,7 @@ function recruitment_psychotest_closing_timestamp( array $settings ): ?int {
 }
 
 /**
- * Get when an online psychotest opens on its scheduled date in the site timezone.
+ * Get when an online psychotest opens in the site timezone.
  *
  * @param array<string, mixed> $settings
  */
@@ -576,8 +578,8 @@ function recruitment_psychotest_start_timestamp( array $settings ): ?int {
         return null;
     }
 
-    $start_at = DateTimeImmutable::createFromFormat( '!Y-m-d', $date, wp_timezone() );
-    if ( ! $start_at || $start_at->format( 'Y-m-d' ) !== $date ) {
+    $start_at = DateTimeImmutable::createFromFormat( '!Y-m-d H:i', $date . ' ' . $time, wp_timezone() );
+    if ( ! $start_at || $start_at->format( 'Y-m-d H:i' ) !== $date . ' ' . $time ) {
         return null;
     }
 

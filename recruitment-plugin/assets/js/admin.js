@@ -1088,38 +1088,6 @@ document.documentElement.classList.add("js");
   updateTotal();
 })();
 
-(function userDepartmentProfilePrint() {
-  const profile = document.querySelector("[data-candidate-profile]");
-  if (!profile) {
-    return;
-  }
-
-  const printProfile = function printProfile() {
-    const previousTitle = document.title;
-    document.title = "Profil-Pelamar-" + profile.dataset.candidateCode;
-    window.addEventListener(
-      "afterprint",
-      function restoreTitle() {
-        document.title = previousTitle;
-      },
-      { once: true },
-    );
-    window.print();
-  };
-
-  profile
-    .querySelector("[data-print-profile]")
-    .addEventListener("click", printProfile);
-
-  if ("1" === new URLSearchParams(window.location.search).get("print")) {
-    if ("complete" === document.readyState) {
-      window.requestAnimationFrame(printProfile);
-    } else {
-      window.addEventListener("load", printProfile, { once: true });
-    }
-  }
-})();
-
 (function recruitmentDepartmentAccounts() {
   const screen = document.querySelector(".daw-account-settings");
   if (!screen) {

@@ -1905,32 +1905,40 @@
   font-size: 12px;
 }
 .daw-recruitment--tracking .daw-recruitment__header {
-  height: 36px;
+  height: 50px;
   padding: 0 6%;
 }
+.daw-recruitment--tracking .daw-recruitment__brand,
+.daw-recruitment--tracking .daw-account-menu {
+  display: none;
+}
+.daw-recruitment--tracking .daw-recruitment__nav {
+  justify-content: center;
+  width: 100%;
+}
 .daw-recruitment--tracking .daw-recruitment__brand {
-  font-size: 9px;
-  gap: 5px;
+  font-size: 12px;
+  gap: 7px;
 }
 .daw-recruitment--tracking .daw-recruitment__logo {
   border-radius: 2px;
-  height: 16px;
-  width: 16px;
+  height: 22px;
+  width: 22px;
 }
 .daw-recruitment--tracking .daw-recruitment__brand small {
-  font-size: 6px;
+  font-size: 8px;
 }
 .daw-recruitment--tracking .daw-recruitment__nav {
   display: flex;
 }
 .daw-recruitment--tracking .daw-recruitment__nav a {
-  font-size: 8px;
-  padding: 4px;
+  font-size: 11px;
+  padding: 6px;
 }
 .daw-recruitment--tracking .daw-recruitment__cta {
-  font-size: 8px;
+  font-size: 11px;
   margin-left: 0;
-  padding: 5px 9px;
+  padding: 7px 13px;
 }
 .daw-recruitment--tracking .daw-account-menu {
   margin-left: 0;
@@ -1954,156 +1962,156 @@
 .daw-account__main--tracking {
   max-width: none;
   min-height: 0;
-  padding: 18px 16px 16px;
+  padding: 22px 16px 20px;
 }
 .daw-account__main--tracking > .daw-account__heading,
 .daw-account__main--tracking > .daw-account__card,
 .daw-account__main--tracking > .daw-account__empty,
 .daw-account__main--tracking > .daw-account__token-search,
 .daw-account__main--tracking > .daw-account__tracking-footer {
-  max-width: 445px;
+  max-width: 630px;
 }
 .daw-account__main--tracking > .daw-account__heading {
   align-items: flex-end;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 17px;
+  margin-bottom: 17px;
 }
 .daw-account__main--tracking .daw-recruitment__eyebrow {
-  font-size: 9px;
+  font-size: 12px;
 }
 .daw-account__main--tracking .daw-account__heading h1 {
-  font-size: 14px;
-  margin: 2px 0;
+  font-size: 20px;
+  margin: 3px 0;
 }
 .daw-account__main--tracking .daw-account__heading p {
-  font-size: 8px;
+  font-size: 11px;
 }
 .daw-account__main--tracking .daw-account__select-label {
-  flex: 0 0 150px;
-  font-size: 8px;
-  gap: 3px;
+  flex: 0 0 212px;
+  font-size: 11px;
+  gap: 4px;
   min-width: 0;
   text-transform: uppercase;
 }
 .daw-account__main--tracking .daw-account__select-label select {
-  font-size: 9px;
-  min-height: 29px;
-  padding: 4px 7px;
+  font-size: 12px;
+  min-height: 40px;
+  padding: 6px 10px;
 }
 .daw-account__main--tracking > .daw-account__token-search {
   align-items: flex-end;
   display: flex;
-  gap: 8px;
-  margin: 0 auto 12px;
+  gap: 11px;
+  margin: 0 auto 17px;
 }
 .daw-account__main--tracking .daw-account__token-search label {
   color: var(--daw-gray);
   display: grid;
   flex: 1;
-  font-size: 8px;
-  gap: 3px;
+  font-size: 11px;
+  gap: 4px;
   text-transform: uppercase;
 }
 .daw-account__main--tracking .daw-account__token-search input {
   border: 1px solid #dfe2e7;
-  border-radius: 6px;
+  border-radius: 8px;
   box-sizing: border-box;
-  font-size: 10px;
-  min-height: 31px;
+  font-size: 14px;
+  min-height: 44px;
   min-width: 0;
-  padding: 6px 8px;
+  padding: 8px 11px;
   width: 100%;
 }
 .daw-account__main--tracking .daw-account__token-search .daw-recruitment__button {
-  font-size: 9px;
-  min-height: 31px;
-  padding: 6px 10px;
+  font-size: 13px;
+  min-height: 44px;
+  padding: 8px 14px;
 }
 .daw-account__main--tracking > .daw-account__card {
-  border-radius: 7px;
-  margin-bottom: 10px;
-  padding: 11px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+  padding: 15px;
 }
 .daw-account__main--tracking > .daw-account__process-summary {
-  padding: 9px;
+  padding: 13px;
 }
 .daw-account__main--tracking .daw-account__process-identity {
   display: grid;
-  gap: 2px;
+  gap: 3px;
   line-height: 1.2;
   position: relative;
 }
 .daw-account__main--tracking .daw-account__tracking-label {
   color: var(--daw-gray);
-  font-size: 8px;
+  font-size: 11px;
   text-transform: uppercase;
 }
 .daw-account__main--tracking .daw-account__process-identity .daw-account__status {
   background: #fff0f2;
   color: var(--daw-red);
-  font-size: 8px;
+  font-size: 11px;
   position: absolute;
   right: 0;
   top: 0;
 }
 .daw-account__main--tracking .daw-account__process-identity h2 {
   border: 0;
-  font-size: 10px;
+  font-size: 14px;
   line-height: 1.2;
-  margin: 2px 0 0;
+  margin: 3px 0 0;
   padding: 0;
 }
 .daw-account__main--tracking .daw-account__process-identity > strong {
-  font-size: 8px;
+  font-size: 11px;
 }
 .daw-account__main--tracking .daw-account__process-identity > small {
   color: var(--daw-gray);
-  font-size: 8px;
+  font-size: 11px;
 }
 .daw-account__main--tracking .daw-account__process-summary .daw-account__fields {
-  gap: 8px;
+  gap: 11px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: 7px;
-  padding-top: 7px;
+  margin-top: 10px;
+  padding-top: 10px;
 }
 .daw-account__main--tracking .daw-account__process-summary .daw-account__fields span {
-  font-size: 7px;
-  gap: 2px;
+  font-size: 10px;
+  gap: 3px;
   line-height: 1.2;
 }
 .daw-account__main--tracking .daw-account__process-summary .daw-account__fields strong {
-  font-size: 8px;
+  font-size: 11px;
   line-height: 1.2;
 }
 .daw-account__main--tracking .daw-account__card > h2 {
   border: 0;
-  font-size: 9px;
-  margin: 0 0 3px;
+  font-size: 13px;
+  margin: 0 0 4px;
   padding: 0;
 }
 .daw-account__main--tracking .daw-account__muted {
-  font-size: 7px;
-  margin-bottom: 7px;
+  font-size: 10px;
+  margin-bottom: 10px;
 }
 .daw-account__main--tracking .daw-account__timeline {
   gap: 6px;
   padding: 0;
 }
 .daw-account__main--tracking .daw-account__timeline article {
-  border-radius: 5px;
-  gap: 7px;
+  border-radius: 7px;
+  gap: 10px;
   grid-template-columns: minmax(0, 1fr) auto;
-  padding: 6px 7px 6px 27px;
+  padding: 9px 10px 9px 38px;
   position: relative;
 }
 .daw-account__main--tracking .daw-account__timeline article::before {
   background: #d1d5db;
   content: "";
-  left: 14px;
+  left: 20px;
   position: absolute;
-  top: 20px;
-  bottom: -9px;
-  width: 2px;
+  top: 28px;
+  bottom: -13px;
+  width: 3px;
 }
 .daw-account__main--tracking .daw-account__timeline article.is-done::before {
   background: #18a957;
@@ -2112,39 +2120,39 @@
   display: none;
 }
 .daw-account__main--tracking .daw-account__timeline article > div {
-  gap: 2px;
+  gap: 3px;
 }
 .daw-account__main--tracking .daw-account__timeline article > div > strong {
-  font-size: 7px;
+  font-size: 10px;
 }
 .daw-account__main--tracking .daw-account__timeline small,
 .daw-account__main--tracking .daw-account__timeline p {
-  font-size: 7px;
+  font-size: 10px;
 }
 .daw-account__main--tracking .daw-account__timeline article > b {
-  font-size: 6px;
-  padding: 2px 4px;
+  font-size: 9px;
+  padding: 3px 6px;
 }
 .daw-account__main--tracking .daw-account__timeline-marker {
   align-items: center;
   background: #fff;
-  border: 1px solid #d1d5db;
+  border: 2px solid #d1d5db;
   border-radius: 50%;
   display: flex;
   font-size: 0;
-  height: 15px;
+  height: 21px;
   justify-content: center;
-  left: 7px;
+  left: 10px;
   position: absolute;
-  top: 7px;
-  width: 15px;
+  top: 10px;
+  width: 21px;
   z-index: 1;
 }
 .daw-account__main--tracking .daw-account__timeline article.is-done .daw-account__timeline-marker,
 .daw-account__main--tracking .daw-account__timeline article.is-current .daw-account__timeline-marker {
   border: 0;
   color: #fff;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 700;
 }
 .daw-account__main--tracking .is-done .daw-account__timeline-marker {
@@ -2159,10 +2167,10 @@
   color: var(--daw-red);
 }
 .daw-account__main--tracking .daw-account__timeline .daw-recruitment__button {
-  font-size: 7px;
+  font-size: 10px;
   justify-self: start;
-  margin-top: 2px;
-  padding: 4px 8px;
+  margin-top: 3px;
+  padding: 6px 11px;
 }
 .daw-account__tracking-footer {
   align-items: center;
@@ -2171,14 +2179,14 @@
   border-radius: 5px;
   color: var(--daw-gray);
   display: flex;
-  font-size: 8px;
+  font-size: 11px;
   justify-content: space-between;
   margin: 0 auto;
-  padding: 8px 9px;
+  padding: 11px 13px;
 }
 .daw-account__tracking-footer a {
   color: var(--daw-red);
-  font-size: 8px;
+  font-size: 11px;
   white-space: nowrap;
 }
 .daw-application-wizard__progress {
@@ -3676,7 +3684,7 @@ body:has(.daw-account-auth) .daw-account-auth__main {
   width: 100%;
 }
 
-/* Preview-only screen explorer */
+/* Screen explorer */
 .daw-screen-explorer {
   bottom: 18px;
   font-family: Inter, Arial, sans-serif;
@@ -4423,6 +4431,417 @@ body:has(.daw-account-auth) .daw-account-auth__main {
 }
 .daw-recruitment__application-main .daw-recruitment__container {
   max-width: 760px;
+}
+
+.daw-recruitment--exam-active {
+  background: #f4f4f6;
+  min-height: 100vh;
+}
+.daw-exam-bar {
+  align-items: center;
+  background: #1c1c1e;
+  color: #fff;
+  display: flex;
+  gap: 18px;
+  height: 54px;
+  justify-content: space-between;
+  padding: 0 18px;
+}
+.daw-exam-bar__brand {
+  align-items: center;
+  color: #fff !important;
+  display: flex;
+  flex: 1 1 0;
+  font-size: 13px;
+  font-weight: 700;
+  gap: 10px;
+  min-width: 0;
+}
+.daw-exam-bar__brand > span:first-child {
+  align-items: center;
+  background: var(--daw-red);
+  border-radius: 4px;
+  display: inline-flex;
+  flex: 0 0 26px;
+  height: 26px;
+  justify-content: center;
+}
+.daw-exam-bar__brand small {
+  color: #c5c5c7;
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+}
+.daw-exam-bar__stage {
+  background: #39393b;
+  border-radius: 4px;
+  color: #eee;
+  flex: 0 0 auto;
+  font-size: 11px;
+  padding: 3px 8px;
+}
+.daw-exam-bar__details {
+  align-items: center;
+  display: flex;
+  flex: 1 1 0;
+  font-size: 13px;
+  gap: 18px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+.daw-exam-bar__timer {
+  align-items: center;
+  display: inline-flex;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 750;
+  gap: 6px;
+}
+.daw-recruitment--exam-active .daw-recruitment__psychotest-main {
+  padding: 0;
+}
+.daw-exam-shell {
+  margin: 0 auto;
+  max-width: 1420px !important;
+  padding: 22px 20px 36px;
+  width: 100%;
+}
+.daw-exam-layout {
+  align-items: start;
+  display: grid;
+  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) 170px;
+}
+.daw-exam-primary {
+  min-width: 0;
+}
+.daw-recruitment--exam-active .daw-iq-assessment,
+.daw-recruitment--exam-active .daw-personality-assessment {
+  border: 1px solid #d5d6dc;
+  border-radius: 11px;
+  margin: 44px auto 16px;
+  max-width: 630px;
+  padding: 22px 26px;
+  text-align: left;
+  width: 100%;
+}
+.daw-exam-card__eyebrow {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.daw-exam-card__eyebrow > span {
+  align-items: center;
+  background: #fbecef;
+  border: 1px solid #f4d0d7;
+  border-radius: 999px;
+  color: var(--daw-red);
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 700;
+  gap: 7px;
+  padding: 4px 10px;
+}
+.daw-exam-card__eyebrow i {
+  background: var(--daw-red);
+  border-radius: 50%;
+  height: 7px;
+  width: 7px;
+}
+.daw-exam-card__eyebrow p {
+  color: #15803d !important;
+  font-size: 11px !important;
+  margin: 0 !important;
+  text-align: right;
+}
+.daw-exam-card__instructions {
+  color: #626671;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0 0 12px;
+}
+.daw-iq-assessment__questions,
+.daw-personality-assessment__questions {
+  display: block;
+  margin: 0;
+}
+.daw-exam-question[hidden] {
+  display: none !important;
+}
+.daw-recruitment--exam-active .daw-iq-assessment__question,
+.daw-recruitment--exam-active .daw-personality-assessment__question {
+  background: #fff;
+  border: 0;
+  border-radius: 0;
+  padding: 8px 0 10px;
+}
+.daw-recruitment--exam-active .daw-iq-assessment__question legend,
+.daw-recruitment--exam-active .daw-personality-assessment__question legend {
+  display: block;
+  margin: 0 0 18px;
+}
+.daw-exam-question__number {
+  color: #777980;
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-bottom: 9px;
+}
+.daw-recruitment--exam-active .daw-iq-assessment__question legend strong,
+.daw-recruitment--exam-active .daw-personality-assessment__question legend strong {
+  background: transparent;
+  border-radius: 0;
+  color: #25272d;
+  display: block;
+  font-size: 17px;
+  font-weight: 700;
+  height: auto;
+  line-height: 1.45;
+  padding: 0;
+}
+.daw-recruitment--exam-active .daw-iq-assessment__choice {
+  border: 2px solid #d3d4dc;
+  border-radius: 8px;
+  font-size: 14px;
+  grid-template-columns: 18px 26px minmax(0, 1fr);
+  margin-top: 9px;
+  min-height: 54px;
+  padding: 9px 14px;
+}
+.daw-recruitment--exam-active .daw-iq-assessment__choice:has(input:checked) {
+  background: #fff7f8;
+  border-color: var(--daw-red);
+}
+.daw-recruitment--exam-active .daw-iq-assessment__choice-key {
+  background: #fff;
+  border: 2px solid #d3d4dc;
+  border-radius: 50%;
+  height: 26px;
+  width: 26px;
+}
+.daw-recruitment--exam-active .daw-personality-assessment__disc-head,
+.daw-recruitment--exam-active .daw-personality-assessment__disc-row {
+  grid-template-columns: minmax(0, 1fr) 78px 78px;
+}
+.daw-recruitment--exam-active .daw-personality-assessment__disc-head {
+  padding: 12px 4px 7px;
+}
+.daw-recruitment--exam-active .daw-personality-assessment__disc-row {
+  padding: 8px 4px;
+}
+.daw-recruitment--exam-active .daw-personality-assessment__pairs {
+  margin-top: 0;
+}
+.daw-recruitment--exam-active .daw-personality-assessment__pair {
+  background: #fff;
+  border: 2px solid #d3d4dc;
+  border-radius: 8px;
+  font-size: 14px;
+  min-height: 54px;
+  padding: 12px 14px;
+}
+.daw-recruitment--exam-active .daw-personality-assessment__pair:has(input:checked) {
+  background: #fff7f8;
+  border-color: var(--daw-red);
+}
+.daw-exam-controls {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 18px;
+}
+.daw-exam-controls button {
+  align-items: center;
+  border-radius: 5px;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 16px;
+}
+.daw-exam-controls__previous {
+  background: transparent;
+  border: 1px solid #dddde2;
+  color: #64656b;
+}
+.daw-exam-controls__previous:disabled {
+  color: #bfc0c5;
+  cursor: default;
+}
+.daw-exam-controls [data-exam-next],
+.daw-exam-controls [data-exam-finish] {
+  background: var(--daw-red);
+  border: 0;
+  color: #fff !important;
+}
+.daw-exam-controls button[hidden] {
+  display: none;
+}
+.daw-exam-navigator {
+  background: #fff;
+  border: 1px solid #d5d6dc;
+  border-radius: 9px;
+  margin: 0 auto;
+  max-width: 630px;
+  padding: 12px 14px;
+}
+.daw-exam-navigator__heading {
+  align-items: center;
+  color: #666871;
+  display: flex;
+  font-size: 11px;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.daw-exam-navigator__heading strong {
+  color: #46474e;
+}
+.daw-exam-navigator__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.daw-exam-navigator__buttons button {
+  background: #f4f4f6;
+  border: 1px solid #d9dae0;
+  border-radius: 4px;
+  color: #666871;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  height: 32px;
+  min-width: 32px;
+}
+.daw-exam-navigator__buttons button.is-current {
+  background: var(--daw-red);
+  border-color: var(--daw-red);
+  color: #fff;
+}
+.daw-exam-navigator__buttons button.is-answered:not(.is-current) {
+  background: #dcfce7;
+  border-color: #bbf7d0;
+  color: #15803d;
+}
+.daw-exam-camera {
+  color: #55565e;
+  font-size: 12px;
+  padding-top: 0;
+  text-align: center;
+}
+.daw-exam-camera__preview {
+  align-items: center;
+  background: #1c1c1e;
+  border-radius: 8px;
+  display: flex;
+  height: 84px;
+  justify-content: center;
+  margin: 0 auto 9px;
+  width: 100%;
+}
+.daw-exam-camera__preview svg {
+  fill: none;
+  height: 23px;
+  stroke: #777980;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+  width: 23px;
+}
+.daw-exam-camera strong {
+  color: #55565e;
+  display: block;
+  font-size: 12px;
+}
+.daw-exam-camera p {
+  color: #888991;
+  font-size: 10px;
+  line-height: 1.45;
+  margin: 3px auto 0;
+  max-width: 150px;
+}
+@media (max-width: 760px) {
+  .daw-exam-bar {
+    gap: 8px;
+    padding: 0 10px;
+  }
+  .daw-exam-bar__stage {
+    display: none;
+  }
+  .daw-exam-bar__details {
+    flex: 0 0 auto;
+    gap: 10px;
+  }
+  .daw-exam-bar__timer {
+    font-size: 13px;
+  }
+  .daw-exam-shell {
+    padding: 16px 12px 28px;
+  }
+  .daw-exam-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .daw-exam-camera {
+    align-items: center;
+    display: grid;
+    gap: 0 12px;
+    grid-template-columns: 120px minmax(0, 1fr);
+    margin: 0 auto;
+    max-width: 630px;
+    text-align: left;
+    width: 100%;
+  }
+  .daw-exam-camera__preview {
+    grid-row: span 2;
+    height: 68px;
+    margin: 0;
+  }
+  .daw-exam-camera p {
+    margin: 2px 0 0;
+    max-width: none;
+  }
+}
+@media (max-width: 520px) {
+  .daw-recruitment--exam-active .daw-iq-assessment,
+  .daw-recruitment--exam-active .daw-personality-assessment {
+    margin-top: 14px;
+    padding: 16px 14px;
+  }
+  .daw-exam-card__eyebrow {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .daw-exam-card__eyebrow p {
+    text-align: left;
+  }
+  .daw-recruitment--exam-active .daw-personality-assessment__disc-head,
+  .daw-recruitment--exam-active .daw-personality-assessment__disc-row {
+    gap: 4px;
+    grid-template-columns: minmax(0, 1fr) 38px 38px;
+  }
+  .daw-recruitment--exam-active .daw-personality-assessment__disc-head {
+    font-size: 0;
+  }
+  .daw-recruitment--exam-active .daw-personality-assessment__disc-head > span:not(:first-child) {
+    font-size: 0;
+  }
+  .daw-recruitment--exam-active .daw-personality-assessment__disc-head > span:nth-child(2)::before {
+    content: "P";
+    font-size: 11px;
+  }
+  .daw-recruitment--exam-active .daw-personality-assessment__disc-head > span:nth-child(3)::before {
+    content: "K";
+    font-size: 11px;
+  }
+  .daw-exam-controls button {
+    font-size: 12px;
+    padding: 8px 11px;
+  }
 }
 
 .daw-recruitment--psychotest-home,
@@ -6599,7 +7018,7 @@ body:has(.daw-account-auth) .daw-account-auth__main {
   height: 42px;
   outline-offset: 3px;
   text-align: center;
-  width: 62px;
+  width: 90px;
 }
 .daw-pauli-live__keypad {
   display: grid;
@@ -6720,4 +7139,13 @@ body:has(.daw-recruitment) main.daw-account__main--profile {
   body:has(.daw-recruitment) main.daw-account__main--profile {
     padding: 20px 14px 36px !important;
   }
+}
+
+.daw-recruitment--exam-active .daw-exam-shell {
+  max-width: 1420px !important;
+}
+.daw-recruitment--exam-active .daw-iq-assessment__questions,
+.daw-recruitment--exam-active .daw-personality-assessment__questions {
+  display: block;
+  grid-template-columns: none;
 }

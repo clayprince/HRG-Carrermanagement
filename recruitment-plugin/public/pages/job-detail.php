@@ -9,6 +9,9 @@ foreach ( $vacancies_result['jobs'] as $vacancy_item ) {
         break;
     }
 }
+if ( ! $job && recruitment_is_ui_preview() && ! empty( $vacancies_result['jobs'] ) ) {
+    $job = $vacancies_result['jobs'][0];
+}
 ?>
 <div class="daw-recruitment">
     <?php require recruitment_get_plugin_path( 'public/components/header.php' ); ?>

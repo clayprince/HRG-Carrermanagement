@@ -823,6 +823,21 @@ class Recruitment_Plugin {
         }
         $applicant = recruitment_get_current_applicant();
         $candidate_id = isset( $_GET['candidate_id'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['candidate_id'] ) ) : '';
+        if ( function_exists( 'current_user_can' ) && current_user_can( 'manage_user_department' ) ) {
+            $application_id = isset( $_GET['application_id'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['application_id'] ) ) : '';
+            $account_id = absint( get_user_meta( get_current_user_id(), 'daw_oracle_account_id', true ) );
+            $department_report = ( new Recruitment_Database() )->get_user_department_candidate_detail( $application_id, $account_id );
+            if (
+                $department_report
+                && (string) ( $department_report['application']['candidate_id'] ?? '' ) === $candidate_id
+            ) {
+                $applicant = [
+                    'profile_details' => $department_report['profile']['profile_details'] ?? [],
+                ];
+            } else {
+                $applicant = null;
+            }
+        }
         if ( ( ! $applicant || '' !== $candidate_id ) && function_exists( 'current_user_can' ) && current_user_can( 'manage_recruitment' ) ) {
             if ( '' !== $candidate_id ) {
                 $admin_applicant = ( new Recruitment_Database() )->get_admin_applicant( $candidate_id );
@@ -832,6 +847,10 @@ class Recruitment_Plugin {
             }
         }
         $document_type = sanitize_key( wp_unslash( $_GET['document'] ?? '' ) );
+        if ( function_exists( 'current_user_can' ) && current_user_can( 'manage_user_department' ) && 'resume' !== $document_type ) {
+            status_header( 404 );
+            exit;
+        }
         $profile_details = is_array( $applicant['profile_details'] ?? null ) ? $applicant['profile_details'] : [];
         $document = $profile_details['documents'][ $document_type ] ?? null;
         if ( ! $applicant || ! in_array( $document_type, [ 'profile_photo', 'resume', 'portfolio' ], true ) || ! is_array( $document ) ) {

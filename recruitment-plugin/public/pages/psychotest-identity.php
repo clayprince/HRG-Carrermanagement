@@ -18,19 +18,19 @@ $test_labels = [ 'iq' => 'IQ', 'pauli' => 'Pauli', 'disc' => 'DISC', 'papi' => '
     <main class="daw-recruitment__psychotest-main">
         <div class="daw-recruitment__psychotest-shell daw-recruitment__psychotest-shell--narrow">
             <section class="daw-recruitment__psychotest-card">
-                <h1>Verifikasi Identitas Psikotes</h1>
+                <h1>Foto Sebelum Psikotes</h1>
                 <?php if ( 'MANUAL_REVIEW' === $identity_status ) : ?>
                     <p role="status">Kamera tidak digunakan. Tim HR akan memeriksa identitas Anda secara manual; pilihan ini tidak otomatis menggagalkan tes.</p>
                 <?php elseif ( 'MANUAL_VERIFIED' === $identity_status ) : ?>
                     <p role="status">Tim HR telah menyelesaikan verifikasi identitas manual Anda.</p>
                 <?php elseif ( 'CAPTURED' === $identity_status ) : ?>
-                    <p role="status">Foto identitas telah diterima dan hanya dapat dilihat oleh Administrator yang berwenang.</p>
+                    <p role="status">Foto sudah tersimpan. Anda dapat melanjutkan ke tes.</p>
                 <?php else : ?>
-                    <p>Gunakan kamera untuk mengambil satu foto selfie sambil memegang sisi depan KTP. Pastikan wajah dan informasi pada kartu terlihat. Foto tidak dianalisis dengan OCR atau pencocokan wajah.</p>
+                    <p>Aktifkan kamera dan ambil satu foto. Foto bebas; setelah foto berhasil disimpan, Anda akan langsung lanjut ke tes.</p>
                     <div class="daw-proctoring-capture" data-proctoring-identity>
                         <video data-proctoring-identity-video autoplay muted playsinline hidden></video>
                         <canvas data-proctoring-identity-canvas hidden></canvas>
-                        <p role="status" data-proctoring-identity-status>Aktifkan kamera untuk mengambil foto identitas.</p>
+                        <p role="status" data-proctoring-identity-status>Aktifkan kamera untuk mengambil foto.</p>
                         <button type="button" class="daw-recruitment__button" data-proctoring-identity-start>Aktifkan Kamera</button>
                         <button type="button" class="daw-recruitment__button" data-proctoring-identity-capture disabled>Ambil Foto</button>
                     </div>
@@ -49,7 +49,7 @@ $test_labels = [ 'iq' => 'IQ', 'pauli' => 'Pauli', 'disc' => 'DISC', 'papi' => '
                     <?php endif; ?>
                     <p role="alert" data-proctoring-identity-error hidden></p>
                 </form>
-                <p class="description">Satu foto identitas disimpan secara privat selama maksimal satu tahun setelah tes selesai. Pemeriksaan mikrofon saat tes hanya mencatat status perangkat; audio tidak direkam.</p>
+                <p class="description">Satu foto disimpan secara privat selama maksimal satu tahun setelah tes selesai. Pemeriksaan mikrofon saat tes hanya mencatat status perangkat; audio tidak direkam.</p>
             </section>
         </div>
     </main>

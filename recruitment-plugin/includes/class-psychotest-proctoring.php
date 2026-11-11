@@ -51,6 +51,14 @@ class Recruitment_Psychotest_Proctoring {
         return $this->database->has_error();
     }
 
+    public function has_current_consent(): bool {
+        $session = $this->get_current_session();
+        return ! $this->database->has_error()
+            && is_array( $session )
+            && '' !== (string) ( $session['consent_at'] ?? '' )
+            && in_array( (string) ( $session['identity_status'] ?? '' ), [ 'CAPTURED', 'MANUAL_REVIEW', 'MANUAL_VERIFIED' ], true );
+    }
+
     public function mark_completed(): bool {
         $context = $this->get_context();
         return null !== $context
@@ -128,7 +136,7 @@ class Recruitment_Psychotest_Proctoring {
         if ( 'capture' === $action ) {
             $stored_document = $this->store_capture_upload();
             if ( null === $stored_document ) {
-                wp_die( esc_html__( 'Foto tidak valid atau gagal disimpan. Gunakan JPEG dari kamera dan coba kembali.', 'recruitment-plugin' ), '', [ 'response' => 400 ] );
+                wp_die( esc_html__( 'Foto tidak dapat diproses atau gagal disimpan. Aktifkan kamera dan ambil foto kembali.', 'recruitment-plugin' ), '', [ 'response' => 400 ] );
             }
             $saved = $this->database->save_proctoring_identity(
                 $context['candidate_id'],

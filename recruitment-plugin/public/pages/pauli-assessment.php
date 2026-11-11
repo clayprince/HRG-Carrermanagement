@@ -29,7 +29,7 @@ $psychotest_home_url = recruitment_get_public_url( 'psychotest' );
             <?php else : ?>
                 <?php
                 $test = $view['test'];
-                $number_sequence = implode( '', $test['numbers'] );
+                $number_sequence = implode( ',', $test['numbers'] );
                 ?>
                 <?php require recruitment_get_plugin_path( 'public/components/psychotest-proctoring-watch.php' ); ?>
                 <section
@@ -41,6 +41,7 @@ $psychotest_home_url = recruitment_get_public_url( 'psychotest' );
                     data-segment-deadline="<?= esc_attr( (string) $test['segment_deadline'] ) ?>"
                     data-deadline="<?= esc_attr( (string) $test['deadline'] ) ?>"
                     data-number-sequence="<?= esc_attr( $number_sequence ) ?>"
+                    data-answer-width="<?= esc_attr( (string) $test['answer_width'] ) ?>"
                     data-cursor="<?= esc_attr( (string) $test['cursor'] ) ?>"
                     data-correct="<?= esc_attr( (string) $test['correct'] ) ?>"
                     data-incorrect="<?= esc_attr( (string) $test['incorrect'] ) ?>"
@@ -49,7 +50,7 @@ $psychotest_home_url = recruitment_get_public_url( 'psychotest' );
                         <div>
                             <span class="daw-recruitment__eyebrow daw-recruitment__eyebrow--red">TES PAULI · LAJUR <?= esc_html( (string) ( $test['segment'] + 1 ) ) ?> DARI <?= esc_html( (string) $test['segment_count'] ) ?></span>
                             <h1>Tes Koran Pauli</h1>
-                            <p>Jumlahkan dua angka yang berurutan. Masukkan angka satuan hasilnya secepat dan setepat mungkin.</p>
+                            <p>Jumlahkan dua angka yang berurutan. Anda boleh memasukkan angka satuan atau hasil penjumlahan penuh.</p>
                         </div>
                         <div class="daw-pauli-assessment__timers">
                             <div><span>PINDAH LAJUR</span><time data-pauli-segment-timer>--:--</time></div>
@@ -63,7 +64,7 @@ $psychotest_home_url = recruitment_get_public_url( 'psychotest' );
                         <div><span>Total</span><strong data-pauli-answered><?= esc_html( (string) $test['answered'] ) ?></strong></div>
                     </div>
 
-                    <p class="daw-pauli-live__instruction"><strong>Contoh:</strong> 7 + 8 = 5. Hanya masukkan angka satuan. Lajur berganti otomatis setiap tiga menit.</p>
+                    <p class="daw-pauli-live__instruction"><strong>Rentang lajur ini: <?= esc_html( (string) $test['number_minimum'] ) ?>–<?= esc_html( (string) $test['number_maximum'] ) ?>.</strong> Contoh: 5 + 7 = 12. Jawab 12 atau cukup 2; keduanya diterima.</p>
                     <p class="daw-pauli-assessment__save-status" role="status" data-pauli-save-status>Jawaban disimpan otomatis.</p>
 
                     <form class="daw-pauli-live__form" data-pauli-assessment-form autocomplete="off">
@@ -75,8 +76,8 @@ $psychotest_home_url = recruitment_get_public_url( 'psychotest' );
                                 <span class="daw-pauli-live__plus" aria-hidden="true">+</span>
                                 <span data-pauli-right><?= esc_html( (string) ( $test['numbers'][ $test['cursor'] + 1 ] ?? '—' ) ) ?></span>
                             </div>
-                            <label class="daw-pauli-live__answer-label" for="daw-pauli-answer">Jawaban angka satuan</label>
-                            <input id="daw-pauli-answer" class="daw-pauli-live__answer" type="text" inputmode="numeric" pattern="[0-9]" maxlength="1" readonly autofocus data-pauli-current-answer aria-label="Jawaban angka satuan">
+                            <label class="daw-pauli-live__answer-label" for="daw-pauli-answer">Jawaban satuan atau hasil penuh</label>
+                            <input id="daw-pauli-answer" class="daw-pauli-live__answer" type="text" inputmode="numeric" pattern="[0-9]{1,3}" maxlength="3" readonly autofocus data-pauli-current-answer aria-label="Jawaban satuan atau hasil penuh">
                         </div>
 
                         <div class="daw-pauli-live__keypad" aria-label="Keypad angka">

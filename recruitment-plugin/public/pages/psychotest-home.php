@@ -14,6 +14,7 @@ $personality_active_test = is_array( $personality_state ) ? sanitize_key( (strin
 $personality_next_test = 'papi' === $personality_active_test || $disc_complete ? 'papi' : 'disc';
 $personality_active = in_array( $personality_active_test, [ 'disc', 'papi' ], true )
     && 'active' === ( $personality_tests[ $personality_active_test ]['status'] ?? '' );
+$has_existing_proctoring_consent = ( new Recruitment_Psychotest_Proctoring() )->has_current_consent();
 $psychotest_settings = recruitment_sync_psychotest_closing( (array) get_option( 'recruitment_psychotest_settings', [] ) );
 $iq_enabled = recruitment_is_psychotest_test_enabled( 'iq' );
 $pauli_enabled = recruitment_is_psychotest_test_enabled( 'pauli' );
@@ -140,9 +141,15 @@ $progress = 0 < $test_count ? (int) round( $completed_count / $test_count * 100 
                     $unlocked = $test['unlocked'];
                     $status = $complete ? 'Selesai' : ( $active ? 'Sedang dikerjakan' : ( $unlocked ? 'Tersedia' : 'Menunggu tes sebelumnya' ) );
                     $status_class = $complete ? 'complete' : ( $unlocked ? 'available' : 'locked' );
-                    $test_url = $active
-                        ? recruitment_get_public_url( $test['screen'], 'psych-personality' === $test['screen'] ? [ 'test' => $test['test'] ] : [] )
-                        : recruitment_get_public_url( 'psychotest-preparation', [ 'test' => $test['test'] ] );
+                    $test_arguments = 'psych-personality' === $test['screen'] ? [ 'test' => $test['test'] ] : [];
+                    if ( $active ) {
+                        $test_url = recruitment_get_public_url( $test['screen'], $test_arguments );
+                    } elseif ( $has_existing_proctoring_consent ) {
+                        $test_arguments['start'] = '1';
+                        $test_url = recruitment_get_public_url( $test['screen'], $test_arguments );
+                    } else {
+                        $test_url = recruitment_get_public_url( 'psychotest-preparation', [ 'test' => $test['test'] ] );
+                    }
                     ?>
                     <article class="daw-recruitment__psychotest-item <?= esc_attr( 'is-' . $status_class ) ?>">
                         <div class="daw-recruitment__psychotest-index"><?= esc_html( $test['number'] ) ?></div>

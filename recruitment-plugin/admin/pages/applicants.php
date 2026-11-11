@@ -1,6 +1,7 @@
 <?php
 $database = new Recruitment_Database();
 $applications = $database->get_applications();
+$applications_error = $database->has_error();
 $applicants = $database->get_applicants();
 $vacancies = $database->get_vacancies();
 if ( function_exists( 'get_posts' ) ) {
@@ -162,6 +163,9 @@ foreach ( $applications as $application ) {
         'user_interview' => 'Wawancara User',
         'final' => 'Keputusan Akhir',
     ][ $stage_key ] ?? 'Seleksi Administrasi';
+    $status_label = 'dalam_proses' === $status_bucket
+        ? $stage_label
+        : ( $all_statuses[ $status_bucket ] ?? 'Dalam Proses' );
 
     $code = 'DAW-' . $year . '-' . str_pad( (string) $applicant_id, 3, '0', STR_PAD_LEFT );
     $applicant_name = (string) ( $candidate['name'] ?? $application['applicant_name'] ?? 'Pelamar #' . $applicant_id );
@@ -184,7 +188,7 @@ foreach ( $applications as $application ) {
         'stage' => $stage_label,
         'raw_status' => strtoupper( $effective_status ),
         'status_key' => $status_bucket,
-        'status_label' => $all_statuses[ $status_bucket ] ?? 'Dalam Proses',
+        'status_label' => $status_label,
         'created_at' => $created_at,
         'search' => $search_text,
         'notes' => '',
@@ -195,7 +199,8 @@ foreach ( $applications as $application ) {
     ];
 }
 
-foreach ( $applicant_map as $applicant_id => $candidate ) {
+$applicants_without_applications = $applications_error ? [] : $applicant_map;
+foreach ( $applicants_without_applications as $applicant_id => $candidate ) {
     if ( isset( $applicants_with_applications[ (string) $applicant_id ] ) ) {
         continue;
     }
@@ -471,6 +476,7 @@ if ( 'diterima' === ( $selected_candidate['status_key'] ?? '' ) ) {
 $view_mode = $selected_candidate ? 'detail' : 'list';
 ?>
 <div class="wrap recruitment-admin daw-applicants-page" data-applicants-screen>
+    <?php if ( $applications_error ) : ?><div class="notice notice-error inline" role="alert"><p>Data lamaran belum dapat dimuat dari Oracle. Status kandidat tidak ditandai sebagai “Belum Melamar” sampai data berhasil dibaca.</p></div><?php endif; ?>
     <?php if ( 'detail' === $view_mode && $selected_candidate ) : ?>
         <div class="daw-applicants__header">
             <p class="daw-applicants__breadcrumb">DAW Admin / Detail Kandidat</p>
@@ -587,7 +593,6 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
                     'next_stages' => [
                         'INTERVIEW_HR'   => 'Wawancara HR',
                         'INTERVIEW_USER' => 'Wawancara User (Departemen)',
-                        'FINAL'          => 'Keputusan Akhir (Offering)',
                     ],
                 ],
                 'INTERVIEW_HR' => [
@@ -596,7 +601,6 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
                     'default_nxt' => 'INTERVIEW_USER',
                     'next_stages' => [
                         'INTERVIEW_USER' => 'Wawancara User (Departemen)',
-                        'FINAL'          => 'Keputusan Akhir (Offering)',
                     ],
                 ],
                 'INTERVIEW_USER' => [
@@ -799,6 +803,7 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
                     <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>">
                         <input type="hidden" name="action" value="daw_download_applicant_profile">
                         <input type="hidden" name="candidate_id" value="<?= esc_attr( (int) $selected_candidate['id'] ) ?>">
+                        <input type="hidden" name="application_id" value="<?= esc_attr( (int) $selected_candidate['application_id'] ) ?>">
                         <?php wp_nonce_field( 'daw_download_applicant_profile_' . (int) $selected_candidate['id'] ); ?>
                         <button type="submit" class="button button-primary daw-document-btn">Download Profil Pelamar</button>
                     </form>

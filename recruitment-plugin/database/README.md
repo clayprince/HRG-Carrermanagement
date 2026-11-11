@@ -155,9 +155,12 @@ their SQL is compatible with the current Oracle database.
   into four subtests with the existing fixed time limits; additional questions
   use those same limits. Pauli presents one vertical sum at a time for 60
   minutes, with 20 timed lanes and an automatic lane change every three
-  minutes. Each lane supports up to 900 answers; the applicant can use the
-  on-screen keypad or keyboard, and Oracle stores the generated number sequence,
-  submitted digits, and correct-answer score. Long answer payloads are split
+  minutes. Operand ranges rise by five per lane from 0–9 in the first lane
+  through 95–99 in the final lane. Applicants may enter either the ones digit
+  or the full sum (up to three digits); each lane supports up to 900 answers
+  using the on-screen keypad or keyboard. Oracle stores the generated sequence
+  and full answers in a compact encoded payload with the correct-answer score.
+  Long answer payloads are split
   into bounded CLOB binds for PDO_OCI. The Pauli bank must contain at
   least 20 questions to provide the fixed one-hour session. The applicant
   psychotest flow has three stages: IQ, Pauli, and Personality. Personality is
@@ -177,9 +180,12 @@ their SQL is compatible with the current Oracle database.
   options. Online schedules close at the configured date and time through
   WP-Cron, with an additional expiry check on page requests. Candidate
   attendance confirmations are stored per Oracle application in
-  `HRS_KONFIRMASI_PSIKOTES`; review and apply
-  `migrations/014_psychotest_attendance_confirmation.sql` before enabling
-  applicant confirmations. The plugin does not apply this migration.
+  `HRS_KONFIRMASI_PSIKOTES`. With user approval, migration
+  `migrations/014_psychotest_attendance_confirmation.sql` was applied to the
+  connected local Oracle schema on 2026-11-10. Read-only verification confirmed
+  the table, all five columns, and its primary key, foreign key, and check
+  constraint are present and enabled. The plugin does not apply this migration
+  to other environments.
 
 ## Schema alignment and migrations
 
@@ -341,12 +347,35 @@ be presented as live recruitment records.
 
 The admin dashboard and applicant screens read application, status, profile,
 and form-answer data from the HRS Oracle tables. HR status changes update the
-application and append its tracking history together. User Department
-candidate details are scoped to the signed-in account's department and
-forwarded/interviewed candidates; profile answers and selection history are
-loaded from Oracle. Private uploads remain private and are not exposed as
-download links on the User Department screen. No schema migration is added by
-these read-flow changes.
+application and append its tracking history together. HR interview results
+are stored per application in `HRS_HASIL_WAWANCARA_HR`, including the exact
+active User Department account selected as the recipient. User Department
+candidate lists, profile details, and submitted-file downloads must verify
+that same account assignment in Oracle; department-name matching alone is not
+authorization. User interview results are linked to `LAMARAN_ID` so repeated
+applications by one candidate do not share interview data.
+
+These features require migration
+[`migrations/016_hr_interview_department_assignment.sql`](migrations/016_hr_interview_department_assignment.sql).
+It creates the HR interview/assignment table and adds the nullable
+application link, foreign key, and unique index to
+`HRS_HASIL_WAWANCARA_USER`. It was applied and verified on the local Oracle
+schema on 2026-11-10; this does not confirm application to any shared or
+production schema. Obtain the Oracle owner's approval and verify the target
+schema before applying it elsewhere. HR and User Department profile downloads
+use Dompdf to generate PDF files. Private applicant uploads remain behind
+authenticated, assignment-checked routes.
+
+Migration
+[`migrations/017_hr_interview_rating_date.sql`](migrations/017_hr_interview_rating_date.sql)
+adds HR interview dates, ratings, department recommendations, and append-only
+interview note history. With the Oracle owner's approval, it was applied and
+verified on the local Oracle schema on 2026-11-11 after confirming migration
+016's prerequisites. This does not confirm application to any shared or
+production schema; verify and obtain approval before applying it elsewhere.
+The plugin does not apply the migration automatically. The duplicate local
+copy of migration 016 was reconciled by retaining the canonical
+`migrations/016_hr_interview_department_assignment.sql`.
 
 Some legacy application and vacancy gateway methods still contain
 `DAW_*`-table operations; they need schema reconciliation before being treated

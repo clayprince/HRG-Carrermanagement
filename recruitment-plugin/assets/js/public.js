@@ -580,26 +580,66 @@
 
     const form = root.querySelector("[data-iq-form]");
     const status = root.querySelector("[data-iq-save-status]");
-    const timer = root.querySelector("[data-iq-timer]");
-    const progressLabel = root.querySelector("[data-iq-progress-label]");
-    const progressBar = root.querySelector("[data-iq-progress-bar]");
+    const timer = document.querySelector("[data-iq-timer]");
     if (!form || !status || !timer) {
       return;
     }
 
-    const pendingTimers = new Map();
+    const questions = [...form.querySelectorAll("[data-iq-question]")];
+    const questionButtons = [...root.querySelectorAll("[data-exam-question-nav]")];
+    const previousButton = root.querySelector("[data-exam-previous]");
+    const nextButton = root.querySelector("[data-exam-next]");
+    const finishButton = root.querySelector("[data-exam-finish]");
+    const questionCounter = document.querySelector("[data-exam-question-counter]");
+    const answeredCount = root.querySelector("[data-exam-answered-count]");
+    const savedQuestions = new Set(
+      questions
+        .filter((question) => question.querySelector("[data-iq-answer]:checked"))
+        .map((question) => question.dataset.iqQuestion || ""),
+    );
+    let currentIndex = Math.min(
+      Math.max(0, Number(root.dataset.currentIndex || 0)),
+      Math.max(0, questions.length - 1),
+    );
     const updateProgress = function updateProgress() {
-      const questions = [...form.querySelectorAll("[data-iq-question]")];
-      const answered = questions.filter((question) =>
-        question.querySelector("[data-iq-answer]:checked"),
-      ).length;
-      if (progressLabel) {
-        progressLabel.textContent = `${answered} dari ${questions.length} soal dijawab`;
+      const answered = savedQuestions.size;
+      if (answeredCount) {
+        answeredCount.textContent = String(answered);
       }
-      if (progressBar) {
-        progressBar.value = answered;
-        progressBar.setAttribute("aria-valuetext", `${answered} dari ${questions.length} soal dijawab`);
+      questionButtons.forEach(function updateQuestionButton(button) {
+        const index = Number(button.dataset.examQuestionNav);
+        const questionId = questions[index]?.dataset.iqQuestion || "";
+        const isAnswered = savedQuestions.has(questionId);
+        button.classList.toggle("is-answered", isAnswered);
+        button.classList.toggle("is-current", index === currentIndex);
+        if (index === currentIndex) {
+          button.setAttribute("aria-current", "step");
+        } else {
+          button.removeAttribute("aria-current");
+        }
+      });
+    };
+    const showQuestion = function showIqQuestion(index) {
+      if (index < 0 || index >= questions.length) {
+        return;
       }
+      currentIndex = index;
+      questions.forEach(function toggleQuestion(question, questionIndex) {
+        question.hidden = questionIndex !== currentIndex;
+      });
+      if (previousButton) {
+        previousButton.disabled = 0 === currentIndex;
+      }
+      if (nextButton) {
+        nextButton.hidden = currentIndex === questions.length - 1;
+      }
+      if (finishButton) {
+        finishButton.hidden = currentIndex !== questions.length - 1;
+      }
+      if (questionCounter) {
+        questionCounter.textContent = `${currentIndex + 1} / ${questions.length}`;
+      }
+      updateProgress();
     };
     let saveQueue = Promise.resolve();
     const saveQuestion = function saveQuestion(question) {
@@ -608,6 +648,7 @@
       values.set("action", "recruitment_iq_save_answer");
       values.set("nonce", root.dataset.saveNonce || "");
       values.set("question_id", question.dataset.iqQuestion || "");
+      const hasAnswer = inputs.length > 0;
       inputs.forEach(function appendAnswer(input, index) {
         values.set(`selected_answers[${index}]`, input.value);
       });
@@ -618,7 +659,15 @@
           return postAssessment(root.dataset.ajaxUrl, values);
         })
         .then(function savedAnswer() {
+          const questionId = question.dataset.iqQuestion || "";
+          if (hasAnswer) {
+            savedQuestions.add(questionId);
+          } else {
+            savedQuestions.delete(questionId);
+          }
           status.textContent = "Jawaban tersimpan.";
+          status.removeAttribute("data-save-error");
+          updateProgress();
         })
         .catch(function reportSaveError(error) {
           status.textContent = error.message;
@@ -645,33 +694,45 @@
         status.textContent = `Pilih paling banyak ${question.dataset.maxSelect || 1} jawaban untuk soal ini.`;
         return;
       }
+      const questionIndex = Number(question.dataset.questionIndex);
+      savedQuestions.delete(question.dataset.iqQuestion || "");
       updateProgress();
-      window.clearTimeout(pendingTimers.get(question));
-      pendingTimers.set(
-        question,
-        window.setTimeout(function enqueueAnswer() {
-          pendingTimers.delete(question);
-          saveQuestion(question).catch(function keepFailureVisible() {});
-        }, 250),
-      );
+      const shouldAdvance = event.target.checked;
+      saveQuestion(question)
+        .then(function moveAfterSavedAnswer() {
+          if (shouldAdvance && currentIndex === questionIndex) {
+            if (questionIndex === questions.length - 1) {
+              return;
+            }
+            showQuestion(questionIndex + 1);
+          }
+        })
+        .catch(function keepSaveErrorVisible() {});
     });
 
     form.addEventListener("submit", function waitForIqSaves(event) {
       event.preventDefault();
-      pendingTimers.forEach(function flushTimer(timerId, question) {
-        window.clearTimeout(timerId);
-        saveQuestion(question);
-      });
-      pendingTimers.clear();
       saveQueue
-        .catch(function allowServerToRetryIqAnswers() {})
         .then(function submitIqForm() {
           HTMLFormElement.prototype.submit.call(form);
         })
-        .catch(function preventIncompleteSubmit() {});
+        .catch(function keepSubmitBlockedAfterSaveFailure() {});
     });
 
-    updateProgress();
+    root.addEventListener("click", function navigateIqQuestions(event) {
+      const navButton = event.target.closest("[data-exam-question-nav]");
+      if (navButton) {
+        showQuestion(Number(navButton.dataset.examQuestionNav));
+        return;
+      }
+      if (event.target.closest("[data-exam-previous]")) {
+        showQuestion(currentIndex - 1);
+      } else if (event.target.closest("[data-exam-next]")) {
+        showQuestion(currentIndex + 1);
+      }
+    });
+
+    showQuestion(currentIndex);
     const deadline = Number(root.dataset.deadline || 0);
     const updateTimer = function updateIqTimer() {
       const remaining = Math.max(0, deadline - Math.floor(Date.now() / 1000));
@@ -705,7 +766,13 @@
     const correctCount = root.querySelector("[data-pauli-correct]");
     const incorrectCount = root.querySelector("[data-pauli-incorrect]");
     const answeredCount = root.querySelector("[data-pauli-answered]");
-    const numberSequence = root.dataset.numberSequence || "";
+    const numberSequence = (root.dataset.numberSequence || "")
+      .split(",")
+      .map(function parsePauliNumber(value) {
+        return Number(value);
+      });
+    const answerWidth = Number(root.dataset.answerWidth || 1);
+    const answerPlaceholder = "-".repeat(answerWidth);
     if (
       !form ||
       !payload ||
@@ -713,12 +780,17 @@
       !currentAnswer ||
       !leftNumber ||
       !rightNumber ||
-      !numberSequence
+      !root.dataset.numberSequence ||
+      ![1, 3].includes(answerWidth) ||
+      payload.value.length % answerWidth !== 0
     ) {
       return;
     }
 
-    const answers = payload.value.split("");
+    const answers = [];
+    for (let index = 0; index < payload.value.length; index += answerWidth) {
+      answers.push(payload.value.slice(index, index + answerWidth));
+    }
     const answerLimit = answers.length;
     let cursor = Number(root.dataset.cursor || 0);
     let correct = Number(root.dataset.correct || 0);
@@ -737,7 +809,7 @@
         });
     };
     const updateProblem = function updateProblem() {
-      while (cursor < answerLimit && answers[cursor] !== "-") {
+      while (cursor < answerLimit && answers[cursor] !== answerPlaceholder) {
         cursor += 1;
       }
       root.dataset.cursor = String(cursor);
@@ -749,10 +821,10 @@
         setAnswerControlsDisabled(true);
         return;
       }
-      leftNumber.textContent = numberSequence[cursor];
-      rightNumber.textContent = numberSequence[cursor + 1];
+      leftNumber.textContent = String(numberSequence[cursor]);
+      rightNumber.textContent = String(numberSequence[cursor + 1]);
       if (previousAnswer) {
-        previousAnswer.textContent = cursor > 0 ? answers[cursor - 1] : "—";
+        previousAnswer.textContent = cursor > 0 ? String(Number(answers[cursor - 1])) : "—";
       }
       setAnswerControlsDisabled(false);
     };
@@ -795,15 +867,21 @@
         }
       }, 2500);
     };
+    const enterDigit = function enterPauliDigit(digit) {
+      if (currentAnswer.value.length < answerWidth) {
+        currentAnswer.value += digit;
+      }
+    };
     const acceptAnswer = function acceptAnswer() {
-      if (currentAnswer.value === "" || cursor >= answerLimit) {
+      if (!/^[0-9]{1,3}$/.test(currentAnswer.value) || cursor >= answerLimit) {
         return;
       }
-      const answer = currentAnswer.value;
+      const answer = currentAnswer.value.padStart(answerWidth, "0");
       answers[cursor] = answer;
       payload.value = answers.join("");
-      const expected = (Number(numberSequence[cursor]) + Number(numberSequence[cursor + 1])) % 10;
-      if (Number(answer) === expected) {
+      const expected = numberSequence[cursor] + numberSequence[cursor + 1];
+      const enteredValue = Number(currentAnswer.value);
+      if (enteredValue === expected || enteredValue === expected % 10) {
         correct += 1;
       } else {
         incorrect += 1;
@@ -831,7 +909,7 @@
       const key = event.target.closest("[data-pauli-key]");
       if (key) {
         if (!key.disabled) {
-          currentAnswer.value = key.dataset.pauliKey || "";
+          enterDigit(key.dataset.pauliKey || "");
         }
         return;
       }
@@ -846,10 +924,10 @@
     root.addEventListener("keydown", function handlePauliKeyboard(event) {
       if (/^[0-9]$/.test(event.key)) {
         event.preventDefault();
-        currentAnswer.value = event.key;
+        enterDigit(event.key);
       } else if ("Backspace" === event.key) {
         event.preventDefault();
-        currentAnswer.value = "";
+        currentAnswer.value = currentAnswer.value.slice(0, -1);
       } else if ("Enter" === event.key) {
         event.preventDefault();
         acceptAnswer();
@@ -909,18 +987,77 @@
 
     const form = root.querySelector("[data-personality-form]");
     const status = root.querySelector("[data-personality-save-status]");
-    const progress = root.querySelector("[data-personality-progress]");
-    if (!form || !status || !progress) {
+    if (!form || !status) {
       return;
     }
 
-    const pendingTimers = new Map();
+    const questions = [...form.querySelectorAll("[data-personality-question]")];
+    const questionButtons = [...root.querySelectorAll("[data-exam-question-nav]")];
+    const previousButton = root.querySelector("[data-exam-previous]");
+    const nextButton = root.querySelector("[data-exam-next]");
+    const finishButton = root.querySelector("[data-exam-finish]");
+    const questionCounter = document.querySelector("[data-exam-question-counter]");
+    const answeredCount = root.querySelector("[data-exam-answered-count]");
+    const isAnswered = function isPersonalityQuestionAnswered(question) {
+      const selected = [...question.querySelectorAll("[data-personality-answer]:checked")];
+      if ("disc" === root.dataset.testKey) {
+        const most = selected.find((input) => "most" === input.dataset.answerPart);
+        const least = selected.find((input) => "least" === input.dataset.answerPart);
+        return Boolean(most && least && most.value !== least.value);
+      }
+      return selected.some((input) => "choice" === input.dataset.answerPart);
+    };
     const savedQuestions = new Set();
-    root.querySelectorAll("[data-personality-question]").forEach(function trackExistingAnswer(question) {
-      if (question.querySelector("[data-personality-answer]:checked")) {
+    questions.forEach(function trackExistingAnswer(question) {
+      if (isAnswered(question)) {
         savedQuestions.add(question.dataset.personalityQuestion || "");
       }
     });
+    let currentIndex = Math.min(
+      Math.max(0, Number(root.dataset.currentIndex || 0)),
+      Math.max(0, questions.length - 1),
+    );
+    const updateNavigation = function updatePersonalityNavigation() {
+      if (answeredCount) {
+        answeredCount.textContent = String(savedQuestions.size);
+      }
+      questionButtons.forEach(function updateQuestionButton(button) {
+        const index = Number(button.dataset.examQuestionNav);
+        const questionId = questions[index]?.dataset.personalityQuestion || "";
+        button.classList.toggle("is-answered", savedQuestions.has(questionId));
+        button.classList.toggle("is-current", index === currentIndex);
+        if (index === currentIndex) {
+          button.setAttribute("aria-current", "step");
+        } else {
+          button.removeAttribute("aria-current");
+        }
+      });
+      if (finishButton) {
+        finishButton.disabled = savedQuestions.size !== questions.length;
+      }
+    };
+    const showQuestion = function showPersonalityQuestion(index) {
+      if (index < 0 || index >= questions.length) {
+        return;
+      }
+      currentIndex = index;
+      questions.forEach(function toggleQuestion(question, questionIndex) {
+        question.hidden = questionIndex !== currentIndex;
+      });
+      if (previousButton) {
+        previousButton.disabled = 0 === currentIndex;
+      }
+      if (nextButton) {
+        nextButton.hidden = currentIndex === questions.length - 1;
+      }
+      if (finishButton) {
+        finishButton.hidden = currentIndex !== questions.length - 1;
+      }
+      if (questionCounter) {
+        questionCounter.textContent = `${currentIndex + 1} / ${questions.length}`;
+      }
+      updateNavigation();
+    };
     let saveQueue = Promise.resolve();
     const saveQuestion = function saveQuestion(question) {
       const questionId = question.dataset.personalityQuestion || "";
@@ -943,8 +1080,8 @@
         })
         .then(function savedPersonalityAnswer() {
           savedQuestions.add(questionId);
-          progress.textContent = String(savedQuestions.size);
           status.textContent = "Jawaban tersimpan.";
+          updateNavigation();
         })
         .catch(function reportPersonalityError(error) {
           status.textContent = error.message;
@@ -961,34 +1098,65 @@
       if (!question) {
         return;
       }
-      window.clearTimeout(pendingTimers.get(question));
-      pendingTimers.set(
-        question,
-        window.setTimeout(function persistPersonalityAnswer() {
-          pendingTimers.delete(question);
-          saveQuestion(question).catch(function keepFailureVisible() {});
-        }, 250),
-      );
+      if ("disc" === root.dataset.testKey) {
+        const selected = [...question.querySelectorAll("[data-personality-answer]:checked")];
+        const most = selected.find((input) => "most" === input.dataset.answerPart);
+        const least = selected.find((input) => "least" === input.dataset.answerPart);
+        if (!most || !least) {
+          savedQuestions.delete(question.dataset.personalityQuestion || "");
+          updateNavigation();
+          status.textContent = "Pilih satu pernyataan paling menggambarkan dan satu paling tidak menggambarkan.";
+          return;
+        }
+        if (most.value === least.value) {
+          savedQuestions.delete(question.dataset.personalityQuestion || "");
+          updateNavigation();
+          status.textContent = "Pilihan paling dan paling tidak harus berbeda.";
+          return;
+        }
+      }
+      const questionIndex = Number(question.dataset.questionIndex);
+      savedQuestions.delete(question.dataset.personalityQuestion || "");
+      updateNavigation();
+      saveQuestion(question)
+        .then(function moveAfterSavedPersonalityAnswer() {
+          if (currentIndex !== questionIndex) {
+            return;
+          }
+          if (questionIndex === questions.length - 1) {
+            form.requestSubmit();
+            return;
+          }
+          showQuestion(questionIndex + 1);
+        })
+        .catch(function keepPersonalitySaveErrorVisible() {});
     });
 
     form.addEventListener("submit", function waitForPersonalitySaves(event) {
       event.preventDefault();
-      pendingTimers.forEach(function flushTimer(timerId, question) {
-        window.clearTimeout(timerId);
-        saveQuestion(question);
-      });
-      pendingTimers.clear();
       saveQueue
-        .catch(function allowServerToRetryPersonalityAnswers() {})
         .then(function submitPersonalityForm() {
           HTMLFormElement.prototype.submit.call(form);
         })
-        .catch(function preventIncompleteSubmit() {});
+        .catch(function keepPersonalitySubmitBlocked() {});
+    });
+
+    root.addEventListener("click", function navigatePersonalityQuestions(event) {
+      const navButton = event.target.closest("[data-exam-question-nav]");
+      if (navButton) {
+        showQuestion(Number(navButton.dataset.examQuestionNav));
+        return;
+      }
+      if (event.target.closest("[data-exam-previous]")) {
+        showQuestion(currentIndex - 1);
+      } else if (event.target.closest("[data-exam-next]")) {
+        showQuestion(currentIndex + 1);
+      }
     });
 
     const reminderMinutes = Number(root.dataset.reminderMinutes || 0);
     const startedAt = Number(root.dataset.startedAt || 0);
-    const elapsed = root.querySelector("[data-personality-elapsed]");
+    const elapsed = document.querySelector("[data-personality-elapsed]");
     const reminder = root.querySelector("[data-personality-reminder]");
     if (elapsed && startedAt) {
       const updateElapsed = function updateElapsedTime() {
@@ -1002,6 +1170,7 @@
       };
       updateElapsed();
     }
+    showQuestion(currentIndex);
   }
 
   async function postAssessment(url, body) {
@@ -1053,6 +1222,36 @@
       let stream = null;
 
       if (video && canvas && startButton && captureButton && form && actionInput && status && error) {
+        async function uploadIdentityPhoto(image) {
+          actionInput.value = "capture";
+          const body = new FormData(form);
+          body.set("snapshot", image, "capture.jpg");
+          status.textContent = "Menyimpan foto secara privat...";
+          captureButton.disabled = true;
+          stream?.getTracks().forEach((track) => track.stop());
+          try {
+            const response = await fetch(form.action, {
+              method: "POST",
+              body,
+              credentials: "same-origin",
+            });
+            if (!response.ok || !response.redirected) {
+              throw new Error("Identity upload failed.");
+            }
+            window.location.assign(response.url);
+          } catch {
+            stream?.getTracks().forEach((track) => track.stop());
+            stream = null;
+            video.srcObject = null;
+            startButton.disabled = false;
+            captureButton.disabled = true;
+            error.textContent =
+              "Foto tidak berhasil disimpan. Periksa koneksi dan coba kembali.";
+            error.hidden = false;
+            status.textContent = "Pengiriman foto gagal.";
+          }
+        }
+
         startButton.addEventListener("click", async function startIdentityCamera() {
           if (!navigator.mediaDevices?.getUserMedia) {
             status.textContent = "Browser ini tidak mendukung kamera. Pilih verifikasi manual.";
@@ -1102,33 +1301,55 @@
             return;
           }
 
-          actionInput.value = "capture";
-          const body = new FormData(form);
-          body.set("snapshot", image, "capture.jpg");
-          status.textContent = "Menyimpan foto secara privat...";
-          stream.getTracks().forEach((track) => track.stop());
-          try {
-            const response = await fetch(form.action, {
-              method: "POST",
-              body,
-              credentials: "same-origin",
-            });
-            if (!response.ok || !response.redirected) {
-              throw new Error("Identity upload failed.");
-            }
-            window.location.assign(response.url);
-          } catch {
-            captureButton.disabled = false;
-            error.textContent =
-              "Foto tidak berhasil disimpan. Periksa koneksi dan coba kembali.";
-            error.hidden = false;
-            status.textContent = "Pengiriman foto gagal.";
-          }
+          await uploadIdentityPhoto(image);
         });
         window.addEventListener("pagehide", function stopIdentityCamera() {
           stream?.getTracks().forEach((track) => track.stop());
         });
       }
+    }
+
+    const tabWatch = document.querySelector("[data-psychotest-tab-watch]");
+    if (tabWatch) {
+      const ajaxUrl = tabWatch.dataset.ajaxUrl;
+      const nonce = tabWatch.dataset.nonce;
+      const status = tabWatch.querySelector("[data-tab-watch-status]");
+      let lastSentAt = 0;
+      document.addEventListener("visibilitychange", function recordTabSwitch() {
+        if (!document.hidden) {
+          return;
+        }
+        const now = Date.now();
+        if (10_000 > now - lastSentAt) {
+          return;
+        }
+        lastSentAt = now;
+        const body = new URLSearchParams({
+          action: "recruitment_proctoring_event",
+          nonce: nonce || "",
+          event_type: "TAB_HIDDEN",
+        });
+        fetch(ajaxUrl || "", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
+          body: body.toString(),
+          keepalive: true,
+        })
+          .then(async function verifyTabEvent(response) {
+            const result = await response.json();
+            if (!response.ok || !result?.success) {
+              throw new Error("Perpindahan tab belum berhasil dicatat.");
+            }
+          })
+          .catch(function reportTabEventFailure() {
+            lastSentAt = 0;
+            if (status) {
+              status.textContent =
+                "Perpindahan tab belum berhasil dicatat. Kamera belum terhubung; integrasi disiapkan oleh PIC.";
+            }
+          });
+      });
     }
 
     const watch = document.querySelector("[data-psychotest-proctoring-watch]");

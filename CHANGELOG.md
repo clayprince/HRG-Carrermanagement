@@ -6,6 +6,19 @@ migration log.
 
 ## 2026-11-10
 
+### HR interview handoff and applicant profiles
+
+- Added application-scoped HR interview outcomes and routing to one active
+  User Department account in the application's department. Status and tracking
+  history are saved together; the administrative status form cannot bypass
+  this handoff.
+- Scoped User Department candidate, profile, result, and submitted-document
+  access to the exact assigned account. Profile views include psychotest,
+  HR/User interview results, and selection history.
+- Replaced browser print with real Dompdf profile downloads for HR and User
+  Department. Applied and verified Oracle migration 016 on the local schema
+  only; no shared or production schema application is implied.
+
 ### Psychotest camera and microphone checks
 
 - Made the device check explain when an insecure HTTP origin blocks camera
@@ -58,6 +71,14 @@ migration log.
   when a candidate has multiple applications.
 - No database migration was introduced. Private applicant uploads are not
   exposed as download links in User Department.
+
+### Psychotest attendance confirmation migration
+
+- Applied migration `014_psychotest_attendance_confirmation.sql` to the
+  connected local Oracle schema after confirming its `HRS_LAMARAN` prerequisites.
+- Verified `HRS_KONFIRMASI_PSIKOTES`, all five columns, and its primary key,
+  foreign key, and check constraint are present and enabled. No other migration
+  files were run.
 
 ## 2026-11-08
 
