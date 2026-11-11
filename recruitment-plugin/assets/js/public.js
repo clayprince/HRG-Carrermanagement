@@ -1720,6 +1720,10 @@
 
     const setBrowserStatus = function setBrowserStatus() {
       if (!window.isSecureContext) {
+        if (window.location.protocol === "http:" && window.location.hostname !== "localhost") {
+          window.location.protocol = "https:";
+          return;
+        }
         unsupportedBanner.hidden = false;
         unsupportedBanner.textContent = "HTTPS diperlukan untuk mengakses kamera";
         updateStatus(
@@ -1736,8 +1740,11 @@
             ? "Gunakan HTTPS atau localhost agar izin kamera dapat diminta."
             : "Tes dapat dilanjutkan tanpa kamera karena pengaturan tes tidak mewajibkannya.",
         );
-        permissionButton.disabled = true;
-        permissionButton.textContent = "Perlu HTTPS";
+        permissionButton.disabled = false;
+        permissionButton.textContent = "Beralih ke HTTPS";
+        permissionButton.onclick = function () {
+          window.location.protocol = "https:";
+        };
         setContinueState();
         return;
       }
@@ -1826,6 +1833,10 @@
 
     permissionButton.addEventListener("click", function requestCameraAccess() {
       if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+        if (!window.isSecureContext && window.location.protocol === "http:") {
+          window.location.protocol = "https:";
+          return;
+        }
         setBrowserStatus();
         return;
       }
