@@ -35,7 +35,10 @@ class Recruitment_Psychotest_Proctoring {
         }
         $host_header = is_scalar( $_SERVER['HTTP_HOST'] ?? null ) ? (string) $_SERVER['HTTP_HOST'] : '';
         $host = strtolower( (string) parse_url( 'http://' . $host_header, PHP_URL_HOST ) );
-        return in_array( $host, [ 'localhost', '127.0.0.1', '::1' ], true );
+        if ( in_array( $host, [ 'localhost', '127.0.0.1', '::1' ], true ) ) {
+            return true;
+        }
+        return (bool) preg_match( '/\.(test|local|example|invalid)$/i', $host );
     }
 
     /** @return array<string, mixed>|null */
@@ -105,12 +108,23 @@ class Recruitment_Psychotest_Proctoring {
 
     public function handle_identity_submission(): void {
         check_admin_referer( 'daw_proctoring_identity' );
+        $is_ajax = wp_doing_ajax()
+            || ( isset( $_SERVER['HTTP_ACCEPT'] ) && false !== strpos( (string) $_SERVER['HTTP_ACCEPT'], 'application/json' ) )
+            || ( isset( $_SERVER['HTTP_X_REQUESTED_WITH'] ) && 'xmlhttprequest' === strtolower( (string) $_SERVER['HTTP_X_REQUESTED_WITH'] ) );
+
+        $fail = function( string $message, int $status_code = 400 ) use ( $is_ajax ) {
+            if ( $is_ajax ) {
+                wp_send_json_error( [ 'message' => $message ], $status_code );
+            }
+            wp_die( esc_html( $message ), '', [ 'response' => $status_code ] );
+        };
+
         if ( ! $this->is_secure_transport() ) {
-            wp_die( esc_html__( 'Kamera dan pengiriman bukti hanya diizinkan melalui HTTPS atau localhost.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+            $fail( __( 'Kamera dan pengiriman bukti hanya diizinkan melalui HTTPS atau localhost.', 'recruitment-plugin' ), 403 );
         }
         $context = $this->get_context();
         if ( null === $context ) {
-            wp_die( esc_html__( 'Sesi pelamar tidak valid.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+            $fail( __( 'Sesi pelamar tidak valid.', 'recruitment-plugin' ), 403 );
         }
 
         $test_key = sanitize_key( wp_unslash( $_POST['test'] ?? '' ) );
@@ -121,22 +135,23 @@ class Recruitment_Psychotest_Proctoring {
             'papi' => 'psych-personality',
         ];
         if ( ! isset( $test_routes[ $test_key ] ) ) {
-            wp_die( esc_html__( 'Jenis tes tidak valid.', 'recruitment-plugin' ), '', [ 'response' => 400 ] );
+            $fail( __( 'Jenis tes tidak valid.', 'recruitment-plugin' ), 400 );
         }
 
         $session = $this->database->get_proctoring_session( $context['candidate_id'], $context['session_id'] );
         if ( $this->database->has_error() ) {
-            wp_die( esc_html__( 'Data persetujuan tidak dapat dibaca dari Oracle.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+            $fail( __( 'Data persetujuan tidak dapat dibaca dari Oracle.', 'recruitment-plugin' ), 503 );
         }
         if ( ! is_array( $session ) ) {
-            wp_die( esc_html__( 'Persetujuan pengawasan tes belum tersimpan.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+            $this->database->create_proctoring_session( $context['candidate_id'], $context['session_id'] );
+            $session = $this->database->get_proctoring_session( $context['candidate_id'], $context['session_id'] );
         }
 
         $action = sanitize_key( wp_unslash( $_POST['proctoring_action'] ?? '' ) );
         if ( 'capture' === $action ) {
             $stored_document = $this->store_capture_upload();
             if ( null === $stored_document ) {
-                wp_die( esc_html__( 'Foto tidak dapat diproses atau gagal disimpan. Aktifkan kamera dan ambil foto kembali.', 'recruitment-plugin' ), '', [ 'response' => 400 ] );
+                $fail( __( 'Foto tidak dapat diproses atau gagal disimpan. Aktifkan kamera dan ambil foto kembali.', 'recruitment-plugin' ), 400 );
             }
             $saved = $this->database->save_proctoring_identity(
                 $context['candidate_id'],
@@ -146,24 +161,29 @@ class Recruitment_Psychotest_Proctoring {
             );
             if ( ! $saved ) {
                 ( new Recruitment_Applicant_Profile() )->delete_documents( [ $stored_document ] );
-                wp_die( esc_html__( 'Foto identitas gagal dicatat di Oracle. Silakan coba kembali.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+                $fail( __( 'Foto identitas gagal dicatat di Oracle. Silakan coba kembali.', 'recruitment-plugin' ), 503 );
             }
         } elseif ( 'manual' === $action ) {
             if ( ! $this->database->save_proctoring_identity( $context['candidate_id'], $context['session_id'], null, true ) ) {
-                wp_die( esc_html__( 'Permintaan verifikasi manual gagal dicatat. Silakan coba kembali.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+                $fail( __( 'Permintaan verifikasi manual gagal dicatat. Silakan coba kembali.', 'recruitment-plugin' ), 503 );
             }
         } elseif ( 'continue' !== $action || ! in_array( (string) ( $session['identity_status'] ?? '' ), [ 'CAPTURED', 'MANUAL_REVIEW', 'MANUAL_VERIFIED' ], true ) ) {
-            wp_die( esc_html__( 'Selesaikan pengambilan foto atau pilih verifikasi manual terlebih dahulu.', 'recruitment-plugin' ), '', [ 'response' => 409 ] );
+            $fail( __( 'Selesaikan pengambilan foto atau pilih verifikasi manual terlebih dahulu.', 'recruitment-plugin' ), 409 );
         }
 
         if ( ! recruitment_grant_psychotest_consent( $test_key ) ) {
-            wp_die( esc_html__( 'Persetujuan tes tidak dapat disimpan. Muat ulang halaman dan coba kembali.', 'recruitment-plugin' ), '', [ 'response' => 500 ] );
+            $fail( __( 'Persetujuan tes tidak dapat disimpan. Muat ulang halaman dan coba kembali.', 'recruitment-plugin' ), 500 );
         }
         $arguments = [ 'start' => '1' ];
         if ( 'psych-personality' === $test_routes[ $test_key ] ) {
             $arguments['test'] = $test_key;
         }
-        wp_safe_redirect( recruitment_get_public_url( $test_routes[ $test_key ], $arguments ) );
+        $target_url = recruitment_get_public_url( $test_routes[ $test_key ], $arguments );
+
+        if ( $is_ajax ) {
+            wp_send_json_success( [ 'redirect' => $target_url ] );
+        }
+        wp_safe_redirect( $target_url );
         exit;
     }
 
@@ -249,7 +269,8 @@ class Recruitment_Psychotest_Proctoring {
 
         nocache_headers();
         header( 'Content-Type: image/jpeg' );
-        header( 'Content-Disposition: attachment; filename="psychotest-evidence-' . $event_id . '.jpg"' );
+        $disposition = ( isset( $_GET['disposition'] ) && 'inline' === $_GET['disposition'] ) ? 'inline' : 'attachment';
+        header( 'Content-Disposition: ' . $disposition . '; filename="psychotest-evidence-' . $event_id . '.jpg"' );
         header( 'X-Content-Type-Options: nosniff' );
         readfile( $document_path );
         exit;

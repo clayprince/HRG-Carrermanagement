@@ -3772,22 +3772,31 @@ class Recruitment_Database {
                    AND RETENTION_UNTIL > CURRENT_TIMESTAMP FOR UPDATE'
             );
             $lock->execute( [ 'session_id' => $session_id, 'candidate_id' => $candidate_id ] );
-            if ( 'PENDING' !== (string) $lock->fetchColumn() ) {
-                throw new RuntimeException( 'Proctoring session was not found.' );
-            }
-            $update = $connection->prepare(
-                'UPDATE HRS_PSY_PROCTOR_SESSIONS SET IDENTITY_STATUS = :identity_status, UPDATED_AT = CURRENT_TIMESTAMP
-                 WHERE SESSION_ID = :session_id AND KANDIDAT_ID = :candidate_id'
-            );
-            $update->execute(
-                [
-                    'identity_status' => $manual_review ? 'MANUAL_REVIEW' : 'CAPTURED',
-                    'session_id' => $session_id,
-                    'candidate_id' => $candidate_id,
-                ]
-            );
-            if ( 1 !== $update->rowCount() ) {
-                throw new RuntimeException( 'Proctoring identity status could not be updated.' );
+            $current_status = $lock->fetchColumn();
+            if ( false === $current_status ) {
+                $insert = $connection->prepare(
+                    'INSERT INTO HRS_PSY_PROCTOR_SESSIONS (SESSION_ID, KANDIDAT_ID, CONSENT_VERSION, IDENTITY_STATUS, CREATED_AT, RETENTION_UNTIL, UPDATED_AT)
+                     VALUES (:session_id, :candidate_id, \'proctoring-v1\', :identity_status, CURRENT_TIMESTAMP, ADD_MONTHS(CURRENT_TIMESTAMP, 12), CURRENT_TIMESTAMP)'
+                );
+                $insert->execute(
+                    [
+                        'session_id' => $session_id,
+                        'candidate_id' => $candidate_id,
+                        'identity_status' => $manual_review ? 'MANUAL_REVIEW' : 'CAPTURED',
+                    ]
+                );
+            } else {
+                $update = $connection->prepare(
+                    'UPDATE HRS_PSY_PROCTOR_SESSIONS SET IDENTITY_STATUS = :identity_status, UPDATED_AT = CURRENT_TIMESTAMP
+                     WHERE SESSION_ID = :session_id AND KANDIDAT_ID = :candidate_id'
+                );
+                $update->execute(
+                    [
+                        'identity_status' => $manual_review ? 'MANUAL_REVIEW' : 'CAPTURED',
+                        'session_id' => $session_id,
+                        'candidate_id' => $candidate_id,
+                    ]
+                );
             }
             $event = $connection->prepare(
                 'INSERT INTO HRS_PSY_PROCTOR_EVENTS (SESSION_ID, EVENT_TYPE, FILE_KEY, EVENT_AT)

@@ -1205,11 +1205,32 @@
       const canvas = identityCapture.querySelector(
         "[data-proctoring-identity-canvas]",
       );
+      const previewImg = identityCapture.querySelector(
+        "[data-proctoring-identity-preview]",
+      );
+      const placeholder = identityCapture.querySelector(
+        "[data-proctoring-placeholder]",
+      );
+      const overlay = identityCapture.querySelector(
+        "[data-proctoring-overlay]",
+      );
       const startButton = identityCapture.querySelector(
         "[data-proctoring-identity-start]",
       );
       const captureButton = identityCapture.querySelector(
         "[data-proctoring-identity-capture]",
+      );
+      const confirmGroup = identityCapture.querySelector(
+        "[data-proctoring-identity-confirm-group]",
+      );
+      const retakeButton = identityCapture.querySelector(
+        "[data-proctoring-identity-retake]",
+      );
+      const confirmSubmitButton = identityCapture.querySelector(
+        "[data-proctoring-identity-confirm-submit]",
+      );
+      const manualButton = document.querySelector(
+        "[data-proctoring-identity-manual]",
       );
       const form = document.querySelector("[data-proctoring-identity-form]");
       const actionInput = form?.querySelector(
@@ -1220,45 +1241,22 @@
       );
       const error = form?.querySelector("[data-proctoring-identity-error]");
       let stream = null;
+      let capturedBlob = null;
 
-      if (video && canvas && startButton && captureButton && form && actionInput && status && error) {
-        async function uploadIdentityPhoto(image) {
-          actionInput.value = "capture";
-          const body = new FormData(form);
-          body.set("snapshot", image, "capture.jpg");
-          status.textContent = "Menyimpan foto secara privat...";
-          captureButton.disabled = true;
-          stream?.getTracks().forEach((track) => track.stop());
-          try {
-            const response = await fetch(form.action, {
-              method: "POST",
-              body,
-              credentials: "same-origin",
-            });
-            if (!response.ok || !response.redirected) {
-              throw new Error("Identity upload failed.");
-            }
-            window.location.assign(response.url);
-          } catch {
-            stream?.getTracks().forEach((track) => track.stop());
-            stream = null;
-            video.srcObject = null;
-            startButton.disabled = false;
-            captureButton.disabled = true;
-            error.textContent =
-              "Foto tidak berhasil disimpan. Periksa koneksi dan coba kembali.";
-            error.hidden = false;
-            status.textContent = "Pengiriman foto gagal.";
-          }
-        }
-
-        startButton.addEventListener("click", async function startIdentityCamera() {
+      if (video && canvas && form && actionInput && status) {
+        async function startCamera() {
           if (!navigator.mediaDevices?.getUserMedia) {
-            status.textContent = "Browser ini tidak mendukung kamera. Pilih verifikasi manual.";
+            status.textContent =
+              "Browser ini tidak mendukung kamera. Silakan pilih verifikasi manual.";
             return;
           }
-          startButton.disabled = true;
-          status.textContent = "Meminta izin kamera...";
+          if (startButton) {
+            startButton.disabled = true;
+            startButton.textContent = "Membuka Kamera...";
+          }
+          status.textContent = "Menghubungkan ke kamera Anda...";
+          if (error) error.hidden = true;
+
           try {
             stream = await navigator.mediaDevices.getUserMedia({
               video: {
@@ -1270,39 +1268,193 @@
             });
             video.srcObject = stream;
             video.hidden = false;
-            captureButton.disabled = false;
-            status.textContent = "Posisikan wajah dan sisi depan KTP di dalam bingkai.";
-          } catch (cameraError) {
-            startButton.disabled = false;
+            if (placeholder) placeholder.hidden = true;
+            if (overlay) overlay.hidden = false;
+            if (previewImg) previewImg.hidden = true;
+            if (startButton) startButton.style.display = "none";
+            if (captureButton) {
+              captureButton.style.display = "block";
+              captureButton.disabled = false;
+            }
+            if (confirmGroup) confirmGroup.style.display = "none";
             status.textContent =
+              "Pegang fisik KTP Anda di samping wajah sesuai bingkai panduan, lalu tekan tombol 'Ambil Foto Sekarang'.";
+          } catch (cameraError) {
+            if (startButton) {
+              startButton.disabled = false;
+              startButton.innerHTML = "&#128247; Buka Kamera";
+            }
+            const msg =
               cameraError?.name === "NotAllowedError"
-                ? "Izin kamera ditolak. Izinkan kamera atau pilih verifikasi manual."
-                : "Kamera tidak dapat dibuka. Pilih verifikasi manual bila perlu.";
+                ? "Izin kamera ditolak. Silakan izinkan akses kamera di browser Anda."
+                : cameraError?.name === "NotReadableError"
+                  ? "Kamera sedang digunakan aplikasi lain. Tutup Zoom/aplikasi lain lalu coba lagi."
+                  : "Kamera tidak dapat dibuka. Anda dapat menggunakan opsi verifikasi manual.";
+            status.textContent = msg;
+            if (error) {
+              error.textContent = msg;
+              error.hidden = false;
+            }
           }
-        });
+        }
 
-        captureButton.addEventListener("click", async function captureIdentity() {
-          if (!stream || !video.videoWidth || !video.videoHeight) {
-            status.textContent = "Kamera belum siap. Tunggu sebentar lalu coba lagi.";
-            return;
+        function retakePhoto() {
+          capturedBlob = null;
+          if (previewImg) {
+            previewImg.hidden = true;
+            previewImg.src = "";
           }
-          captureButton.disabled = true;
-          error.hidden = true;
-          const scale = Math.min(1, 1600 / video.videoWidth);
-          canvas.width = Math.round(video.videoWidth * scale);
-          canvas.height = Math.round(video.videoHeight * scale);
-          canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
-          const image = await new Promise((resolve) =>
-            canvas.toBlob(resolve, "image/jpeg", 0.82),
-          );
-          if (!image) {
+          if (confirmGroup) confirmGroup.style.display = "none";
+          if (captureButton) {
+            captureButton.style.display = "block";
             captureButton.disabled = false;
-            status.textContent = "Foto gagal dibuat. Silakan coba kembali.";
-            return;
           }
+          if (overlay) overlay.hidden = false;
+          if (video) video.hidden = false;
+          if (error) error.hidden = true;
 
-          await uploadIdentityPhoto(image);
-        });
+          if (!stream || !stream.active) {
+            startCamera();
+          } else {
+            status.textContent =
+              "Posisikan kembali wajah dan kartu KTP Anda lalu tekan 'Ambil Foto Sekarang'.";
+          }
+        }
+
+        async function uploadIdentityPhoto(image) {
+          actionInput.value = "capture";
+          const body = new FormData(form);
+          body.set("snapshot", image, "capture.jpg");
+          status.textContent =
+            "Menyimpan foto identitas ke laporan psikotes...";
+          if (confirmSubmitButton) confirmSubmitButton.disabled = true;
+          if (retakeButton) retakeButton.disabled = true;
+          if (error) error.hidden = true;
+
+          try {
+            const response = await fetch(form.action, {
+              method: "POST",
+              body,
+              credentials: "same-origin",
+              headers: {
+                Accept: "application/json",
+                "X-Requested-With": "XMLHttpRequest",
+              },
+            });
+
+            let data = null;
+            try {
+              data = await response.json();
+            } catch (jsonErr) {}
+
+            if (data && data.success && data.data && data.data.redirect) {
+              status.textContent =
+                "Foto identitas berhasil tersimpan! Membuka soal ujian...";
+              stream?.getTracks().forEach((track) => track.stop());
+              window.location.href = data.data.redirect;
+              return;
+            }
+
+            if (response.ok && response.redirected && response.url) {
+              status.textContent =
+                "Foto identitas berhasil tersimpan! Membuka soal ujian...";
+              stream?.getTracks().forEach((track) => track.stop());
+              window.location.assign(response.url);
+              return;
+            }
+
+            const failMsg =
+              data && data.data && data.data.message
+                ? data.data.message
+                : "Foto tidak berhasil disimpan. Periksa koneksi dan coba kembali.";
+            throw new Error(failMsg);
+          } catch (uploadError) {
+            if (confirmSubmitButton) confirmSubmitButton.disabled = false;
+            if (retakeButton) retakeButton.disabled = false;
+            if (error) {
+              error.textContent =
+                uploadError.message || "Gagal menyimpan foto identitas.";
+              error.hidden = false;
+            }
+            status.textContent =
+              "Pengiriman foto gagal. Silakan klik Simpan kembali atau gunakan Verifikasi Manual.";
+          }
+        }
+
+        if (startButton) {
+          startButton.addEventListener("click", startCamera);
+        }
+
+        if (captureButton) {
+          captureButton.addEventListener("click", async function takePhoto() {
+            if (!stream || !video.videoWidth || !video.videoHeight) {
+              status.textContent =
+                "Kamera belum siap. Tunggu sebentar lalu coba lagi.";
+              return;
+            }
+            captureButton.disabled = true;
+            if (error) error.hidden = true;
+
+            const scale = Math.min(1, 1600 / video.videoWidth);
+            canvas.width = Math.round(video.videoWidth * scale);
+            canvas.height = Math.round(video.videoHeight * scale);
+            canvas
+              .getContext("2d")
+              .drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const image = await new Promise((resolve) =>
+              canvas.toBlob(resolve, "image/jpeg", 0.88),
+            );
+            if (!image) {
+              captureButton.disabled = false;
+              status.textContent = "Foto gagal dibuat. Silakan coba kembali.";
+              return;
+            }
+
+            capturedBlob = image;
+            if (previewImg) {
+              previewImg.src = URL.createObjectURL(image);
+              previewImg.hidden = false;
+            }
+            video.hidden = true;
+            if (overlay) overlay.hidden = true;
+            captureButton.style.display = "none";
+            if (confirmGroup) confirmGroup.style.display = "flex";
+            if (confirmSubmitButton) confirmSubmitButton.disabled = false;
+            if (retakeButton) retakeButton.disabled = false;
+            status.textContent =
+              "Foto berhasil diambil! Periksa apakah wajah dan kartu KTP Anda terlihat jelas. Klik tombol 'Simpan & Mulai Tes' di bawah untuk langsung menuju soal ujian.";
+          });
+        }
+
+        if (retakeButton) {
+          retakeButton.addEventListener("click", retakePhoto);
+        }
+
+        if (confirmSubmitButton) {
+          confirmSubmitButton.addEventListener("click", function submitCaptured() {
+            if (capturedBlob) {
+              uploadIdentityPhoto(capturedBlob);
+            } else {
+              retakePhoto();
+            }
+          });
+        }
+
+        if (manualButton) {
+          manualButton.addEventListener("click", function requestManual() {
+            actionInput.value = "manual";
+          });
+        }
+
+        if (navigator.mediaDevices?.getUserMedia && window.isSecureContext) {
+          setTimeout(function autoStart() {
+            if (video.hidden && !capturedBlob) {
+              startCamera();
+            }
+          }, 350);
+        }
+
         window.addEventListener("pagehide", function stopIdentityCamera() {
           stream?.getTracks().forEach((track) => track.stop());
         });
