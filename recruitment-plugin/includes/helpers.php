@@ -650,6 +650,17 @@ function recruitment_get_assessment_state( int $user_id, string $key ) {
 }
 
 /**
+ * Check that saved assessment progress belongs to the current candidate.
+ *
+ * @param mixed $state
+ */
+function recruitment_assessment_state_matches_candidate( $state, int $candidate_id ): bool {
+    return $candidate_id > 0
+        && is_array( $state )
+        && (int) ( $state['candidate_id'] ?? 0 ) === $candidate_id;
+}
+
+/**
  * Persist assessment progress without changing the applicant's isolated login cookie.
  *
  * @param mixed $value

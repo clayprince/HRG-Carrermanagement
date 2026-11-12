@@ -20,7 +20,7 @@ class Recruitment_Admin {
 		add_action( 'admin_post_daw_set_vacancy_status', [ $this, 'handle_vacancy_status' ] );
 		add_action( 'admin_post_daw_update_application_status', [ $this, 'handle_application_status' ] );
 		add_action( 'admin_post_daw_save_hr_interview', [ $this, 'handle_hr_interview_save' ] );
-		add_action( 'wp_ajax_daw_save_interview_schedule', [ $this, 'handle_interview_schedule_save' ] );
+		add_action( 'wp_ajax_daw_save_interview_schedule', [ $this, 'handle_interview_schedule_save_ajax' ] );
 		add_action( 'admin_post_daw_send_application_status_email', [ $this, 'handle_application_status_email' ] );
 		add_action( 'admin_post_daw_update_psychotest_attendance_time', [ $this, 'handle_psychotest_attendance_time_update' ] );
 		add_action( 'admin_post_daw_update_applicant_email', [ $this, 'handle_applicant_email_update' ] );
@@ -1581,11 +1581,7 @@ class Recruitment_Admin {
 		$this->render_page( 'interview-schedule-user' );
 	}
 
-	public function handle_interview_schedule_save(): void {
-		if ( ! current_user_can( 'manage_recruitment' ) ) {
-			wp_send_json_error( [ 'message' => 'Anda tidak memiliki izin untuk mengatur jadwal wawancara.' ], 403 );
-		}
-		check_ajax_referer( 'daw_save_interview_schedule', 'nonce' );
+	public function handle_interview_schedule_save_ajax(): void {
 
 		$dates_json = $_POST['dates'] ?? '';
 		$slots_json = $_POST['slots'] ?? '';

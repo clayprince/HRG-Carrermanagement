@@ -25,6 +25,48 @@ $tracking_url = recruitment_get_public_url(
         : []
 );
 $applied_at = $application ? strtotime( (string) ( $application['created_at'] ?? '' ) ) : false;
+
+$is_announcement = ( ! $database_error && $application && ( $is_final || is_array( $stage_announcement ) ) );
+$announcement_eyebrow = '';
+$announcement_passed = false;
+$announcement_badge = '';
+$announcement_title = '';
+$announcement_desc = '';
+$announcement_enc = '';
+$next_action_type = '';
+
+if ( $is_announcement ) {
+    if ( $is_final ) {
+        $announcement_eyebrow = 'KEPUTUSAN AKHIR';
+        $announcement_passed = $is_accepted;
+        $announcement_badge = $is_accepted ? 'DITERIMA' : 'TIDAK DITERIMA';
+        $announcement_title = $is_accepted
+            ? 'Selamat, ' . esc_html( (string) $applicant['full_name'] ) . '!'
+            : 'Terima kasih telah mengikuti proses seleksi.';
+        $announcement_desc = $is_accepted
+            ? 'Anda dinyatakan diterima untuk posisi ' . esc_html( (string) $application['title'] ) . '.'
+            : 'Untuk saat ini, Anda belum dapat melanjutkan pada lowongan ' . esc_html( (string) $application['title'] ) . '.';
+        $announcement_enc = $is_accepted
+            ? 'Kami menantikan kontribusi Anda dan berharap perjalanan baru ini menjadi awal yang baik.'
+            : 'Jangan berkecil hati. Terus kembangkan potensi Anda dan tetap semangat menantikan kesempatan berikutnya.';
+    } else {
+        $is_stage_passed = 'passed' === $stage_announcement['outcome'];
+        $stage_name = (string) ( $stage_announcement['stage_label'] ?? 'Seleksi' );
+        $announcement_eyebrow = 'PENGUMUMAN TAHAP SELEKSI';
+        $announcement_passed = $is_stage_passed;
+        $announcement_badge = $is_stage_passed ? 'LOLOS TAHAP ' . strtoupper( $stage_name ) : 'TIDAK LOLOS';
+        $announcement_title = $is_stage_passed
+            ? 'Selamat, ' . esc_html( (string) $applicant['full_name'] ) . '!'
+            : 'Mohon Maaf, ' . esc_html( (string) $applicant['full_name'] );
+        $announcement_desc = $is_stage_passed
+            ? 'Anda dinyatakan lolos tahap <strong>' . esc_html( $stage_name ) . '</strong> untuk posisi <strong>' . esc_html( (string) $application['title'] ) . '</strong>.'
+            : 'Untuk saat ini, Anda belum dapat melanjutkan pada tahap seleksi <strong>' . esc_html( $stage_name ) . '</strong> lowongan <strong>' . esc_html( (string) $application['title'] ) . '</strong>.';
+        $announcement_enc = $is_stage_passed
+            ? 'Hasil seleksi ini membuka kesempatan Anda untuk melangkah ke tahap berikutnya. Persiapkan diri Anda sebaik mungkin.'
+            : 'Jangan berkecil hati. Terus kembangkan potensi Anda dan tetap semangat dalam proses pencarian kesempatan berikutnya.';
+        $next_action_type = $is_stage_passed ? (string) ( $stage_announcement['next_page'] ?? '' ) : '';
+    }
+}
 ?>
 <div class="daw-recruitment daw-account daw-recruitment--tracking">
     <?php require recruitment_get_plugin_path( 'public/components/header.php' ); ?>
@@ -32,8 +74,8 @@ $applied_at = $application ? strtotime( (string) ( $application['created_at'] ??
         <header class="daw-account__heading daw-application-result__heading">
             <div>
                 <span class="daw-recruitment__eyebrow">HASIL SELEKSI</span>
-                <h1>Pengumuman Hasil Lowongan</h1>
-                <p><?= $is_final ? 'Informasi keputusan akhir dan ringkasan lamaran Anda.' : 'Informasi hasil seleksi dan ringkasan lamaran Anda.' ?></p>
+                <h1>Pengumuman Hasil Seleksi</h1>
+                <p><?= $is_final ? 'Informasi keputusan akhir dan ringkasan lamaran Anda.' : 'Informasi status hasil seleksi dan langkah selanjutnya.' ?></p>
             </div>
         </header>
 
@@ -49,36 +91,31 @@ $applied_at = $application ? strtotime( (string) ( $application['created_at'] ??
                 <h2>Lamaran tidak ditemukan</h2>
                 <p>Lamaran ini tidak tersedia untuk akun Anda.</p>
             </section>
-        <?php elseif ( ! $is_final && is_array( $stage_announcement ) ) : ?>
-            <section class="daw-application-result__message" role="status">
-                <span aria-hidden="true"><?= 'passed' === $stage_announcement['outcome'] ? '&#10003;' : '&#8212;' ?></span>
-                <h2><?= 'passed' === $stage_announcement['outcome']
-                    ? 'Selamat, Anda lolos tahap ' . esc_html( $stage_announcement['stage_label'] )
-                    : 'Mohon maaf, Anda belum lolos tahap ' . esc_html( $stage_announcement['stage_label'] ) ?></h2>
-                <p><?= 'passed' === $stage_announcement['outcome']
-                    ? 'Pengumuman tahap seleksi Anda tersedia pada halaman tracking lamaran. Silakan kembali ke tracking untuk melanjutkan.'
-                    : 'Lihat riwayat tracking untuk mengetahui informasi tahapan seleksi Anda.' ?></p>
-            </section>
-        <?php elseif ( ! $is_final ) : ?>
+        <?php elseif ( ! $is_announcement ) : ?>
             <section class="daw-application-result__message" role="status">
                 <span aria-hidden="true">…</span>
-                <h2>Keputusan belum tersedia</h2>
-                <p>Pengumuman akan muncul setelah HR menetapkan keputusan akhir.</p>
+                <h2>Pengumuman belum tersedia</h2>
+                <p>Pengumuman akan muncul setelah tim rekrutmen memperbarui tahapan seleksi Anda.</p>
             </section>
         <?php else : ?>
-            <section class="daw-application-result__hero <?= $is_accepted ? 'is-accepted' : 'is-rejected' ?>" role="status" aria-live="polite">
-                <span class="daw-application-result__icon" aria-hidden="true"><?= $is_accepted ? '&#10003;' : '&#8212;' ?></span>
+            <section class="daw-application-result__hero <?= $announcement_passed ? 'is-accepted' : 'is-rejected' ?>" role="status" aria-live="polite">
+                <span class="daw-application-result__icon" aria-hidden="true"><?= $announcement_passed ? '&#10003;' : '&#8212;' ?></span>
                 <div class="daw-application-result__hero-copy">
-                    <span class="daw-application-result__eyebrow">KEPUTUSAN AKHIR</span>
-                    <h2><?= $is_accepted ? 'Selamat, ' . esc_html( (string) $applicant['full_name'] ) . '!' : 'Terima kasih telah mengikuti proses seleksi.' ?></h2>
-                    <p><?= $is_accepted
-                        ? 'Anda dinyatakan diterima untuk posisi ' . esc_html( (string) $application['title'] ) . '.'
-                        : 'Untuk saat ini, Anda belum dapat melanjutkan pada lowongan ' . esc_html( (string) $application['title'] ) . '.' ?></p>
-                    <p class="daw-application-result__encouragement"><?= $is_accepted
-                        ? 'Kami menantikan kontribusi Anda dan berharap perjalanan baru ini menjadi awal yang baik.'
-                        : 'Jangan berkecil hati. Terus kembangkan potensi Anda dan tetap semangat menantikan kesempatan berikutnya.' ?></p>
+                    <span class="daw-application-result__eyebrow"><?= esc_html( $announcement_eyebrow ) ?></span>
+                    <h2><?= $announcement_title ?></h2>
+                    <p><?= $announcement_desc ?></p>
+                    <p class="daw-application-result__encouragement"><?= esc_html( $announcement_enc ) ?></p>
+                    <?php if ( 'psychotest-preparation' === $next_action_type ) : ?>
+                        <div style="margin-top: 18px;">
+                            <a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'application-process', [ 'application_id' => (string) $application['id'], 'show_psychotest_info' => '1', 'result_viewed' => '1' ] ) ) ?>">Lihat Informasi Psikotes</a>
+                        </div>
+                    <?php elseif ( 'interview-booking' === $next_action_type ) : ?>
+                        <div style="margin-top: 18px;">
+                            <a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'interview-booking', [ 'application_id' => (string) $application['id'] ] ) ) ?>"><?= esc_html( $stage_announcement['next_label'] ?: 'Pilih Jadwal Wawancara' ) ?></a>
+                        </div>
+                    <?php endif; ?>
                 </div>
-                <strong class="daw-application-result__badge"><?= $is_accepted ? 'DITERIMA' : 'TIDAK DITERIMA' ?></strong>
+                <strong class="daw-application-result__badge"><?= esc_html( $announcement_badge ) ?></strong>
             </section>
 
             <div class="daw-application-result__grid">
@@ -100,16 +137,15 @@ $applied_at = $application ? strtotime( (string) ( $application['created_at'] ??
                 <aside class="daw-application-result__tracking">
                     <span class="daw-application-result__tracking-icon" aria-hidden="true">&#8634;</span>
                     <h2>Riwayat lamaran tetap tersedia</h2>
-                    <p>Gunakan token ini kapan saja untuk membuka kembali tracking dan riwayat seleksi. Setelah keputusan final, lamaran hanya dapat dilihat dan tidak dapat diubah.</p>
+                    <p>Gunakan nomor lamaran atau token ini kapan saja untuk membuka kembali tracking dan riwayat seleksi akun Anda.</p>
                     <span class="daw-application-result__token-label">TOKEN TRACKING</span>
                     <code><?= esc_html( (string) ( $application['token'] ?? '' ) ?: 'Token belum tersedia' ) ?></code>
-                    <a class="daw-application-result__tracking-link" href="<?= esc_url( $tracking_url ) ?>">Lihat Riwayat Tracking <span aria-hidden="true">&rarr;</span></a>
+                    <a class="daw-application-result__tracking-link" href="<?= esc_url( $tracking_url ) ?>">Kembali ke Tracking <span aria-hidden="true">&rarr;</span></a>
                 </aside>
             </div>
-
         <?php endif; ?>
 
-        <?php if ( ! $application || ! $is_final || $database_error ) : ?>
+        <?php if ( ! $application || ! $is_announcement || $database_error ) : ?>
             <a class="daw-application-result__back-link" href="<?= esc_url( $tracking_url ) ?>">&larr; Kembali ke Tracking Lamaran</a>
         <?php endif; ?>
     </main>

@@ -6107,8 +6107,9 @@ class Recruitment_Database {
 
     /**
      * @return array<int, array<string, mixed>>
+     * @deprecated Renamed to avoid duplicate method name. Was using legacy HRS_SLOT_WAWANCARA schema.
      */
-    public function get_applicant_interview_slots( string $applicant_id, string $application_id, string $type ): array {
+    public function get_applicant_interview_slots_legacy( string $applicant_id, string $application_id, string $type ): array {
         if ( ! ctype_digit( $applicant_id ) || ! ctype_digit( $application_id ) || '0' === $applicant_id || '0' === $application_id || ! in_array( $type, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) ) {
             return [];
         }
@@ -6154,8 +6155,11 @@ class Recruitment_Database {
         );
     }
 
-    /** @return array<string, mixed>|null */
-    public function get_applicant_interview_booking( string $applicant_id, string $application_id, string $type ): ?array {
+    /**
+     * @return array<string, mixed>|null
+     * @deprecated Renamed to avoid duplicate method name. Was using legacy HRS_BOOKING_INTERVIEW schema.
+     */
+    public function get_applicant_interview_booking_legacy( string $applicant_id, string $application_id, string $type ): ?array {
         if ( ! ctype_digit( $applicant_id ) || ! ctype_digit( $application_id ) || ! in_array( $type, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) ) {
             return null;
         }
