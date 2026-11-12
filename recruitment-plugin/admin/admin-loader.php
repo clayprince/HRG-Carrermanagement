@@ -4,6 +4,8 @@ class Recruitment_Admin {
 
 	public function init(): void {
 		add_action( 'admin_menu', [ $this, 'register_admin_menu' ], 9 );
+		add_action( 'admin_init', [ $this, 'handle_user_interview_post' ], 1 );
+		add_action( 'admin_init', [ $this, 'handle_final_decision_post' ], 1 );
 		add_action( 'admin_post_daw_save_department_request', [ $this, 'handle_department_request_post' ] );
 		add_action( 'admin_post_daw_review_department_request', [ $this, 'handle_department_request_review' ] );
 		add_action( 'admin_post_daw_create_department_account', [ $this, 'handle_department_account_creation' ] );
@@ -18,6 +20,7 @@ class Recruitment_Admin {
 		add_action( 'admin_post_daw_set_vacancy_status', [ $this, 'handle_vacancy_status' ] );
 		add_action( 'admin_post_daw_update_application_status', [ $this, 'handle_application_status' ] );
 		add_action( 'admin_post_daw_save_hr_interview', [ $this, 'handle_hr_interview_save' ] );
+		add_action( 'wp_ajax_daw_save_interview_schedule', [ $this, 'handle_interview_schedule_save' ] );
 		add_action( 'admin_post_daw_send_application_status_email', [ $this, 'handle_application_status_email' ] );
 		add_action( 'admin_post_daw_update_psychotest_attendance_time', [ $this, 'handle_psychotest_attendance_time_update' ] );
 		add_action( 'admin_post_daw_update_applicant_email', [ $this, 'handle_applicant_email_update' ] );
@@ -186,7 +189,7 @@ class Recruitment_Admin {
 					<h1 id="daw-vacancy-overview-title">Lowongan</h1>
 					<p class="daw-vacancy-overview__description">Kelola posisi dan publikasi lowongan kerja.</p>
 				</div>
-				<a class="daw-vacancy-overview__create" href="<?= esc_url( admin_url( 'post-new.php?post_type=daw_vacancy' ) ) ?>"><span aria-hidden="true">+</span> Buat Lowongan</a>
+				<a class="daw-vacancy-overview__create" href="<?= esc_url( add_query_arg( 'view', 'create', recruitment_get_admin_url( 'vacancies' ) ) ) ?>"><span aria-hidden="true">+</span> Buat Lowongan</a>
 			</div>
 			<div class="daw-vacancy-overview__stats" aria-label="Ringkasan lowongan">
 				<div class="daw-vacancy-overview__stat daw-vacancy-overview__stat--total"><span>Total Lowongan</span><strong><?= esc_html( number_format_i18n( $total ) ) ?></strong></div>
@@ -227,7 +230,8 @@ class Recruitment_Admin {
 		add_submenu_page( 'recruitment-dashboard', 'Wawancara HR', 'Wawancara HR', 'manage_recruitment', 'recruitment-hr-interview', [ $this, 'render_hr_interview' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Final Decision', 'Final Decision', 'manage_recruitment', 'recruitment-final-decision', [ $this, 'render_final_decision' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Wawancara User', 'Wawancara User', 'manage_recruitment', 'recruitment-user-interview', [ $this, 'render_user_interview' ] );
-		add_submenu_page( 'recruitment-dashboard', 'Jadwal Wawancara', 'Jadwal Wawancara', 'manage_recruitment', 'recruitment-interview-schedule', [ $this, 'render_interview_schedule' ] );
+		add_submenu_page( 'recruitment-dashboard', 'Jadwal Wawancara HR', 'Jadwal Wawancara HR', 'manage_recruitment', 'recruitment-interview-schedule', [ $this, 'render_interview_schedule' ] );
+		add_submenu_page( 'recruitment-dashboard', 'Jadwal Wawancara User', 'Jadwal Wawancara User', 'manage_recruitment', 'recruitment-interview-schedule-user', [ $this, 'render_user_interview_schedule' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Pengelolaan Akun User', 'Pengelolaan Akun User', 'manage_recruitment', 'recruitment-user-management', [ $this, 'render_user_management' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Profil Admin HR', 'Profil Admin HR', 'manage_recruitment', 'recruitment-hr-profile', [ $this, 'render_hr_profile' ] );
 		add_submenu_page( 'recruitment-dashboard', 'Setting Psikotes', 'Setting Psikotes', 'manage_recruitment', 'recruitment-psychotest-settings', [ $this, 'render_psychotest_settings' ] );
@@ -297,6 +301,13 @@ class Recruitment_Admin {
 		$department_id = absint( $_POST['department_id'] ?? 0 );
 		$dealer = sanitize_text_field( wp_unslash( $_POST['dealer'] ?? '' ) );
 		$location = sanitize_text_field( wp_unslash( $_POST['location'] ?? '' ) );
+		$headcount_raw = isset( $_POST['headcount'] ) && is_scalar( $_POST['headcount'] )
+			? wp_unslash( (string) $_POST['headcount'] )
+			: '';
+		$headcount = filter_var( $headcount_raw, FILTER_VALIDATE_INT );
+		if ( ( ! is_int( $headcount ) || 1 > $headcount ) && $vacancy_id ) {
+			$headcount = recruitment_get_vacancy_requested_headcount( $vacancy_id );
+		}
 		$deadline = sanitize_text_field( wp_unslash( $_POST['deadline'] ?? '' ) );
 		$status = sanitize_key( wp_unslash( $_POST['status'] ?? 'draft' ) );
 		$database = new Recruitment_Database();
@@ -317,16 +328,23 @@ class Recruitment_Admin {
 			&& $valid_date->format( 'Y-m-d' ) === $deadline
 			&& $deadline >= current_time( 'Y-m-d' );
 
-		if ( '' === $title || '' === $dealer || '' === $department_name || ! $is_valid_date || ! in_array( $status, [ 'draft', 'published' ], true ) ) {
+		if ( '' === $title || '' === $dealer || '' === $department_name || ! is_int( $headcount ) || 1 > $headcount || ! $is_valid_date || ! in_array( $status, [ 'draft', 'published' ], true ) ) {
 			$this->redirect_to_vacancies( 'invalid_data', $vacancy_id );
 		}
-		if ( $vacancy_id && ( 'daw_vacancy' !== get_post_type( $vacancy_id ) || ! current_user_can( 'edit_post', $vacancy_id ) ) ) {
+		if ( $vacancy_id && ! $this->can_manage_vacancy( $vacancy_id ) ) {
 			wp_die( esc_html__( 'Lowongan yang akan diubah tidak ditemukan atau tidak dapat diakses.', 'recruitment-plugin' ) );
+		}
+		if ( 'published' === $status && ( ! $vacancy_id || ! recruitment_has_approved_vacancy_request( $vacancy_id ) ) ) {
+			$this->redirect_to_vacancies( 'request_required', $vacancy_id );
+		}
+		$is_filled = $vacancy_id && '1' === (string) get_post_meta( $vacancy_id, '_daw_vacancy_filled', true );
+		if ( $is_filled && 'published' === $status ) {
+			$this->redirect_to_vacancies( 'already_filled', $vacancy_id );
 		}
 
 		$post_data = [
 			'post_type' => 'daw_vacancy',
-			'post_status' => 'published' === $status ? 'publish' : 'draft',
+			'post_status' => $is_filled ? 'private' : ( 'published' === $status ? 'publish' : 'draft' ),
 			'post_title' => $title,
 			'post_content' => $description,
 			'post_excerpt' => wp_trim_words( $description, 24 ),
@@ -351,10 +369,18 @@ class Recruitment_Admin {
 				'_daw_dealer' => $dealer,
 				'_daw_location' => $location,
 				'_daw_deadline' => $deadline,
-				'_daw_vacancy_status' => $status,
+				'_daw_headcount' => $headcount,
+				'_daw_vacancy_status' => $is_filled ? 'closed' : $status,
 			] as $meta_key => $meta_value
 		) {
 			update_post_meta( $post_id, $meta_key, $meta_value );
+		}
+		$headcount_sync = $database->sync_wordpress_vacancy_headcount( (int) $post_id, $headcount );
+		if ( empty( $headcount_sync['success'] ) ) {
+			$this->redirect_to_vacancies( 'headcount_sync_failed', (int) $post_id );
+		}
+		if ( ! empty( $headcount_sync['warning'] ) ) {
+			$this->redirect_to_vacancies( 'close_warning', (int) $post_id );
 		}
 
 		$this->redirect_to_vacancies( 'saved' );
@@ -368,8 +394,21 @@ class Recruitment_Admin {
 		$vacancy_id = absint( $_POST['vacancy_id'] ?? 0 );
 		$status = sanitize_key( wp_unslash( $_POST['status'] ?? '' ) );
 		check_admin_referer( 'daw_set_vacancy_status_' . $vacancy_id );
-		if ( ! $vacancy_id || 'daw_vacancy' !== get_post_type( $vacancy_id ) || ! current_user_can( 'edit_post', $vacancy_id ) || ! in_array( $status, [ 'published', 'draft', 'closed', 'archived' ], true ) ) {
+		if ( ! $this->can_manage_vacancy( $vacancy_id ) || ! in_array( $status, [ 'published', 'draft', 'closed', 'archived' ], true ) ) {
 			wp_die( esc_html__( 'Data status lowongan tidak valid.', 'recruitment-plugin' ) );
+		}
+		if ( 'published' === $status && '1' === (string) get_post_meta( $vacancy_id, '_daw_vacancy_filled', true ) ) {
+			$this->redirect_to_vacancies( 'already_filled' );
+		}
+		if ( 'published' === $status && ! recruitment_has_approved_vacancy_request( $vacancy_id ) ) {
+			$this->redirect_to_vacancies( 'request_required', $vacancy_id );
+		}
+		if ( 'published' === $status ) {
+			$headcount = filter_var( get_post_meta( $vacancy_id, '_daw_headcount', true ), FILTER_VALIDATE_INT );
+			if ( ! is_int( $headcount ) || 1 > $headcount ) {
+				$notice = recruitment_get_vacancy_requested_headcount( $vacancy_id ) ? 'headcount_save_first' : 'headcount_required';
+				$this->redirect_to_vacancies( $notice, $vacancy_id );
+			}
 		}
 
 		$post_status = in_array( $status, [ 'published', 'draft' ], true ) ? ( 'published' === $status ? 'publish' : 'draft' ) : 'private';
@@ -393,6 +432,12 @@ class Recruitment_Admin {
 		exit;
 	}
 
+	private function can_manage_vacancy( int $vacancy_id ): bool {
+		return $vacancy_id > 0
+			&& 'daw_vacancy' === get_post_type( $vacancy_id )
+			&& current_user_can( 'manage_recruitment' );
+	}
+
 	public function render_applicants(): void {
 		$this->render_page( 'applicants' );
 	}
@@ -411,6 +456,162 @@ class Recruitment_Admin {
 
 	public function render_user_department(): void {
 		$this->render_page( 'user-department' );
+	}
+
+	public function handle_final_decision_post(): void {
+		$action = isset( $_POST['daw_final_decision_action'] ) && is_scalar( $_POST['daw_final_decision_action'] )
+			? sanitize_key( wp_unslash( (string) $_POST['daw_final_decision_action'] ) )
+			: '';
+		if (
+			'POST' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) )
+			|| 'recruitment-final-decision' !== sanitize_key( $_GET['page'] ?? '' )
+			|| 'save_final_decision' !== $action
+		) {
+			return;
+		}
+
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk menyimpan keputusan akhir.', 'recruitment-plugin' ) );
+		}
+		check_admin_referer( 'daw_save_final_decision' );
+
+		$application_id = absint( $_POST['application_id'] ?? 0 );
+		$posted_decision = isset( $_POST['decision'] ) && is_scalar( $_POST['decision'] )
+			? sanitize_key( wp_unslash( (string) $_POST['decision'] ) )
+			: '';
+		$decision = 'accept' === $posted_decision ? 'DITERIMA' : ( 'reject' === $posted_decision ? 'DITOLAK' : '' );
+		$role_access_id = absint( get_user_meta( get_current_user_id(), 'daw_oracle_account_id', true ) );
+		$save_result = '' !== $decision
+			? ( new Recruitment_Database() )->save_final_decision(
+				(string) $application_id,
+				$decision,
+				$role_access_id > 0 ? $role_access_id : null
+			)
+			: [ 'success' => false, 'error' => 'Pilihan keputusan tidak valid.' ];
+
+		if ( ! empty( $save_result['success'] ) ) {
+			$redirect_args = [
+				'page' => 'recruitment-final-decision',
+				'section' => 'decision',
+				'decision_saved' => '1',
+			];
+			if ( ! empty( $save_result['warning'] ) ) {
+				$redirect_args['vacancy_close_warning'] = '1';
+			}
+			wp_safe_redirect(
+				add_query_arg(
+					$redirect_args,
+					admin_url( 'admin.php' )
+				)
+			);
+			exit;
+		}
+
+		$GLOBALS['daw_final_decision_error'] = 'Gagal menyimpan keputusan: ' . ( $save_result['error'] ?? 'Terjadi kesalahan.' );
+	}
+
+	public function handle_user_interview_post(): void {
+		$action = isset( $_POST['daw_ud_action'] ) && is_scalar( $_POST['daw_ud_action'] )
+			? sanitize_key( wp_unslash( (string) $_POST['daw_ud_action'] ) )
+			: '';
+		if (
+			'POST' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) )
+			|| 'daw-user-department' !== sanitize_key( $_GET['page'] ?? '' )
+			|| 'save_user_interview' !== $action
+		) {
+			return;
+		}
+
+		$account_id = absint( get_user_meta( get_current_user_id(), 'daw_oracle_account_id', true ) );
+		if ( ! current_user_can( 'manage_user_department' ) || $account_id < 1 ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk menyimpan hasil wawancara.', 'recruitment-plugin' ) );
+		}
+
+		$nonce = isset( $_POST['daw_user_interview_nonce'] ) && is_scalar( $_POST['daw_user_interview_nonce'] )
+			? sanitize_text_field( wp_unslash( (string) $_POST['daw_user_interview_nonce'] ) )
+			: '';
+		if ( ! wp_verify_nonce( $nonce, 'daw_save_user_interview' ) ) {
+			wp_die( esc_html__( 'Sesi penilaian tidak valid. Muat ulang halaman dan coba lagi.', 'recruitment-plugin' ) );
+		}
+
+		$application_id = isset( $_POST['candidate_code'] ) && is_scalar( $_POST['candidate_code'] )
+			? sanitize_text_field( wp_unslash( (string) $_POST['candidate_code'] ) )
+			: '';
+		$score_keys = [ 'presentation', 'communication', 'motivation', 'experience', 'knowledge', 'teamwork', 'problem_solving', 'adaptability' ];
+		$raw_scores = isset( $_POST['scores'] ) && is_array( $_POST['scores'] ) ? wp_unslash( $_POST['scores'] ) : [];
+		$scores = [];
+		foreach ( $score_keys as $key ) {
+			$value = $raw_scores[ $key ] ?? '';
+			$scores[ $key ] = is_scalar( $value ) && 1 === preg_match( '/\A[1-5]\z/', (string) $value )
+				? (int) $value
+				: 0;
+		}
+		$recommendation = isset( $_POST['recommendation'] ) && is_scalar( $_POST['recommendation'] )
+			? sanitize_text_field( wp_unslash( (string) $_POST['recommendation'] ) )
+			: '';
+		$selection_status = isset( $_POST['selection_status'] ) && is_scalar( $_POST['selection_status'] )
+			? sanitize_text_field( wp_unslash( (string) $_POST['selection_status'] ) )
+			: '';
+		$interviewer = isset( $_POST['interviewer'] ) && is_scalar( $_POST['interviewer'] )
+			? sanitize_text_field( wp_unslash( (string) $_POST['interviewer'] ) )
+			: '';
+		$notes = isset( $_POST['interview_notes'] ) && is_scalar( $_POST['interview_notes'] )
+			? sanitize_textarea_field( wp_unslash( (string) $_POST['interview_notes'] ) )
+			: '';
+		$valid_recommendations = [ 'Sangat Baik', 'Baik', 'Dipertimbangkan', 'Tidak Dilanjutkan' ];
+		$valid_selection_statuses = [ 'Lolos Wawancara User', 'Tidak Lolos Wawancara User' ];
+		$error = '';
+
+		if ( ! ctype_digit( $application_id ) || '0' === $application_id ) {
+			$error = 'Kandidat ini tidak sedang dalam status wawancara terjadwal.';
+		} elseif (
+			in_array( 0, $scores, true )
+			|| '' === trim( $interviewer )
+			|| ! in_array( $recommendation, $valid_recommendations, true )
+			|| ! in_array( $selection_status, $valid_selection_statuses, true )
+		) {
+			$error = 'Lengkapi nama pewawancara, seluruh penilaian, rekomendasi, dan status hasil sebelum menyimpan.';
+		} else {
+			$score_total = (int) floor( array_sum( $scores ) / ( count( $score_keys ) * 5 ) * 100 );
+			$save_result = ( new Recruitment_Database() )->save_user_interview_result(
+				(int) $application_id,
+				$account_id,
+				[
+					'scores' => $scores,
+					'score' => $score_total,
+					'recommendation' => $recommendation,
+					'selection_status' => $selection_status,
+					'notes' => $notes,
+					'interviewer' => $interviewer,
+					'department' => (string) get_user_meta( get_current_user_id(), 'daw_department', true ),
+				]
+			);
+			if ( empty( $save_result['success'] ) ) {
+				$error = (string) ( $save_result['error'] ?? 'Hasil wawancara gagal disimpan. Silakan coba lagi.' );
+			} else {
+				wp_safe_redirect(
+					add_query_arg(
+						[
+							'page' => 'daw-user-department',
+							'view' => 'interview-detail',
+							'candidate_code' => $application_id,
+							'saved' => '1',
+						],
+						admin_url( 'admin.php' )
+					)
+				);
+				exit;
+			}
+		}
+
+		$GLOBALS['daw_user_interview_submission'] = [
+			'scores' => $scores,
+			'recommendation' => $recommendation,
+			'selection_status' => $selection_status,
+			'interviewer' => $interviewer,
+			'notes' => $notes,
+			'error' => $error,
+		];
 	}
 
 	public function handle_department_request_post(): void {
@@ -468,6 +669,10 @@ class Recruitment_Admin {
 			}
 			$fields = is_array( $request['fields'] ?? null ) ? $request['fields'] : [];
 			if ( 'approve' === $decision && empty( $request['vacancy_id'] ) ) {
+				$headcount = filter_var( $fields['headcount'] ?? null, FILTER_VALIDATE_INT );
+				if ( ! is_int( $headcount ) || 1 > $headcount ) {
+					wp_die( esc_html__( 'Jumlah kebutuhan harus berupa bilangan bulat positif sebelum pengajuan dapat disetujui.', 'recruitment-plugin' ) );
+				}
 				$department_name = trim( sanitize_text_field( (string) ( $fields['department'] ?? '' ) ) );
 				$department_id = 0;
 				$database = new Recruitment_Database();
@@ -498,6 +703,7 @@ class Recruitment_Admin {
 							'_daw_department' => $department_name,
 							'_daw_type' => sanitize_text_field( $fields['employment_type'] ?? '' ),
 							'_daw_location' => sanitize_text_field( $fields['location'] ?? '' ),
+							'_daw_headcount' => $headcount,
 							'_daw_fptk_code' => $request_code,
 						],
 					],
@@ -690,8 +896,9 @@ class Recruitment_Admin {
 		$department_notes = isset( $_POST['department_notes'] ) && is_scalar( $_POST['department_notes'] )
 			? sanitize_textarea_field( wp_unslash( (string) $_POST['department_notes'] ) )
 			: '';
-		$user = wp_get_current_user();
-		$interviewer = sanitize_text_field( (string) ( $user->display_name ?: $user->user_login ) );
+		$interviewer = isset( $_POST['interviewer'] ) && is_scalar( $_POST['interviewer'] )
+			? sanitize_text_field( wp_unslash( (string) $_POST['interviewer'] ) )
+			: '';
 		$database = new Recruitment_Database();
 		if ( 'save_note' === $intent ) {
 			$save_result = $database->save_hr_interview_note(
@@ -1370,6 +1577,81 @@ class Recruitment_Admin {
 		$this->render_page( 'interview-schedule' );
 	}
 
+	public function render_user_interview_schedule(): void {
+		$this->render_page( 'interview-schedule-user' );
+	}
+
+	public function handle_interview_schedule_save(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_send_json_error( [ 'message' => 'Anda tidak memiliki izin untuk mengatur jadwal wawancara.' ], 403 );
+		}
+		check_ajax_referer( 'daw_save_interview_schedule', 'nonce' );
+
+		$dates_json = $_POST['dates'] ?? '';
+		$slots_json = $_POST['slots'] ?? '';
+		if ( ! is_string( $dates_json ) || ! is_string( $slots_json ) ) {
+			wp_send_json_error( [ 'message' => 'Data jadwal tidak valid. Muat ulang halaman dan coba kembali.' ], 400 );
+		}
+		try {
+			$dates = json_decode( wp_unslash( $dates_json ), true, 512, JSON_THROW_ON_ERROR );
+			$raw_slots = json_decode( wp_unslash( $slots_json ), true, 512, JSON_THROW_ON_ERROR );
+		} catch ( JsonException $exception ) {
+			wp_send_json_error( [ 'message' => 'Data jadwal tidak valid. Muat ulang halaman dan coba kembali.' ], 400 );
+		}
+
+		if ( ! is_array( $dates ) || ! is_array( $raw_slots ) ) {
+			wp_send_json_error( [ 'message' => 'Pilih tanggal dan slot waktu yang valid.' ], 400 );
+		}
+
+		$slots = [];
+		foreach ( $raw_slots as $raw_slot ) {
+			if ( ! is_array( $raw_slot ) ) {
+				wp_send_json_error( [ 'message' => 'Data slot jadwal tidak valid.' ], 400 );
+			}
+			$slot_text = static function ( string $key ) use ( $raw_slot ): string {
+				$value = $raw_slot[ $key ] ?? '';
+				return is_string( $value ) || is_numeric( $value ) ? sanitize_text_field( (string) $value ) : '';
+			};
+			$slots[] = [
+				'schedule_id' => $raw_slot['schedule_id'] ?? null,
+				'start' => $slot_text( 'start' ),
+				'end' => $slot_text( 'end' ),
+				'method' => strtoupper( sanitize_key( $slot_text( 'method' ) ) ),
+				'platform' => $slot_text( 'platform' ),
+				'meeting_link' => esc_url_raw( $slot_text( 'meeting_link' ) ),
+				'location' => $slot_text( 'location' ),
+				'interviewer_name' => $slot_text( 'interviewer_name' ),
+				'capacity' => $raw_slot['capacity'] ?? null,
+			];
+		}
+
+		$interview_type = $_POST['interview_type'] ?? '';
+		if ( ! is_string( $interview_type ) ) {
+			wp_send_json_error( [ 'message' => 'Jenis wawancara tidak valid.' ], 400 );
+		}
+		$result = ( new Recruitment_Database() )->save_interview_schedules(
+			strtoupper( sanitize_key( $interview_type ) ),
+			$dates,
+			$slots
+		);
+		if ( ! empty( $result['success'] ) ) {
+			wp_send_json_success( [ 'message' => 'Jadwal berhasil disimpan.' ] );
+		}
+
+		$error = (string) ( $result['error'] ?? '' );
+		$message = [
+			'invalid_schedule_data' => 'Periksa kembali tanggal, kapasitas, dan detail setiap slot.',
+			'overlapping_slots' => 'Waktu antar-slot tidak boleh saling tumpang tindih.',
+			'schedule_already_exists' => 'Tanggal tersebut sudah memiliki jadwal. Gunakan tombol Edit jadwal pada daftar jadwal tersimpan.',
+			'booked_slot_cannot_remove' => 'Slot yang sudah dipesan tidak dapat dihapus.',
+			'booked_slot_time_locked' => 'Waktu slot yang sudah dipesan tidak dapat diubah.',
+			'capacity_below_bookings' => 'Kapasitas slot tidak boleh lebih kecil dari jumlah peserta yang sudah memesan.',
+			'schedule_interviewer_schema_unavailable' => 'Jalankan migrasi 020 untuk menambahkan nama pewawancara sebelum menyimpan jadwal.',
+			'service_unavailable' => 'Jadwal gagal disimpan ke Oracle. Pastikan migrasi 018, 019, dan 020 telah diterapkan dan koneksi tersedia.',
+		][ $error ] ?? 'Jadwal gagal disimpan. Silakan coba kembali.';
+		wp_send_json_error( [ 'message' => $message ], in_array( $error, [ 'service_unavailable', 'schedule_interviewer_schema_unavailable' ], true ) ? 503 : 400 );
+	}
+
 	public function render_user_management(): void {
 		$this->render_page( 'user-management' );
 	}
@@ -1634,6 +1916,7 @@ class Recruitment_Admin {
 			'recruitment-final-decision',
 			'recruitment-user-interview',
 			'recruitment-interview-schedule',
+			'recruitment-interview-schedule-user',
 			'recruitment-user-management',
 			'recruitment-hr-profile',
 			'recruitment-psychotest-settings',

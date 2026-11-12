@@ -13,8 +13,14 @@ $notice_messages = [
     'saved' => 'Lowongan berhasil disimpan.',
     'status_updated' => 'Status lowongan berhasil diperbarui.',
     'invalid_data' => 'Lowongan belum disimpan. Periksa nama posisi, dealer, departemen, dan deadline yang harus diisi dengan tanggal hari ini atau sesudahnya.',
+    'headcount_required' => 'Jumlah kebutuhan belum tersimpan dan tidak ditemukan pada request FPTK yang tertaut. Lowongan tetap tidak dipublikasikan; lengkapi jumlah kebutuhan terlebih dahulu.',
+    'headcount_save_first' => 'Jumlah kebutuhan dari request FPTK ditemukan. Simpan lowongan melalui formulir edit terlebih dahulu agar jumlah tersimpan dan tersinkron.',
+    'request_required' => 'Request FPTK yang disetujui wajib tertaut agar lowongan dapat dipublikasikan. Tanpa request tersebut, lowongan hanya dapat disimpan sebagai draft.',
     'department_unavailable' => 'Daftar departemen Oracle tidak tersedia. Lowongan belum disimpan.',
     'save_failed' => 'Lowongan belum dapat disimpan. Silakan coba kembali.',
+    'headcount_sync_failed' => 'Lowongan tersimpan di WordPress, tetapi jumlah kebutuhan gagal disinkronkan ke Oracle. Periksa data dan coba kembali.',
+    'close_warning' => 'Jumlah kebutuhan dan status penutupan tersimpan di Oracle, tetapi penutupan lowongan WordPress perlu diperiksa.',
+    'already_filled' => 'Lowongan sudah memenuhi jumlah kebutuhan dan tidak dapat dipublikasikan kembali.',
 ];
 $edit_id = absint( $_GET['edit_vacancy'] ?? 0 );
 $editing_vacancy = $edit_id ? get_post( $edit_id ) : null;
@@ -46,6 +52,19 @@ foreach ( $vacancy_posts as $vacancy_post ) {
         $status = 'closed';
     }
     $deadline_timestamp = strtotime( $deadline );
+    $stored_headcount = filter_var( get_post_meta( $vacancy_post->ID, '_daw_headcount', true ), FILTER_VALIDATE_INT );
+    $requested_headcount = recruitment_get_vacancy_requested_headcount( (int) $vacancy_post->ID );
+    $has_approved_request = recruitment_has_approved_vacancy_request( (int) $vacancy_post->ID );
+    $has_consistent_headcount = $has_approved_request
+        && is_int( $stored_headcount )
+        && 1 <= $stored_headcount
+        && ( ! is_int( $requested_headcount ) || $requested_headcount === $stored_headcount );
+    if ( ! $has_consistent_headcount && in_array( $status, [ 'published', 'closed' ], true ) ) {
+        $status = 'archived';
+    }
+    $display_headcount = is_int( $stored_headcount ) && 1 <= $stored_headcount
+        ? ( is_int( $requested_headcount ) && $requested_headcount !== $stored_headcount ? 'Tidak sesuai FPTK' : (string) $stored_headcount )
+        : (string) ( $requested_headcount ?? '' );
     $vacancies[] = [
         'id' => (int) $vacancy_post->ID,
         'title' => get_the_title( $vacancy_post ),
@@ -53,12 +72,18 @@ foreach ( $vacancy_posts as $vacancy_post ) {
         'region' => (string) get_post_meta( $vacancy_post->ID, '_daw_region', true ),
         'department' => (string) get_post_meta( $vacancy_post->ID, '_daw_department', true ),
         'type' => (string) get_post_meta( $vacancy_post->ID, '_daw_type', true ),
+        'headcount' => $display_headcount,
         'deadline' => $deadline_timestamp ? wp_date( 'j M Y', $deadline_timestamp ) : '—',
         'posted' => get_the_date( 'j M Y', $vacancy_post ),
         'status' => $status,
     ];
 }
 $status_labels = [ 'published' => 'Published', 'draft' => 'Draft', 'closed' => 'Closed', 'archived' => 'Archived' ];
+$active_vacancies = array_filter( $vacancies, static fn( array $vacancy ): bool => 'archived' !== $vacancy['status'] );
+$editing_headcount = $edit_id
+    ? ( get_post_meta( $edit_id, '_daw_headcount', true ) ?: recruitment_get_vacancy_requested_headcount( $edit_id ) )
+    : '';
+$editing_has_approved_request = $edit_id && recruitment_has_approved_vacancy_request( $edit_id );
 ?>
 <div class="daw-vacancies">
     <aside class="daw-vacancies__sidebar">
@@ -105,6 +130,7 @@ $status_labels = [ 'published' => 'Published', 'draft' => 'Draft', 'closed' => '
                 <div class="daw-vacancies__page-heading"><h1><?= $editing_vacancy ? 'Edit Lowongan' : 'Tambah Lowongan' ?></h1><p>Isi detail lowongan. Lowongan berstatus Published akan tampil di portal karier DAW.</p></div>
                 <?php if ( isset( $notice_messages[ $notice ] ) ) : ?><p class="daw-vacancies__feedback daw-vacancies__feedback--error" role="alert"><?= esc_html( $notice_messages[ $notice ] ) ?></p><?php endif; ?>
                 <?php if ( $department_lookup_error ) : ?><p class="daw-vacancies__feedback daw-vacancies__feedback--error" role="alert"><?= esc_html( $notice_messages['department_unavailable'] ) ?></p><?php endif; ?>
+                <?php if ( ! $editing_has_approved_request ) : ?><p class="daw-vacancies__feedback daw-vacancies__feedback--error" role="alert"><?= esc_html( $notice_messages['request_required'] ) ?></p><?php endif; ?>
                 <form class="daw-vacancies__create-form" data-vacancy-create-form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>">
                     <input type="hidden" name="action" value="daw_save_vacancy">
                     <input type="hidden" name="vacancy_id" value="<?= esc_attr( (string) $edit_id ) ?>">
@@ -116,23 +142,23 @@ $status_labels = [ 'published' => 'Published', 'draft' => 'Draft', 'closed' => '
                     <div class="daw-vacancies__form-row"><label>Jenis Pekerjaan<select name="type"><?php foreach ( [ 'Full-time', 'Part-time', 'Kontrak', 'Magang' ] as $type ) : ?><option value="<?= esc_attr( $type ) ?>" <?= selected( $edit_id ? get_post_meta( $edit_id, '_daw_type', true ) : 'Full-time', $type, false ) ?>><?= esc_html( $type ) ?></option><?php endforeach; ?></select></label><label>Wilayah<select name="region"><?php foreach ( [ 'Sulawesi Utara', 'Gorontalo', 'Maluku Utara' ] as $region ) : ?><option value="<?= esc_attr( $region ) ?>" <?= selected( $edit_id ? get_post_meta( $edit_id, '_daw_region', true ) : 'Sulawesi Utara', $region, false ) ?>><?= esc_html( $region ) ?></option><?php endforeach; ?></select></label></div>
                     <label>Departemen <span>*</span><select name="department_id" required <?= $departments && ! $department_lookup_error ? '' : 'disabled' ?>><option value="">Pilih departemen</option><?php foreach ( $departments as $department ) : ?><option value="<?= esc_attr( $department['id'] ) ?>" <?= selected( $selected_department_id, (string) $department['id'], false ) ?>><?= esc_html( $department['name'] ) ?></option><?php endforeach; ?></select></label>
                     <div class="daw-vacancies__form-row"><label>Dealer <span>*</span><input name="dealer" value="<?= esc_attr( $edit_id ? get_post_meta( $edit_id, '_daw_dealer', true ) : '' ) ?>" placeholder="Nama Dealer / AHASS" maxlength="255" required></label><label>Lokasi<input name="location" value="<?= esc_attr( $edit_id ? get_post_meta( $edit_id, '_daw_location', true ) : '' ) ?>" placeholder="Kota/Kabupaten" maxlength="255"></label></div>
-                    <div class="daw-vacancies__form-row"><label>Deadline Lamaran <span>*</span><input name="deadline" type="date" value="<?= esc_attr( $edit_id ? get_post_meta( $edit_id, '_daw_deadline', true ) : '' ) ?>" min="<?= esc_attr( current_time( 'Y-m-d' ) ) ?>" required></label></div>
-                    <div class="daw-vacancies__form-actions"><a href="<?= esc_url( $list_url ) ?>">Batal</a><button type="submit" name="status" value="draft">Simpan Draft</button><button type="submit" name="status" value="published">Publish Lowongan</button></div>
+                    <div class="daw-vacancies__form-row"><label>Jumlah Kebutuhan <span>*</span><input name="headcount" type="number" min="1" step="1" value="<?= esc_attr( $editing_headcount ) ?>" required></label><label>Deadline Lamaran <span>*</span><input name="deadline" type="date" value="<?= esc_attr( $edit_id ? get_post_meta( $edit_id, '_daw_deadline', true ) : '' ) ?>" min="<?= esc_attr( current_time( 'Y-m-d' ) ) ?>" required></label></div>
+                    <div class="daw-vacancies__form-actions"><a href="<?= esc_url( $list_url ) ?>">Batal</a><button type="submit" name="status" value="draft">Simpan Draft</button><button type="submit" name="status" value="published" <?= $editing_has_approved_request ? '' : 'disabled' ?>>Publish Lowongan</button></div>
                 </form>
             <?php else : ?>
                 <div class="daw-vacancies__list-heading"><div><h1>Semua Lowongan</h1><p>Kelola lowongan pekerjaan yang dipublikasikan di portal karier DAW.</p></div><a class="daw-vacancies__create" href="<?= esc_url( $create_url ) ?>"><span aria-hidden="true">+</span> Tambah Lowongan</a></div>
                 <?php if ( isset( $notice_messages[ $notice ] ) ) : ?><p class="daw-vacancies__feedback" role="status"><?= esc_html( $notice_messages[ $notice ] ) ?></p><?php endif; ?>
                 <nav class="daw-vacancies__tabs" aria-label="Filter status lowongan" data-vacancy-tabs>
-                    <?php foreach ( [ 'all' => 'Semua', 'draft' => 'Draft', 'published' => 'Published', 'closed' => 'Closed', 'archived' => 'Archived' ] as $key => $label ) : ?>
-                        <button type="button" class="<?= 'all' === $key ? 'is-active' : '' ?>" data-vacancy-tab="<?= esc_attr( $key ) ?>" aria-pressed="<?= 'all' === $key ? 'true' : 'false' ?>"><?= esc_html( $label ) ?><span><?= esc_html( (string) ( 'all' === $key ? count( $vacancies ) : count( array_filter( $vacancies, static fn( $item ) => $item['status'] === $key ) ) ) ) ?></span></button>
+                    <?php foreach ( [ 'all' => 'Semua Aktif', 'draft' => 'Draft', 'published' => 'Published', 'closed' => 'Closed', 'archived' => 'Archived' ] as $key => $label ) : ?>
+                        <button type="button" class="<?= 'all' === $key ? 'is-active' : '' ?>" data-vacancy-tab="<?= esc_attr( $key ) ?>" aria-pressed="<?= 'all' === $key ? 'true' : 'false' ?>"><?= esc_html( $label ) ?><span><?= esc_html( (string) ( 'all' === $key ? count( $active_vacancies ) : count( array_filter( $vacancies, static fn( $item ) => $item['status'] === $key ) ) ) ) ?></span></button>
                     <?php endforeach; ?>
                 </nav>
                 <p class="daw-vacancies__feedback" role="status" aria-live="polite" data-vacancy-feedback hidden></p>
                 <div class="daw-vacancies__table-wrap"><table class="daw-vacancies__table"><caption class="screen-reader-text">Daftar lowongan</caption>
-                    <thead><tr><th scope="col">Posisi</th><th scope="col">Dealer</th><th scope="col">Wilayah</th><th scope="col">Departemen</th><th scope="col">Jenis</th><th scope="col">Dibuat</th><th scope="col">Deadline</th><th scope="col">Status</th><th scope="col">Aksi</th></tr></thead>
-                    <tbody data-vacancy-list><?php if ( ! $vacancies ) : ?><tr><td colspan="9">Belum ada data lowongan.</td></tr><?php endif; ?><?php foreach ( $vacancies as $vacancy ) : ?>
-                        <tr data-vacancy-row data-vacancy-id="<?= esc_attr( (string) $vacancy['id'] ) ?>" data-status="<?= esc_attr( $vacancy['status'] ) ?>">
-                            <td><strong data-field="title"><?= esc_html( $vacancy['title'] ) ?></strong></td><td data-field="dealer"><?= esc_html( $vacancy['dealer'] ) ?></td><td data-field="region"><?= esc_html( $vacancy['region'] ) ?></td><td data-field="department"><?= esc_html( $vacancy['department'] ?: 'Belum diatur' ) ?></td><td data-field="type"><?= esc_html( $vacancy['type'] ) ?></td><td><?= esc_html( $vacancy['posted'] ) ?></td><td data-field="deadline"><?= esc_html( $vacancy['deadline'] ) ?></td>
+                    <thead><tr><th scope="col">Posisi</th><th scope="col">Dealer</th><th scope="col">Wilayah</th><th scope="col">Departemen</th><th scope="col">Jenis</th><th scope="col">Jumlah Kebutuhan</th><th scope="col">Dibuat</th><th scope="col">Deadline</th><th scope="col">Status</th><th scope="col">Aksi</th></tr></thead>
+                    <tbody data-vacancy-list><tr data-vacancy-empty <?= $active_vacancies ? 'hidden' : '' ?>><td colspan="10">Tidak ada lowongan pada kategori ini.</td></tr><?php foreach ( $vacancies as $vacancy ) : ?>
+                        <tr data-vacancy-row data-vacancy-id="<?= esc_attr( (string) $vacancy['id'] ) ?>" data-status="<?= esc_attr( $vacancy['status'] ) ?>" <?= 'archived' === $vacancy['status'] ? 'hidden' : '' ?>>
+                            <td><strong data-field="title"><?= esc_html( $vacancy['title'] ) ?></strong></td><td data-field="dealer"><?= esc_html( $vacancy['dealer'] ) ?></td><td data-field="region"><?= esc_html( $vacancy['region'] ) ?></td><td data-field="department"><?= esc_html( $vacancy['department'] ?: 'Belum diatur' ) ?></td><td data-field="type"><?= esc_html( $vacancy['type'] ) ?></td><td data-field="headcount"><?= esc_html( $vacancy['headcount'] ?: 'Belum diatur' ) ?></td><td><?= esc_html( $vacancy['posted'] ) ?></td><td data-field="deadline"><?= esc_html( $vacancy['deadline'] ) ?></td>
                             <td><span class="daw-vacancies__badge daw-vacancies__badge--<?= esc_attr( $vacancy['status'] ) ?>" data-vacancy-status><?= esc_html( $status_labels[ $vacancy['status'] ] ) ?></span></td><td class="daw-vacancies__actions">
                                 <a href="<?= esc_url( add_query_arg( [ 'view' => 'create', 'edit_vacancy' => $vacancy['id'] ], $list_url ) ) ?>">Edit</a>
                                 <?php if ( 'archived' !== $vacancy['status'] ) : ?>

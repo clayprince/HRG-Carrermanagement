@@ -125,17 +125,24 @@ foreach ( $proctoring_report['events'] as $event ) {
                                                             · Administrator ID <?= esc_html( (string) ( $event['actor_user_id'] ?? '' ) ) ?> mengakses bukti <?= esc_html( (string) ( $event['target_event_id'] ?? '' ) ) ?>
                                                         <?php endif; ?>
                                                         <?php if ( ! empty( $event['file_key'] ) ) :
-                                                            $image_url = add_query_arg(
-                                                                [
-                                                                    'action' => 'daw_proctoring_image',
-                                                                    'candidate_id' => $candidate_id,
-                                                                    'session_id' => (string) $session['session_id'],
-                                                                    'event_id' => absint( $event['event_id'] ?? 0 ),
-                                                                ],
-                                                                admin_url( 'admin-post.php' )
-                                                            );
+                                                            $base_image_args = [
+                                                                'action' => 'daw_proctoring_image',
+                                                                'candidate_id' => $candidate_id,
+                                                                'session_id' => (string) $session['session_id'],
+                                                                'event_id' => absint( $event['event_id'] ?? 0 ),
+                                                            ];
+                                                            $view_url = wp_nonce_url( add_query_arg( array_merge( $base_image_args, [ 'disposition' => 'inline' ] ), admin_url( 'admin-post.php' ) ), 'daw_proctoring_image_' . $candidate_id );
+                                                            $download_url = wp_nonce_url( add_query_arg( $base_image_args, admin_url( 'admin-post.php' ) ), 'daw_proctoring_image_' . $candidate_id );
                                                             ?>
-                                                            · <a href="<?= esc_url( wp_nonce_url( $image_url, 'daw_proctoring_image_' . $candidate_id ) ) ?>">Unduh gambar</a>
+                                                            <div style="margin:6px 0 10px; display:flex; align-items:center; gap:10px;">
+                                                                <a href="<?= esc_url( $view_url ) ?>" target="_blank" rel="noopener" title="Klik untuk memperbesar foto">
+                                                                    <img src="<?= esc_url( $view_url ) ?>" alt="Bukti Foto Identitas" style="max-height:64px; max-width:96px; border-radius:6px; border:1px solid #cbd5e1; object-fit:cover; vertical-align:middle; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                                                                </a>
+                                                                <div>
+                                                                    <a class="button button-small" href="<?= esc_url( $view_url ) ?>" target="_blank" rel="noopener">👁 Lihat Foto</a>
+                                                                    <a class="button button-small" href="<?= esc_url( $download_url ) ?>" style="margin-left:4px;">⬇ Unduh</a>
+                                                                </div>
+                                                            </div>
                                                         <?php endif; ?>
                                                     </li>
                                                 <?php endforeach; ?>

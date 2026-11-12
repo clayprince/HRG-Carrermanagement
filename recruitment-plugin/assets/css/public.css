@@ -457,6 +457,15 @@
 .daw-recruitment__result-count--empty {
   text-align: center;
 }
+.daw-recruitment__job-grid--empty {
+  grid-template-columns: minmax(0, 1fr);
+}
+.daw-recruitment__job-grid--empty .daw-recruitment__panel {
+  margin: 0 auto;
+  max-width: 560px;
+  text-align: center;
+  width: 100%;
+}
 .daw-recruitment__job {
   display: flex;
   flex-direction: column;
@@ -2047,12 +2056,25 @@
   text-transform: uppercase;
 }
 .daw-account__main--tracking .daw-account__process-identity .daw-account__status {
-  background: #fff0f2;
-  color: var(--daw-red);
+  background: #e0edff;
+  color: #1d4ed8;
   font-size: 11px;
   position: absolute;
   right: 0;
   top: 0;
+}
+.daw-account__main--tracking .daw-account__process-identity .daw-account__status.is-accepted {
+  background: #dcfce7;
+  color: #15803d;
+}
+.daw-account__main--tracking .daw-account__process-identity .daw-account__status.is-rejected {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.daw-account__main--tracking .daw-account__process-identity .daw-account__status.is-neutral {
+  background: #fff;
+  border: 1px solid #dbe2ea;
+  color: #64748b;
 }
 .daw-account__main--tracking .daw-account__process-identity h2 {
   border: 0;
@@ -2088,6 +2110,55 @@
   font-size: 13px;
   margin: 0 0 4px;
   padding: 0;
+}
+.daw-account__main--tracking > .daw-stage-announcement {
+  border-radius: 10px;
+  margin-bottom: 14px;
+  padding: 18px;
+}
+.daw-account__main--tracking > .daw-stage-announcement.is-passed {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-left: 4px solid #16a34a;
+}
+.daw-account__main--tracking > .daw-stage-announcement.is-failed {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  border-left: 4px solid #dc2626;
+}
+.daw-account__main--tracking .daw-stage-announcement__eyebrow {
+  color: #64748b;
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+.daw-account__main--tracking .daw-stage-announcement > h2 {
+  font-size: 19px;
+  line-height: 1.35;
+  margin: 0 0 7px;
+}
+.daw-account__main--tracking .daw-stage-announcement.is-passed > h2 {
+  color: #166534;
+}
+.daw-account__main--tracking .daw-stage-announcement.is-failed > h2 {
+  color: #9f1239;
+}
+.daw-account__main--tracking .daw-stage-announcement > p {
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0 0 7px;
+}
+.daw-account__main--tracking .daw-stage-announcement > .daw-stage-announcement__encouragement {
+  font-weight: 600;
+}
+.daw-account__main--tracking .daw-stage-announcement > .daw-stage-announcement__waiting {
+  margin-top: 11px;
+}
+.daw-account__main--tracking .daw-stage-announcement > .daw-recruitment__button {
+  margin-top: 7px;
 }
 .daw-account__main--tracking .daw-account__muted {
   font-size: 10px;
@@ -2166,6 +2237,81 @@
   border: 1px solid #f6c8d0;
   color: var(--daw-red);
 }
+.daw-account__main--tracking .daw-account__timeline article.is-final-neutral {
+  background: #fff;
+  border-color: #e2e8f0;
+}
+.daw-account__main--tracking .daw-account__timeline article.is-final-neutral .daw-account__timeline-marker {
+  background: #fff;
+  border: 2px solid #cbd5e1;
+  color: #94a3b8;
+  font-size: 0;
+}
+.daw-account__main--tracking .daw-account__timeline article.is-final-neutral > b {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+}
+.daw-account__main--tracking .daw-account__timeline article.is-final-accepted {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+.daw-account__main--tracking .daw-account__timeline article.is-final-accepted .daw-account__timeline-marker {
+  background: #16a34a;
+  border: 0;
+  color: #fff;
+  font-size: 12px;
+}
+.daw-account__main--tracking .daw-account__timeline article.is-final-accepted > b {
+  background: #dcfce7;
+  border: 1px solid #86efac;
+  color: #15803d;
+}
+.daw-account__main--tracking .daw-account__timeline article.is-final-rejected {
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+.daw-account__main--tracking .daw-account__timeline article.is-final-rejected .daw-account__timeline-marker {
+  background: #dc2626;
+  border: 0;
+  color: #fff;
+  font-size: 12px;
+}
+.daw-account__main--tracking .daw-account__timeline article.is-final-rejected > b {
+  background: #fee2e2;
+  border: 1px solid #fda4af;
+  color: #b91c1c;
+}
+.daw-account__main--tracking .daw-account__timeline article.is-stage-passed {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+.daw-account__main--tracking .daw-account__timeline article.is-stage-passed .daw-account__timeline-marker {
+  background: #16a34a;
+  border: 0;
+  color: #fff;
+  font-size: 12px;
+}
+.daw-account__main--tracking .daw-account__timeline article.is-stage-passed > b {
+  background: #dcfce7;
+  border: 1px solid #86efac;
+  color: #15803d;
+}
+.daw-account__main--tracking .daw-account__timeline article.is-stage-failed {
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+.daw-account__main--tracking .daw-account__timeline article.is-stage-failed .daw-account__timeline-marker {
+  background: #dc2626;
+  border: 0;
+  color: #fff;
+  font-size: 12px;
+}
+.daw-account__main--tracking .daw-account__timeline article.is-stage-failed > b {
+  background: #fee2e2;
+  border: 1px solid #fda4af;
+  color: #b91c1c;
+}
 .daw-account__main--tracking .daw-account__timeline .daw-recruitment__button {
   font-size: 10px;
   justify-self: start;
@@ -2183,6 +2329,338 @@
   justify-content: space-between;
   margin: 0 auto;
   padding: 11px 13px;
+}
+
+.daw-account__readonly {
+  align-items: flex-start;
+  background: #f8fafc;
+  border: 1px solid #dbe2ea;
+  border-left: 4px solid #64748b;
+  border-radius: 8px;
+  color: #475569;
+  display: flex;
+  font-size: 13px;
+  gap: 9px;
+  line-height: 1.55;
+  margin: 0 auto 16px;
+  max-width: 980px;
+  padding: 13px 15px;
+}
+.daw-account__readonly > span {
+  flex: 0 0 auto;
+}
+.daw-application-result__message {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  margin: 0 auto 18px;
+  max-width: 980px;
+  padding: 40px 24px;
+  text-align: center;
+}
+.daw-application-result__message > span {
+  align-items: center;
+  background: #f1f5f9;
+  border-radius: 50%;
+  color: #475569;
+  display: flex;
+  font-size: 20px;
+  font-weight: 700;
+  height: 48px;
+  justify-content: center;
+  margin: 0 auto 14px;
+  width: 48px;
+}
+.daw-application-result__message h2 {
+  font-size: 22px;
+  margin: 0 0 7px;
+}
+.daw-application-result__message p {
+  color: var(--daw-gray);
+  margin: 0;
+}
+.daw-account__main--tracking.daw-application-result {
+  align-self: center;
+  box-sizing: border-box;
+  margin: 0 auto;
+  max-width: 1120px;
+  padding: 44px 24px 64px;
+  width: 100%;
+}
+.daw-account__main--tracking.daw-application-result > .daw-application-result__heading {
+  justify-content: center;
+  margin: 0 auto 24px;
+  max-width: 980px;
+  text-align: center;
+}
+.daw-account__main--tracking.daw-application-result > .daw-application-result__heading > div {
+  width: 100%;
+}
+.daw-account__main--tracking.daw-application-result > .daw-application-result__heading h1 {
+  font-size: clamp(26px, 3vw, 36px);
+  line-height: 1.2;
+  margin: 5px 0 7px;
+}
+.daw-account__main--tracking.daw-application-result > .daw-application-result__heading p {
+  color: var(--daw-gray);
+  font-size: 15px;
+}
+.daw-application-result__hero {
+  align-items: center;
+  background: linear-gradient(115deg, #ecfdf3, #fff 76%);
+  border: 1px solid #bbf7d0;
+  border-radius: 18px;
+  box-shadow: 0 14px 34px rgba(22, 101, 52, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0 auto;
+  max-width: 980px;
+  padding: 30px;
+  text-align: center;
+}
+.daw-application-result__hero.is-rejected {
+  background: linear-gradient(115deg, #fff1f2, #fff 76%);
+  border-color: #fecdd3;
+  box-shadow: 0 14px 34px rgba(159, 18, 57, 0.06);
+}
+.daw-application-result__icon {
+  align-items: center;
+  background: #dcfce7;
+  border-radius: 50%;
+  color: #15803d;
+  display: flex;
+  font-size: 28px;
+  font-weight: 700;
+  height: 62px;
+  justify-content: center;
+  width: 62px;
+}
+.daw-application-result__hero.is-rejected .daw-application-result__icon {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.daw-application-result__hero-copy {
+  min-width: 0;
+  width: 100%;
+}
+.daw-application-result__eyebrow,
+.daw-application-result__token-label {
+  color: #64748b;
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+}
+.daw-application-result__hero-copy h2 {
+  color: #14532d;
+  font-size: clamp(21px, 2.5vw, 29px);
+  line-height: 1.3;
+  margin: 5px 0 7px;
+  overflow-wrap: anywhere;
+}
+.daw-application-result__hero.is-rejected .daw-application-result__hero-copy h2 {
+  color: #881337;
+}
+.daw-application-result__hero-copy p {
+  color: #475569;
+  font-size: 15px;
+  line-height: 1.6;
+  margin: 0;
+}
+.daw-application-result__hero-copy .daw-application-result__encouragement {
+  color: #64748b;
+  font-size: 14px;
+  margin-top: 8px;
+}
+.daw-application-result__badge {
+  background: #dcfce7;
+  border: 1px solid #86efac;
+  border-radius: 999px;
+  color: #166534;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  padding: 9px 13px;
+  white-space: nowrap;
+}
+.daw-application-result__hero.is-rejected .daw-application-result__badge {
+  background: #fee2e2;
+  border-color: #fda4af;
+  color: #9f1239;
+}
+.daw-application-result__grid {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  margin: 18px auto;
+  max-width: 980px;
+}
+.daw-application-result__card,
+.daw-application-result__tracking {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.045);
+  min-width: 0;
+  padding: 24px;
+}
+.daw-application-result__card-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.daw-application-result__card-icon,
+.daw-application-result__tracking-icon {
+  align-items: center;
+  background: #f1f5f9;
+  border-radius: 11px;
+  color: #475569;
+  display: flex;
+  flex: 0 0 42px;
+  font-size: 20px;
+  height: 42px;
+  justify-content: center;
+}
+.daw-application-result__card-heading h2,
+.daw-application-result__tracking h2 {
+  color: #1e293b;
+  font-size: 18px;
+  line-height: 1.35;
+  margin: 0;
+}
+.daw-application-result__card-heading p {
+  color: #64748b;
+  font-size: 13px;
+  margin: 3px 0 0;
+}
+.daw-application-result__details {
+  display: grid;
+  gap: 0 22px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+.daw-application-result__details > div {
+  border-top: 1px solid #edf0f4;
+  min-width: 0;
+  padding: 13px 0;
+}
+.daw-application-result__details dt {
+  color: #64748b;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.daw-application-result__details dd {
+  color: #1e293b;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.daw-application-result__tracking {
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.daw-application-result__tracking-icon {
+  background: #e0edff;
+  color: #1d4ed8;
+  font-size: 24px;
+  margin-bottom: 14px;
+}
+.daw-application-result__tracking h2 {
+  font-size: 17px;
+}
+.daw-application-result__tracking p {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 8px 0 18px;
+}
+.daw-application-result__token-label {
+  font-size: 10px;
+  margin-bottom: 6px;
+}
+.daw-application-result__tracking code {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #334155;
+  display: block;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  padding: 11px 12px;
+  width: 100%;
+}
+.daw-application-result__tracking-link {
+  align-items: center;
+  background: #1e293b;
+  border: 1px solid #1e293b;
+  border-radius: 9px;
+  color: #fff !important;
+  display: flex;
+  font-size: 14px;
+  font-weight: 700;
+  justify-content: space-between;
+  margin-top: 14px;
+  min-height: 46px;
+  padding: 10px 14px;
+  transition: background-color 160ms ease, transform 160ms ease;
+  width: 100%;
+}
+.daw-application-result__tracking-link:hover {
+  background: #334155;
+  transform: translateY(-1px);
+}
+.daw-application-result__back-link {
+  color: #475569 !important;
+  display: table;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 2px auto 0;
+  max-width: 980px;
+}
+.daw-application-result__back-link:hover {
+  color: var(--daw-red) !important;
+}
+@media (max-width: 760px) {
+  .daw-application-result__hero {
+    gap: 12px;
+    padding: 22px;
+  }
+  .daw-application-result__icon {
+    height: 52px;
+    width: 52px;
+  }
+  .daw-application-result__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 520px) {
+  .daw-account__main--tracking.daw-application-result {
+    padding: 30px 16px 42px;
+  }
+  .daw-account__main--tracking.daw-application-result > .daw-application-result__heading {
+    margin-bottom: 18px;
+  }
+  .daw-application-result__hero {
+    border-radius: 14px;
+    padding: 18px;
+  }
+  .daw-application-result__hero-copy p {
+    font-size: 14px;
+  }
+  .daw-application-result__card,
+  .daw-application-result__tracking {
+    border-radius: 13px;
+    padding: 19px;
+  }
+  .daw-application-result__details {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .daw-account__tracking-footer a {
   color: var(--daw-red);
@@ -3676,6 +4154,13 @@ body:has(.daw-recruitment) .daw-recruitment {
   margin-right: 0 !important;
 }
 
+body:has(.daw-recruitment) main.daw-account__main--tracking.daw-application-result {
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding-left: clamp(16px, 4vw, 36px) !important;
+  padding-right: clamp(16px, 4vw, 36px) !important;
+}
+
 body:has(.daw-account-auth) .daw-account-auth__main {
   align-self: center;
   margin-left: auto !important;
@@ -3910,6 +4395,24 @@ body:has(.daw-account-auth) .daw-account-auth__main {
   .daw-interview-date { min-height: 88px; }
   .daw-interview-applicant { align-items: flex-start; flex-direction: column; gap: 12px; }
   .daw-interview-applicant div + div { border-top: 1px solid #e5e5e7; padding-top: 10px; width: 100%; }
+}
+.daw-interview-month-nav { align-items: center; display: flex; justify-content: space-between; margin-bottom: 18px; }
+.daw-interview-month-nav h2 { margin: 0; }
+.daw-interview-month-nav a { align-items: center; border: 1px solid var(--daw-border); border-radius: 6px; display: flex; font-size: 22px; height: 34px; justify-content: center; width: 38px; }
+.daw-interview-day { border: 0; border-top: 1px solid #e5e5e7; margin: 0; padding: 14px 0; }
+.daw-interview-day legend { color: var(--daw-charcoal); font-size: 13px; font-weight: 700; padding: 0 8px 0 0; }
+.daw-interview-slot { cursor: pointer; gap: 12px; justify-content: flex-start; }
+.daw-interview-slot input { accent-color: var(--daw-red); flex: 0 0 auto; margin: 0; }
+.daw-interview-slot__details { display: grid; flex: 1; gap: 3px; }
+.daw-interview-slot__details small { color: var(--daw-gray); font-size: 10px; font-weight: 400; }
+.daw-interview-slot__capacity { flex: 0 0 auto; text-align: right; }
+.daw-interview-slot.is-full { cursor: not-allowed; }
+.daw-interview-submit { border: 0; cursor: pointer; margin-top: 12px; width: 100%; }
+.daw-interview-empty { color: var(--daw-gray); font-size: 12px; padding: 10px 0; }
+.daw-interview-success { background: #dcfce7; border-radius: 6px; color: #166534; font-size: 12px; margin: 0 0 14px; padding: 12px 14px; }
+@media (max-width: 600px) {
+  .daw-interview-slot { align-items: flex-start; flex-wrap: wrap; }
+  .daw-interview-slot__capacity { margin-left: 26px; text-align: left; }
 }
 
 /* Psychological test result states. */
@@ -7165,4 +7668,357 @@ body:has(.daw-recruitment) main.daw-account__main--profile {
 .daw-recruitment--exam-active .daw-personality-assessment__questions {
   display: block;
   grid-template-columns: none;
+}
+
+/* ==========================================================================
+   VERIFIKASI IDENTITAS & FOTO BERSAMA KTP (PSIKOTES)
+   ========================================================================== */
+.daw-recruitment__psychotest-shell--wide {
+  max-width: 1040px !important;
+  margin: 0 auto;
+}
+
+.daw-identity-card {
+  padding: 32px !important;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+}
+
+.daw-identity-header {
+  margin-bottom: 24px;
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 16px;
+}
+
+.daw-identity-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 8px;
+}
+
+.daw-identity-header p {
+  color: #475569;
+  font-size: 14.5px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.daw-identity-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  align-items: start;
+}
+
+@media (max-width: 820px) {
+  .daw-identity-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+
+/* Kolom Kiri: Panduan & Contoh */
+.daw-identity-guide-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.daw-identity-example-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.daw-identity-badge-correct {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: 20px;
+  margin-bottom: 14px;
+}
+
+.daw-identity-badge-icon {
+  font-size: 14px;
+}
+
+.daw-identity-illustration {
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto 16px;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.daw-identity-guide-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.daw-identity-guide-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.daw-identity-guide-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #0284c7;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Kolom Kanan: Area Kamera */
+.daw-identity-camera-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.daw-identity-viewport {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #0f172a;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
+.daw-identity-video,
+.daw-identity-preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.daw-identity-placeholder {
+  text-align: center;
+  padding: 24px 20px;
+  color: #94a3b8;
+}
+
+.daw-identity-placeholder-icon {
+  font-size: 44px;
+  margin-bottom: 8px;
+}
+
+.daw-identity-placeholder strong {
+  display: block;
+  font-size: 16px;
+  color: #f1f5f9;
+  margin-bottom: 4px;
+}
+
+.daw-identity-placeholder small {
+  font-size: 13px;
+  color: #64748b;
+  max-width: 260px;
+  display: inline-block;
+}
+
+/* Bingkai Overlay Panduan */
+.daw-identity-frame-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 16px;
+}
+
+.daw-identity-frame-face {
+  width: 44%;
+  height: 75%;
+  border: 2px dashed rgba(255, 255, 255, 0.65);
+  border-radius: 50%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 12px;
+}
+
+.daw-identity-frame-face span,
+.daw-identity-frame-card span {
+  background: rgba(15, 23, 42, 0.75);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+}
+
+.daw-identity-frame-card {
+  width: 42%;
+  height: 52%;
+  border: 2px dashed #38bdf8;
+  border-radius: 8px;
+  background: rgba(56, 189, 248, 0.08);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 10px;
+}
+
+/* Status Text Box */
+.daw-identity-status-box {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: #f1f5f9;
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: #334155;
+  text-align: center;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.4;
+}
+
+/* Actions */
+.daw-identity-actions {
+  margin-top: 14px;
+}
+
+.daw-identity-btn-capture {
+  background: #c8102e !important;
+  color: #ffffff !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 14px rgba(200, 16, 46, 0.35);
+  transition: all 0.2s ease;
+}
+
+.daw-identity-btn-capture:hover {
+  background: #a50b24 !important;
+}
+
+.daw-identity-confirm-group {
+  display: flex;
+  gap: 10px;
+}
+
+.daw-identity-btn-confirm {
+  background: #16a34a !important;
+  color: #ffffff !important;
+  font-size: 14.5px !important;
+  font-weight: 700 !important;
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.3);
+}
+
+.daw-identity-btn-confirm:hover {
+  background: #15803d !important;
+}
+
+.daw-identity-error-msg {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin: 10px 0 0;
+  text-align: center;
+}
+
+.daw-identity-manual-fallback {
+  margin-top: 14px;
+  text-align: center;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.daw-identity-manual-btn {
+  background: none;
+  border: none;
+  color: #0284c7;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.daw-identity-manual-btn:hover {
+  color: #0369a1;
+}
+
+.daw-identity-footer-notice {
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 1px solid #f1f5f9;
+  text-align: center;
+  color: #64748b;
+  font-size: 12.5px;
+}
+
+.daw-identity-btn-skip-top {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  padding: 8px 16px !important;
+  border-radius: 8px !important;
+  text-decoration: none !important;
+  white-space: nowrap;
+}
+
+.daw-identity-btn-skip-top:hover {
+  background: #e2e8f0 !important;
+  color: #0284c7 !important;
+}
+
+.daw-identity-btn-skip-direct {
+  display: block;
+  text-align: center;
+  margin-top: 10px;
+  background: #f8fafc;
+  color: #475569;
+  border: 1px dashed #cbd5e1;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 10px 14px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.daw-identity-btn-skip-direct:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+  color: #64748b;
+  font-size: 12.5px;
 }

@@ -273,6 +273,12 @@ document.documentElement.classList.add("js");
     return;
   }
 
+  const selectedDates = new Set(
+    Array.from(schedule.querySelectorAll("[data-schedule-date][aria-pressed='true']"))
+      .map(function getSelectedDate(button) {
+      return button.dataset.scheduleDate;
+      }),
+  );
   const config = schedule.querySelector("[data-schedule-config]");
   const configDateLabel = schedule.querySelector("[data-config-dates]");
   const countLabel = schedule.querySelector("[data-selected-count]");
@@ -283,24 +289,19 @@ document.documentElement.classList.add("js");
   const slotTemplate = schedule.querySelector("[data-schedule-slot-template]");
   const feedback = schedule.querySelector("[data-schedule-feedback]");
   const dateButtons = Array.from(schedule.querySelectorAll("[data-schedule-date]"));
-  const selectedDates = new Set();
-  const scheduleForm = schedule.querySelector("[data-schedule-form]");
-  const datesInput = schedule.querySelector("[data-schedule-dates]");
-  const slotsInput = schedule.querySelector("[data-schedule-slots]");
-
-  if (!config || !slotList || !slotTemplate || !feedback || !scheduleForm) {
-    return;
-  }
+  let editingDate = null;
 
   const sortedSelectedDates = function sortedSelectedDates() {
-    return Array.from(selectedDates).sort();
+    return Array.from(selectedDates).sort(function sortDates(first, second) {
+      return first.localeCompare(second);
+    });
   };
   const formatDates = function formatDates(dates) {
     return dates.map(function formatDate(date) {
-      const button = dateButtons.find(function findButton(item) {
-        return item.dataset.scheduleDate === date;
-      });
-      return button ? button.dataset.scheduleLabel : date;
+      return new Intl.DateTimeFormat("id-ID", {
+        day: "numeric",
+        month: "short",
+      }).format(new Date(`${date}T00:00:00`));
     }).join(" · ");
   };
   const updateSelection = function updateSelection() {
@@ -328,8 +329,11 @@ document.documentElement.classList.add("js");
     const slots = Array.from(slotList.querySelectorAll("[data-schedule-slot]"));
     slots.forEach(function updateSlot(slot, index) {
       slot.querySelector("[data-slot-title]").textContent = `Slot ${index + 1}`;
-      slot.querySelector("[data-remove-slot]").disabled = slots.length === 1;
-      const isOnline = "ONLINE" === getSlotMode(slot);
+      const bookedCount = Number(slot.dataset.bookedCount || 0);
+      slot.querySelector("[data-remove-slot]").disabled = slots.length === 1 || bookedCount > 0;
+      slot.querySelector("[data-slot-start]").disabled = bookedCount > 0;
+      slot.querySelector("[data-slot-end]").disabled = bookedCount > 0;
+      const isOnline = "online" === getSlotMode(slot);
       slot.querySelector("[data-slot-online]").hidden = !isOnline;
       slot.querySelector("[data-slot-location]").hidden = isOnline;
       slot.querySelector("[data-slot-platform]").required = isOnline;
@@ -347,6 +351,43 @@ document.documentElement.classList.add("js");
     feedback.hidden = false;
     feedback.classList.toggle("is-error", Boolean(isError));
   };
+  const resetSlotList = function resetSlotList() {
+    slotList.replaceChildren(slotTemplate.content.firstElementChild.cloneNode(true));
+  };
+  const loadSavedSlots = function loadSavedSlots(date, slots) {
+    editingDate = date;
+    selectedDates.clear();
+    selectedDates.add(date);
+    resetSlotList();
+    slots.forEach(function loadSlot(value, index) {
+      const slot = 0 === index
+        ? slotList.firstElementChild
+        : slotTemplate.content.firstElementChild.cloneNode(true);
+      if (0 < index) {
+        slotList.append(slot);
+      }
+      slot.dataset.scheduleId = String(value.schedule_id);
+      slot.dataset.bookedCount = String(value.booked_count || 0);
+      slot.querySelector("[data-slot-start]").value = value.start;
+      slot.querySelector("[data-slot-end]").value = value.end;
+      slot.querySelector("[data-slot-capacity]").value = String(value.capacity);
+      slot.querySelector("[data-slot-interviewer]").value = value.interviewer_name || "";
+      slot.querySelector("[data-slot-platform]").value = value.platform || "";
+      slot.querySelector("[data-slot-link]").value = value.meeting_link || "";
+      slot.querySelector("[data-slot-location-value]").value = value.location || "";
+      slot.querySelectorAll("[data-slot-mode]").forEach(function setSavedMode(button) {
+        const active = button.dataset.slotMode.toUpperCase() === value.method;
+        button.classList.toggle("is-active", active);
+        button.setAttribute("aria-pressed", String(active));
+      });
+    });
+    config.hidden = false;
+    config.dataset.editDate = date;
+    feedback.hidden = true;
+    updateSelection();
+    configDateLabel.textContent = `Edit jadwal ${formatDates([date])}`;
+    updateSlotLabels();
+  };
 
   schedule.addEventListener("click", function handleScheduleClick(event) {
     const target = event.target.closest("button");
@@ -355,12 +396,20 @@ document.documentElement.classList.add("js");
     }
 
     if (target.matches("[data-schedule-date]")) {
+      const day = target.dataset.scheduleDate;
       if (target.disabled) {
         return;
       }
-      const date = target.dataset.scheduleDate;
-      if (selectedDates.has(date)) {
-        selectedDates.delete(date);
+      if (editingDate) {
+        editingDate = null;
+        selectedDates.clear();
+        delete config.dataset.editDate;
+        config.hidden = true;
+        resetSlotList();
+        updateSlotLabels();
+      }
+      if (selectedDates.has(day)) {
+        selectedDates.delete(day);
       } else {
         selectedDates.add(date);
       }
@@ -371,7 +420,11 @@ document.documentElement.classList.add("js");
 
     if (target.matches("[data-reset-selection]")) {
       selectedDates.clear();
+      editingDate = null;
       config.hidden = true;
+      delete config.dataset.editDate;
+      resetSlotList();
+      updateSlotLabels();
       feedback.hidden = true;
       updateSelection();
       return;
@@ -381,10 +434,29 @@ document.documentElement.classList.add("js");
       if (0 === selectedDates.size) {
         return;
       }
+      editingDate = null;
+      delete config.dataset.editDate;
+      resetSlotList();
       config.hidden = false;
       feedback.hidden = true;
       updateSelection();
       updateSlotLabels();
+      return;
+    }
+
+    if (target.matches("[data-edit-schedule]")) {
+      let slots = [];
+      try {
+        slots = JSON.parse(target.dataset.editSchedule || "[]");
+      } catch (error) {
+        showFeedback("Data jadwal tersimpan tidak dapat dibaca.", true);
+        return;
+      }
+      if (!Array.isArray(slots) || 0 === slots.length) {
+        showFeedback("Jadwal tersimpan tidak memiliki slot yang dapat diedit.", true);
+        return;
+      }
+      loadSavedSlots(target.dataset.editDate, slots);
       return;
     }
 
@@ -445,7 +517,7 @@ document.documentElement.classList.add("js");
 
     if (target.matches("[data-save-schedule]")) {
       const slots = Array.from(slotList.querySelectorAll("[data-schedule-slot]"));
-      const slotData = [];
+      const slotsPayload = [];
       for (const [index, slot] of slots.entries()) {
         const start = slot.querySelector("[data-slot-start]");
         const end = slot.querySelector("[data-slot-end]");
@@ -462,7 +534,19 @@ document.documentElement.classList.add("js");
           capacity.focus();
           return;
         }
-        if ("ONLINE" === mode) {
+        const bookedCount = Number(slot.dataset.bookedCount || 0);
+        if (capacityValue < bookedCount) {
+          showFeedback(`Kapasitas Slot ${index + 1} tidak boleh di bawah jumlah peserta yang sudah memesan.`, true);
+          capacity.focus();
+          return;
+        }
+        const interviewer = slot.querySelector("[data-slot-interviewer]");
+        if (!interviewer.value.trim() || interviewer.value.trim().length > 100) {
+          showFeedback(`Isi nama pewawancara (maksimal 100 karakter) pada Slot ${index + 1}.`, true);
+          interviewer.focus();
+          return;
+        }
+        if ("online" === getSlotMode(slot)) {
           const platform = slot.querySelector("[data-slot-platform]");
           const link = slot.querySelector("[data-slot-link]");
           if (!platform.value.trim() || !link.value.trim() || !link.validity.valid) {
@@ -478,36 +562,76 @@ document.documentElement.classList.add("js");
             return;
           }
         }
-        slotData.push({
+        const method = getSlotMode(slot).toUpperCase();
+        const slotPayload = {
           start: start.value,
           end: end.value,
-          mode,
+          method,
+          platform: "ONLINE" === method
+            ? slot.querySelector("[data-slot-platform]").value.trim()
+            : "",
+          meeting_link: "ONLINE" === method
+            ? slot.querySelector("[data-slot-link]").value.trim()
+            : "",
+          location: "OFFLINE" === method
+            ? slot.querySelector("[data-slot-location-value]").value.trim()
+            : "",
           capacity: capacityValue,
-          platform: slot.querySelector("[data-slot-platform]").value.trim(),
-          meeting_url: slot.querySelector("[data-slot-link]").value.trim(),
-          location: slot.querySelector("[data-slot-location-value]").value.trim(),
-          interviewer: slot.querySelector("[data-slot-interviewer]").value.trim(),
-        });
+          interviewer_name: interviewer.value.trim(),
+        };
+        if (slot.dataset.scheduleId) {
+          slotPayload.schedule_id = slot.dataset.scheduleId;
+        }
+        slotsPayload.push(slotPayload);
       }
 
-      const dates = sortedSelectedDates();
-      for (const [index, first] of slotData.entries()) {
-        for (const second of slotData.slice(index + 1)) {
-          if (first.start < second.end && first.end > second.start) {
-            showFeedback("Waktu slot dalam satu hari tidak boleh bertumpang tindih.", true);
+      for (let index = 0; index < slotsPayload.length; index += 1) {
+        for (let otherIndex = index + 1; otherIndex < slotsPayload.length; otherIndex += 1) {
+          if (
+            slotsPayload[index].start < slotsPayload[otherIndex].end
+            && slotsPayload[index].end > slotsPayload[otherIndex].start
+          ) {
+            showFeedback("Waktu antar-slot tidak boleh saling tumpang tindih.", true);
             return;
           }
         }
       }
 
-      datesInput.value = JSON.stringify(dates);
-      slotsInput.value = JSON.stringify(slotData);
-      target.disabled = true;
-      if (typeof scheduleForm.requestSubmit === "function") {
-        scheduleForm.requestSubmit();
-      } else {
-        scheduleForm.submit();
-      }
+      const saveButton = target;
+      saveButton.disabled = true;
+      showFeedback("Menyimpan jadwal ke Oracle…", false);
+      const request = new URLSearchParams({
+        action: "daw_save_interview_schedule",
+        nonce: schedule.dataset.scheduleNonce,
+        interview_type: schedule.dataset.scheduleType,
+        dates: JSON.stringify(sortedSelectedDates()),
+        slots: JSON.stringify(slotsPayload),
+      });
+      fetch(schedule.dataset.ajaxUrl, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
+        body: request.toString(),
+      })
+        .then(function parseResponse(response) {
+          return response.json().then(function checkResult(data) {
+            if (!response.ok || !data.success) {
+              const message = data.data && data.data.message
+                ? data.data.message
+                : "Jadwal gagal disimpan. Periksa koneksi dan coba kembali.";
+              throw new Error(message);
+            }
+          });
+        })
+        .then(function reloadSavedSchedules() {
+          window.location.reload();
+        })
+        .catch(function reportSaveFailure(error) {
+          showFeedback(error instanceof Error
+            ? error.message
+            : "Jadwal gagal disimpan. Periksa koneksi dan coba kembali.", true);
+          saveButton.disabled = false;
+        });
     }
   });
 
@@ -540,11 +664,22 @@ document.documentElement.classList.add("js");
 
   const tabs = Array.from(screen.querySelectorAll("[data-vacancy-tab]"));
   const rows = Array.from(list.querySelectorAll("[data-vacancy-row]"));
+  const emptyState = list.querySelector("[data-vacancy-empty]");
   let activeStatus = "all";
   const applyStatusFilter = function applyStatusFilter() {
+    let visibleRows = 0;
     rows.forEach(function filterRow(row) {
-      row.hidden = "all" !== activeStatus && row.dataset.status !== activeStatus;
+      const visible = "all" === activeStatus
+        ? "archived" !== row.dataset.status
+        : row.dataset.status === activeStatus;
+      row.hidden = !visible;
+      if (visible) {
+        visibleRows += 1;
+      }
     });
+    if (emptyState) {
+      emptyState.hidden = visibleRows > 0;
+    }
   };
 
   tabs.forEach(function bindStatusTab(tab) {
