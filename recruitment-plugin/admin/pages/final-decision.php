@@ -33,27 +33,11 @@ $decision_notice = '';
 if ( '1' === sanitize_text_field( wp_unslash( $_GET['decision_saved'] ?? '' ) ) ) {
 	$decision_notice = 'Keputusan berhasil disimpan ke Oracle Database.';
 }
-if ( 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) && 'save_final_decision' === sanitize_key( wp_unslash( $_POST['daw_final_decision_action'] ?? '' ) ) ) {
-	if ( ! current_user_can( 'manage_recruitment' ) ) {
-		wp_die( esc_html__( 'Anda tidak memiliki izin untuk menyimpan keputusan akhir.', 'recruitment-plugin' ) );
-	}
-	check_admin_referer( 'daw_save_final_decision' );
-	$application_id = absint( wp_unslash( $_POST['application_id'] ?? 0 ) );
-	$posted_decision = sanitize_key( wp_unslash( $_POST['decision'] ?? '' ) );
-	$decision = 'accept' === $posted_decision ? 'DITERIMA' : ( 'reject' === $posted_decision ? 'DITOLAK' : '' );
-	$role_access_id = absint( get_user_meta( get_current_user_id(), 'daw_oracle_account_id', true ) );
-	$save_result = '' !== $decision
-		? $database->save_final_decision(
-			(string) $application_id,
-			$decision,
-			$role_access_id > 0 ? $role_access_id : null
-		)
-		: [ 'success' => false, 'error' => 'Pilihan keputusan tidak valid.' ];
-	if ( ! empty( $save_result['success'] ) ) {
-		wp_safe_redirect( add_query_arg( [ 'page' => 'recruitment-final-decision', 'section' => 'decision', 'decision_saved' => '1' ], $page_url ) );
-		exit;
-	}
-	$decision_notice = 'Gagal menyimpan keputusan: ' . ( $save_result['error'] ?? 'Terjadi kesalahan.' );
+if ( '1' === sanitize_text_field( wp_unslash( $_GET['vacancy_close_warning'] ?? '' ) ) ) {
+	$decision_notice = 'Keputusan tersimpan, tetapi status lowongan WordPress belum berhasil ditutup. Periksa lowongan tersebut sebelum melanjutkan.';
+}
+if ( isset( $GLOBALS['daw_final_decision_error'] ) ) {
+	$decision_notice = (string) $GLOBALS['daw_final_decision_error'];
 }
 
 $candidates = [];
@@ -102,7 +86,7 @@ foreach ( $applications as $app ) {
 		'email_status'  => 'Belum Dikirim',
 		'email_date'    => '',
 		'email'         => (string) ( $app['applicant_email'] ?: '' ),
-		'user_interview_ready' => '' !== $user_selection_status,
+		'user_interview_ready' => 'Lolos Wawancara User' === $user_selection_status,
 	];
 }
 
@@ -161,6 +145,9 @@ foreach ( $candidates as $candidate ) {
 		$matches = false;
 	}
 	if ( 'email' === $section && 'Menunggu Keputusan' === $candidate['decision'] ) {
+		$matches = false;
+	}
+	if ( 'decision' === $section && 'Menunggu Keputusan' !== $candidate['decision'] ) {
 		$matches = false;
 	}
 	if ( $matches ) {

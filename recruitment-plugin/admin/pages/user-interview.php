@@ -56,12 +56,19 @@ foreach ( $applications as $app ) {
         'dealer'         => (string) ( $app['dealer'] ?: '-' ),
         'region'         => (string) ( $app['location'] ?: $app['province'] ?: '-' ),
         'hr_result'      => trim( (string) ( $app['hr_result'] ?? '' ) ) ?: 'Belum tersedia',
-        'interview_date' => trim( (string) ( $app['user_interview_date'] ?? '' ) ) ?: '—',
+        'interview_date' => trim( (string) ( $app['user_scheduled_interview_date'] ?? '' ) ) ?: ( trim( (string) ( $app['user_interview_date'] ?? '' ) ) ?: '—' ),
+        'interview_time' => trim( (string) ( $app['user_scheduled_interview_time'] ?? '' ) ),
+        'interview_method' => [
+            'ONLINE' => 'Online',
+            'OFFLINE' => 'Tatap muka',
+        ][ strtoupper( trim( (string) ( $app['user_scheduled_interview_method'] ?? '' ) ) ) ] ?? '',
+        'interview_location' => trim( (string) ( $app['user_scheduled_interview_location'] ?? '' ) ),
+        'interview_link' => trim( (string) ( $app['user_scheduled_interview_link'] ?? '' ) ),
         'status'         => $has_result ? $selection_status : 'Menunggu Wawancara',
         'status_class'   => $is_passed ? 'is-passed' : ( $is_failed ? 'is-failed' : 'is-waiting' ),
         'score'          => (string) ( $app['user_score'] ?? '' ),
         'recommendation' => trim( (string) ( $app['user_recommendation'] ?? '' ) ),
-        'interviewer'    => trim( (string) ( $app['user_interviewer'] ?? '' ) ),
+        'interviewer'    => trim( (string) ( $app['user_interviewer'] ?? '' ) ) ?: trim( (string) ( $app['user_scheduled_interviewer'] ?? '' ) ),
         'notes'          => trim( (string) ( $app['user_interview_notes'] ?? '' ) ),
         'final_decision' => [
             'DITERIMA' => 'Diterima',
@@ -107,7 +114,8 @@ if ( ! $selected_cand && 0 === $selected_application_id && 0 === $selected_candi
                     <a class="daw-user-interview__nav-item daw-user-interview__nav-subitem" href="<?= esc_url( recruitment_get_admin_url( 'vacancies' ) ) ?>">Daftar Lowongan</a>
                     <a class="daw-user-interview__nav-item daw-user-interview__nav-subitem" href="<?= esc_url( recruitment_get_admin_url( 'applications' ) ) ?>">Pengajuan Lowongan</a>
                 </details>
-                <span class="daw-user-interview__nav-item">Jadwal Wawancara</span>
+                <a class="daw-user-interview__nav-item" href="<?= esc_url( recruitment_get_admin_url( 'interview-schedule' ) ) ?>">Jadwal Wawancara HR</a>
+                <a class="daw-user-interview__nav-item" href="<?= esc_url( recruitment_get_admin_url( 'interview-schedule-user' ) ) ?>">Jadwal Wawancara User</a>
                 <span class="daw-user-interview__nav-item">Email Recruitment</span>
                 <span class="daw-user-interview__nav-item">Akun User Dept</span>
             </nav>
@@ -158,7 +166,10 @@ if ( ! $selected_cand && 0 === $selected_application_id && 0 === $selected_candi
                         <h1 id="notes-title">Hasil Wawancara User</h1>
                         <dl class="daw-user-interview__candidate-facts">
                             <div><dt>Status</dt><dd><?= esc_html( $selected_cand['status'] ) ?></dd></div>
-                            <div><dt>Tanggal Wawancara</dt><dd><?= esc_html( $selected_cand['interview_date'] ) ?></dd></div>
+                            <div><dt>Jadwal Wawancara</dt><dd><?= esc_html( trim( $selected_cand['interview_date'] . ' ' . $selected_cand['interview_time'] ) ) ?></dd></div>
+                            <?php if ( '' !== $selected_cand['interview_method'] ) : ?><div><dt>Metode</dt><dd><?= esc_html( $selected_cand['interview_method'] ) ?></dd></div><?php endif; ?>
+                            <?php if ( '' !== $selected_cand['interview_location'] ) : ?><div><dt>Lokasi/Platform</dt><dd><?= esc_html( $selected_cand['interview_location'] ) ?></dd></div><?php endif; ?>
+                            <?php if ( '' !== $selected_cand['interview_link'] ) : ?><div><dt>Link Wawancara</dt><dd><a href="<?= esc_url( $selected_cand['interview_link'] ) ?>" target="_blank" rel="noopener noreferrer"><?= esc_html( $selected_cand['interview_link'] ) ?></a></dd></div><?php endif; ?>
                             <div><dt>Interviewer</dt><dd><?= esc_html( $selected_cand['interviewer'] ?: '—' ) ?></dd></div>
                             <div><dt>Skor</dt><dd><?= '' !== $selected_cand['score'] ? esc_html( $selected_cand['score'] . '/100' ) : '—' ?></dd></div>
                             <div><dt>Rekomendasi</dt><dd><?= esc_html( $selected_cand['recommendation'] ?: 'Belum tersedia' ) ?></dd></div>

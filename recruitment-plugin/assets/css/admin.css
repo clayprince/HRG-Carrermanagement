@@ -4552,13 +4552,14 @@ body.daw-recruitment-admin:has(.daw-user-department) #wpcontent {
   background: #fff;
   border-bottom: 1px solid #d9dce1;
   display: flex;
-  height: 42px;
+  gap: 16px;
   justify-content: space-between;
-  padding: 0 14px;
+  min-height: 64px;
+  padding: 10px 24px;
 }
 .daw-ud-topbar h1 {
   color: #22262d;
-  font-size: 11px;
+  font-size: 16px;
   font-weight: 650;
   margin: 0;
 }
@@ -4568,31 +4569,41 @@ body.daw-recruitment-admin:has(.daw-user-department) #wpcontent {
   gap: 7px;
 }
 .daw-ud-topbar__account {
-  gap: 12px !important;
+  gap: 16px !important;
 }
 .daw-ud-topbar__identity {
   align-items: center;
   display: flex;
-  gap: 7px;
+  gap: 10px;
 }
 .daw-ud-topbar__identity > span:last-child {
   display: grid;
-  gap: 2px;
+  gap: 3px;
 }
 .daw-ud-topbar__logout {
   margin: 0;
 }
-.daw-ud-topbar__logout {
-  background: transparent;
-  border: 0;
+.daw-ud-topbar__logout button,
+button.daw-ud-topbar__logout {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #d9dce1;
+  border-radius: 6px;
   color: #c8102e;
   cursor: pointer;
-  font-size: 8px;
-  font-weight: 700;
-  padding: 4px 0;
+  display: inline-flex;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  justify-content: center;
+  min-height: 36px;
+  padding: 7px 12px;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
 }
-.daw-ud-topbar__logout:hover {
-  text-decoration: underline;
+button.daw-ud-topbar__logout:hover {
+  background: #fff1f3;
+  border-color: #e8aab4;
+  color: #a90d27;
 }
 .daw-ud-topbar > div > span:last-child {
   display: grid;
@@ -4604,19 +4615,20 @@ body.daw-recruitment-admin:has(.daw-user-department) #wpcontent {
   border-radius: 50%;
   color: #fff;
   display: inline-flex;
-  font-size: 7px;
+  flex: 0 0 34px;
+  font-size: 13px;
   font-weight: 700;
-  height: 21px;
+  height: 34px;
   justify-content: center;
-  width: 21px;
+  width: 34px;
 }
 .daw-ud-topbar strong {
   color: #30353c;
-  font-size: 8px;
+  font-size: 13px;
 }
 .daw-ud-topbar small {
   color: #858b95;
-  font-size: 7px;
+  font-size: 11px;
 }
 .daw-ud-main {
   margin: 0 auto;
@@ -4658,7 +4670,7 @@ body.daw-recruitment-admin:has(.daw-user-department) #wpcontent {
   margin: 0;
 }
 .daw-ud-section__heading a,
-.daw-ud-page-heading a {
+.daw-ud-page-heading a:not(.daw-ud-primary-button) {
   color: #c8102e;
   font-size: 8px;
   font-weight: 650;
@@ -4761,15 +4773,34 @@ body.daw-recruitment-admin:has(.daw-user-department) #wpcontent {
   cursor: pointer;
   display: inline-flex;
   font: inherit;
-  font-size: 8px;
+  font-size: 13px;
   font-weight: 650;
-  gap: 5px;
-  min-height: 25px;
-  padding: 5px 9px;
+  gap: 8px;
+  justify-content: center;
+  line-height: 1.2;
+  min-height: 40px;
+  padding: 9px 14px;
   text-decoration: none;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+  white-space: nowrap;
 }
 .daw-ud-primary-button:hover {
   background: #a90d27;
+  border-color: #a90d27;
+  color: #fff;
+}
+.daw-ud-primary-button:focus-visible {
+  outline: 3px solid rgba(200, 16, 46, 0.25);
+  outline-offset: 2px;
+}
+.daw-ud-page-heading > a.daw-ud-primary-button,
+.daw-ud-page-heading > a.daw-ud-primary-button:visited {
+  color: #fff;
+}
+.daw-ud-page-heading > a.daw-ud-primary-button:hover,
+.daw-ud-page-heading > a.daw-ud-primary-button:focus-visible {
+  background: #a90d27;
+  border-color: #a90d27;
   color: #fff;
 }
 .daw-ud-pills {
@@ -6855,6 +6886,10 @@ body:has(.daw-user-interview) {
   background: #fff2db;
   color: #a86700;
 }
+.daw-interview-screen__status.is-booked {
+  background: #def4e8;
+  color: #168252;
+}
 .daw-interview-screen__action {
   align-items: center;
   background: #c8102e;
@@ -7643,12 +7678,49 @@ body:has(.daw-user-interview) {
   margin: 0;
   padding: 18px 20px 24px;
 }
+.daw-schedule__type-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+.daw-schedule__type-switch a {
+  border: 1px solid var(--schedule-border);
+  border-radius: 8px;
+  color: #59616d;
+  font-size: 13px;
+  font-weight: 650;
+  padding: 9px 13px;
+  text-decoration: none;
+}
+.daw-schedule__type-switch a.is-active {
+  background: #fff3f4;
+  border-color: var(--schedule-red);
+  color: var(--schedule-red);
+}
 .daw-schedule__intro {
   align-items: center;
   display: flex;
   gap: 16px;
   justify-content: space-between;
   margin: 0 0 18px;
+}
+.daw-schedule__month-nav {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+.daw-schedule__month-nav a {
+  align-items: center;
+  border: 1px solid var(--schedule-border);
+  border-radius: 8px;
+  color: var(--schedule-ink);
+  display: inline-flex;
+  font-size: 22px;
+  height: 36px;
+  justify-content: center;
+  text-decoration: none;
+  width: 36px;
 }
 .daw-schedule__intro h1 {
   color: var(--schedule-ink);
@@ -9214,7 +9286,7 @@ body:has(.daw-user-interview) {
 }
 .daw-vacancies__table {
   border-collapse: collapse;
-  min-width: 780px;
+  min-width: 960px;
   table-layout: fixed;
   width: 100%;
 }
@@ -9222,46 +9294,55 @@ body:has(.daw-user-interview) {
   background: #fafafb;
   border-bottom: 1px solid #dedee2;
   color: #73737a;
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 650;
-  height: 25px;
+  height: 34px;
   letter-spacing: 0.04em;
-  padding: 5px 10px;
+  padding: 7px 9px;
   text-align: left;
   text-transform: uppercase;
 }
 .daw-vacancies__table td {
   border-bottom: 1px solid #e4e4e7;
   color: #77777e;
-  font-size: 8px;
-  height: 38px;
-  line-height: 1.35;
-  padding: 5px 10px;
+  font-size: 12px;
+  height: 44px;
+  line-height: 1.4;
+  padding: 7px 9px;
   vertical-align: middle;
 }
 .daw-vacancies__table tbody tr:last-child td {
   border-bottom: 0;
 }
 .daw-vacancies__table th:nth-child(1) {
-  width: 21%;
+  width: 11%;
 }
 .daw-vacancies__table th:nth-child(2) {
-  width: 18%;
+  width: 9%;
 }
 .daw-vacancies__table th:nth-child(3) {
-  width: 12%;
+  width: 10%;
 }
 .daw-vacancies__table th:nth-child(4) {
-  width: 8%;
+  width: 9%;
 }
 .daw-vacancies__table th:nth-child(5) {
-  width: 14%;
+  width: 8%;
 }
 .daw-vacancies__table th:nth-child(6) {
-  width: 13%;
+  width: 11%;
 }
 .daw-vacancies__table th:nth-child(7) {
-  width: 14%;
+  width: 8%;
+}
+.daw-vacancies__table th:nth-child(8) {
+  width: 10%;
+}
+.daw-vacancies__table th:nth-child(9) {
+  width: 9%;
+}
+.daw-vacancies__table th:nth-child(10) {
+  width: 16%;
 }
 .daw-vacancies__table td:first-child strong,
 .daw-vacancies__table td:first-child small {
@@ -9269,21 +9350,21 @@ body:has(.daw-user-interview) {
 }
 .daw-vacancies__table td:first-child strong {
   color: #3d3d43;
-  font-size: 8px;
+  font-size: 12px;
   font-weight: 650;
 }
 .daw-vacancies__table td:first-child small {
   color: #929299;
-  font-size: 7px;
-  margin-top: 2px;
+  font-size: 10px;
+  margin-top: 3px;
 }
 .daw-vacancies__badge {
   border-radius: 3px;
   display: inline-block;
-  font-size: 7px;
+  font-size: 10px;
   font-weight: 600;
   line-height: 1.2;
-  padding: 3px 6px;
+  padding: 4px 7px;
   white-space: nowrap;
 }
 .daw-vacancies__badge--published {
@@ -9301,14 +9382,20 @@ body:has(.daw-user-interview) {
 .daw-vacancies__actions {
   white-space: nowrap;
 }
+.daw-vacancies__actions form {
+  display: inline-flex;
+  gap: 5px;
+  margin: 0;
+  vertical-align: middle;
+}
 .daw-vacancies__actions button {
   background: none;
   border: 0;
   color: #85858c;
   cursor: pointer;
   font: inherit;
-  font-size: 7px;
-  padding: 2px 3px;
+  font-size: 10px;
+  padding: 4px 3px;
 }
 .daw-vacancies__actions button:first-child {
   color: #b24c60;
@@ -9318,9 +9405,10 @@ body:has(.daw-user-interview) {
   text-decoration: underline;
 }
 .daw-vacancies__actions a {
+  display: inline-block;
   color: #5d5d65;
-  font-size: 8px;
-  padding: 2px 4px;
+  font-size: 10px;
+  padding: 4px;
   text-decoration: none;
 }
 .daw-vacancies__actions a:hover {

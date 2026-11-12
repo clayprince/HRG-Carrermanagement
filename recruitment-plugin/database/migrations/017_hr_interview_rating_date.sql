@@ -9,7 +9,7 @@ BEGIN
     FROM USER_TABLES
     WHERE TABLE_NAME IN ('HRS_LAMARAN', 'HRS_ROLE_AKSES', 'HRS_HASIL_WAWANCARA_HR');
     IF object_count <> 3 THEN
-        RAISE_APPLICATION_ERROR(-20071, 'Apply and verify the HR interview assignment schema before this migration.');
+        RAISE_APPLICATION_ERROR(-20071, 'Required tables HRS_LAMARAN, HRS_ROLE_AKSES, and HRS_HASIL_WAWANCARA_HR must exist in the current schema. Apply migration 016 first.');
     END IF;
 
     SELECT COUNT(*) INTO object_count

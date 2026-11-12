@@ -111,23 +111,37 @@ foreach ( array_merge( array_column( $requests, 'code' ), array_keys( $stored_de
 $new_request_code = sprintf( 'FPTK-%s-%03d', gmdate( 'Y' ), max( $request_code_numbers ) + 1 );
 $request_code = sanitize_text_field( wp_unslash( $_GET['request_code'] ?? '' ) );
 $request_step = min( 6, max( 1, absint( $_GET['step'] ?? 1 ) ) );
-$request_form_error = 'required' === sanitize_key( wp_unslash( $_GET['request_error'] ?? '' ) ) ? 'Lengkapi field wajib pada tahap ini. Isian sudah disimpan sebagai draft.' : '';
+$request_form_error = 'required' === sanitize_key( wp_unslash( $_GET['request_error'] ?? '' ) ) ? 'Lengkapi field wajib dan pastikan Jumlah Kebutuhan berupa bilangan bulat positif. Isian sudah disimpan sebagai draft.' : '';
 $request_form_notice = '';
 $request_form_values = [];
 $selected_request = null;
 
 foreach ( $stored_department_requests as $saved_code => $saved_request ) {
 	$fields = is_array( $saved_request['fields'] ?? null ) ? $saved_request['fields'] : [];
+	$stored_headcount = filter_var( $fields['headcount'] ?? null, FILTER_VALIDATE_INT );
+	$linked_vacancy_id = absint( $saved_request['vacancy_id'] ?? 0 );
+	$linked_headcount = $linked_vacancy_id
+		? filter_var( get_post_meta( $linked_vacancy_id, '_daw_headcount', true ), FILTER_VALIDATE_INT )
+		: null;
+	$linked_request_headcount = $linked_vacancy_id ? recruitment_get_vacancy_requested_headcount( $linked_vacancy_id ) : null;
+	$vacancy_archived = $linked_vacancy_id && (
+		'archived' === (string) get_post_meta( $linked_vacancy_id, '_daw_vacancy_status', true )
+		|| ! recruitment_has_approved_vacancy_request( $linked_vacancy_id )
+		|| ! is_int( $linked_headcount )
+		|| 1 > $linked_headcount
+		|| ( is_int( $linked_request_headcount ) && $linked_request_headcount !== $linked_headcount )
+	);
 	$request_summary = [
 		'code' => $saved_code,
 		'position' => (string) ( $fields['position'] ?? 'Posisi belum diisi' ),
-		'count' => (int) ( $fields['headcount'] ?? 1 ),
+		'count' => is_int( $stored_headcount ) && 1 <= $stored_headcount ? (string) $stored_headcount : 'Belum diatur',
 		'priority' => (string) ( $fields['priority'] ?? 'Sedang' ),
 		'date' => ! empty( $saved_request['updated_at'] ) ? date_i18n( 'd M Y', strtotime( $saved_request['updated_at'] ) ) : '—',
 		'updated_at' => (string) ( $saved_request['updated_at'] ?? '' ),
 		'status' => (string) ( $saved_request['status'] ?? 'Draft' ),
 		'fields' => $fields,
 		'hr_note' => (string) ( $saved_request['hr_note'] ?? '' ),
+		'vacancy_archived' => $vacancy_archived,
 	];
 	$requests[] = $request_summary;
 }
@@ -195,6 +209,12 @@ if ( 'request-form' === $view ) {
 					}
 				}
 			}
+			if ( 'submit' === $action || ( 'next' === $action && 1 === $posted_step ) ) {
+				$headcount = filter_var( $request_form_values['headcount'] ?? null, FILTER_VALIDATE_INT );
+				if ( ! is_int( $headcount ) || 1 > $headcount ) {
+					$missing_fields[] = 'Jumlah Kebutuhan';
+				}
+			}
 		}
 		if ( $missing_fields ) {
 			$existing_request = $stored_department_requests[ $posted_code ] ?? [];
@@ -247,10 +267,10 @@ if ( 'request-detail' === $view ) {
 	}
 }
 $interview_database = new Recruitment_Database();
-$interview_rows = $department_assigned && $department_account_id > 0 ? $interview_database->get_user_interview_candidates( $department, $department_account_id ) : [];
-$interview_load_error = ! $department_assigned
-	? 'Akun ini belum ditautkan ke departemen.'
-	: ( $department_account_id < 1 || $interview_database->has_error() ? 'Data wawancara belum dapat dimuat dari Oracle. Silakan coba kembali.' : '' );
+$interview_rows = $department_account_id > 0 ? $interview_database->get_user_interview_candidates( $department, $department_account_id ) : [];
+$interview_load_error = $department_account_id < 1 || $interview_database->has_error()
+	? 'Data wawancara belum dapat dimuat dari Oracle. Pastikan akun User Department telah ditautkan ke akun Oracle.'
+	: '';
 $interviews = [];
 foreach ( $interview_rows as $row ) {
 	$candidate_id = (int) ( $row['CANDIDATE_ID'] ?? 0 );
@@ -267,6 +287,7 @@ foreach ( $interview_rows as $row ) {
 		'candidate_id' => $candidate_id,
 		'position' => (string) ( $row['POSITION'] ?? '' ),
 		'dealer' => (string) ( $row['DEALER'] ?? '' ),
+		'assigned_department' => (string) ( $row['ASSIGNED_DEPARTMENT'] ?? '' ),
 		'status' => $has_result ? 'Sudah Dinilai' : ( $scheduled ? 'Terjadwal' : 'Menunggu Jadwal' ),
 		'selection_status' => (string) ( $row['INTERVIEW_STATUS'] ?? '' ),
 		'final_decision' => (string) ( $row['FINAL_DECISION'] ?? '' ),
@@ -274,9 +295,14 @@ foreach ( $interview_rows as $row ) {
 		'hr_recommendation' => (string) ( $row['HR_RECOMMENDATION'] ?? '' ),
 		'hr_interviewer' => (string) ( $row['HR_INTERVIEWER'] ?? '' ),
 		'hr_notes' => (string) ( $row['HR_INTERVIEW_NOTES'] ?? '' ),
+		'scheduled_interviewer' => (string) ( $row['SCHEDULED_INTERVIEWER'] ?? '' ),
 		'date' => trim( (string) ( $row['INTERVIEW_DATE'] ?? '' ) . ' ' . (string) ( $row['INTERVIEW_TIME'] ?? '' ) ),
-		'method' => (string) ( $row['INTERVIEW_METHOD'] ?? 'Belum ditentukan' ),
+		'method' => [
+			'ONLINE' => 'Online',
+			'OFFLINE' => 'Tatap muka',
+		][ strtoupper( trim( (string) ( $row['INTERVIEW_METHOD'] ?? '' ) ) ) ] ?? ( trim( (string) ( $row['INTERVIEW_METHOD'] ?? '' ) ) ?: 'Belum ditentukan' ),
 		'location' => (string) ( $row['INTERVIEW_LOCATION'] ?? 'Belum ditentukan' ),
+		'meeting_link' => trim( (string) ( $row['INTERVIEW_LINK'] ?? '' ) ),
 		'score' => (string) ( $row['SCORE'] ?? '' ),
 		'recommendation' => (string) ( $row['REKOMENDASI'] ?? '' ),
 		'notes' => (string) ( $row['INTERVIEW_NOTES'] ?? '' ),
@@ -305,68 +331,14 @@ $rating_criteria = [
 	'adaptability' => 'Kemampuan Adaptasi',
 ];
 $stored_interview_results = [];
-$posted_scores = [];
-$posted_recommendation = '';
-$posted_selection_status = '';
-$posted_notes = '';
-$interview_save_error = '';
+$interview_submission = $GLOBALS['daw_user_interview_submission'] ?? [];
+$posted_scores = is_array( $interview_submission['scores'] ?? null ) ? $interview_submission['scores'] : [];
+$posted_recommendation = (string) ( $interview_submission['recommendation'] ?? '' );
+$posted_selection_status = (string) ( $interview_submission['selection_status'] ?? '' );
+$posted_interviewer = (string) ( $interview_submission['interviewer'] ?? '' );
+$posted_notes = (string) ( $interview_submission['notes'] ?? '' );
+$interview_save_error = (string) ( $interview_submission['error'] ?? '' );
 $interview_saved = '1' === sanitize_text_field( wp_unslash( $_GET['saved'] ?? '' ) );
-
-if ( 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) && 'save_user_interview' === sanitize_key( wp_unslash( $_POST['daw_ud_action'] ?? '' ) ) ) {
-	if ( ! current_user_can( 'manage_user_department' ) || ! $department_assigned ) {
-		wp_die( esc_html__( 'Anda tidak memiliki izin untuk menyimpan hasil wawancara.', 'recruitment-plugin' ) );
-	}
-	$nonce = sanitize_text_field( wp_unslash( $_POST['daw_user_interview_nonce'] ?? '' ) );
-	if ( ! wp_verify_nonce( $nonce, 'daw_save_user_interview' ) ) {
-		wp_die( esc_html__( 'Sesi penilaian tidak valid. Muat ulang halaman dan coba lagi.', 'recruitment-plugin' ) );
-	}
-	$posted_code = sanitize_text_field( wp_unslash( $_POST['candidate_code'] ?? '' ) );
-	$posted_scores = isset( $_POST['scores'] ) && is_array( $_POST['scores'] ) ? wp_unslash( $_POST['scores'] ) : [];
-	foreach ( $rating_criteria as $key => $label ) {
-		$raw_score = $posted_scores[ $key ] ?? '';
-		$posted_scores[ $key ] = is_scalar( $raw_score ) && 1 === preg_match( '/\A[1-5]\z/', (string) $raw_score )
-			? (int) $raw_score
-			: 0;
-	}
-	$posted_recommendation = sanitize_text_field( wp_unslash( $_POST['recommendation'] ?? '' ) );
-	$posted_selection_status = sanitize_text_field( wp_unslash( $_POST['selection_status'] ?? '' ) );
-	$posted_notes = sanitize_textarea_field( wp_unslash( $_POST['interview_notes'] ?? '' ) );
-	$valid_recommendations = [ 'Sangat Baik', 'Baik', 'Dipertimbangkan', 'Tidak Dilanjutkan' ];
-	$valid_selection_statuses = [ 'Lolos Wawancara User', 'Tidak Lolos Wawancara User' ];
-	$valid_candidate = false;
-	foreach ( $interviews as $interview ) {
-		if ( $interview['code'] === $posted_code && in_array( $interview['status'], [ 'Menunggu Jadwal', 'Terjadwal', 'Sudah Dinilai' ], true ) ) {
-			$valid_candidate = true;
-			break;
-		}
-	}
-	if ( ! $valid_candidate ) {
-		$interview_save_error = 'Kandidat ini tidak sedang dalam status wawancara terjadwal.';
-	} elseif ( in_array( 0, $posted_scores, true ) || ! in_array( $posted_recommendation, $valid_recommendations, true ) || ! in_array( $posted_selection_status, $valid_selection_statuses, true ) ) {
-		$interview_save_error = 'Lengkapi seluruh penilaian, rekomendasi, dan status hasil wawancara sebelum menyimpan.';
-	} else {
-		$score_total = (int) floor( array_sum( $posted_scores ) / ( count( $rating_criteria ) * 5 ) * 100 );
-		$save_result = $interview_database->save_user_interview_result(
-			(int) $posted_code,
-			$department_account_id,
-			[
-				'scores' => $posted_scores,
-				'score' => $score_total,
-				'recommendation' => $posted_recommendation,
-				'selection_status' => $posted_selection_status,
-				'notes' => $posted_notes,
-				'interviewer' => $display_name,
-				'department' => $department,
-			]
-		);
-		if ( empty( $save_result['success'] ) ) {
-			$interview_save_error = (string) ( $save_result['error'] ?? 'Hasil wawancara gagal disimpan. Silakan coba lagi.' );
-		} else {
-			wp_safe_redirect( add_query_arg( [ 'view' => 'interview-detail', 'candidate_code' => $posted_code, 'saved' => '1' ], $page_url ) );
-			exit;
-		}
-	}
-}
 
 $selected_interview = null;
 $selected_interview_code = sanitize_text_field( wp_unslash( $_GET['candidate_code'] ?? $_POST['candidate_code'] ?? '' ) );
@@ -394,7 +366,7 @@ $applicants = array_map(
 	},
 	$interviews
 );
-$interview_result_rows = $department_assigned && $department_account_id > 0 ? $interview_database->get_user_interview_results( $department, $department_account_id ) : [];
+$interview_result_rows = $department_account_id > 0 ? $interview_database->get_user_interview_results( $department, $department_account_id ) : [];
 if ( $interview_database->has_error() ) {
 	$interview_load_error = 'Data hasil wawancara belum dapat dimuat dari Oracle. Silakan coba kembali.';
 }
@@ -414,7 +386,7 @@ $results = array_map(
 );
 $selected_department_profile = null;
 $profile_load_error = '';
-if ( in_array( $view, [ 'profile', 'interview-detail' ], true ) && $selected_interview && $department_assigned && $department_account_id > 0 ) {
+if ( in_array( $view, [ 'profile', 'interview-detail' ], true ) && $selected_interview && $department_account_id > 0 ) {
 	$selected_department_profile = $interview_database->get_user_department_candidate_detail( $selected_interview_code, $department_account_id );
 	if ( $interview_database->has_error() ) {
 		$profile_load_error = 'Sebagian data profil dan lamaran belum dapat dimuat dari Oracle. Silakan coba kembali.';
@@ -422,12 +394,13 @@ if ( in_array( $view, [ 'profile', 'interview-detail' ], true ) && $selected_int
 }
 
 $request_statuses = array_fill_keys( [ 'Draft', 'Menunggu Review HR', 'Perlu Revisi', 'Disetujui', 'Lowongan Dibuka' ], 0 );
-foreach ( $requests as $request ) {
+$active_requests = array_values( array_filter( $requests, static fn( array $request ): bool => empty( $request['vacancy_archived'] ) ) );
+foreach ( $active_requests as $request ) {
 	if ( isset( $request_statuses[ $request['status'] ] ) ) {
 		++$request_statuses[ $request['status'] ];
 	}
 }
-$recent_requests = $requests;
+$recent_requests = $active_requests;
 usort(
 	$recent_requests,
 	static function ( array $left, array $right ): int {
@@ -436,7 +409,7 @@ usort(
 );
 $recent_requests = array_slice( $recent_requests, 0, 4 );
 $filtered_requests = [];
-foreach ( $requests as $request ) {
+foreach ( $active_requests as $request ) {
 	$matches_status = '' === $request_filter || $request['status'] === $request_filter || ( 'Review HR' === $request_filter && 'Menunggu Review HR' === $request['status'] );
 	$matches_search = '' === $search || false !== strpos( strtolower( $request['code'] . ' ' . $request['position'] ), strtolower( $search ) );
 	if ( $matches_status && $matches_search ) {
@@ -654,6 +627,7 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 						'hr_interviewer' => (string) ( $application['hr_interviewer'] ?? 'Belum tersedia' ),
 						'hr_notes' => (string) ( $application['hr_interview_notes'] ?? '' ),
 						'department_account' => trim( (string) ( $application['department_account_username'] ?? '' ) . ' · ' . (string) ( $application['department_account_email'] ?? '' ) ),
+						'assigned_department' => (string) ( $application['assigned_department'] ?? $department ),
 						'user_result' => (string) ( $application['user_interview_result'] ?? 'Belum dinilai' ),
 						'user_score' => (string) ( $application['user_interview_score'] ?? '—' ),
 						'user_recommendation' => (string) ( $application['user_recommendation'] ?? 'Belum tersedia' ),
@@ -698,7 +672,7 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 							<section class="daw-ud-profile-section"><h3>Pendidikan</h3><?php if ( empty( $full_profile['education'] ) ) : ?><p class="daw-ud-profile-empty">Data pendidikan belum tersedia.</p><?php endif; ?><?php foreach ( $full_profile['education'] as $education ) : ?><article class="daw-ud-profile-education"><div><strong><?= esc_html( $education[0] ?: 'Pendidikan' ) ?></strong><span><?= esc_html( $education[1] ?: 'Institusi belum tersedia' ) ?></span><small><?= esc_html( $education[3] ?: 'Tahun lulus belum tersedia' ) ?></small></div><b><?= esc_html( $education[2] ?: '—' ) ?></b></article><?php endforeach; ?></section>
 							<section class="daw-ud-profile-section"><h3>Pengalaman Kerja</h3><?php if ( empty( $full_profile['experience'] ) ) : ?><p class="daw-ud-profile-empty">Data pengalaman kerja belum tersedia.</p><?php endif; ?><?php foreach ( $full_profile['experience'] as $experience ) : ?><article class="daw-ud-profile-experience"><div><strong><?= esc_html( $experience[0] ) ?></strong><small><?= esc_html( $experience[2] ) ?></small></div><span><?= esc_html( $experience[1] ) ?></span><p><?= esc_html( $experience[3] ) ?></p></article><?php endforeach; ?></section>
 							<section class="daw-ud-profile-section"><h3>Dokumen Lamaran</h3><?php if ( empty( $full_profile['documents'] ) ) : ?><p class="daw-ud-profile-empty">Metadata dokumen belum tersedia.</p><?php else : ?><div class="daw-ud-profile-documents"><?php foreach ( $full_profile['documents'] as $document ) : ?><div><span class="dashicons dashicons-media-document" aria-hidden="true"></span><strong><?= esc_html( $document['label'] ) ?></strong><small><a href="<?= esc_url( $document['url'] ) ?>" download><?= esc_html( $document['name'] ) ?></a></small></div><?php endforeach; ?></div><?php endif; ?></section>
-							<section class="daw-ud-profile-section"><h3>Riwayat Seleksi</h3><?php if ( empty( $full_profile['selection'] ) ) : ?><p class="daw-ud-profile-empty">Riwayat seleksi belum tersedia.</p><?php else : ?><div class="daw-ud-profile-history"><?php foreach ( $full_profile['selection'] as $stage ) : ?><div><i class="<?= esc_attr( $stage[3] ) ?>"></i><strong><?= esc_html( $stage[0] ) ?></strong><span><?= esc_html( $stage[1] ) ?></span><small><?= esc_html( $stage[2] ) ?></small></div><?php endforeach; ?></div><?php endif; ?><p class="daw-ud-profile-assignment">Direkomendasikan HR ke Departemen: <?= esc_html( $department ) ?> · <?= esc_html( $full_profile['department_account'] ) ?></p></section>
+							<section class="daw-ud-profile-section"><h3>Riwayat Seleksi</h3><?php if ( empty( $full_profile['selection'] ) ) : ?><p class="daw-ud-profile-empty">Riwayat seleksi belum tersedia.</p><?php else : ?><div class="daw-ud-profile-history"><?php foreach ( $full_profile['selection'] as $stage ) : ?><div><i class="<?= esc_attr( $stage[3] ) ?>"></i><strong><?= esc_html( $stage[0] ) ?></strong><span><?= esc_html( $stage[1] ) ?></span><small><?= esc_html( $stage[2] ) ?></small></div><?php endforeach; ?></div><?php endif; ?><p class="daw-ud-profile-assignment">Direkomendasikan HR ke Departemen: <?= esc_html( $full_profile['assigned_department'] ) ?> · <?= esc_html( $full_profile['department_account'] ) ?></p></section>
 						</article>
 					</section>
 				<?php endif; ?>
@@ -732,7 +706,7 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 								<?php else : ?><label class="daw-ud-request-field"><span><?= esc_html( $field['label'] ) ?><?php if ( $required ) : ?> <b>*</b><?php endif; ?></span>
 									<?php if ( 'select' === $field['type'] ) : ?><select name="request_data[<?= esc_attr( $key ) ?>]" <?= $required ? 'required' : '' ?>><option value="">Pilih...</option><?php foreach ( $field['options'] as $option ) : ?><option value="<?= esc_attr( $option ) ?>" <?= selected( $value, $option, false ) ?>><?= esc_html( $option ) ?></option><?php endforeach; ?></select>
 									<?php elseif ( 'textarea' === $field['type'] ) : ?><textarea name="request_data[<?= esc_attr( $key ) ?>]" rows="3" placeholder="<?= esc_attr( $field['placeholder'] ?? '' ) ?>" <?= $required ? 'required' : '' ?>><?= esc_textarea( (string) $value ) ?></textarea>
-									<?php else : ?><input type="<?= esc_attr( $field['type'] ) ?>" name="request_data[<?= esc_attr( $key ) ?>]" value="<?= esc_attr( (string) $value ) ?>" placeholder="<?= esc_attr( $field['placeholder'] ?? '' ) ?>" <?= $required ? 'required' : '' ?> /><?php endif; ?>
+									<?php else : ?><input type="<?= esc_attr( $field['type'] ) ?>" name="request_data[<?= esc_attr( $key ) ?>]" value="<?= esc_attr( (string) $value ) ?>" placeholder="<?= esc_attr( $field['placeholder'] ?? '' ) ?>" <?= 'number' === $field['type'] ? 'min="1" step="1"' : '' ?> <?= $required ? 'required' : '' ?> /><?php endif; ?>
 								</label><?php endif; ?>
 							<?php endforeach; ?>
 							</div>
@@ -758,9 +732,9 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 				<?php endif; ?>
 
 			<?php elseif ( 'requests' === $view ) : ?>
-				<div class="daw-ud-page-heading"><p>Total <?= esc_html( (string) count( $requests ) ) ?> permintaan</p><a class="daw-ud-primary-button" href="<?= esc_url( add_query_arg( [ 'view' => 'request-form', 'request_code' => 'new', 'step' => '1' ], $page_url ) ) ?>"><span class="dashicons dashicons-plus-alt2" aria-hidden="true"></span>Buat Request Baru</a></div>
+				<div class="daw-ud-page-heading"><p>Total <?= esc_html( (string) count( $active_requests ) ) ?> permintaan</p><a class="daw-ud-primary-button" href="<?= esc_url( add_query_arg( [ 'view' => 'request-form', 'request_code' => 'new', 'step' => '1' ], $page_url ) ) ?>"><span class="dashicons dashicons-plus-alt2" aria-hidden="true"></span>Buat Request Baru</a></div>
 				<nav class="daw-ud-pills" aria-label="Filter status request"><?php foreach ( [ 'Semua' => '', 'Draft' => 'Draft', 'Perlu Revisi' => 'Perlu Revisi', 'Review HR' => 'Review HR', 'Disetujui' => 'Disetujui', 'Lowongan Dibuka' => 'Lowongan Dibuka' ] as $label => $value ) : ?><a class="<?= $request_filter === $value ? 'is-active' : '' ?>" href="<?= esc_url( add_query_arg( [ 'status' => $value ], $view_url( 'requests' ) ) ) ?>"><?= esc_html( $label ) ?></a><?php endforeach; ?></nav>
-				<?php $revision_requests = array_values( array_filter( $requests, static fn( array $request ): bool => 'Perlu Revisi' === $request['status'] ) ); ?>
+				<?php $revision_requests = array_values( array_filter( $active_requests, static fn( array $request ): bool => 'Perlu Revisi' === $request['status'] ) ); ?>
 				<?php if ( $revision_requests && ( '' === $request_filter || 'Perlu Revisi' === $request_filter ) ) : ?><div class="daw-ud-alert"><span class="dashicons dashicons-warning" aria-hidden="true"></span><span><strong><?= esc_html( (string) count( $revision_requests ) ) ?> permintaan perlu direvisi</strong><small><?= esc_html( $revision_requests[0]['code'] . ': ' . ( $revision_requests[0]['hr_note'] ?: 'Silakan periksa catatan HR.' ) ) ?></small></span></div><?php endif; ?>
 				<form class="daw-ud-search" method="get" action="<?= esc_url( admin_url( 'admin.php' ) ) ?>"><input type="hidden" name="page" value="daw-user-department" /><input type="hidden" name="view" value="requests" /><input type="hidden" name="status" value="<?= esc_attr( $request_filter ) ?>" /><label><span class="screen-reader-text">Cari request</span><input type="search" name="search" value="<?= esc_attr( $search ) ?>" placeholder="Cari nomor FPTK atau posisi..." /></label><button class="button" type="submit">Cari</button></form>
 				<div class="daw-ud-table-wrap"><table class="daw-ud-table"><thead><tr><th>No. FPTK</th><th>Posisi</th><th>Jml</th><th>Prioritas</th><th>Tgl Pengajuan</th><th>Status</th><th>Aksi</th></tr></thead><tbody><?php if ( empty( $filtered_requests ) ) : ?><tr><td colspan="7" class="daw-ud-empty">Tidak ada request yang cocok.</td></tr><?php endif; ?><?php foreach ( $filtered_requests as $request ) : ?><tr><td><strong><?= esc_html( $request['code'] ) ?></strong></td><td><?= esc_html( $request['position'] ) ?></td><td><?= esc_html( (string) $request['count'] ) ?></td><td class="priority-<?= esc_attr( strtolower( $request['priority'] ) ) ?>"><?= esc_html( $request['priority'] ) ?></td><td><?= esc_html( $request['date'] ) ?></td><td><span class="daw-ud-status <?= esc_attr( sanitize_title( $request['status'] ) ) ?>"><?= esc_html( $request['status'] ) ?></span></td><td class="daw-ud-request-row-actions"><a class="daw-ud-link" href="<?= esc_url( add_query_arg( [ 'view' => 'request-detail', 'request_code' => $request['code'] ], $page_url ) ) ?>">Lihat</a><?php if ( isset( $stored_department_requests[ $request['code'] ] ) && in_array( $request['status'], [ 'Draft', 'Perlu Revisi' ], true ) ) : ?><a href="<?= esc_url( add_query_arg( [ 'view' => 'request-form', 'request_code' => $request['code'], 'step' => '1' ], $page_url ) ) ?>">Edit</a><?php endif; ?></td></tr><?php endforeach; ?></tbody></table></div>
@@ -825,7 +799,7 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 					<?php if ( '' !== $interview_save_error ) : ?><p class="daw-ud-alert" role="alert"><?= esc_html( $interview_save_error ) ?></p><?php endif; ?>
 					<div class="daw-ud-detail-layout">
 						<section class="daw-ud-detail-main">
-							<div class="daw-ud-interview-summary"><div><small>Jadwal</small><strong><?= esc_html( $selected_interview['date'] ) ?></strong></div><div><small>Metode</small><strong><?= esc_html( $selected_interview['method'] ) ?></strong></div><div><small>Lokasi</small><strong><?= esc_html( $selected_interview['location'] ) ?></strong></div><div><small>Hasil HR</small><strong><?= esc_html( $selected_interview['hr_result'] ) ?></strong></div></div>
+							<div class="daw-ud-interview-summary"><div><small>Jadwal</small><strong><?= esc_html( $selected_interview['date'] ) ?></strong></div><div><small>Metode</small><strong><?= esc_html( $selected_interview['method'] ) ?></strong></div><div><small>Lokasi/Platform</small><strong><?= esc_html( $selected_interview['location'] ) ?></strong></div><div><small>Hasil HR</small><strong><?= esc_html( $selected_interview['hr_result'] ) ?></strong></div><?php if ( '' !== $selected_interview['meeting_link'] ) : ?><div><small>Link Wawancara</small><strong><a href="<?= esc_url( $selected_interview['meeting_link'] ) ?>" target="_blank" rel="noopener noreferrer"><?= esc_html( $selected_interview['meeting_link'] ) ?></a></strong></div><?php endif; ?></div>
 							<?php if ( 'Menunggu Jadwal' === $selected_interview['status'] && ! $show_rating_form ) : ?>
 								<div class="daw-ud-detail-panel"><div class="daw-ud-alert"><span class="dashicons dashicons-clock" aria-hidden="true"></span><span><strong>Menunggu Jadwal Wawancara</strong><small>Jadwal wawancara user belum ditentukan. Hubungi HR untuk konfirmasi jadwal.</small></span></div><div class="daw-ud-summary-grid"><div><small>Hasil HR Interview</small><strong><?= esc_html( $selected_interview['hr_result'] ) ?></strong></div><div><small>Departemen</small><strong><?= esc_html( $department ) ?></strong></div></div><p class="daw-ud-muted-panel">Form penilaian wawancara akan tersedia setelah jadwal wawancara user dikonfirmasi.</p></div>
 							<?php elseif ( $show_rating_form ) : ?>
@@ -838,6 +812,7 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 										<?php endforeach; ?>
 									</div>
 									<div class="daw-ud-score-total"><span>Skor Total</span><strong><span data-score-total><?= esc_html( (string) $detail_score_total ) ?></span><small>/100</small></strong></div>
+									<label class="daw-ud-notes-field"><span>Nama Pewawancara <b>*</b></span><input type="text" name="interviewer" value="<?= esc_attr( $posted_interviewer ?: ( $selected_interview['interviewer'] ?: $selected_interview['scheduled_interviewer'] ) ) ?>" maxlength="100" required /></label>
 									<fieldset class="daw-ud-recommendation"><legend>Status Hasil Wawancara <b>*</b></legend><div><?php foreach ( [ 'Lolos Wawancara User', 'Tidak Lolos Wawancara User' ] as $selection_status ) : ?><label class="<?= $posted_selection_status === $selection_status || ( '' === $posted_selection_status && ( $selected_interview['selection_status'] ?? '' ) === $selection_status ) ? 'is-selected' : '' ?>"><input type="radio" name="selection_status" value="<?= esc_attr( $selection_status ) ?>" <?= checked( $posted_selection_status ?: ( $selected_interview['selection_status'] ?? '' ), $selection_status, false ) ?> required /><span><?= esc_html( $selection_status ) ?></span></label><?php endforeach; ?></div></fieldset>
 									<fieldset class="daw-ud-recommendation"><legend>Rekomendasi <b>*</b></legend><div><?php foreach ( [ 'Sangat Baik', 'Baik', 'Dipertimbangkan', 'Tidak Dilanjutkan' ] as $recommendation ) : ?><label class="<?= $posted_recommendation === $recommendation || ( '' === $posted_recommendation && ( $selected_interview['recommendation'] ?? '' ) === $recommendation ) ? 'is-selected' : '' ?>"><input type="radio" name="recommendation" value="<?= esc_attr( $recommendation ) ?>" <?= checked( $posted_recommendation ?: ( $selected_interview['recommendation'] ?? '' ), $recommendation, false ) ?> required /><span><?= esc_html( $recommendation ) ?></span></label><?php endforeach; ?></div></fieldset>
 									<label class="daw-ud-notes-field"><span>Catatan Wawancara</span><textarea name="interview_notes" rows="4" placeholder="Catat observasi dan kesan umum dari proses wawancara..."><?= esc_textarea( $posted_notes ?: ( $selected_interview['notes'] ?? '' ) ) ?></textarea></label>
@@ -852,7 +827,7 @@ $greeting_name = trim( (string) preg_replace( '/\s+.*/', '', $display_name ) );
 								<h3>Pendidikan</h3><div class="daw-ud-profile-box"><strong><?= esc_html( $profile['education'][0] ) ?></strong><span><?= esc_html( $profile['education'][1] ) ?></span><small><?= esc_html( $profile['education'][2] ) ?></small></div>
 								<h3>Pengalaman Kerja</h3><?php if ( empty( $profile_experiences ) ) : ?><p>Data pengalaman belum tersedia.</p><?php endif; ?><?php foreach ( $profile_experiences as $experience ) : ?><div class="daw-ud-profile-box"><strong><?= esc_html( $experience[0] ?: 'Posisi' ) ?></strong><span><?= esc_html( $experience[1] ?: 'Perusahaan belum tersedia' ) ?></span><small><?= esc_html( $experience[2] ?: 'Periode belum tersedia' ) ?></small><p><?= esc_html( $experience[3] ) ?></p></div><?php endforeach; ?>
 								<h3>Dokumen</h3><?php if ( empty( $profile_documents ) ) : ?><p>Metadata dokumen belum tersedia.</p><?php else : ?><div class="daw-ud-doc-list"><?php foreach ( $profile_documents as $document ) : ?><div><span class="dashicons dashicons-media-document" aria-hidden="true"></span><?= esc_html( $document ) ?><small>File privat pada profil kandidat</small></div><?php endforeach; ?></div><?php endif; ?>
-								<h3>Riwayat Seleksi</h3><?php if ( empty( $selected_department_profile['history'] ) ) : ?><p>Riwayat seleksi belum tersedia.</p><?php else : ?><ul class="daw-ud-selection-history"><?php foreach ( array_reverse( $selected_department_profile['history'] ) as $history ) : ?><li><span><?= esc_html( (string) ( $history['stage'] ?? '' ) ) ?></span><strong><?= esc_html( (string) ( $history['status'] ?? '' ) ) ?></strong></li><?php endforeach; ?></ul><?php endif; ?><div class="daw-ud-profile-callout">Direkomendasikan HR ke Departemen: <?= esc_html( $department ) ?></div><a class="daw-ud-profile-action" href="<?= esc_url( add_query_arg( [ 'view' => 'profile', 'candidate_code' => $selected_interview['code'], 'return' => 'interview-detail' ], $page_url ) ) ?>">Lihat Profil Lengkap</a><a class="daw-ud-profile-action" href="<?= esc_url( $department_profile_pdf_url( (int) $selected_interview['code'] ) ) ?>">Download Profil Pelamar (PDF)</a>
+								<h3>Riwayat Seleksi</h3><?php if ( empty( $selected_department_profile['history'] ) ) : ?><p>Riwayat seleksi belum tersedia.</p><?php else : ?><ul class="daw-ud-selection-history"><?php foreach ( array_reverse( $selected_department_profile['history'] ) as $history ) : ?><li><span><?= esc_html( (string) ( $history['stage'] ?? '' ) ) ?></span><strong><?= esc_html( (string) ( $history['status'] ?? '' ) ) ?></strong></li><?php endforeach; ?></ul><?php endif; ?><div class="daw-ud-profile-callout">Direkomendasikan HR ke Departemen: <?= esc_html( $selected_interview['assigned_department'] ?: $department ) ?></div><a class="daw-ud-profile-action" href="<?= esc_url( add_query_arg( [ 'view' => 'profile', 'candidate_code' => $selected_interview['code'], 'return' => 'interview-detail' ], $page_url ) ) ?>">Lihat Profil Lengkap</a><a class="daw-ud-profile-action" href="<?= esc_url( $department_profile_pdf_url( (int) $selected_interview['code'] ) ) ?>">Download Profil Pelamar (PDF)</a>
 							</aside>
 					</div>
 				<?php endif; ?>

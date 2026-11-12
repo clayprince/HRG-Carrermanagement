@@ -11,6 +11,7 @@
 class Recruitment_Plugin {
 
     private ?Recruitment_Psychotest_Proctoring $proctoring = null;
+    private bool $blocked_vacancy_publication = false;
 
     /**
      * Plugin info used across the system.
@@ -35,6 +36,11 @@ class Recruitment_Plugin {
         $this->proctoring = new Recruitment_Psychotest_Proctoring();
         $this->proctoring->init();
         add_action( 'init', [ $this, 'register_content' ] );
+        add_filter( 'wp_insert_post_data', [ $this, 'prevent_unapproved_vacancy_publication' ], 10, 2 );
+        add_action( 'save_post_daw_vacancy', [ $this, 'enforce_vacancy_publication_source' ], 10, 2 );
+        add_filter( 'redirect_post_location', [ $this, 'add_vacancy_publication_notice' ], 10, 2 );
+        add_action( 'admin_notices', [ $this, 'render_vacancy_publication_notice' ] );
+        add_action( 'template_redirect', [ $this, 'hide_unapproved_vacancy_page' ], 0 );
         add_action( 'init', [ $this, 'register_portal_pages' ] );
         add_action( 'init', [ $this, 'register_hr_role' ] );
         add_action( 'init', [ $this, 'register_user_department_role' ] );
@@ -49,6 +55,7 @@ class Recruitment_Plugin {
         add_action( 'template_redirect', [ $this, 'handle_portal_login' ] );
         add_action( 'template_redirect', [ $this, 'handle_psychotest_consent' ], 1 );
         add_action( 'template_redirect', [ $this, 'handle_psychotest_attendance' ], 1 );
+        add_action( 'template_redirect', [ $this, 'handle_interview_booking' ], 1 );
         add_action( 'phpmailer_init', [ $this, 'configure_smtp' ] );
         add_filter( 'wp_mail_from', [ $this, 'filter_mail_from' ] );
         add_filter( 'wp_mail_from_name', [ $this, 'filter_mail_from_name' ] );
@@ -135,6 +142,7 @@ class Recruitment_Plugin {
         }
 
         if ( ! recruitment_is_applicant_user() ) {
+            recruitment_abort_if_applicant_session_unavailable();
             wp_safe_redirect( recruitment_get_public_url( 'applicant-login' ) );
             exit;
         }
@@ -193,6 +201,7 @@ class Recruitment_Plugin {
         }
 
         if ( ! recruitment_is_applicant_user() ) {
+            recruitment_abort_if_applicant_session_unavailable();
             wp_safe_redirect( recruitment_get_public_url( 'applicant-login' ) );
             exit;
         }
@@ -202,6 +211,7 @@ class Recruitment_Plugin {
             ? absint( wp_unslash( (string) $_POST['application_id'] ) )
             : 0;
         if ( ! $applicant || 0 >= $application_id ) {
+            recruitment_abort_if_applicant_session_unavailable();
             wp_die( esc_html__( 'Lamaran untuk konfirmasi kehadiran tidak valid.', 'recruitment-plugin' ), '', [ 'response' => 400 ] );
         }
 
@@ -213,12 +223,15 @@ class Recruitment_Plugin {
         $timeline = $database->get_applicant_application_timeline( (string) $applicant['id'], (string) $application_id );
         $latest_stage = $timeline ? (string) $timeline[ count( $timeline ) - 1 ]['stage'] : (string) ( $application['latest_stage'] ?? $application['status'] ?? '' );
         $stage_key = strtolower( trim( preg_replace( '/[^a-z0-9]+/i', '_', $latest_stage ), '_' ) );
-        $final_status = strtoupper( trim( (string) ( $application['final_status'] ?? '' ) ) );
+        $final_status = strtoupper( trim( (string) ( ( $application['final_status'] ?? '' ) ?: ( $application['status'] ?? '' ) ) ) );
+        if ( in_array( $final_status, [ 'DITERIMA', 'ACCEPTED', 'DITOLAK', 'REJECTED' ], true ) ) {
+            wp_die( esc_html__( 'Lamaran sudah mencapai keputusan akhir dan hanya dapat dilihat.', 'recruitment-plugin' ), '', [ 'response' => 409 ] );
+        }
         $is_psychotest_stage = (
             false !== strpos( $stage_key, 'psikotes' )
             || false !== strpos( $stage_key, 'psycholog' )
             || 'tes_psikologi' === $stage_key
-        ) && ! in_array( $final_status, [ 'DITERIMA', 'DITOLAK', 'ACCEPTED', 'REJECTED' ], true );
+        );
         if ( ! $is_psychotest_stage ) {
             wp_die( esc_html__( 'Konfirmasi hanya tersedia saat tahap lamaran berada di psikotes.', 'recruitment-plugin' ), '', [ 'response' => 409 ] );
         }
@@ -348,6 +361,21 @@ class Recruitment_Plugin {
             return;
         }
 
+        $raw_request_action = $_REQUEST['action'] ?? '';
+        $request_action = is_scalar( $raw_request_action )
+            ? sanitize_key( wp_unslash( (string) $raw_request_action ) )
+            : '';
+        $is_logout_post = in_array( $request_action, [ 'daw_logout', 'daw_applicant_logout' ], true )
+            && 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? '' ) )
+            && 'admin-post.php' === basename( (string) ( $_SERVER['PHP_SELF'] ?? '' ) );
+        if ( $is_logout_post ) {
+            return;
+        }
+
+        if ( function_exists( 'wp_doing_ajax' ) && wp_doing_ajax() && 'heartbeat' === $request_action ) {
+            return;
+        }
+
         $user = wp_get_current_user();
         $account_type = (string) get_user_meta( $user->ID, 'daw_oracle_account_type', true );
         $account_id = (string) get_user_meta( $user->ID, 'daw_oracle_account_id', true );
@@ -393,6 +421,16 @@ class Recruitment_Plugin {
                 exit;
             }
             return;
+        }
+
+        $status_error = (string) ( $status['error'] ?? '' );
+        if ( 'service_unavailable' === $status_error ) {
+            $message = __( 'Status akun belum dapat diverifikasi karena layanan data sedang bermasalah. Sesi Anda tetap tersimpan; silakan coba lagi beberapa saat lagi.', 'recruitment-plugin' );
+            if ( function_exists( 'wp_doing_ajax' ) && wp_doing_ajax() ) {
+                wp_send_json_error( [ 'message' => $message ], 503 );
+            }
+
+            wp_die( esc_html( $message ), esc_html__( 'Layanan akun sementara tidak tersedia', 'recruitment-plugin' ), [ 'response' => 503 ] );
         }
 
         wp_logout();
@@ -663,6 +701,85 @@ class Recruitment_Plugin {
         return $user;
     }
 
+    public function handle_interview_booking(): void {
+        $screen = sanitize_key( wp_unslash( $_GET['recruitment_page'] ?? '' ) );
+        if ( 'interview-booking' !== $screen || 'POST' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
+            return;
+        }
+
+        $raw_application_id = $_POST['application_id'] ?? '';
+        $application_id = is_scalar( $raw_application_id )
+            ? sanitize_text_field( wp_unslash( (string) $raw_application_id ) )
+            : '';
+        if ( recruitment_is_ui_preview() || '1' === sanitize_text_field( wp_unslash( $_POST['daw_ui_preview'] ?? '' ) ) ) {
+            wp_safe_redirect( recruitment_get_public_url( 'interview-booking', [ 'application_id' => $application_id, 'booking_result' => 'read_only' ] ) );
+            exit;
+        }
+
+        $applicant = recruitment_get_current_applicant();
+        if ( ! $applicant ) {
+            recruitment_abort_if_applicant_session_unavailable();
+            wp_safe_redirect( recruitment_get_public_url( 'applicant-login', [ 'redirect_to' => 'applicant-dashboard' ] ) );
+            exit;
+        }
+
+        $raw_nonce = $_POST['interview_booking_nonce'] ?? '';
+        $nonce = is_scalar( $raw_nonce )
+            ? sanitize_text_field( wp_unslash( (string) $raw_nonce ) )
+            : '';
+        if ( ! ctype_digit( $application_id ) || '0' === $application_id || ! wp_verify_nonce( $nonce, 'daw_book_interview_' . $application_id ) ) {
+            wp_safe_redirect( recruitment_get_public_url( 'interview-booking', [ 'application_id' => $application_id, 'booking_result' => 'invalid_request' ] ) );
+            exit;
+        }
+
+        $database = new Recruitment_Database();
+        $application = $database->get_applicant_application( (string) $applicant['id'], $application_id );
+        if ( $database->has_error() ) {
+            wp_safe_redirect( recruitment_get_public_url( 'interview-booking', [ 'application_id' => $application_id, 'booking_result' => 'service_unavailable' ] ) );
+            exit;
+        }
+        if ( ! $application ) {
+            wp_safe_redirect( recruitment_get_public_url( 'interview-booking', [ 'application_id' => $application_id, 'booking_result' => 'invalid_application' ] ) );
+            exit;
+        }
+        $timeline = $database->get_applicant_application_timeline( (string) $applicant['id'], $application_id );
+        if ( $database->has_error() ) {
+            wp_safe_redirect( recruitment_get_public_url( 'interview-booking', [ 'application_id' => $application_id, 'booking_result' => 'service_unavailable' ] ) );
+            exit;
+        }
+        if ( recruitment_has_user_interview_result( $timeline ) ) {
+            wp_safe_redirect( recruitment_get_public_url( 'interview-booking', [ 'application_id' => $application_id, 'booking_result' => 'stage_not_eligible' ] ) );
+            exit;
+        }
+        $final_status = strtoupper( trim( (string) ( ( $application['final_status'] ?? '' ) ?: ( $application['status'] ?? '' ) ) ) );
+        if ( in_array( $final_status, [ 'DITERIMA', 'ACCEPTED', 'DITOLAK', 'REJECTED' ], true ) ) {
+            wp_safe_redirect( recruitment_get_public_url( 'interview-booking', [ 'application_id' => $application_id, 'booking_result' => 'read_only' ] ) );
+            exit;
+        }
+        $interview_type = [
+            'INTERVIEW_HR' => 'HR',
+            'INTERVIEW_USER' => 'USER',
+        ][ strtoupper( trim( (string) ( $application['status'] ?? '' ) ) ) ] ?? '';
+        if ( '' === $interview_type ) {
+            wp_safe_redirect( recruitment_get_public_url( 'interview-booking', [ 'application_id' => $application_id, 'booking_result' => 'stage_not_eligible' ] ) );
+            exit;
+        }
+
+        $raw_schedule_id = $_POST['schedule_id'] ?? '';
+        $schedule_id = is_scalar( $raw_schedule_id ) ? absint( $raw_schedule_id ) : 0;
+        $result = $database->book_applicant_interview_slot(
+            (string) $applicant['id'],
+            $application_id,
+            $interview_type,
+            $schedule_id
+        );
+        $notice = ! empty( $result['success'] )
+            ? 'booked'
+            : (string) ( $result['error'] ?? 'service_unavailable' );
+        wp_safe_redirect( recruitment_get_public_url( 'interview-booking', [ 'application_id' => $application_id, 'booking_result' => sanitize_key( $notice ) ] ) );
+        exit;
+    }
+
     public function handle_applicant_account(): void {
         $screen = sanitize_key( wp_unslash( $_GET['recruitment_page'] ?? '' ) );
         if ( 'applicant-file' === $screen && 'GET' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
@@ -696,6 +813,7 @@ class Recruitment_Plugin {
             }
             $applicant = recruitment_get_current_applicant();
             if ( ! $applicant ) {
+                recruitment_abort_if_applicant_session_unavailable();
                 $this->redirect_to_applicant_screen( 'applicant-login', 'applicant_account_required' );
             }
             $new_password = (string) wp_unslash( $_POST['new_password'] ?? '' );
@@ -786,6 +904,7 @@ class Recruitment_Plugin {
 
         $applicant = recruitment_get_current_applicant();
         if ( ! $applicant ) {
+            recruitment_abort_if_applicant_session_unavailable();
             $this->redirect_to_applicant_screen( 'applicant-login', 'applicant_account_required' );
         }
 
@@ -822,6 +941,12 @@ class Recruitment_Plugin {
             nocache_headers();
         }
         $applicant = recruitment_get_current_applicant();
+        if ( ! $applicant
+            && ! current_user_can( 'manage_user_department' )
+            && ! current_user_can( 'manage_recruitment' )
+        ) {
+            recruitment_abort_if_applicant_session_unavailable();
+        }
         $candidate_id = isset( $_GET['candidate_id'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['candidate_id'] ) ) : '';
         if ( function_exists( 'current_user_can' ) && current_user_can( 'manage_user_department' ) ) {
             $application_id = isset( $_GET['application_id'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['application_id'] ) ) : '';
@@ -1300,7 +1425,7 @@ class Recruitment_Plugin {
         $redirect_query = (string) parse_url( $redirect, PHP_URL_QUERY );
         parse_str( $redirect_query, $query_args );
         $page = sanitize_key( $query_args['page'] ?? '' );
-        $hr_pages = [ 'recruitment-dashboard', 'recruitment-vacancies', 'recruitment-applicants', 'recruitment-applications', 'recruitment-hr-interview', 'recruitment-final-decision', 'recruitment-user-interview', 'recruitment-interview-schedule', 'recruitment-user-management', 'recruitment-hr-profile', 'recruitment-psychotest-settings', 'recruitment-question-bank', 'recruitment-settings' ];
+        $hr_pages = [ 'recruitment-dashboard', 'recruitment-vacancies', 'recruitment-applicants', 'recruitment-applications', 'recruitment-hr-interview', 'recruitment-final-decision', 'recruitment-user-interview', 'recruitment-interview-schedule', 'recruitment-interview-schedule-user', 'recruitment-user-management', 'recruitment-hr-profile', 'recruitment-psychotest-settings', 'recruitment-question-bank', 'recruitment-settings' ];
 
         if ( 'daw-user-department' === $page ) {
             return recruitment_get_department_login_url();
@@ -1363,6 +1488,92 @@ class Recruitment_Plugin {
                 'rewrite'      => [ 'slug' => 'lowongan' ],
             ]
         );
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<string, mixed> $postarr
+     * @return array<string, mixed>
+     */
+    public function prevent_unapproved_vacancy_publication( array $data, array $postarr ): array {
+        if ( 'daw_vacancy' !== ( $data['post_type'] ?? '' ) || 'publish' !== ( $data['post_status'] ?? '' ) ) {
+            return $data;
+        }
+
+        $post_id = absint( $postarr['ID'] ?? 0 );
+        if ( ! $post_id || ! recruitment_has_approved_vacancy_request( $post_id ) ) {
+            $data['post_status'] = 'draft';
+            $this->blocked_vacancy_publication = true;
+        }
+
+        return $data;
+    }
+
+    public function enforce_vacancy_publication_source( int $post_id, WP_Post $post ): void {
+        if ( 'publish' === $post->post_status && ! recruitment_has_approved_vacancy_request( $post_id ) ) {
+            $this->blocked_vacancy_publication = true;
+            $updated = wp_update_post( [ 'ID' => $post_id, 'post_status' => 'draft' ], true );
+            if ( is_wp_error( $updated ) || ! $updated ) {
+                $error = is_wp_error( $updated ) ? $updated->get_error_message() : 'WordPress did not demote the unapproved vacancy.';
+                error_log( 'Recruitment vacancy publication was blocked but the post could not be set to draft: ' . $error );
+                return;
+            }
+        }
+
+        if (
+            'draft' === get_post_status( $post_id )
+            && 'published' === (string) get_post_meta( $post_id, '_daw_vacancy_status', true )
+            && ! recruitment_has_approved_vacancy_request( $post_id )
+        ) {
+            update_post_meta( $post_id, '_daw_vacancy_status', 'draft' );
+        }
+    }
+
+    public function add_vacancy_publication_notice( string $location, int $post_id ): string {
+        if ( ! $this->blocked_vacancy_publication || 'daw_vacancy' !== get_post_type( $post_id ) ) {
+            return $location;
+        }
+
+        $this->blocked_vacancy_publication = false;
+        return add_query_arg( 'daw_vacancy_request_required', '1', $location );
+    }
+
+    public function render_vacancy_publication_notice(): void {
+        $notice = isset( $_GET['daw_vacancy_request_required'] ) && is_scalar( $_GET['daw_vacancy_request_required'] )
+            ? (string) wp_unslash( $_GET['daw_vacancy_request_required'] )
+            : '';
+        if ( '1' !== $notice ) {
+            return;
+        }
+
+        $screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+        if ( ! $screen || 'daw_vacancy' !== $screen->post_type ) {
+            return;
+        }
+
+        echo '<div class="notice notice-error"><p>' . esc_html__( 'Lowongan tidak dipublikasikan karena tidak tertaut ke request FPTK yang disetujui.', 'recruitment-plugin' ) . '</p></div>';
+    }
+
+    public function hide_unapproved_vacancy_page(): void {
+        if ( ! is_singular( 'daw_vacancy' ) ) {
+            return;
+        }
+
+        $post_id = absint( get_queried_object_id() );
+        if (
+            $post_id
+            && (
+                recruitment_has_approved_vacancy_request( $post_id )
+                || ( is_preview() && current_user_can( 'edit_post', $post_id ) )
+            )
+        ) {
+            return;
+        }
+
+        global $wp_query;
+        $wp_query->set_404();
+        status_header( 404 );
+        nocache_headers();
     }
 
     public function register_portal_pages(): void {

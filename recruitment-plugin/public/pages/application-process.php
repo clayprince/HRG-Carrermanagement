@@ -25,18 +25,58 @@ if ( '' === $application_id && '' === $application_token && ! $selected_applicat
 }
 $invalid_application_selection = ( '' !== $application_id || '' !== $application_token ) && ! $selected_application;
 $selected_application_id = (string) ( $selected_application['id'] ?? '' );
+$interview_booking_type = [
+    'INTERVIEW_HR' => 'HR',
+    'INTERVIEW_USER' => 'USER',
+][ strtoupper( trim( (string) ( $selected_application['status'] ?? '' ) ) ) ] ?? '';
+if ( in_array( strtoupper( trim( (string) ( $selected_application['final_status'] ?? '' ) ) ), [ 'DITERIMA', 'ACCEPTED', 'DITOLAK', 'REJECTED' ], true ) ) {
+    $interview_booking_type = '';
+}
 $timeline = $selected_application
     ? $database->get_applicant_application_timeline( (string) $applicant['id'], (string) $selected_application['id'] )
     : [];
 $timeline_latest = $timeline ? $timeline[ count( $timeline ) - 1 ] : [];
+$timeline_previous = 1 < count( $timeline ) ? $timeline[ count( $timeline ) - 2 ] : null;
+$stage_announcement = $timeline_latest ? recruitment_get_application_stage_announcement( $timeline_latest, $timeline_previous ) : null;
 $psychotest_stage_source = (string) ( $timeline_latest['stage'] ?? $selected_application['latest_stage'] ?? $selected_application['status'] ?? '' );
 $psychotest_stage_key = strtolower( trim( preg_replace( '/[^a-z0-9]+/i', '_', $psychotest_stage_source ), '_' ) );
-$application_final_status = strtoupper( trim( (string) ( $selected_application['final_status'] ?? '' ) ) );
+$is_final_application = is_array( $stage_announcement ) && ! empty( $stage_announcement['is_final'] );
+if (
+    $is_final_application
+    || recruitment_has_user_interview_result( $timeline )
+    || ( is_array( $stage_announcement ) && 'failed' === $stage_announcement['outcome'] )
+) {
+    $interview_booking_type = '';
+}
+$interview_booking_title = 'HR' === $interview_booking_type ? 'Wawancara HR' : 'Wawancara User';
+$result_viewed = isset( $_GET['result_viewed'] )
+    && is_scalar( $_GET['result_viewed'] )
+    && '1' === sanitize_text_field( wp_unslash( (string) $_GET['result_viewed'] ) );
+$show_final_decision = $is_final_application && $result_viewed;
+$latest_final_decision_index = null;
+if ( $is_final_application ) {
+    foreach ( $timeline as $event_index => $event ) {
+        $event_announcement = recruitment_get_application_stage_announcement( $event );
+        if ( is_array( $event_announcement ) && ! empty( $event_announcement['is_final'] ) ) {
+            $latest_final_decision_index = $event_index;
+        }
+    }
+}
+$application_status_class = $is_final_application
+    ? ( ! $show_final_decision
+        ? ' is-neutral'
+        : ( 'passed' === $stage_announcement['outcome'] ? ' is-accepted' : ' is-rejected' ) )
+    : ( is_array( $stage_announcement )
+        ? ( 'passed' === $stage_announcement['outcome']
+            ? ( ! empty( $stage_announcement['awaiting_final_decision'] ) ? ' is-neutral' : ' is-accepted' )
+            : ' is-rejected' )
+        : '' );
 $is_psychotest_stage = (
     false !== strpos( $psychotest_stage_key, 'psikotes' )
     || false !== strpos( $psychotest_stage_key, 'psycholog' )
     || 'tes_psikologi' === $psychotest_stage_key
-) && ! in_array( $application_final_status, [ 'DITERIMA', 'DITOLAK', 'ACCEPTED', 'REJECTED' ], true );
+) && ! $is_final_application
+    && ( ! is_array( $stage_announcement ) || 'failed' !== $stage_announcement['outcome'] );
 $psychotest_defaults = [
     'camera_required' => true,
     'status' => 'active',
@@ -245,16 +285,114 @@ $reopen_psychotest_info = isset( $_GET['show_psychotest_info'] )
         <?php elseif ( ! $selected_application ) : ?>
             <section class="daw-account__empty"><h2>Belum ada lamaran untuk dilacak</h2><p>Tracking akan muncul setelah Anda mengirim lamaran menggunakan akun ini.</p><a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'careers' ) ) ?>">Lihat Lowongan</a></section>
         <?php else :
-            $status = trim( (string) ( $selected_application['final_status'] ?: $selected_application['status'] ) );
+            $status = trim( (string) ( $is_final_application
+                ? ( ( $selected_application['final_status'] ?? '' ) ?: ( $selected_application['status'] ?? '' ) )
+                : ( $selected_application['status'] ?? '' ) ) );
             $status_label = $tracking_status_labels[ strtoupper( $status ) ] ?? $status;
+            if ( $is_final_application && ! $show_final_decision ) {
+                $status_label = 'Hasil tersedia';
+            } elseif ( is_array( $stage_announcement ) ) {
+                $status_label = ! empty( $stage_announcement['awaiting_final_decision'] )
+                    ? 'Menunggu Keputusan Akhir'
+                    : ( 'passed' === $stage_announcement['outcome'] ? 'Lolos' : 'Tidak Lolos' );
+            }
             $timestamp = strtotime( (string) ( $selected_application['created_at'] ?? '' ) );
             ?>
-            <section class="daw-account__card daw-account__process-summary"><div class="daw-account__process-identity"><span class="daw-account__tracking-label">Status lamaran</span><span class="daw-account__status"><?= esc_html( $status_label ?: 'Menunggu pembaruan' ) ?></span><h2><?= esc_html( $selected_application['title'] ) ?></h2><small><?= esc_html( trim( (string) $selected_application['department'] . ' · ' . (string) $selected_application['location'], ' ·' ) ) ?></small></div><div class="daw-account__fields"><span>No. Lamaran<strong><?= esc_html( $selected_application['id'] ) ?></strong></span><span>Token Tracking<strong><?= esc_html( (string) ( $selected_application['token'] ?? '' ) ?: 'Belum tersedia' ) ?></strong></span><span>Tanggal melamar<strong><?= esc_html( $timestamp ? wp_date( 'j F Y', $timestamp ) : '—' ) ?></strong></span><span>Tahap saat ini<strong><?= esc_html( $timeline ? ( $tracking_stage_labels[ strtoupper( trim( (string) $timeline[ count( $timeline ) - 1 ]['stage'] ) ) ] ?? $timeline[ count( $timeline ) - 1 ]['stage'] ) : 'Belum ada riwayat tahap' ) ?></strong></span></div><?php if ( $is_psychotest_stage && ! $timeline ) : ?><button class="daw-recruitment__button daw-psychotest-info__trigger" type="button" data-open-psychotest-info>Lihat Informasi Psikotes</button><?php endif; ?></section>
+            <section class="daw-account__card daw-account__process-summary">
+                <div class="daw-account__process-identity">
+                    <span class="daw-account__tracking-label">Status lamaran</span>
+                    <span class="daw-account__status<?= esc_attr( $application_status_class ) ?>"><?= esc_html( $status_label ?: 'Menunggu pembaruan' ) ?></span>
+                    <h2><?= esc_html( $selected_application['title'] ) ?></h2>
+                    <small><?= esc_html( trim( (string) $selected_application['department'] . ' · ' . (string) $selected_application['location'], ' ·' ) ) ?></small>
+                </div>
+                <div class="daw-account__fields">
+                    <span>No. Lamaran<strong><?= esc_html( $selected_application['id'] ) ?></strong></span>
+                    <span>Token Tracking<strong><?= esc_html( (string) ( $selected_application['token'] ?? '' ) ?: 'Belum tersedia' ) ?></strong></span>
+                    <span>Tanggal melamar<strong><?= esc_html( $timestamp ? wp_date( 'j F Y', $timestamp ) : '—' ) ?></strong></span>
+                    <span>Tahap saat ini<strong><?= esc_html( $timeline ? ( $tracking_stage_labels[ strtoupper( trim( (string) $timeline[ count( $timeline ) - 1 ]['stage'] ) ) ] ?? $timeline[ count( $timeline ) - 1 ]['stage'] ) : 'Belum ada riwayat tahap' ) ?></strong></span>
+                </div>
+                <?php if ( $is_final_application ) : ?>
+                    <a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'application-result', [ 'application_id' => $selected_application_id ] ) ) ?>">Lihat Hasil</a>
+                <?php endif; ?>
+                <?php if ( $is_psychotest_stage && ! $timeline ) : ?>
+                    <button class="daw-recruitment__button daw-psychotest-info__trigger" type="button" data-open-psychotest-info>Lihat Informasi Psikotes</button>
+                <?php endif; ?>
+            </section>
+            <?php if ( $is_final_application ) : ?><p class="daw-account__readonly"><span aria-hidden="true">&#128274;</span> Keputusan akhir telah ditetapkan. Tracking dan riwayat tetap dapat dilihat, tetapi lamaran tidak dapat diedit.</p><?php endif; ?>
+            <?php if ( is_array( $stage_announcement ) && empty( $stage_announcement['is_final'] ) ) : ?>
+                <section class="daw-account__card daw-stage-announcement is-<?= esc_attr( 'passed' === $stage_announcement['outcome'] ? 'passed' : 'failed' ) ?>" aria-live="polite">
+                    <span class="daw-stage-announcement__eyebrow">PENGUMUMAN TAHAP SELEKSI</span>
+                    <h2><?= 'passed' === $stage_announcement['outcome'] ? 'Selamat, Anda lolos tahap ' : 'Mohon maaf, Anda belum lolos tahap ' ?><?= esc_html( $stage_announcement['stage_label'] ) ?></h2>
+                    <p><?= 'passed' === $stage_announcement['outcome']
+                        ? 'Hasil seleksi ini membuka kesempatan Anda untuk melanjutkan ke tahap berikutnya.'
+                        : 'Untuk saat ini, proses seleksi Anda pada lowongan ini telah berakhir.' ?></p>
+                    <p class="daw-stage-announcement__encouragement"><?= 'passed' === $stage_announcement['outcome']
+                        ? 'Persiapkan diri Anda dengan baik dan semoga sukses di tahap selanjutnya.'
+                        : 'Terus kembangkan potensi Anda. Semoga kesempatan yang lebih baik segera datang.' ?></p>
+                    <?php if ( 'psychotest-preparation' === $stage_announcement['next_page'] && 'online' === $psychotest_mode && $psychotest_online_window_open && '' !== $psychotest_preparation_test ) : ?>
+                        <a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'psychotest-preparation', [ 'test' => $psychotest_preparation_test, 'application_id' => $selected_application_id ] ) ) ?>" aria-label="<?= esc_attr( $stage_announcement['next_label'] ) ?>">Lanjut</a>
+                    <?php elseif ( 'interview-booking' === $stage_announcement['next_page'] ) : ?>
+                        <a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'interview-booking', [ 'application_id' => $selected_application_id ] ) ) ?>" aria-label="<?= esc_attr( $stage_announcement['next_label'] ) ?>">Lanjut</a>
+                    <?php elseif ( 'psychotest-preparation' === $stage_announcement['next_page'] ) : ?>
+                        <a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'application-process', [ 'application_id' => $selected_application_id, 'show_psychotest_info' => '1' ] ) ) ?>" aria-label="Lanjut ke informasi psikotes">Lanjut</a>
+                    <?php elseif ( ! empty( $stage_announcement['awaiting_final_decision'] ) ) : ?>
+                        <p class="daw-stage-announcement__waiting">Silakan menunggu keputusan akhir dari tim HR. Riwayat lamaran Anda tetap dapat dilihat melalui halaman ini.</p>
+                    <?php endif; ?>
+                </section>
+            <?php endif; ?>
             <section class="daw-account__card"><h2>Riwayat Status Seleksi</h2><p class="daw-account__muted">Menampilkan pembaruan yang tercatat oleh tim rekrutmen.</p>
-                <?php if ( $timeline ) : ?><div class="daw-account__timeline"><?php foreach ( $timeline as $index => $event ) :
+                <?php if ( $timeline ) : ?><div class="daw-account__timeline"><?php foreach ( $timeline as $index => $event) :
                     $event_time = strtotime( (string) ( $event['changed_at'] ?? '' ) );
                     $state = $index === count( $timeline ) - 1 ? 'current' : 'done';
-                    ?><article class="is-<?= esc_attr( $state ) ?>"><span class="daw-account__timeline-marker"><?= 'done' === $state ? '&#10003;' : '●' ?></span><div><strong><?= esc_html( $tracking_stage_labels[ strtoupper( trim( (string) $event['stage'] ) ) ] ?? ( $event['stage'] ?: 'Tahap seleksi' ) ) ?></strong><small><?= esc_html( $event_time ? wp_date( 'j F Y H:i', $event_time ) : '—' ) ?></small><?php if ( '' !== trim( (string) $event['note'] ) ) : ?><p><?= esc_html( $event['note'] ) ?></p><?php endif; ?><?php if ( $is_psychotest_stage && $index === count( $timeline ) - 1 ) : ?><button class="daw-recruitment__button daw-psychotest-info__trigger" type="button" data-open-psychotest-info>Lihat Informasi Psikotes</button><?php endif; ?></div><b><?= esc_html( $tracking_status_labels[ strtoupper( trim( (string) $event['status'] ) ) ] ?? ( $event['status'] ?: 'Diperbarui' ) ) ?></b></article><?php endforeach; ?></div><?php else : ?><p class="daw-account__muted">Belum ada pembaruan status untuk lamaran ini.</p><?php endif; ?>
+                    $event_stage = (string) ( $event['stage'] ?? '' );
+                    $event_announcement = recruitment_get_application_stage_announcement( $event );
+                    $is_final_decision_event = is_array( $event_announcement ) && ! empty( $event_announcement['is_final'] );
+                    if ( $is_final_decision_event && $index !== $latest_final_decision_index ) {
+                        continue;
+                    }
+                    $mask_final_decision = $is_final_decision_event && ! $show_final_decision;
+                    $event_state = $state;
+                    if ( $is_final_decision_event ) {
+                        $event_state = ! $show_final_decision
+                            ? 'final-neutral'
+                            : ( 'passed' === $event_announcement['outcome'] ? 'final-accepted' : 'final-rejected' );
+                    } elseif ( $index === count( $timeline ) - 1 && is_array( $event_announcement ) ) {
+                        $event_state = 'passed' === $event_announcement['outcome'] ? 'stage-passed' : 'stage-failed';
+                    }
+                    $event_status = (string) ( $event['status'] ?? '' );
+                    $event_status_key = strtoupper( trim( $event_status ) );
+                    $event_status_label = $tracking_status_labels[ $event_status_key ] ?? ( '' !== $event_status ? $event_status : 'Diperbarui' );
+                    if ( $index === count( $timeline ) - 1 && is_array( $event_announcement ) && empty( $event_announcement['is_final'] ) ) {
+                        $event_status_label = 'passed' === $event_announcement['outcome'] ? 'Lolos' : 'Tidak Lolos';
+                    }
+                    $event_note = (string) ( $event['note'] ?? '' );
+                    if ( $mask_final_decision ) {
+                        $event_status_label = 'Hasil tersedia';
+                        $event_note = 'Pilih Lihat Hasil untuk mengetahui keputusan akhir.';
+                    }
+                    $event_marker = 'done' === $state ? '&#10003;' : '●';
+                    if ( $is_final_decision_event && $show_final_decision ) {
+                        $event_marker = 'passed' === $event_announcement['outcome']
+                            ? '&#10003;'
+                            : '&#10005;';
+                    } elseif ( 'stage-passed' === $event_state ) {
+                        $event_marker = '&#10003;';
+                    } elseif ( 'stage-failed' === $event_state ) {
+                        $event_marker = '&#10005;';
+                    }
+                    ?>
+                    <article class="is-<?= esc_attr( $event_state ) ?>">
+                        <span class="daw-account__timeline-marker"><?= $event_marker ?></span>
+                        <div>
+                            <strong><?= esc_html( $tracking_stage_labels[ strtoupper( trim( $event_stage ) ) ] ?? ( $event_stage ?: 'Tahap seleksi' ) ) ?></strong>
+                            <small><?= esc_html( $event_time ? wp_date( 'j F Y H:i', $event_time ) : '—' ) ?></small>
+                            <?php if ( '' !== trim( $event_note ) ) : ?><p><?= esc_html( $event_note ) ?></p><?php endif; ?>
+                            <?php if ( $is_psychotest_stage && $index === count( $timeline ) - 1 ) : ?><button class="daw-recruitment__button daw-psychotest-info__trigger" type="button" data-open-psychotest-info>Lihat Informasi Psikotes</button><?php endif; ?>
+                            <?php if ( '' !== $interview_booking_type && $index === count( $timeline ) - 1 && ( ! is_array( $stage_announcement ) || 'interview-booking' !== $stage_announcement['next_page'] ) ) : ?><a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'interview-booking', [ 'application_id' => $selected_application_id ] ) ) ?>">Pilih Jadwal <?= esc_html( $interview_booking_title ) ?></a><?php endif; ?>
+                        </div>
+                        <b><?= esc_html( $event_status_label ) ?></b>
+                    </article>
+                <?php endforeach; ?></div><?php else : ?><p class="daw-account__muted">Belum ada pembaruan status untuk lamaran ini.</p><?php endif; ?>
             </section>
             <?php if ( $is_psychotest_stage ) : ?>
                 <dialog class="daw-psychotest-info" data-psychotest-info-dialog data-auto-open="<?= $reopen_psychotest_info ? 'true' : 'false' ?>" aria-labelledby="daw-psychotest-info-title">
@@ -285,10 +423,12 @@ $reopen_psychotest_info = isset( $_GET['show_psychotest_info'] )
                     <?php if ( '' !== trim( (string) $psychotest_settings['instructions'] ) ) : ?><div class="daw-psychotest-info__instructions"><strong>Informasi tambahan dari HR</strong><p><?= nl2br( esc_html( (string) $psychotest_settings['instructions'] ) ) ?></p></div><?php endif; ?>
                     <?php if ( 'inactive' === $psychotest_settings['status'] ) : ?><p class="daw-psychotest-info__notice">Tes sedang dinonaktifkan. Silakan menunggu informasi lanjutan dari HR.</p><?php endif; ?>
                     <?php if ( 'online' === $psychotest_mode && $psychotest_online_window_open ) : ?>
-                        <?php if ( '' !== $psychotest_preparation_test ) : ?>
+                        <?php if ( '' !== $psychotest_preparation_test && ( ! is_array( $stage_announcement ) || 'psychotest-preparation' !== $stage_announcement['next_page'] ) ) : ?>
                             <div class="daw-psychotest-info__actions">
                                 <a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'psychotest-preparation', [ 'test' => $psychotest_preparation_test, 'application_id' => $selected_application_id ] ) ) ?>">Mulai Persiapan Tes Psikotes</a>
                             </div>
+                        <?php elseif ( '' !== $psychotest_preparation_test && ! $reopen_psychotest_info ) : ?>
+                            <p class="daw-psychotest-info__notice">Lanjutkan ke persiapan tes melalui tombol Lanjut pada pengumuman tahap seleksi.</p>
                         <?php else : ?>
                             <p class="daw-psychotest-info__notice">Semua tes yang aktif telah diselesaikan, atau belum ada tes online aktif yang dapat dimulai.</p>
                         <?php endif; ?>
