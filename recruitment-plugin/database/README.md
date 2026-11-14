@@ -181,7 +181,9 @@ their SQL is compatible with the current Oracle database.
 - Migration `012_psychotest_candidate_results.sql` adds the candidate and
   completed-result links used by assessment writes and result review. It must
   be reviewed and applied by the authorized Oracle owner; the plugin does not
-  run it automatically.
+  run it automatically. The result table's primary key is
+  `HASIL_TES_PSIKOLOGI`; response rows store that value in
+  `HASIL_TES_PSIKOLOGI_ID`.
 - Proctoring consent, identity-verification status, alert metadata, and the
   one-year retention deadline are stored in Oracle by
   `Recruitment_Database`. Migration
@@ -215,6 +217,9 @@ their SQL is compatible with the current Oracle database.
   or the full sum (up to three digits); each lane supports up to 900 answers
   using the on-screen keypad or keyboard. Oracle stores the generated sequence
   and full answers in a compact encoded payload with the correct-answer score.
+  The question-bank admin action can create a missing active Pauli definition
+  and its 20 generic lane records in one transaction; the arithmetic sequence
+  itself is generated per applicant session.
   Long answer payloads are split
   into bounded CLOB binds for PDO_OCI. The Pauli bank must contain at
   least 20 questions to provide the fixed one-hour session. The applicant

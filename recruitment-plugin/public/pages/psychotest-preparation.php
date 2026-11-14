@@ -51,6 +51,10 @@ $device_url = recruitment_get_public_url( 'psychotest-device', $device_arguments
                     <span>4</span>
                     <small>Persetujuan</small>
                 </div>
+                <div class="daw-recruitment__psychotest-step">
+                    <span>5</span>
+                    <small>Foto &amp; KTP</small>
+                </div>
             </div>
 
             <div class="daw-recruitment__psychotest-prep-card">
@@ -115,7 +119,7 @@ $device_url = recruitment_get_public_url( 'psychotest-device', $device_arguments
                             <span class="daw-recruitment__prepare-icon">✓</span>
                             <div>
                                 <strong><?= $camera_required ? 'Izinkan kamera' : 'Kamera opsional' ?></strong>
-                                <small><?= $camera_required ? 'Izinkan akses kamera dan mikrofon sebelum melanjutkan.' : 'Pemeriksaan kamera dapat dilewati untuk tes ini.' ?></small>
+                                <small><?= $camera_required ? 'Izinkan akses kamera pada tahap pemeriksaan sebelum melanjutkan.' : 'Pemeriksaan kamera dapat dilewati untuk tes ini.' ?></small>
                             </div>
                         </li>
                     </ul>

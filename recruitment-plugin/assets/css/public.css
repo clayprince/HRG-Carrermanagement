@@ -3264,6 +3264,8 @@
 .daw-psychotest-info__actions {
   border-top: 1px solid #e8eaf0;
   display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
   justify-content: flex-end;
   margin-top: 18px;
   padding-top: 16px;
@@ -5035,6 +5037,14 @@ body:has(.daw-account-auth) .daw-account-auth__main {
 .daw-exam-primary {
   min-width: 0;
 }
+.daw-recruitment--iq .daw-exam-layout {
+  display: block;
+}
+.daw-recruitment--iq .daw-exam-primary {
+  margin: 0 auto;
+  max-width: 760px;
+  width: 100%;
+}
 .daw-recruitment--exam-active .daw-iq-assessment,
 .daw-recruitment--exam-active .daw-personality-assessment {
   border: 1px solid #d5d6dc;
@@ -5446,27 +5456,49 @@ body:has(.daw-account-auth) .daw-account-auth__main {
   padding: 18px 20px;
 }
 .daw-proctoring-watch {
-  align-items: flex-start;
-  background: #f8fafc;
-  border: 1px solid #dbe3ec;
+  background: #20242a;
+  border: 0;
   border-radius: 12px;
-  display: grid;
-  gap: 8px 14px;
-  grid-template-columns: 128px minmax(0, 1fr);
-  margin: 0 0 14px;
-  padding: 10px;
+  box-shadow: 0 12px 32px rgba(20, 28, 38, 0.2);
+  cursor: grab;
+  display: block;
+  max-height: calc(100vh - 24px);
+  max-width: calc(100vw - 24px);
+  overflow: hidden;
+  padding: 0;
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  touch-action: none;
+  user-select: none;
+  width: 320px;
+  z-index: 1000;
+}
+.daw-proctoring-watch:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+.daw-proctoring-watch.is-moving {
+  cursor: grabbing;
 }
 .daw-proctoring-watch__video {
   aspect-ratio: 4 / 3;
   background: #20242a;
-  border-radius: 8px;
-  grid-row: span 2;
+  display: block;
+  height: auto;
+  max-height: calc(100vh - 24px);
   object-fit: cover;
   width: 100%;
+  pointer-events: none;
 }
-.daw-proctoring-watch p,
-.daw-proctoring-watch small {
-  margin: 0;
+.daw-proctoring-watch__announcements {
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  height: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+  width: 1px;
 }
 .daw-proctoring-capture video {
   background: #20242a;

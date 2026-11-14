@@ -117,7 +117,7 @@ foreach ( $questions as $question_index => $question ) {
                             </nav>
                         </section>
                     </div>
-                    <?php require recruitment_get_plugin_path( 'public/components/psychotest-camera-placeholder.php' ); ?>
+                    <?php require recruitment_get_plugin_path( 'public/components/psychotest-proctoring-watch.php' ); ?>
                 </div>
             <?php endif; ?>
         </div>

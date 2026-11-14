@@ -48,6 +48,10 @@ $next_url = recruitment_get_public_url( 'psychotest-consent', $device_arguments 
                     <span>4</span>
                     <small>Persetujuan</small>
                 </div>
+                <div class="daw-recruitment__psychotest-step">
+                    <span>5</span>
+                    <small>Foto &amp; KTP</small>
+                </div>
             </div>
 
             <section class="daw-recruitment__psychotest-card daw-recruitment__device-check-card" data-psychotest-device-check data-camera-required="<?= esc_attr( $camera_required ? '1' : '0' ) ?>">

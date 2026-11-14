@@ -4041,6 +4041,123 @@ class Recruitment_Database {
     }
 
     /**
+     * Create the Pauli test definition and any missing lane records.
+     *
+     * @return array{success: bool, test_id?: int, lane_count?: int, created_test?: bool, error?: string}
+     */
+    public function initialize_pauli_question_bank(): array {
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+
+            $test_query = $connection->prepare(
+                'SELECT TES_PSIKOLOGI_ID AS "id", IS_ACTIVE AS "active" FROM HRS_TES_PSIKOLOGI WHERE UPPER(JUDUL) LIKE :title ORDER BY TES_PSIKOLOGI_ID FOR UPDATE'
+            );
+            $test_query->execute( [ 'title' => '%PAULI%' ] );
+            $tests = $test_query->fetchAll( PDO::FETCH_ASSOC );
+            if ( 1 < count( $tests ) ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'Terdapat lebih dari satu definisi tes Pauli di Oracle. Periksa katalog tes terlebih dahulu.' ];
+            }
+
+            $created_test = false;
+            if ( $tests ) {
+                $test_id = absint( $tests[0]['id'] ?? 0 );
+                if ( $test_id < 1 ) {
+                    $connection->rollBack();
+                    return [ 'success' => false, 'error' => 'ID definisi tes Pauli di Oracle tidak valid.' ];
+                }
+                if ( 1 !== absint( $tests[0]['active'] ?? 0 ) ) {
+                    $connection->rollBack();
+                    return [ 'success' => false, 'error' => 'Definisi tes Pauli di Oracle tidak aktif. Aktifkan tes melalui pengaturan HR sebelum menyiapkan bank.' ];
+                }
+            } else {
+                $order_query = $connection->query(
+                    'SELECT NVL(MAX(URUTAN_TAMPILAN), 0) + 1 FROM HRS_TES_PSIKOLOGI'
+                );
+                $display_order = absint( $order_query->fetchColumn() );
+                $insert_test = $connection->prepare(
+                    'INSERT INTO HRS_TES_PSIKOLOGI (JUDUL, PETUNJUK_PENGERJAAN, DURASI_PENGERJAAN, UPDATED_AT, JUMLAH_SOAL, IS_ACTIVE, URUTAN_TAMPILAN, CREATED_AT) VALUES (:title, TO_CLOB(:instructions), :duration, CURRENT_TIMESTAMP, :question_count, 1, :display_order, CURRENT_TIMESTAMP) RETURNING TES_PSIKOLOGI_ID INTO :test_id'
+                );
+                $test_id = 0;
+                $insert_test->bindValue( ':title', 'Tes Koran Pauli', PDO::PARAM_STR );
+                $insert_test->bindValue( ':instructions', 'Jumlahkan dua angka yang berurutan pada setiap lajur. Jawaban dapat diisi dengan angka satuan atau hasil penjumlahan penuh.', PDO::PARAM_STR );
+                $insert_test->bindValue( ':duration', 60, PDO::PARAM_INT );
+                $insert_test->bindValue( ':question_count', 20 * 900, PDO::PARAM_INT );
+                $insert_test->bindValue( ':display_order', $display_order, PDO::PARAM_INT );
+                $insert_test->bindParam( ':test_id', $test_id, PDO::PARAM_INT | PDO::PARAM_INPUT_OUTPUT, 19 );
+                $insert_test->execute();
+                if ( $test_id < 1 ) {
+                    throw new RuntimeException( 'Oracle did not return a Pauli test ID.' );
+                }
+                $created_test = true;
+            }
+
+            $count_query = $connection->prepare(
+                'SELECT COUNT(*) FROM HRS_PERTANYAAN_PSIKOTES WHERE TES_PSIKOLOGI_ID = :test_id'
+            );
+            $count_query->execute( [ 'test_id' => $test_id ] );
+            $lane_count = (int) $count_query->fetchColumn();
+            if ( 20 < $lane_count ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'Bank Pauli memiliki lebih dari 20 lajur. Periksa urutan dan konfigurasi soal sebelum melanjutkan.' ];
+            }
+
+            if ( $lane_count < 20 ) {
+                $order_query = $connection->prepare(
+                    'SELECT NVL(MAX(DISPLAY_ORDER), 0) + 1 FROM HRS_PERTANYAAN_PSIKOTES WHERE TES_PSIKOLOGI_ID = :test_id'
+                );
+                $order_query->execute( [ 'test_id' => $test_id ] );
+                $display_order = absint( $order_query->fetchColumn() );
+                $insert_question = $connection->prepare(
+                    'INSERT INTO HRS_PERTANYAAN_PSIKOTES (TES_PSIKOLOGI_ID, TEKS_PERTANYAAN, JENIS_PERTANYAAN, NILAI_PERTANYAAN, DISPLAY_ORDER) VALUES (:test_id, TO_CLOB(:prompt), :question_type, 1, :display_order)'
+                );
+                while ( $lane_count < 20 ) {
+                    $insert_question->execute(
+                        [
+                            'test_id' => $test_id,
+                            'prompt' => sprintf( 'Lajur Pauli %02d', $display_order ),
+                            'question_type' => 'NUMERIC',
+                            'display_order' => $display_order,
+                        ]
+                    );
+                    $lane_count++;
+                    $display_order++;
+                }
+            }
+
+            $update_test = $connection->prepare(
+                'UPDATE HRS_TES_PSIKOLOGI SET DURASI_PENGERJAAN = :duration, JUMLAH_SOAL = :question_count, UPDATED_AT = CURRENT_TIMESTAMP WHERE TES_PSIKOLOGI_ID = :test_id'
+            );
+            $update_test->execute(
+                [
+                    'duration' => $lane_count * 3,
+                    'question_count' => $lane_count * 900,
+                    'test_id' => $test_id,
+                ]
+            );
+            if ( 1 !== $update_test->rowCount() ) {
+                throw new RuntimeException( 'Pauli test configuration could not be updated.' );
+            }
+
+            $connection->commit();
+            return [
+                'success' => true,
+                'test_id' => $test_id,
+                'lane_count' => $lane_count,
+                'created_test' => $created_test,
+            ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_oracle_failure( 'Pauli question bank initialization failed', $exception );
+            return [ 'success' => false, 'error' => 'Bank Pauli gagal disiapkan di Oracle. Periksa koneksi dan log server.' ];
+        }
+    }
+
+    /**
      * @param array<string, mixed> $question
      * @return array{success: bool, error?: string}
      */
@@ -4603,7 +4720,7 @@ class Recruitment_Database {
         $result = [];
         if ( $result_id > 0 ) {
             $rows = $this->fetch_all(
-                'SELECT HASIL_TES_PSIKOLOGI_ID AS "id", NILAI AS "score", TO_CHAR(MULAI_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "started_at", TO_CHAR(DIKUMPULKAN_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "completed_at" FROM HRS_HASIL_TES_PSIKOLOGI WHERE HASIL_TES_PSIKOLOGI_ID = :result_id AND TES_PSIKOLOGI_ID = :test_id',
+                'SELECT HASIL_TES_PSIKOLOGI AS "id", NILAI AS "score", TO_CHAR(MULAI_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "started_at", TO_CHAR(DIKUMPULKAN_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "completed_at" FROM HRS_HASIL_TES_PSIKOLOGI WHERE HASIL_TES_PSIKOLOGI = :result_id AND TES_PSIKOLOGI_ID = :test_id',
                 [ 'result_id' => $result_id, 'test_id' => $test_id ]
             );
             $result = $rows[0] ?? [];
@@ -5057,7 +5174,7 @@ class Recruitment_Database {
     public function get_psychotest_results(): array {
         return $this->fetch_all(
             'SELECT "candidate_id", "candidate_name", "candidate_email", "test_id", "test_title", "result_id", "status", "started_at", "completed_at", "score", "response_count", "question_count" FROM (' .
-                'SELECT p.KANDIDAT_ID AS "candidate_id", NVL(p.NAMA_LENGKAP, p.NAMA_KANDIDAT) AS "candidate_name", p.EMAIL AS "candidate_email", t.TES_PSIKOLOGI_ID AS "test_id", t.JUDUL AS "test_title", h.HASIL_TES_PSIKOLOGI_ID AS "result_id", \'complete\' AS "status", TO_CHAR(h.MULAI_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "started_at", TO_CHAR(h.DIKUMPULKAN_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "completed_at", h.NILAI AS "score", COUNT(r.RESPON_PSIKOTES_ID) AS "response_count", (SELECT COUNT(*) FROM HRS_PERTANYAAN_PSIKOTES q WHERE q.TES_PSIKOLOGI_ID = t.TES_PSIKOLOGI_ID) AS "question_count" FROM HRS_HASIL_TES_PSIKOLOGI h JOIN HRS_TES_PSIKOLOGI t ON t.TES_PSIKOLOGI_ID = h.TES_PSIKOLOGI_ID JOIN HRS_PROFIL_KANDIDAT p ON p.KANDIDAT_ID = h.KANDIDAT_ID LEFT JOIN HRS_RESPON_PSIKOTES r ON r.HASIL_TES_PSIKOLOGI_ID = h.HASIL_TES_PSIKOLOGI_ID AND r.KANDIDAT_ID = h.KANDIDAT_ID GROUP BY p.KANDIDAT_ID, p.NAMA_LENGKAP, p.NAMA_KANDIDAT, p.EMAIL, t.TES_PSIKOLOGI_ID, t.JUDUL, h.HASIL_TES_PSIKOLOGI_ID, h.MULAI_PADA, h.DIKUMPULKAN_PADA, h.NILAI ' .
+                'SELECT p.KANDIDAT_ID AS "candidate_id", NVL(p.NAMA_LENGKAP, p.NAMA_KANDIDAT) AS "candidate_name", p.EMAIL AS "candidate_email", t.TES_PSIKOLOGI_ID AS "test_id", t.JUDUL AS "test_title", h.HASIL_TES_PSIKOLOGI AS "result_id", \'complete\' AS "status", TO_CHAR(h.MULAI_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "started_at", TO_CHAR(h.DIKUMPULKAN_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "completed_at", h.NILAI AS "score", COUNT(r.RESPON_PSIKOTES_ID) AS "response_count", (SELECT COUNT(*) FROM HRS_PERTANYAAN_PSIKOTES q WHERE q.TES_PSIKOLOGI_ID = t.TES_PSIKOLOGI_ID) AS "question_count" FROM HRS_HASIL_TES_PSIKOLOGI h JOIN HRS_TES_PSIKOLOGI t ON t.TES_PSIKOLOGI_ID = h.TES_PSIKOLOGI_ID JOIN HRS_PROFIL_KANDIDAT p ON p.KANDIDAT_ID = h.KANDIDAT_ID LEFT JOIN HRS_RESPON_PSIKOTES r ON r.HASIL_TES_PSIKOLOGI_ID = h.HASIL_TES_PSIKOLOGI AND r.KANDIDAT_ID = h.KANDIDAT_ID GROUP BY p.KANDIDAT_ID, p.NAMA_LENGKAP, p.NAMA_KANDIDAT, p.EMAIL, t.TES_PSIKOLOGI_ID, t.JUDUL, h.HASIL_TES_PSIKOLOGI, h.MULAI_PADA, h.DIKUMPULKAN_PADA, h.NILAI ' .
                 'UNION ALL ' .
                 'SELECT p.KANDIDAT_ID AS "candidate_id", NVL(p.NAMA_LENGKAP, p.NAMA_KANDIDAT) AS "candidate_name", p.EMAIL AS "candidate_email", t.TES_PSIKOLOGI_ID AS "test_id", t.JUDUL AS "test_title", CAST(NULL AS NUMBER) AS "result_id", \'active\' AS "status", TO_CHAR(MIN(r.DIBUAT_PADA), \'YYYY-MM-DD HH24:MI:SS\') AS "started_at", CAST(NULL AS VARCHAR2(19)) AS "completed_at", SUM(r.NILAI_DIPEROLEH) AS "score", COUNT(r.RESPON_PSIKOTES_ID) AS "response_count", (SELECT COUNT(*) FROM HRS_PERTANYAAN_PSIKOTES q WHERE q.TES_PSIKOLOGI_ID = t.TES_PSIKOLOGI_ID) AS "question_count" FROM HRS_RESPON_PSIKOTES r JOIN HRS_PERTANYAAN_PSIKOTES q ON q.PEERTANYAAN_PSIKOTES_ID = r.PERTANYAAN_PSIKOTES_ID JOIN HRS_TES_PSIKOLOGI t ON t.TES_PSIKOLOGI_ID = q.TES_PSIKOLOGI_ID JOIN HRS_PROFIL_KANDIDAT p ON p.KANDIDAT_ID = r.KANDIDAT_ID WHERE r.HASIL_TES_PSIKOLOGI_ID IS NULL GROUP BY p.KANDIDAT_ID, p.NAMA_LENGKAP, p.NAMA_KANDIDAT, p.EMAIL, t.TES_PSIKOLOGI_ID, t.JUDUL' .
                 ') ORDER BY "started_at" DESC FETCH FIRST 250 ROWS ONLY'
@@ -5363,7 +5480,7 @@ class Recruitment_Database {
                     hr.catatan_wawancara AS "hr_interview_notes",
                     (SELECT h.nilai FROM HRS_HASIL_TES_PSIKOLOGI h
                      WHERE h.kandidat_id = p.kandidat_id
-                     ORDER BY h.dikumpulkan_pada DESC NULLS LAST, h.hasil_tes_psikologi_id DESC
+                     ORDER BY h.dikumpulkan_pada DESC NULLS LAST, h.hasil_tes_psikologi DESC
                      FETCH FIRST 1 ROW ONLY) AS "psychotest_score",
                     w.status_seleksi AS "user_interview_result",
                     w.rekomendasi AS "user_recommendation",
@@ -6932,7 +7049,7 @@ class Recruitment_Database {
                         }
 
                         $insert = $connection->prepare(
-                            'INSERT INTO HRS_HASIL_TES_PSIKOLOGI (KANDIDAT_ID, MULAI_PADA, DIKUMPULKAN_PADA, NILAI, TES_PSIKOLOGI_ID) VALUES (:candidate_id, TO_TIMESTAMP(:started_at, \'YYYY-MM-DD HH24:MI:SS\'), CURRENT_TIMESTAMP, :score, :test_id) RETURNING HASIL_TES_PSIKOLOGI_ID INTO :result_id'
+                            'INSERT INTO HRS_HASIL_TES_PSIKOLOGI (KANDIDAT_ID, MULAI_PADA, DIKUMPULKAN_PADA, NILAI, TES_PSIKOLOGI_ID) VALUES (:candidate_id, TO_TIMESTAMP(:started_at, \'YYYY-MM-DD HH24:MI:SS\'), CURRENT_TIMESTAMP, :score, :test_id) RETURNING HASIL_TES_PSIKOLOGI INTO :result_id'
                         );
                         $result_id = 0;
                         $insert->bindValue( ':candidate_id', $candidate_id, PDO::PARAM_INT );

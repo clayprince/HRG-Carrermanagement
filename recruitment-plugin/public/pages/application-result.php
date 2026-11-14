@@ -1,4 +1,5 @@
 <?php
+nocache_headers();
 $applicant = recruitment_get_current_applicant();
 $application_id = isset( $_GET['application_id'] ) && is_scalar( $_GET['application_id'] )
     ? sanitize_text_field( wp_unslash( (string) $_GET['application_id'] ) )
@@ -14,19 +15,45 @@ $database_error = $database->has_error();
 $timeline_latest = $timeline ? $timeline[ count( $timeline ) - 1 ] : [];
 $timeline_previous = 1 < count( $timeline ) ? $timeline[ count( $timeline ) - 2 ] : null;
 $stage_announcement = $timeline_latest ? recruitment_get_application_stage_announcement( $timeline_latest, $timeline_previous ) : null;
+$result_event_key = $timeline_latest && is_array( $stage_announcement )
+    ? recruitment_application_result_event_key( $timeline_latest )
+    : '';
+$requested_result_event_key = isset( $_GET['result_event'] ) && is_scalar( $_GET['result_event'] )
+    ? strtolower( sanitize_text_field( wp_unslash( (string) $_GET['result_event'] ) ) )
+    : '';
+$show_result_requested = isset( $_GET['show_result'] )
+    && is_scalar( $_GET['show_result'] )
+    && '1' === sanitize_text_field( wp_unslash( (string) $_GET['show_result'] ) )
+    && '' !== $result_event_key
+    && hash_equals( $result_event_key, $requested_result_event_key );
+$result_already_viewed = $application && $applicant && '' !== $result_event_key
+    && recruitment_has_viewed_application_result( (string) $applicant['id'], (string) $application['id'], $result_event_key );
 $is_final = is_array( $stage_announcement ) && ! empty( $stage_announcement['is_final'] );
 $is_accepted = $is_final && 'passed' === $stage_announcement['outcome'];
 $tracking_url = recruitment_get_public_url(
     'application-process',
     $application
         ? ( ! empty( $application['token'] )
-            ? [ 'token' => $application['token'], 'result_viewed' => '1' ]
-            : [ 'application_id' => $application['id'], 'result_viewed' => '1' ] )
+            ? [ 'token' => $application['token'] ]
+            : [ 'application_id' => $application['id'] ] )
         : []
 );
 $applied_at = $application ? strtotime( (string) ( $application['created_at'] ?? '' ) ) : false;
 
-$is_announcement = ( ! $database_error && $application && ( $is_final || is_array( $stage_announcement ) ) );
+$has_current_announcement = ! $database_error && $application && ( $is_final || is_array( $stage_announcement ) );
+if ( $has_current_announcement && ( ! $show_result_requested || $result_already_viewed ) ) {
+    wp_safe_redirect( $tracking_url );
+    exit;
+}
+$is_announcement = $has_current_announcement && $show_result_requested;
+if ( $is_announcement && ! recruitment_mark_application_result_viewed( (string) $applicant['id'], (string) $application['id'], $result_event_key ) ) {
+    if ( recruitment_has_viewed_application_result( (string) $applicant['id'], (string) $application['id'], $result_event_key ) ) {
+        wp_safe_redirect( $tracking_url );
+        exit;
+    }
+
+    wp_die( esc_html__( 'Hasil seleksi belum dapat ditampilkan. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+}
 $announcement_eyebrow = '';
 $announcement_passed = false;
 $announcement_badge = '';
@@ -107,7 +134,7 @@ if ( $is_announcement ) {
                     <p class="daw-application-result__encouragement"><?= esc_html( $announcement_enc ) ?></p>
                     <?php if ( 'psychotest-preparation' === $next_action_type ) : ?>
                         <div style="margin-top: 18px;">
-                            <a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'application-process', [ 'application_id' => (string) $application['id'], 'show_psychotest_info' => '1', 'result_viewed' => '1' ] ) ) ?>">Lihat Informasi Psikotes</a>
+                            <a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'application-process', [ 'application_id' => (string) $application['id'], 'show_psychotest_info' => '1' ] ) ) ?>">Lihat Informasi Psikotes</a>
                         </div>
                     <?php elseif ( 'interview-booking' === $next_action_type ) : ?>
                         <div style="margin-top: 18px;">

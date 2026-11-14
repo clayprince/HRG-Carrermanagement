@@ -1,4 +1,5 @@
 <?php
+nocache_headers();
 $preview = recruitment_is_ui_preview();
 $applicant = $preview ? null : recruitment_get_current_applicant();
 $database = new Recruitment_Database();
@@ -49,9 +50,11 @@ if (
     $interview_booking_type = '';
 }
 $interview_booking_title = 'HR' === $interview_booking_type ? 'Wawancara HR' : 'Wawancara User';
-$result_viewed = isset( $_GET['result_viewed'] )
-    && is_scalar( $_GET['result_viewed'] )
-    && '1' === sanitize_text_field( wp_unslash( (string) $_GET['result_viewed'] ) );
+$result_event_key = $timeline_latest && is_array( $stage_announcement )
+    ? recruitment_application_result_event_key( $timeline_latest )
+    : '';
+$result_viewed = $selected_application && $applicant && '' !== $result_event_key
+    && recruitment_has_viewed_application_result( (string) $applicant['id'], $selected_application_id, $result_event_key );
 $reopen_psychotest_info = isset( $_GET['show_psychotest_info'] )
     && is_scalar( $_GET['show_psychotest_info'] )
     && '1' === sanitize_text_field( wp_unslash( (string) $_GET['show_psychotest_info'] ) );
@@ -325,7 +328,9 @@ $attendance_messages = [
                     <span>Tahap saat ini<strong><?= esc_html( $timeline ? ( $tracking_stage_labels[ strtoupper( trim( (string) $timeline[ count( $timeline ) - 1 ]['stage'] ) ) ] ?? $timeline[ count( $timeline ) - 1 ]['stage'] ) : 'Belum ada riwayat tahap' ) ?></strong></span>
                 </div>
                 <?php if ( $is_final_application ) : ?>
-                    <a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'application-result', [ 'application_id' => $selected_application_id ] ) ) ?>">Lihat Hasil</a>
+                    <?php if ( ! $result_viewed ) : ?>
+                        <a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'application-result', [ 'application_id' => $selected_application_id, 'show_result' => '1', 'result_event' => $result_event_key ] ) ) ?>">Lihat Hasil</a>
+                    <?php endif; ?>
                 <?php endif; ?>
             </section>
             <?php if ( $is_final_application ) : ?><p class="daw-account__readonly"><span aria-hidden="true">&#128274;</span> Keputusan akhir telah ditetapkan. Tracking dan riwayat tetap dapat dilihat, tetapi lamaran tidak dapat diedit.</p><?php endif; ?>
@@ -390,7 +395,7 @@ $attendance_messages = [
                             <?php if ( '' !== trim( $event_note ) ) : ?><p><?= esc_html( $event_note ) ?></p><?php endif; ?>
                             <?php if ( $is_latest_event && 'current' === $event_state ) : ?>
                                 <?php if ( is_array( $stage_announcement ) && ! $reopen_psychotest_info && ! $result_viewed ) : ?>
-                                    <a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'application-result', [ 'application_id' => $selected_application_id ] ) ) ?>">Lanjut</a>
+                                    <a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'application-result', [ 'application_id' => $selected_application_id, 'show_result' => '1', 'result_event' => $result_event_key ] ) ) ?>">Lanjut</a>
                                 <?php elseif ( $is_psychotest_stage ) : ?>
                                     <button class="daw-recruitment__button daw-psychotest-info__trigger" type="button" data-open-psychotest-info>Lihat Informasi Psikotes</button>
                                 <?php elseif ( '' !== $interview_booking_type ) : ?>
@@ -431,15 +436,14 @@ $attendance_messages = [
                     <?php if ( '' !== trim( (string) $psychotest_settings['instructions'] ) ) : ?><div class="daw-psychotest-info__instructions"><strong>Informasi tambahan dari HR</strong><p><?= nl2br( esc_html( (string) $psychotest_settings['instructions'] ) ) ?></p></div><?php endif; ?>
                     <?php if ( 'inactive' === $psychotest_settings['status'] ) : ?><p class="daw-psychotest-info__notice">Tes sedang dinonaktifkan. Silakan menunggu informasi lanjutan dari HR.</p><?php endif; ?>
                     <?php if ( 'online' === $psychotest_mode && $psychotest_online_window_open ) : ?>
-                        <?php if ( '' !== $psychotest_preparation_test && ( ! is_array( $stage_announcement ) || 'psychotest-preparation' !== $stage_announcement['next_page'] ) ) : ?>
-                            <div class="daw-psychotest-info__actions">
+                        <div class="daw-psychotest-info__actions">
+                            <a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'psychotest', [ 'application_id' => $selected_application_id ] ) ) ?>">Beranda Psikotes</a>
+                            <?php if ( '' !== $psychotest_preparation_test ) : ?>
                                 <a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'psychotest-preparation', [ 'test' => $psychotest_preparation_test, 'application_id' => $selected_application_id ] ) ) ?>">Mulai Persiapan Tes Psikotes</a>
-                            </div>
-                        <?php elseif ( '' !== $psychotest_preparation_test && ! $reopen_psychotest_info ) : ?>
-                            <p class="daw-psychotest-info__notice">Lanjutkan ke persiapan tes melalui tombol Lanjut pada pengumuman tahap seleksi.</p>
-                        <?php else : ?>
-                            <p class="daw-psychotest-info__notice">Semua tes yang aktif telah diselesaikan, atau belum ada tes online aktif yang dapat dimulai.</p>
-                        <?php endif; ?>
+                            <?php else : ?>
+                                <p class="daw-psychotest-info__notice">Semua tes yang aktif telah diselesaikan, atau belum ada tes online aktif yang dapat dimulai.</p>
+                            <?php endif; ?>
+                        </div>
                         <?php if ( is_array( $psychotest_attendance ) && ! empty( $psychotest_attendance['confirmed'] ) ) :
                             $confirmed_at = (string) ( $psychotest_attendance['confirmed_at'] ?? '' );
                             $confirmed_datetime = '' !== $confirmed_at

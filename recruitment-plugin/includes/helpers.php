@@ -406,6 +406,44 @@ function recruitment_get_application_stage_announcement( array $event, ?array $p
     ];
 }
 
+function recruitment_application_result_event_key( array $event ): string {
+    $event_values = array_map(
+        static fn ( string $field ): string => (string) ( $event[ $field ] ?? '' ),
+        [ 'stage', 'status', 'changed_at', 'note' ]
+    );
+
+    return hash( 'sha256', implode( "\0", $event_values ) );
+}
+
+function recruitment_application_result_viewed_option_name( string $candidate_id, string $application_id, string $event_key ): ?string {
+    if (
+        ! ctype_digit( $candidate_id )
+        || '0' === $candidate_id
+        || ! ctype_digit( $application_id )
+        || '0' === $application_id
+        || ! preg_match( '/^[a-f0-9]{64}$/', $event_key )
+    ) {
+        return null;
+    }
+
+    return 'daw_result_viewed_' . substr( hash( 'sha256', $candidate_id . "\0" . $application_id . "\0" . $event_key ), 0, 40 );
+}
+
+function recruitment_has_viewed_application_result( string $candidate_id, string $application_id, string $event_key ): bool {
+    $option_name = recruitment_application_result_viewed_option_name( $candidate_id, $application_id, $event_key );
+
+    return null !== $option_name && false !== get_option( $option_name, false );
+}
+
+function recruitment_mark_application_result_viewed( string $candidate_id, string $application_id, string $event_key ): bool {
+    $option_name = recruitment_application_result_viewed_option_name( $candidate_id, $application_id, $event_key );
+    if ( null === $option_name ) {
+        return false;
+    }
+
+    return add_option( $option_name, time(), '', false );
+}
+
 /**
  * Check whether any timeline event records a completed User Department interview.
  *
