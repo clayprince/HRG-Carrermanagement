@@ -1,19 +1,27 @@
 <?php
-$back_url = recruitment_get_public_url( 'psychotest' );
-$test_key = sanitize_key( wp_unslash( $_GET['test'] ?? 'iq' ) );
-$test_key = in_array( $test_key, [ 'iq', 'pauli', 'disc', 'papi' ], true ) ? $test_key : 'iq';
 $requested_application_id = isset( $_GET['application_id'] ) && is_scalar( $_GET['application_id'] )
     ? absint( wp_unslash( (string) $_GET['application_id'] ) )
     : 0;
-$stage_status = recruitment_applicant_psychotest_stage_status(
-    $requested_application_id > 0 ? (string) $requested_application_id : null
-);
+if ( $requested_application_id < 1 ) {
+    wp_die( esc_html__( 'Pilih lamaran psikotes yang aktif sebelum memulai persiapan.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+}
+$stage_status = recruitment_applicant_psychotest_stage_status( (string) $requested_application_id );
 if ( null === $stage_status ) {
     wp_die( esc_html__( 'Status lamaran tidak dapat diverifikasi. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
 }
 if ( ! $stage_status ) {
-    wp_die( esc_html__( 'Halaman persiapan tes hanya tersedia untuk pelamar yang sedang berada pada tahap psikotes.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+    wp_die( esc_html__( 'Persiapan hanya tersedia untuk lamaran yang sedang berada pada tahap psikotes.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
 }
+$proctoring = new Recruitment_Psychotest_Proctoring();
+if ( $proctoring->has_current_consent( $requested_application_id ) ) {
+    wp_safe_redirect( recruitment_get_public_url( 'psychotest', [ 'application_id' => $requested_application_id ] ) );
+    exit;
+}
+if ( $proctoring->get_current_session_error() ) {
+    wp_die( esc_html__( 'Status persiapan tidak dapat dibaca dari Oracle. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+}
+$back_url = recruitment_get_public_url( 'psychotest', [ 'application_id' => $requested_application_id ] );
+$test_key = 'iq';
 if ( ! recruitment_is_psychotest_test_enabled( $test_key ) ) {
     wp_die( esc_html__( 'Tes ini belum dibuka, sudah ditutup, atau tidak diaktifkan oleh HR.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
 }
@@ -22,17 +30,14 @@ $test_settings = (array) get_option( 'recruitment_psychotest_tests', [] );
 $camera_required = isset( $test_settings[ $test_key ]['camera_required'] )
     ? ! empty( $test_settings[ $test_key ]['camera_required'] )
     : ! empty( $global_settings['camera_required'] ?? true );
-$device_arguments = [ 'test' => $test_key ];
-if ( $requested_application_id > 0 ) {
-    $device_arguments['application_id'] = $requested_application_id;
-}
+$device_arguments = [ 'test' => $test_key, 'application_id' => $requested_application_id ];
 $device_url = recruitment_get_public_url( 'psychotest-device', $device_arguments );
 ?>
 <div class="daw-recruitment daw-recruitment--psychotest-preparation">
     <?php require recruitment_get_plugin_path( 'public/components/header.php' ); ?>
     <main class="daw-recruitment__psychotest-main">
         <div class="daw-recruitment__psychotest-shell daw-recruitment__psychotest-shell--narrow">
-            <a class="daw-recruitment__back-link" href="<?= esc_url( $back_url ) ?>">&larr; Kembali ke Daftar Tes</a>
+            <a class="daw-recruitment__back-link" href="<?= esc_url( $back_url ) ?>">&larr; Kembali ke Beranda Psikotes</a>
 
             <div class="daw-recruitment__psychotest-stepper" aria-label="Tahap persiapan psikotes">
                 <div class="daw-recruitment__psychotest-step is-active">
@@ -59,8 +64,8 @@ $device_url = recruitment_get_public_url( 'psychotest-device', $device_arguments
 
             <div class="daw-recruitment__psychotest-prep-card">
                 <div class="daw-recruitment__prepare-intro">
-                    <h1>Persiapan Tes <?= esc_html( strtoupper( 'papi' === $test_key ? 'PAPI Kostick' : $test_key ) ) ?></h1>
-                    <p>Baca dan penuhi seluruh persyaratan di bawah ini agar proses assessment berjalan lancar, konsisten, dan sesuai jadwal.</p>
+                    <h1>Persiapan Assesment</h1>
+                    <p>Lengkapi persiapan ini satu kali sebelum memulai rangkaian tes psikotes.</p>
                 </div>
 
                 <div class="daw-recruitment__prepare-section">
@@ -127,7 +132,7 @@ $device_url = recruitment_get_public_url( 'psychotest-device', $device_arguments
 
                 <div class="daw-recruitment__prepare-actions">
                     <a class="daw-recruitment__button daw-recruitment__button--full" href="<?= esc_url( $device_url ) ?>">Saya Siap — Periksa Perangkat &rarr;</a>
-                    <p>Anda akan diarahkan ke pemeriksaan perangkat, kamera, dan halaman persetujuan sebelum tes dimulai.</p>
+                    <p>Setelah persiapan dan verifikasi identitas selesai, Anda dapat memulai Tes IQ.</p>
                 </div>
             </div>
         </div>

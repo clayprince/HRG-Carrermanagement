@@ -698,6 +698,135 @@ function recruitment_assessment_state_matches_candidate( $state, int $candidate_
         && (int) ( $state['candidate_id'] ?? 0 ) === $candidate_id;
 }
 
+function recruitment_is_iq_assessment_complete_for_application( int $candidate_id, int $application_id ): bool {
+    if ( $candidate_id < 1 || $application_id < 1 ) {
+        return false;
+    }
+
+    $state = get_option(
+        recruitment_assessment_option_name( $candidate_id, 'recruitment_iq_assessment' ),
+        null
+    );
+    return recruitment_assessment_state_matches_candidate( $state, $candidate_id )
+        && absint( $state['application_id'] ?? 0 ) === $application_id
+        && 'complete' === (string) ( $state['status'] ?? '' );
+}
+
+/**
+ * Get completed test result IDs saved for one candidate/application pair.
+ *
+ * @return array<int, int>
+ */
+function recruitment_get_psychotest_result_ids_for_application( int $candidate_id, int $application_id ): array {
+    if ( $candidate_id < 1 || $application_id < 1 ) {
+        return [];
+    }
+
+    $result_ids = [];
+    $iq_state = get_option(
+        recruitment_assessment_option_name( $candidate_id, 'recruitment_iq_assessment' ),
+        null
+    );
+    if (
+        recruitment_assessment_state_matches_candidate( $iq_state, $candidate_id )
+        && absint( $iq_state['application_id'] ?? 0 ) === $application_id
+    ) {
+        foreach ( (array) ( $iq_state['tests'] ?? [] ) as $test ) {
+            $result_id = absint( is_array( $test ) ? ( $test['result_id'] ?? 0 ) : 0 );
+            if ( $result_id > 0 ) {
+                $result_ids[] = $result_id;
+            }
+        }
+        foreach ( (array) ( $iq_state['results'] ?? [] ) as $result_id ) {
+            $result_id = absint( $result_id );
+            if ( $result_id > 0 ) {
+                $result_ids[] = $result_id;
+            }
+        }
+    }
+
+    $pauli_state = get_option(
+        recruitment_assessment_option_name( $candidate_id, 'recruitment_pauli_assessment' ),
+        null
+    );
+    if (
+        recruitment_assessment_state_matches_candidate( $pauli_state, $candidate_id )
+        && absint( $pauli_state['application_id'] ?? 0 ) === $application_id
+        && 'complete' === (string) ( $pauli_state['status'] ?? '' )
+    ) {
+        $result_id = absint( $pauli_state['result_id'] ?? 0 );
+        if ( $result_id > 0 ) {
+            $result_ids[] = $result_id;
+        }
+    }
+
+    $personality_state = get_option(
+        recruitment_assessment_option_name( $candidate_id, 'recruitment_personality_assessment' ),
+        null
+    );
+    if (
+        recruitment_assessment_state_matches_candidate( $personality_state, $candidate_id )
+        && absint( $personality_state['application_id'] ?? 0 ) === $application_id
+    ) {
+        foreach ( (array) ( $personality_state['tests'] ?? [] ) as $test ) {
+            if ( ! is_array( $test ) || 'complete' !== (string) ( $test['status'] ?? '' ) ) {
+                continue;
+            }
+            $result_id = absint( $test['result_id'] ?? 0 );
+            if ( $result_id > 0 ) {
+                $result_ids[] = $result_id;
+            }
+        }
+    }
+
+    return array_values( array_unique( $result_ids ) );
+}
+
+function recruitment_get_psychotest_application_id(): int {
+    foreach ( [ $_POST['application_id'] ?? null, $_GET['application_id'] ?? null ] as $value ) {
+        if ( is_scalar( $value ) && ctype_digit( (string) $value ) && (int) $value > 0 ) {
+            return (int) $value;
+        }
+    }
+
+    $candidate_id = recruitment_get_assessment_user_id();
+    foreach ( [ 'recruitment_iq_assessment', 'recruitment_pauli_assessment', 'recruitment_personality_assessment' ] as $key ) {
+        $state = recruitment_get_assessment_state( $candidate_id, $key );
+        if (
+            recruitment_assessment_state_matches_candidate( $state, $candidate_id )
+            && ctype_digit( (string) ( $state['application_id'] ?? '' ) )
+            && (int) $state['application_id'] > 0
+        ) {
+            return (int) $state['application_id'];
+        }
+    }
+
+    return 0;
+}
+
+function recruitment_require_psychotest_preparation( int $application_id ): void {
+    if ( $application_id < 1 ) {
+        wp_die( esc_html__( 'Pilih lamaran psikotes yang aktif sebelum memulai tes.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+    }
+
+    $stage_status = recruitment_applicant_psychotest_stage_status( (string) $application_id );
+    if ( null === $stage_status ) {
+        wp_die( esc_html__( 'Status lamaran tidak dapat diverifikasi. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+    }
+    if ( ! $stage_status ) {
+        wp_die( esc_html__( 'Tes psikologi hanya tersedia untuk lamaran yang sedang berada pada tahap psikotes.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+    }
+
+    $proctoring = new Recruitment_Psychotest_Proctoring();
+    if ( $proctoring->has_current_consent( $application_id ) ) {
+        return;
+    }
+    if ( $proctoring->get_current_session_error() ) {
+        wp_die( esc_html__( 'Status persiapan tidak dapat dibaca dari Oracle. Tes belum dapat dimulai.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+    }
+    wp_die( esc_html__( 'Selesaikan Persiapan Assesment dari beranda psikotes sebelum memulai tes.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+}
+
 /**
  * Persist assessment progress without changing the applicant's isolated login cookie.
  *
@@ -738,31 +867,31 @@ function recruitment_assessment_option_name( int $user_id, string $key ): string
     return 'daw_assessment_' . $user_id . '_' . substr( hash( 'sha256', $key ), 0, 20 );
 }
 
-function recruitment_psychotest_consent_key( string $test_key ): string {
+function recruitment_psychotest_consent_key( string $test_key, int $application_id = 0 ): string {
     $user_id = recruitment_get_assessment_user_id();
     $applicant = recruitment_get_current_applicant();
     $session_id = is_array( $applicant )
         ? (string) ( $applicant['session_token'] ?? '' )
         : (string) ( function_exists( 'wp_get_session_token' ) ? wp_get_session_token() : '' );
-    return 'daw_psychotest_consent_' . hash( 'sha256', $session_id . ':' . $user_id . ':' . $test_key );
+    return 'daw_psychotest_consent_' . hash( 'sha256', $session_id . ':' . $user_id . ':' . $application_id . ':' . $test_key );
 }
 
-function recruitment_grant_psychotest_consent( string $test_key ): bool {
+function recruitment_grant_psychotest_consent( string $test_key, int $application_id = 0 ): bool {
     if ( recruitment_get_assessment_user_id() < 1 ) {
         return false;
     }
-    $consent_key = recruitment_psychotest_consent_key( $test_key );
+    $consent_key = recruitment_psychotest_consent_key( $test_key, $application_id );
     return set_transient( $consent_key, true, 10 * MINUTE_IN_SECONDS )
         || true === get_transient( $consent_key );
 }
 
-function recruitment_consume_psychotest_consent( string $test_key ): bool {
-    $consent_key = recruitment_psychotest_consent_key( $test_key );
+function recruitment_consume_psychotest_consent( string $test_key, int $application_id = 0 ): bool {
+    $consent_key = recruitment_psychotest_consent_key( $test_key, $application_id );
     if ( get_transient( $consent_key ) ) {
         delete_transient( $consent_key );
         return true;
     }
-    return ( new Recruitment_Psychotest_Proctoring() )->has_current_consent();
+    return ( new Recruitment_Psychotest_Proctoring() )->has_current_consent( $application_id > 0 ? $application_id : null );
 }
 
 /**

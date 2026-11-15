@@ -36,14 +36,26 @@ class Recruitment_Personality_Assessment {
         }
         if ( '1' === sanitize_text_field( wp_unslash( $_GET['start'] ?? '' ) ) ) {
             $state = recruitment_get_assessment_state( $user_id, self::USER_META_KEY );
+            $application_id = recruitment_get_psychotest_application_id();
+            if ( $this->is_valid_state( $state, $candidate_id )
+                && absint( $state['application_id'] ?? 0 ) > 0
+                && absint( $state['application_id'] ) !== $application_id ) {
+                wp_die( esc_html__( 'Sesi tes kepribadian ini terhubung ke lamaran lain.', 'recruitment-plugin' ), '', [ 'response' => 409 ] );
+            }
             $test_already_started = is_array( $state )
                 && (int) ( $state['candidate_id'] ?? 0 ) === $candidate_id
                 && in_array( $state['tests'][ $test_key ]['status'] ?? '', [ 'active', 'complete' ], true );
+            if ( $test_already_started && absint( $state['application_id'] ?? 0 ) > 0 && absint( $state['application_id'] ) !== $application_id ) {
+                wp_die( esc_html__( 'Sesi tes kepribadian ini terhubung ke lamaran lain.', 'recruitment-plugin' ), '', [ 'response' => 409 ] );
+            }
             if ( ! $test_already_started && ! recruitment_is_psychotest_test_enabled( $test_key ) ) {
                 wp_die( esc_html__( 'Tes kepribadian sedang tidak tersedia untuk sesi online. Silakan periksa jadwal dengan tim HR.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
             }
-            $this->start_test( $user_id, $candidate_id, $test_key );
-            wp_safe_redirect( recruitment_get_public_url( 'psych-personality', [ 'test' => $test_key ] ) );
+            if ( ! $test_already_started ) {
+                recruitment_require_psychotest_preparation( $application_id );
+            }
+            $this->start_test( $user_id, $candidate_id, $test_key, $application_id );
+            wp_safe_redirect( recruitment_get_public_url( 'psych-personality', [ 'test' => $test_key, 'application_id' => $application_id ] ) );
             exit;
         }
     }
@@ -184,11 +196,11 @@ class Recruitment_Personality_Assessment {
             && is_array( $state['tests']['papi'] );
     }
 
-    private function start_test( int $user_id, int $candidate_id, string $test_key ): void {
+    private function start_test( int $user_id, int $candidate_id, string $test_key, int $application_id ): void {
         $state = recruitment_get_assessment_state( $user_id, self::USER_META_KEY );
         $test_already_started = $this->is_valid_state( $state, $candidate_id )
             && in_array( $state['tests'][ $test_key ]['status'] ?? '', [ 'active', 'complete' ], true );
-        if ( ! $test_already_started && ! recruitment_consume_psychotest_consent( $test_key ) ) {
+        if ( ! $test_already_started && ! recruitment_consume_psychotest_consent( $test_key, $application_id ) ) {
             wp_die( esc_html__( 'Berikan persetujuan tes terlebih dahulu.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
         }
         if ( ! $this->is_valid_state( $state, $candidate_id ) ) {
@@ -206,6 +218,7 @@ class Recruitment_Personality_Assessment {
             $state = [
                 'version' => 1,
                 'candidate_id' => $candidate_id,
+                'application_id' => $application_id,
                 'active_test' => '',
                 'tests' => [],
             ];
@@ -222,6 +235,8 @@ class Recruitment_Personality_Assessment {
                     'result_id' => 0,
                 ];
             }
+        } elseif ( empty( $state['application_id'] ) ) {
+            $state['application_id'] = $application_id;
         }
 
         $test_state = $state['tests'][ $test_key ];

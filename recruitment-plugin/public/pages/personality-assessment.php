@@ -3,9 +3,9 @@ $test_key = in_array( sanitize_key( wp_unslash( $_GET['test'] ?? 'disc' ) ), [ '
     ? sanitize_key( wp_unslash( $_GET['test'] ?? 'disc' ) )
     : 'disc';
 $view = ( new Recruitment_Personality_Assessment() )->get_page_view();
-$psychotest_home_url = recruitment_get_public_url( 'psychotest' );
-$preparation_url = recruitment_get_public_url( 'psychotest-preparation', [ 'test' => $test_key ] );
-$next_preparation_url = recruitment_get_public_url( 'psychotest-preparation', [ 'test' => 'papi' ] );
+$application_id = recruitment_get_psychotest_application_id();
+$psychotest_home_args = $application_id > 0 ? [ 'application_id' => $application_id ] : [];
+$psychotest_home_url = recruitment_get_public_url( 'psychotest', $psychotest_home_args );
 $test_ready = ! empty( $view['ready'] ) && empty( $view['error'] );
 $questions = (array) ( $view['questions'] ?? [] );
 $question_count = count( $questions );
@@ -52,7 +52,7 @@ foreach ( $questions as $question_index => $question ) {
                     <h1>Tes <?= esc_html( $view['title'] ) ?> selesai</h1>
                     <p>Jawaban Anda sudah disimpan. Tes ini tidak dibatasi waktu; standar waktu hanya menjadi pengingat.</p>
                     <?php if ( 'disc' === $test_key ) : ?>
-                        <a class="daw-psych-test-button" href="<?= esc_url( $next_preparation_url ) ?>">Lanjut ke PAPI Kostick</a>
+                        <a class="daw-psych-test-button" href="<?= esc_url( $psychotest_home_url ) ?>">Lanjut ke PAPI Kostick</a>
                     <?php else : ?>
                         <p>Seluruh tes dalam kelompok Kepribadian telah selesai.</p>
                         <a class="daw-psych-test-button" href="<?= esc_url( $psychotest_home_url ) ?>">Kembali ke daftar tes</a>
@@ -147,7 +147,7 @@ foreach ( $questions as $question_index => $question ) {
                             </nav>
                         </section>
                     </div>
-                    <?php require recruitment_get_plugin_path( 'public/components/psychotest-camera-placeholder.php' ); ?>
+                    <?php require recruitment_get_plugin_path( 'public/components/psychotest-proctoring-watch.php' ); ?>
                 </div>
             <?php endif; ?>
         </div>

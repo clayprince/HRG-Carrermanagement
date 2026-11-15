@@ -32,13 +32,18 @@ class Recruitment_IQ_Assessment {
         }
 
         if ( '1' === sanitize_text_field( wp_unslash( $_GET['start'] ?? '' ) ) ) {
+            $application_id = recruitment_get_psychotest_application_id();
             if ( ! is_array( $state ) || empty( $state['status'] ) ) {
                 if ( ! recruitment_is_psychotest_test_enabled( 'iq' ) ) {
                     wp_die( esc_html__( 'Tes IQ sedang tidak tersedia untuk sesi online. Silakan periksa jadwal dengan tim HR.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
                 }
-                $this->start_session( $user_id, $candidate_id );
+                recruitment_require_psychotest_preparation( $application_id );
+                $this->start_session( $user_id, $candidate_id, $application_id );
+            } elseif ( absint( $state['application_id'] ?? 0 ) > 0 && absint( $state['application_id'] ) !== $application_id ) {
+                wp_die( esc_html__( 'Sesi Tes IQ ini terhubung ke lamaran lain.', 'recruitment-plugin' ), '', [ 'response' => 409 ] );
             }
-            wp_safe_redirect( recruitment_get_public_url( 'psych-iq' ) );
+            $arguments = $application_id > 0 ? [ 'application_id' => $application_id ] : [];
+            wp_safe_redirect( recruitment_get_public_url( 'psych-iq', $arguments ) );
             exit;
         }
 
@@ -177,7 +182,7 @@ class Recruitment_IQ_Assessment {
         return recruitment_get_assessment_user_id();
     }
 
-    private function start_session( int $user_id, int $candidate_id ): void {
+    private function start_session( int $user_id, int $candidate_id, int $application_id ): void {
         $global_settings = (array) get_option( 'recruitment_psychotest_settings', [] );
         $test_settings = (array) get_option( 'recruitment_psychotest_tests', [] );
         if ( isset( $global_settings['status'] ) && 'active' !== $global_settings['status'] ) {
@@ -230,7 +235,7 @@ class Recruitment_IQ_Assessment {
         $now = time();
         $tests[0]['started_at'] = $now;
         $tests[0]['deadline'] = $now + ( $tests[0]['duration'] * MINUTE_IN_SECONDS );
-        if ( ! recruitment_consume_psychotest_consent( 'iq' ) ) {
+        if ( ! recruitment_consume_psychotest_consent( 'iq', $application_id ) ) {
             wp_die( esc_html__( 'Berikan persetujuan tes terlebih dahulu.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
         }
         recruitment_update_assessment_state(
@@ -239,6 +244,7 @@ class Recruitment_IQ_Assessment {
             [
                 'version' => 1,
                 'candidate_id' => $candidate_id,
+                'application_id' => $application_id,
                 'status' => 'active',
                 'subtest_index' => 0,
                 'tests' => $tests,

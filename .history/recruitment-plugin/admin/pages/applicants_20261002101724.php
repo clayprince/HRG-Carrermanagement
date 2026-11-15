@@ -274,7 +274,6 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
                 <button type="button" class="daw-document-btn" disabled>Download Profil Pelamar</button>
                 <button type="button" class="daw-document-btn daw-document-btn--muted" disabled>Download Laporan Psikotes</button>
             </div>
-            <p class="daw-documents-panel__hint">Dokumen kandidat belum tersedia di sistem saat ini. Tombol akan aktif otomatis setelah file diunggah dan diverifikasi.</p>
         </section>
 
         <section class="daw-applicant-detail-tabs" data-applicant-tabs>

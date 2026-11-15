@@ -21,6 +21,7 @@ class Recruitment_Database {
     private ?bool $interview_booking_table_exists = null;
     private ?bool $interview_schedule_interviewer_column_exists = null;
     private ?bool $psychotest_candidate_score_columns_exist = null;
+    private ?array $proctoring_report_columns = null;
 
     /**
      * @param array<string, string> $config Optional configuration overrides.
@@ -513,6 +514,7 @@ class Recruitment_Database {
         if ( ! ctype_digit( $login_id ) || '0' === $login_id || ! ctype_digit( $application_id ) || '0' === $application_id ) {
             return null;
         }
+        $this->last_error = null;
         try {
             $statement = $this->get_connection()->prepare(
                 'SELECT c.attendance_confirmed AS "confirmed", TO_CHAR(c.confirmed_at, \'YYYY-MM-DD HH24:MI:SS\') AS "confirmed_at", CASE WHEN c.email_reminder_sent_at IS NULL THEN \'N\' ELSE \'Y\' END AS "reminder_sent" FROM HRS_KONFIRMASI_PSIKOTES c JOIN HRS_LAMARAN l ON l.lamaran_id = c.lamaran_id WHERE l.profile_kandidat_id = :login_id AND l.lamaran_id = :application_id'
@@ -4731,8 +4733,19 @@ class Recruitment_Database {
         return [ 'success' => true, 'responses' => $responses, 'result' => $result ];
     }
 
-    public function create_proctoring_session( int $candidate_id, string $session_id ): bool {
+    public function create_proctoring_session(
+        int $candidate_id,
+        string $session_id,
+        ?int $application_id = null,
+        string $consent_version = 'proctoring-v1'
+    ): bool {
         if ( $candidate_id < 1 || ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id ) ) {
+            return false;
+        }
+        if ( null !== $application_id && $application_id < 1 ) {
+            return false;
+        }
+        if ( ! preg_match( '/\Aproctoring-v[1-9][0-9]*\z/', $consent_version ) ) {
             return false;
         }
 
@@ -4740,27 +4753,28 @@ class Recruitment_Database {
         try {
             $statement = $this->get_connection()->prepare(
                 'MERGE INTO HRS_PSY_PROCTOR_SESSIONS target
-                 USING (SELECT :session_id AS session_id FROM DUAL) source
+                 USING (SELECT :session_id AS session_id, :candidate_id AS candidate_id,
+                               :application_id AS application_id FROM DUAL) source
                  ON (target.SESSION_ID = source.session_id)
                  WHEN MATCHED THEN UPDATE SET target.CONSENT_VERSION = :matched_consent_version,
+                     target.APPLICATION_ID = source.application_id,
                      target.CONSENT_AT = CURRENT_TIMESTAMP,
                      target.RETENTION_UNTIL = CASE
                          WHEN target.COMPLETED_AT IS NOT NULL THEN target.RETENTION_UNTIL
                          ELSE GREATEST(target.RETENTION_UNTIL, ADD_MONTHS(CURRENT_TIMESTAMP, 12))
                      END,
                      target.UPDATED_AT = CURRENT_TIMESTAMP
-                     WHERE target.KANDIDAT_ID = :candidate_id AND target.RETENTION_UNTIL > CURRENT_TIMESTAMP
-                 WHEN NOT MATCHED THEN INSERT (SESSION_ID, KANDIDAT_ID, CONSENT_VERSION, IDENTITY_STATUS, CREATED_AT, RETENTION_UNTIL, UPDATED_AT)
-                     VALUES (:insert_session_id, :insert_candidate_id, :insert_consent_version, \'PENDING\', CURRENT_TIMESTAMP, ADD_MONTHS(CURRENT_TIMESTAMP, 12), CURRENT_TIMESTAMP)'
+                     WHERE target.KANDIDAT_ID = source.candidate_id AND target.RETENTION_UNTIL > CURRENT_TIMESTAMP
+                 WHEN NOT MATCHED THEN INSERT (SESSION_ID, KANDIDAT_ID, APPLICATION_ID, CONSENT_VERSION, IDENTITY_STATUS, CREATED_AT, RETENTION_UNTIL, UPDATED_AT)
+                     VALUES (source.session_id, source.candidate_id, source.application_id, :insert_consent_version, \'PENDING\', CURRENT_TIMESTAMP, ADD_MONTHS(CURRENT_TIMESTAMP, 12), CURRENT_TIMESTAMP)'
             );
             $statement->execute(
                 [
                     'session_id' => $session_id,
                     'candidate_id' => $candidate_id,
-                    'matched_consent_version' => 'proctoring-v1',
-                    'insert_session_id' => $session_id,
-                    'insert_candidate_id' => $candidate_id,
-                    'insert_consent_version' => 'proctoring-v1',
+                    'application_id' => $application_id,
+                    'matched_consent_version' => $consent_version,
+                    'insert_consent_version' => $consent_version,
                 ]
             );
             $rows = $this->fetch_all(
@@ -4783,7 +4797,8 @@ class Recruitment_Database {
         }
         $this->last_error = null;
         $rows = $this->fetch_all(
-            'SELECT SESSION_ID AS "session_id", KANDIDAT_ID AS "candidate_id", IDENTITY_STATUS AS "identity_status",
+            'SELECT SESSION_ID AS "session_id", KANDIDAT_ID AS "candidate_id", APPLICATION_ID AS "application_id",
+                    CONSENT_VERSION AS "consent_version", IDENTITY_STATUS AS "identity_status",
                     TO_CHAR(CONSENT_AT, \'YYYY-MM-DD HH24:MI:SS\') AS "consent_at",
                     TO_CHAR(RETENTION_UNTIL, \'YYYY-MM-DD HH24:MI:SS\') AS "retention_until"
              FROM HRS_PSY_PROCTOR_SESSIONS
@@ -4794,10 +4809,19 @@ class Recruitment_Database {
         return $rows[0] ?? null;
     }
 
-    public function save_proctoring_identity( int $candidate_id, string $session_id, ?string $file_key, bool $manual_review ): bool {
+    public function save_proctoring_identity(
+        int $candidate_id,
+        string $session_id,
+        ?string $file_key,
+        bool $manual_review,
+        ?string $client_ip = null,
+        ?string $client_user_agent = null
+    ): bool {
         if ( $candidate_id < 1 || ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id )
             || ( null !== $file_key && ! preg_match( '/\A[a-f0-9]{32}\.jpg\z/', $file_key ) )
-            || ( null === $file_key && ! $manual_review ) ) {
+            || ( null === $file_key && ! $manual_review )
+            || ( null !== $client_ip && false === filter_var( $client_ip, FILTER_VALIDATE_IP ) )
+            || ( null !== $client_user_agent && strlen( $client_user_agent ) > 512 ) ) {
             return false;
         }
 
@@ -4816,7 +4840,7 @@ class Recruitment_Database {
             if ( false === $current_status ) {
                 $insert = $connection->prepare(
                     'INSERT INTO HRS_PSY_PROCTOR_SESSIONS (SESSION_ID, KANDIDAT_ID, CONSENT_VERSION, IDENTITY_STATUS, CREATED_AT, RETENTION_UNTIL, UPDATED_AT)
-                     VALUES (:session_id, :candidate_id, \'proctoring-v1\', :identity_status, CURRENT_TIMESTAMP, ADD_MONTHS(CURRENT_TIMESTAMP, 12), CURRENT_TIMESTAMP)'
+                     VALUES (:session_id, :candidate_id, \'proctoring-v2\', :identity_status, CURRENT_TIMESTAMP, ADD_MONTHS(CURRENT_TIMESTAMP, 12), CURRENT_TIMESTAMP)'
                 );
                 $insert->execute(
                     [
@@ -4839,14 +4863,17 @@ class Recruitment_Database {
                 );
             }
             $event = $connection->prepare(
-                'INSERT INTO HRS_PSY_PROCTOR_EVENTS (SESSION_ID, EVENT_TYPE, FILE_KEY, EVENT_AT)
-                 VALUES (:session_id, :event_type, :file_key, CURRENT_TIMESTAMP)'
+                'INSERT INTO HRS_PSY_PROCTOR_EVENTS
+                    (SESSION_ID, EVENT_TYPE, FILE_KEY, ASSESSMENT_STAGE, CLIENT_IP, CLIENT_USER_AGENT, EVENT_AT)
+                 VALUES (:session_id, :event_type, :file_key, \'preparation\', :client_ip, :client_user_agent, CURRENT_TIMESTAMP)'
             );
             $event->execute(
                 [
                     'session_id' => $session_id,
                     'event_type' => $manual_review ? 'MANUAL_IDENTITY' : 'IDENTITY_CAPTURE',
                     'file_key' => $file_key,
+                    'client_ip' => $client_ip,
+                    'client_user_agent' => $client_user_agent,
                 ]
             );
             $connection->commit();
@@ -4861,28 +4888,74 @@ class Recruitment_Database {
     }
 
     /**
-     * Store a signal and, while under the per-session lock, at most five alert images.
+     * Store one unique incident event and its optional private image.
      *
-     * @return array{success: bool, captured: bool}
+     * @param array<string, mixed> $rule
+     * @return array{success: bool, captured: bool, warning_level?: string|null, severity?: string, repeat_count?: int, error?: string}
      */
-    public function save_proctoring_event( int $candidate_id, string $session_id, string $event_type, ?string $file_key ): array {
+    public function save_proctoring_event(
+        int $candidate_id,
+        string $session_id,
+        string $event_type,
+        ?string $file_key,
+        string $assessment_stage,
+        string $event_token,
+        ?string $client_ip = null,
+        ?string $client_user_agent = null,
+        int $detection_duration_ms = 0,
+        ?float $detection_confidence = null,
+        array $rule = []
+    ): array {
         $allowed_types = [
             'TAB_HIDDEN',
+            'TAB_VISIBLE',
             'CAMERA_STOPPED',
             'CAMERA_UNAVAILABLE',
             'FACE_NOT_DETECTED',
             'MULTIPLE_FACES',
+            'FACE_TURNED_AWAY',
             'FACE_DETECTION_UNAVAILABLE',
             'MICROPHONE_AVAILABLE',
             'MICROPHONE_UNAVAILABLE',
         ];
+        $allowed_stages = [ 'iq', 'pauli', 'disc', 'papi' ];
+        $capture_types = [ 'TAB_HIDDEN', 'CAMERA_STOPPED', 'FACE_NOT_DETECTED', 'MULTIPLE_FACES', 'FACE_TURNED_AWAY' ];
+        $violation_types = [ 'CAMERA_STOPPED', 'FACE_NOT_DETECTED', 'MULTIPLE_FACES', 'FACE_TURNED_AWAY' ];
+        $is_violation = in_array( $event_type, $violation_types, true );
         if ( $candidate_id < 1 || ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id )
             || ! in_array( $event_type, $allowed_types, true )
-            || ( null !== $file_key && ! preg_match( '/\A[a-f0-9]{32}\.jpg\z/', $file_key ) ) ) {
+            || ! in_array( $assessment_stage, $allowed_stages, true )
+            || ! preg_match( '/\A[a-f0-9-]{36}\z/', $event_token )
+            || $detection_duration_ms < 0 || 3600000 < $detection_duration_ms
+            || ( null !== $detection_confidence && ( ! is_finite( $detection_confidence ) || 0 > $detection_confidence || 1 < $detection_confidence ) )
+            || ( $is_violation && (
+                $detection_duration_ms < 1
+                || ! isset( $rule['threshold_ms'], $rule['confidence_threshold'], $rule['cooldown_ms'], $rule['repeat_warning_count'], $rule['repeat_warning_window_ms'], $rule['repeat_serious_count'], $rule['repeat_serious_window_ms'], $rule['severity'] )
+                || $detection_duration_ms < absint( $rule['threshold_ms'] )
+                || ( null !== $detection_confidence && $detection_confidence < (float) $rule['confidence_threshold'] )
+            ) )
+            || ( null !== $client_ip && false === filter_var( $client_ip, FILTER_VALIDATE_IP ) )
+            || ( null !== $client_user_agent && strlen( $client_user_agent ) > 512 )
+            || ( null !== $file_key && ( ! preg_match( '/\A[a-f0-9]{32}\.jpg\z/', $file_key )
+                || ! in_array( $event_type, $capture_types, true ) ) ) ) {
             return [ 'success' => false, 'captured' => false ];
         }
 
         $this->last_error = null;
+        $columns = $this->get_proctoring_report_columns();
+        $required_lifecycle_columns = [
+            'detection_duration_ms',
+            'detection_confidence',
+            'severity',
+            'repeat_count',
+            'warning_level',
+            'warning_at',
+            'review_status',
+        ];
+        if ( null === $columns || array_diff( $required_lifecycle_columns, array_keys( array_filter( $columns ) ) ) ) {
+            error_log( 'Recruitment Oracle schema warning: Migration 023 is required before proctoring violation events can be saved.' );
+            return [ 'success' => false, 'captured' => false, 'error' => 'schema_unavailable' ];
+        }
         $connection = null;
         try {
             $connection = $this->get_connection();
@@ -4896,49 +4969,191 @@ class Recruitment_Database {
             if ( false === $lock->fetchColumn() ) {
                 throw new RuntimeException( 'Proctoring session was not found.' );
             }
-            $recent = $connection->prepare(
-                'SELECT COUNT(*) FROM HRS_PSY_PROCTOR_EVENTS
-                 WHERE SESSION_ID = :session_id AND EVENT_TYPE = :event_type
-                   AND EVENT_AT > CURRENT_TIMESTAMP - INTERVAL \'15\' SECOND'
+            $existing_event = $connection->prepare(
+                'SELECT SESSION_ID, FILE_KEY, SEVERITY, REPEAT_COUNT, WARNING_LEVEL
+                 FROM HRS_PSY_PROCTOR_EVENTS
+                 WHERE EVENT_TOKEN = :event_token'
             );
-            $recent->execute( [ 'session_id' => $session_id, 'event_type' => $event_type ] );
-            if ( 0 < (int) $recent->fetchColumn() ) {
+            $existing_event->execute( [ 'event_token' => $event_token ] );
+            $existing = $existing_event->fetch( PDO::FETCH_ASSOC );
+            if ( false !== $existing ) {
                 $connection->commit();
-                return [ 'success' => true, 'captured' => false ];
+                return [
+                    'success' => hash_equals( $session_id, (string) $existing['SESSION_ID'] ),
+                    'captured' => false,
+                    'warning_level' => $existing['WARNING_LEVEL'] ?? null,
+                    'severity' => (string) ( $existing['SEVERITY'] ?? '' ),
+                    'repeat_count' => absint( $existing['REPEAT_COUNT'] ?? 0 ),
+                ];
             }
 
-            $captured = false;
-            $stored_file_key = null;
-            if ( null !== $file_key ) {
-                $count = $connection->prepare(
-                    'SELECT COUNT(*) FROM HRS_PSY_PROCTOR_EVENTS
-                     WHERE SESSION_ID = :session_id AND EVENT_TYPE IN (
-                        \'TAB_HIDDEN\', \'CAMERA_STOPPED\', \'CAMERA_UNAVAILABLE\',
-                        \'FACE_NOT_DETECTED\', \'MULTIPLE_FACES\'
-                     )
-                       AND FILE_KEY IS NOT NULL'
+            $severity = $is_violation && in_array( $rule['severity'], [ 'warning', 'repeated', 'serious' ], true )
+                ? (string) $rule['severity']
+                : '';
+            $repeat_count = $is_violation ? 1 : 0;
+            $warning_level = null;
+            if ( $is_violation ) {
+                $warning_window_seconds = max( 1, (int) ceil( (int) $rule['repeat_warning_window_ms'] / 1000 ) );
+                $serious_window_seconds = max( 1, (int) ceil( (int) $rule['repeat_serious_window_ms'] / 1000 ) );
+                $history = $connection->prepare(
+                    'SELECT
+                        SUM(CASE WHEN EVENT_AT >= CURRENT_TIMESTAMP - NUMTODSINTERVAL(:warning_window, \'SECOND\') THEN 1 ELSE 0 END) AS "warning_count",
+                        SUM(CASE WHEN EVENT_AT >= CURRENT_TIMESTAMP - NUMTODSINTERVAL(:serious_window, \'SECOND\') THEN 1 ELSE 0 END) AS "serious_count"
+                     FROM HRS_PSY_PROCTOR_EVENTS
+                     WHERE SESSION_ID = :session_id AND EVENT_TYPE = :event_type
+                       AND DETECTION_DURATION_MS IS NOT NULL
+                       AND EVENT_AT >= CURRENT_TIMESTAMP - NUMTODSINTERVAL(:max_window, \'SECOND\')'
                 );
-                $count->execute( [ 'session_id' => $session_id ] );
-                if ( 5 > (int) $count->fetchColumn() ) {
-                    $stored_file_key = $file_key;
-                    $captured = true;
+                $history->execute(
+                    [
+                        'warning_window' => $warning_window_seconds,
+                        'serious_window' => $serious_window_seconds,
+                        'session_id' => $session_id,
+                        'event_type' => $event_type,
+                        'max_window' => max( $warning_window_seconds, $serious_window_seconds ),
+                    ]
+                );
+                $counts = $history->fetch( PDO::FETCH_ASSOC ) ?: [];
+                $warning_count = 1 + absint( $counts['warning_count'] ?? 0 );
+                $serious_count = 1 + absint( $counts['serious_count'] ?? 0 );
+                if ( $serious_count >= absint( $rule['repeat_serious_count'] ) ) {
+                    $severity = 'serious';
+                    $repeat_count = $serious_count;
+                } elseif ( $warning_count >= absint( $rule['repeat_warning_count'] ) ) {
+                    if ( 'warning' === $severity ) {
+                        $severity = 'repeated';
+                    }
+                    $repeat_count = $warning_count;
                 }
+
+                $last_warning = $connection->prepare(
+                    'SELECT WARNING_LEVEL,
+                            CASE WHEN WARNING_AT <= CURRENT_TIMESTAMP - NUMTODSINTERVAL(:cooldown_seconds, \'SECOND\')
+                                 THEN 1 ELSE 0 END AS "cooldown_elapsed"
+                     FROM HRS_PSY_PROCTOR_EVENTS
+                     WHERE SESSION_ID = :session_id AND EVENT_TYPE = :event_type
+                       AND WARNING_AT IS NOT NULL AND WARNING_LEVEL IS NOT NULL
+                     ORDER BY WARNING_AT DESC
+                     FETCH FIRST 1 ROWS ONLY'
+                );
+                $last_warning->execute(
+                    [
+                        'cooldown_seconds' => (int) ceil( absint( $rule['cooldown_ms'] ) / 1000 ),
+                        'session_id' => $session_id,
+                        'event_type' => $event_type,
+                    ]
+                );
+                $previous_warning = $last_warning->fetch( PDO::FETCH_ASSOC );
+                $severity_rank = [ 'warning' => 1, 'repeated' => 2, 'serious' => 3 ];
+                $warning_level = false === $previous_warning
+                    || ! empty( $previous_warning['cooldown_elapsed'] )
+                    || ( $severity_rank[ $severity ] ?? 0 ) > ( $severity_rank[ (string) $previous_warning['WARNING_LEVEL'] ] ?? 0 )
+                    ? $severity
+                    : null;
             }
+
+            $captured = null !== $file_key;
             $event = $connection->prepare(
-                'INSERT INTO HRS_PSY_PROCTOR_EVENTS (SESSION_ID, EVENT_TYPE, FILE_KEY, EVENT_AT)
-                 VALUES (:session_id, :event_type, :file_key, CURRENT_TIMESTAMP)'
+                'INSERT INTO HRS_PSY_PROCTOR_EVENTS
+                    (SESSION_ID, EVENT_TYPE, FILE_KEY, ASSESSMENT_STAGE, EVENT_TOKEN, CLIENT_IP, CLIENT_USER_AGENT,
+                     DETECTION_DURATION_MS, DETECTION_CONFIDENCE, SEVERITY, REPEAT_COUNT, WARNING_LEVEL, WARNING_AT,
+                     REVIEW_STATUS, EVENT_AT)
+                 VALUES (:session_id, :event_type, :file_key, :assessment_stage, :event_token, :client_ip, :client_user_agent,
+                         :detection_duration_ms, :detection_confidence, :severity, :repeat_count, :warning_level_value,
+                         CASE WHEN :warning_level_check IS NULL THEN NULL ELSE CURRENT_TIMESTAMP END,
+                         :review_status, CURRENT_TIMESTAMP)'
             );
             $event->execute(
-                [ 'session_id' => $session_id, 'event_type' => $event_type, 'file_key' => $stored_file_key ]
+                [
+                    'session_id' => $session_id,
+                    'event_type' => $event_type,
+                    'file_key' => $file_key,
+                    'assessment_stage' => $assessment_stage,
+                    'event_token' => $event_token,
+                    'client_ip' => $client_ip,
+                    'client_user_agent' => $client_user_agent,
+                    'detection_duration_ms' => $is_violation ? $detection_duration_ms : ( 0 < $detection_duration_ms ? $detection_duration_ms : null ),
+                    'detection_confidence' => $detection_confidence,
+                    'severity' => $is_violation ? $severity : null,
+                    'repeat_count' => $is_violation ? $repeat_count : null,
+                    'warning_level_value' => $warning_level,
+                    'warning_level_check' => $warning_level,
+                    'review_status' => $is_violation ? 'PENDING' : 'NOT_APPLICABLE',
+                ]
             );
             $connection->commit();
-            return [ 'success' => true, 'captured' => $captured ];
+            return [
+                'success' => true,
+                'captured' => $captured,
+                'warning_level' => $warning_level,
+                'severity' => $severity,
+                'repeat_count' => $repeat_count,
+            ];
         } catch ( PDOException | RuntimeException $exception ) {
             if ( $connection instanceof PDO && $connection->inTransaction() ) {
                 $connection->rollBack();
             }
             $this->log_oracle_failure( 'Psychotest proctoring event save failed', $exception );
             return [ 'success' => false, 'captured' => false ];
+        }
+    }
+
+    public function update_proctoring_event_review(
+        int $candidate_id,
+        string $session_id,
+        int $event_id,
+        int $reviewer_user_id,
+        string $review_status,
+        string $review_note
+    ): bool {
+        $note_length = function_exists( 'mb_strlen' ) ? mb_strlen( $review_note, 'UTF-8' ) : strlen( $review_note );
+        if (
+            $candidate_id < 1
+            || $event_id < 1
+            || $reviewer_user_id < 1
+            || ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id )
+            || ! in_array( $review_status, [ 'CONFIRMED', 'DISMISSED' ], true )
+            || 1000 < $note_length
+        ) {
+            return false;
+        }
+
+        $columns = $this->get_proctoring_report_columns();
+        if ( null === $columns || ! $columns['review_status'] || ! $columns['reviewed_by']
+            || ! $columns['reviewed_at'] || ! $columns['review_note'] ) {
+            error_log( 'Recruitment Oracle schema warning: Migration 023 is required before event review can be saved.' );
+            return false;
+        }
+
+        $this->last_error = null;
+        try {
+            $statement = $this->get_connection()->prepare(
+                'UPDATE HRS_PSY_PROCTOR_EVENTS
+                 SET REVIEW_STATUS = :review_status, REVIEWED_BY = :reviewer_user_id,
+                     REVIEWED_AT = CURRENT_TIMESTAMP, REVIEW_NOTE = :review_note
+                 WHERE EVENT_ID = :event_id AND SESSION_ID = :session_id
+                   AND DETECTION_DURATION_MS IS NOT NULL AND REVIEW_STATUS = \'PENDING\'
+                   AND EXISTS (
+                       SELECT 1 FROM HRS_PSY_PROCTOR_SESSIONS s
+                       WHERE s.SESSION_ID = HRS_PSY_PROCTOR_EVENTS.SESSION_ID
+                         AND s.KANDIDAT_ID = :candidate_id
+                         AND s.RETENTION_UNTIL > CURRENT_TIMESTAMP
+                   )'
+            );
+            $statement->execute(
+                [
+                    'review_status' => $review_status,
+                    'reviewer_user_id' => $reviewer_user_id,
+                    'review_note' => '' === $review_note ? null : $review_note,
+                    'event_id' => $event_id,
+                    'session_id' => $session_id,
+                    'candidate_id' => $candidate_id,
+                ]
+            );
+            return 1 === $statement->rowCount();
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_oracle_failure( 'Psychotest proctoring event review failed', $exception );
+            return false;
         }
     }
 
@@ -4974,6 +5189,52 @@ class Recruitment_Database {
             return [ 'sessions' => [], 'events' => [] ];
         }
         $this->last_error = null;
+        $columns = $this->get_proctoring_report_columns();
+        if ( null === $columns ) {
+            return [ 'sessions' => [], 'events' => [] ];
+        }
+        $session_application_id_column = $columns['application_id']
+            ? 'APPLICATION_ID'
+            : 'CAST(NULL AS NUMBER(19,0))';
+        $application_id_column = $columns['application_id']
+            ? 's.APPLICATION_ID'
+            : 'CAST(NULL AS NUMBER(19,0))';
+        $assessment_stage_column = $columns['assessment_stage']
+            ? 'e.ASSESSMENT_STAGE'
+            : 'CAST(NULL AS VARCHAR2(16))';
+        $client_ip_column = $columns['client_ip']
+            ? 'e.CLIENT_IP'
+            : 'CAST(NULL AS VARCHAR2(45))';
+        $client_user_agent_column = $columns['client_user_agent']
+            ? 'e.CLIENT_USER_AGENT'
+            : 'CAST(NULL AS VARCHAR2(512))';
+        $duration_column = $columns['detection_duration_ms']
+            ? 'e.DETECTION_DURATION_MS'
+            : 'CAST(NULL AS NUMBER(10,0))';
+        $confidence_column = $columns['detection_confidence']
+            ? 'e.DETECTION_CONFIDENCE'
+            : 'CAST(NULL AS NUMBER(6,5))';
+        $severity_column = $columns['severity']
+            ? 'e.SEVERITY'
+            : 'CAST(NULL AS VARCHAR2(16))';
+        $repeat_count_column = $columns['repeat_count']
+            ? 'e.REPEAT_COUNT'
+            : 'CAST(NULL AS NUMBER(5,0))';
+        $warning_level_column = $columns['warning_level']
+            ? 'e.WARNING_LEVEL'
+            : 'CAST(NULL AS VARCHAR2(16))';
+        $review_status_column = $columns['review_status']
+            ? 'e.REVIEW_STATUS'
+            : '\'NOT_APPLICABLE\'';
+        $reviewed_by_column = $columns['reviewed_by']
+            ? 'e.REVIEWED_BY'
+            : 'CAST(NULL AS NUMBER(19,0))';
+        $reviewed_at_column = $columns['reviewed_at']
+            ? 'TO_CHAR(e.REVIEWED_AT, \'YYYY-MM-DD HH24:MI:SS\')'
+            : 'CAST(NULL AS VARCHAR2(19))';
+        $review_note_column = $columns['review_note']
+            ? 'e.REVIEW_NOTE'
+            : 'CAST(NULL AS VARCHAR2(1000))';
         $placeholders = [];
         $parameters = [];
         foreach ( $candidate_ids as $index => $candidate_id ) {
@@ -4983,7 +5244,8 @@ class Recruitment_Database {
         }
         $in_clause = implode( ', ', $placeholders );
         $sessions = $this->fetch_all(
-            'SELECT SESSION_ID AS "session_id", KANDIDAT_ID AS "candidate_id", IDENTITY_STATUS AS "identity_status",
+            'SELECT SESSION_ID AS "session_id", KANDIDAT_ID AS "candidate_id",
+                    ' . $session_application_id_column . ' AS "application_id", IDENTITY_STATUS AS "identity_status",
                     TO_CHAR(CREATED_AT, \'YYYY-MM-DD HH24:MI:SS\') AS "created_at",
                     TO_CHAR(COMPLETED_AT, \'YYYY-MM-DD HH24:MI:SS\') AS "completed_at",
                     TO_CHAR(RETENTION_UNTIL, \'YYYY-MM-DD HH24:MI:SS\') AS "retention_until"
@@ -4993,7 +5255,18 @@ class Recruitment_Database {
         );
         $events = $this->fetch_all(
             'SELECT e.EVENT_ID AS "event_id", e.SESSION_ID AS "session_id", s.KANDIDAT_ID AS "candidate_id",
+                    ' . $application_id_column . ' AS "application_id", ' . $assessment_stage_column . ' AS "assessment_stage",
                     e.EVENT_TYPE AS "event_type", e.FILE_KEY AS "file_key",
+                    ' . $duration_column . ' AS "detection_duration_ms",
+                    ' . $confidence_column . ' AS "detection_confidence",
+                    ' . $severity_column . ' AS "severity",
+                    ' . $repeat_count_column . ' AS "repeat_count",
+                    ' . $warning_level_column . ' AS "warning_level",
+                    ' . $review_status_column . ' AS "review_status",
+                    ' . $reviewed_by_column . ' AS "reviewed_by",
+                    ' . $reviewed_at_column . ' AS "reviewed_at",
+                    ' . $review_note_column . ' AS "review_note",
+                    ' . $client_ip_column . ' AS "client_ip", ' . $client_user_agent_column . ' AS "client_user_agent",
                     e.ACTOR_USER_ID AS "actor_user_id", e.TARGET_EVENT_ID AS "target_event_id",
                     TO_CHAR(e.EVENT_AT, \'YYYY-MM-DD HH24:MI:SS\') AS "event_at"
              FROM HRS_PSY_PROCTOR_EVENTS e
@@ -5003,6 +5276,144 @@ class Recruitment_Database {
             $parameters
         );
         return [ 'sessions' => $sessions, 'events' => $events ];
+    }
+
+    /**
+     * @return array{session: array<string, mixed>, events: array<int, array<string, mixed>>}|null
+     */
+    public function get_proctoring_report( int $candidate_id, string $session_id ): ?array {
+        if ( $candidate_id < 1 || ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id ) ) {
+            return null;
+        }
+        $this->last_error = null;
+        $columns = $this->get_proctoring_report_columns();
+        if ( null === $columns ) {
+            return null;
+        }
+        $application_id_column = $columns['application_id']
+            ? 's.APPLICATION_ID'
+            : 'CAST(NULL AS NUMBER(19,0))';
+        $assessment_stage_column = $columns['assessment_stage']
+            ? 'ASSESSMENT_STAGE'
+            : 'CAST(NULL AS VARCHAR2(16))';
+        $client_ip_column = $columns['client_ip']
+            ? 'CLIENT_IP'
+            : 'CAST(NULL AS VARCHAR2(45))';
+        $client_user_agent_column = $columns['client_user_agent']
+            ? 'CLIENT_USER_AGENT'
+            : 'CAST(NULL AS VARCHAR2(512))';
+        $duration_column = $columns['detection_duration_ms']
+            ? 'DETECTION_DURATION_MS'
+            : 'CAST(NULL AS NUMBER(10,0))';
+        $confidence_column = $columns['detection_confidence']
+            ? 'DETECTION_CONFIDENCE'
+            : 'CAST(NULL AS NUMBER(6,5))';
+        $severity_column = $columns['severity']
+            ? 'SEVERITY'
+            : 'CAST(NULL AS VARCHAR2(16))';
+        $repeat_count_column = $columns['repeat_count']
+            ? 'REPEAT_COUNT'
+            : 'CAST(NULL AS NUMBER(5,0))';
+        $warning_level_column = $columns['warning_level']
+            ? 'WARNING_LEVEL'
+            : 'CAST(NULL AS VARCHAR2(16))';
+        $warning_at_column = $columns['warning_at']
+            ? 'TO_CHAR(WARNING_AT, \'YYYY-MM-DD HH24:MI:SS\')'
+            : 'CAST(NULL AS VARCHAR2(19))';
+        $review_status_column = $columns['review_status']
+            ? 'REVIEW_STATUS'
+            : '\'NOT_APPLICABLE\'';
+        $reviewed_by_column = $columns['reviewed_by']
+            ? 'REVIEWED_BY'
+            : 'CAST(NULL AS NUMBER(19,0))';
+        $reviewed_at_column = $columns['reviewed_at']
+            ? 'TO_CHAR(REVIEWED_AT, \'YYYY-MM-DD HH24:MI:SS\')'
+            : 'CAST(NULL AS VARCHAR2(19))';
+        $review_note_column = $columns['review_note']
+            ? 'REVIEW_NOTE'
+            : 'CAST(NULL AS VARCHAR2(1000))';
+        $sessions = $this->fetch_all(
+            'SELECT s.SESSION_ID AS "session_id", s.KANDIDAT_ID AS "candidate_id",
+                    ' . $application_id_column . ' AS "application_id", s.IDENTITY_STATUS AS "identity_status",
+                    TO_CHAR(s.CREATED_AT, \'YYYY-MM-DD HH24:MI:SS\') AS "created_at",
+                    TO_CHAR(s.COMPLETED_AT, \'YYYY-MM-DD HH24:MI:SS\') AS "completed_at",
+                    TO_CHAR(s.RETENTION_UNTIL, \'YYYY-MM-DD HH24:MI:SS\') AS "retention_until",
+                    NVL(p.NAMA_LENGKAP, p.NAMA_KANDIDAT) AS "candidate_name", p.EMAIL AS "candidate_email",
+                    d.JUDUL_PEKERJAAN AS "position",
+                    NVL(d.NAMA_DEPARTEMENT, k.NAMA_DEPARTEMEN) AS "department",
+                    k.NAMA_DEALER AS "location"
+             FROM HRS_PSY_PROCTOR_SESSIONS s
+             JOIN HRS_PROFIL_KANDIDAT p ON p.KANDIDAT_ID = s.KANDIDAT_ID
+             LEFT JOIN HRS_LAMARAN l ON l.LAMARAN_ID = ' . $application_id_column . '
+             LEFT JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.DETAIL_LOWONGAN_ID = l.DETAIL_LOWONGAN_ID
+             LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.KOLOM_PENDAFTARAN_ID = d.KOLOM_PENDAFTARAN_ID
+             WHERE s.SESSION_ID = :session_id AND s.KANDIDAT_ID = :candidate_id
+               AND s.RETENTION_UNTIL > CURRENT_TIMESTAMP',
+            [ 'session_id' => $session_id, 'candidate_id' => $candidate_id ]
+        );
+        if ( $this->has_error() || ! isset( $sessions[0] ) ) {
+            return null;
+        }
+        $events = $this->fetch_all(
+            'SELECT EVENT_ID AS "event_id", SESSION_ID AS "session_id", EVENT_TYPE AS "event_type",
+                    ' . $assessment_stage_column . ' AS "assessment_stage", FILE_KEY AS "file_key",
+                    ' . $duration_column . ' AS "detection_duration_ms",
+                    ' . $confidence_column . ' AS "detection_confidence",
+                    ' . $severity_column . ' AS "severity",
+                    ' . $repeat_count_column . ' AS "repeat_count",
+                    ' . $warning_level_column . ' AS "warning_level",
+                    ' . $warning_at_column . ' AS "warning_at",
+                    ' . $review_status_column . ' AS "review_status",
+                    ' . $reviewed_by_column . ' AS "reviewed_by",
+                    ' . $reviewed_at_column . ' AS "reviewed_at",
+                    ' . $review_note_column . ' AS "review_note",
+                    ' . $client_ip_column . ' AS "client_ip", ' . $client_user_agent_column . ' AS "client_user_agent",
+                    ACTOR_USER_ID AS "actor_user_id", TARGET_EVENT_ID AS "target_event_id",
+                    TO_CHAR(EVENT_AT, \'YYYY-MM-DD HH24:MI:SS\') AS "event_at"
+             FROM HRS_PSY_PROCTOR_EVENTS
+             WHERE SESSION_ID = :session_id
+             ORDER BY EVENT_AT, EVENT_ID',
+            [ 'session_id' => $session_id ]
+        );
+        if ( $this->has_error() ) {
+            return null;
+        }
+        return [ 'session' => $sessions[0], 'events' => $events ];
+    }
+
+    public function log_proctoring_report_download( int $candidate_id, string $session_id, int $admin_user_id ): bool {
+        if ( $candidate_id < 1 || $admin_user_id < 1 || ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id ) ) {
+            return false;
+        }
+        $this->last_error = null;
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $lock = $connection->prepare(
+                'SELECT SESSION_ID FROM HRS_PSY_PROCTOR_SESSIONS
+                 WHERE SESSION_ID = :session_id AND KANDIDAT_ID = :candidate_id
+                   AND RETENTION_UNTIL > CURRENT_TIMESTAMP FOR UPDATE'
+            );
+            $lock->execute( [ 'session_id' => $session_id, 'candidate_id' => $candidate_id ] );
+            if ( false === $lock->fetchColumn() ) {
+                $connection->rollBack();
+                return false;
+            }
+            $event = $connection->prepare(
+                'INSERT INTO HRS_PSY_PROCTOR_EVENTS (SESSION_ID, EVENT_TYPE, ASSESSMENT_STAGE, EVENT_AT, ACTOR_USER_ID)
+                 VALUES (:session_id, \'REPORT_DOWNLOAD\', \'report\', CURRENT_TIMESTAMP, :admin_user_id)'
+            );
+            $event->execute( [ 'session_id' => $session_id, 'admin_user_id' => $admin_user_id ] );
+            $connection->commit();
+            return 1 === $event->rowCount();
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_oracle_failure( 'Psychotest report access audit failed', $exception );
+            return false;
+        }
     }
 
     /** @return array<string, mixed>|null */
@@ -5178,6 +5589,63 @@ class Recruitment_Database {
                 'UNION ALL ' .
                 'SELECT p.KANDIDAT_ID AS "candidate_id", NVL(p.NAMA_LENGKAP, p.NAMA_KANDIDAT) AS "candidate_name", p.EMAIL AS "candidate_email", t.TES_PSIKOLOGI_ID AS "test_id", t.JUDUL AS "test_title", CAST(NULL AS NUMBER) AS "result_id", \'active\' AS "status", TO_CHAR(MIN(r.DIBUAT_PADA), \'YYYY-MM-DD HH24:MI:SS\') AS "started_at", CAST(NULL AS VARCHAR2(19)) AS "completed_at", SUM(r.NILAI_DIPEROLEH) AS "score", COUNT(r.RESPON_PSIKOTES_ID) AS "response_count", (SELECT COUNT(*) FROM HRS_PERTANYAAN_PSIKOTES q WHERE q.TES_PSIKOLOGI_ID = t.TES_PSIKOLOGI_ID) AS "question_count" FROM HRS_RESPON_PSIKOTES r JOIN HRS_PERTANYAAN_PSIKOTES q ON q.PEERTANYAAN_PSIKOTES_ID = r.PERTANYAAN_PSIKOTES_ID JOIN HRS_TES_PSIKOLOGI t ON t.TES_PSIKOLOGI_ID = q.TES_PSIKOLOGI_ID JOIN HRS_PROFIL_KANDIDAT p ON p.KANDIDAT_ID = r.KANDIDAT_ID WHERE r.HASIL_TES_PSIKOLOGI_ID IS NULL GROUP BY p.KANDIDAT_ID, p.NAMA_LENGKAP, p.NAMA_KANDIDAT, p.EMAIL, t.TES_PSIKOLOGI_ID, t.JUDUL' .
                 ') ORDER BY "started_at" DESC FETCH FIRST 250 ROWS ONLY'
+        );
+    }
+
+    /**
+     * Load completed psychotest results by exact candidate and saved result IDs.
+     *
+     * @param array<int, int> $result_ids
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_psychotest_results_for_report( int $candidate_id, array $result_ids ): array {
+        $result_ids = array_values(
+            array_unique(
+                array_filter(
+                    array_map( 'absint', $result_ids ),
+                    static fn( int $result_id ): bool => $result_id > 0
+                )
+            )
+        );
+        if ( $candidate_id < 1 || empty( $result_ids ) ) {
+            return [];
+        }
+
+        $parameters = [ 'candidate_id' => $candidate_id ];
+        $placeholders = [];
+        foreach ( $result_ids as $index => $result_id ) {
+            $placeholder = 'result_id_' . $index;
+            $placeholders[] = ':' . $placeholder;
+            $parameters[ $placeholder ] = $result_id;
+        }
+
+        return $this->fetch_all(
+            'SELECT p.KANDIDAT_ID AS "candidate_id",
+                    NVL(p.NAMA_LENGKAP, p.NAMA_KANDIDAT) AS "candidate_name",
+                    p.EMAIL AS "candidate_email",
+                    t.TES_PSIKOLOGI_ID AS "test_id",
+                    t.JUDUL AS "test_title",
+                    h.HASIL_TES_PSIKOLOGI AS "result_id",
+                    \'complete\' AS "status",
+                    TO_CHAR(h.MULAI_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "started_at",
+                    TO_CHAR(h.DIKUMPULKAN_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "completed_at",
+                    h.NILAI AS "score",
+                    COUNT(r.RESPON_PSIKOTES_ID) AS "response_count",
+                    (SELECT COUNT(*) FROM HRS_PERTANYAAN_PSIKOTES q
+                     WHERE q.TES_PSIKOLOGI_ID = t.TES_PSIKOLOGI_ID) AS "question_count"
+             FROM HRS_HASIL_TES_PSIKOLOGI h
+             JOIN HRS_TES_PSIKOLOGI t ON t.TES_PSIKOLOGI_ID = h.TES_PSIKOLOGI_ID
+             JOIN HRS_PROFIL_KANDIDAT p ON p.KANDIDAT_ID = h.KANDIDAT_ID
+             LEFT JOIN HRS_RESPON_PSIKOTES r
+               ON r.HASIL_TES_PSIKOLOGI_ID = h.HASIL_TES_PSIKOLOGI
+              AND r.KANDIDAT_ID = h.KANDIDAT_ID
+             WHERE p.KANDIDAT_ID = :candidate_id
+               AND h.HASIL_TES_PSIKOLOGI IN (' . implode( ', ', $placeholders ) . ')
+             GROUP BY p.KANDIDAT_ID, p.NAMA_LENGKAP, p.NAMA_KANDIDAT, p.EMAIL,
+                      t.TES_PSIKOLOGI_ID, t.JUDUL, h.HASIL_TES_PSIKOLOGI,
+                      h.MULAI_PADA, h.DIKUMPULKAN_PADA, h.NILAI
+             ORDER BY h.MULAI_PADA, h.HASIL_TES_PSIKOLOGI',
+            $parameters
         );
     }
 
@@ -6505,7 +6973,102 @@ class Recruitment_Database {
     }
 
     public function is_application_interview_link_available(): ?bool {
-        return $this->application_interview_link_exists;
+        if ( null === $this->user_interview_application_link_exists ) {
+            $this->has_user_interview_application_link();
+        }
+
+        return $this->user_interview_application_link_exists;
+    }
+
+    /**
+     * @return array<string, bool>|null
+     */
+    private function get_proctoring_report_columns(): ?array {
+        if ( null !== $this->proctoring_report_columns ) {
+            return $this->proctoring_report_columns;
+        }
+
+        $columns = [
+            'application_id' => false,
+            'assessment_stage' => false,
+            'client_ip' => false,
+            'client_user_agent' => false,
+            'detection_duration_ms' => false,
+            'detection_confidence' => false,
+            'severity' => false,
+            'repeat_count' => false,
+            'warning_level' => false,
+            'warning_at' => false,
+            'review_status' => false,
+            'reviewed_by' => false,
+            'reviewed_at' => false,
+            'review_note' => false,
+        ];
+        $event_column_keys = [
+            'ASSESSMENT_STAGE' => 'assessment_stage',
+            'CLIENT_IP' => 'client_ip',
+            'CLIENT_USER_AGENT' => 'client_user_agent',
+            'DETECTION_DURATION_MS' => 'detection_duration_ms',
+            'DETECTION_CONFIDENCE' => 'detection_confidence',
+            'SEVERITY' => 'severity',
+            'REPEAT_COUNT' => 'repeat_count',
+            'WARNING_LEVEL' => 'warning_level',
+            'WARNING_AT' => 'warning_at',
+            'REVIEW_STATUS' => 'review_status',
+            'REVIEWED_BY' => 'reviewed_by',
+            'REVIEWED_AT' => 'reviewed_at',
+            'REVIEW_NOTE' => 'review_note',
+        ];
+        try {
+            $statement = $this->get_connection()->prepare(
+                'SELECT TABLE_NAME, COLUMN_NAME FROM USER_TAB_COLUMNS
+                 WHERE (TABLE_NAME = :session_table AND COLUMN_NAME = :application_column)
+                    OR (TABLE_NAME = :event_table AND COLUMN_NAME IN (
+                        :stage_column, :ip_column, :user_agent_column, :duration_column, :confidence_column,
+                        :severity_column, :repeat_column, :warning_level_column, :warning_at_column,
+                        :review_status_column, :reviewed_by_column, :reviewed_at_column, :review_note_column
+                    ))'
+            );
+            $statement->execute(
+                [
+                    'session_table' => 'HRS_PSY_PROCTOR_SESSIONS',
+                    'application_column' => 'APPLICATION_ID',
+                    'event_table' => 'HRS_PSY_PROCTOR_EVENTS',
+                    'stage_column' => 'ASSESSMENT_STAGE',
+                    'ip_column' => 'CLIENT_IP',
+                    'user_agent_column' => 'CLIENT_USER_AGENT',
+                    'duration_column' => 'DETECTION_DURATION_MS',
+                    'confidence_column' => 'DETECTION_CONFIDENCE',
+                    'severity_column' => 'SEVERITY',
+                    'repeat_column' => 'REPEAT_COUNT',
+                    'warning_level_column' => 'WARNING_LEVEL',
+                    'warning_at_column' => 'WARNING_AT',
+                    'review_status_column' => 'REVIEW_STATUS',
+                    'reviewed_by_column' => 'REVIEWED_BY',
+                    'reviewed_at_column' => 'REVIEWED_AT',
+                    'review_note_column' => 'REVIEW_NOTE',
+                ]
+            );
+            while ( false !== ( $column = $statement->fetch( PDO::FETCH_ASSOC ) ) ) {
+                if ( 'HRS_PSY_PROCTOR_SESSIONS' === $column['TABLE_NAME'] ) {
+                    $columns['application_id'] = true;
+                } elseif ( isset( $event_column_keys[ $column['COLUMN_NAME'] ] ) ) {
+                    $columns[ $event_column_keys[ $column['COLUMN_NAME'] ] ] = true;
+                }
+            }
+            $this->proctoring_report_columns = $columns;
+            if ( ! $columns['application_id'] || ! $columns['assessment_stage']
+                || ! $columns['client_ip'] || ! $columns['client_user_agent']
+                || ! $columns['review_status'] || ! $columns['detection_duration_ms'] ) {
+                error_log( 'Recruitment Oracle schema warning: Psychotest report migrations 021/022/023 are incomplete; unavailable session links, event metadata, or review state will be omitted from reports.' );
+            }
+
+            return $columns;
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->last_error = $exception->getMessage();
+            $this->log_error( 'Psychotest report schema lookup failed', $exception );
+            return null;
+        }
     }
 
     private function get_application_token_column_expression(): ?string {

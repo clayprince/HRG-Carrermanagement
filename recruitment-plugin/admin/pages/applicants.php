@@ -303,6 +303,16 @@ if ( $selected_candidate_id > 0 ) {
 }
 
 $selected_profile = $selected_candidate ? $database->get_admin_applicant( (string) $selected_candidate['id'] ) : null;
+$selected_profile_id = absint( $selected_profile['profile_id'] ?? 0 );
+$selected_report_available = false;
+if ( $selected_candidate && ( current_user_can( 'manage_recruitment' ) || current_user_can( 'manage_options' ) ) ) {
+    $candidate_id = $selected_profile_id;
+    $application_id = absint( $selected_candidate['application_id'] ?? 0 );
+    $selected_report_available = ! empty(
+        recruitment_get_psychotest_result_ids_for_application( $candidate_id, $application_id )
+    );
+}
+
 $selected_answers = $selected_candidate ? $database->get_admin_application_answers( (string) ( $selected_candidate['application_id'] ?? 0 ) ) : [];
 $selected_attendance = null;
 $selected_attendance_lookup_failed = false;
@@ -817,9 +827,25 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
                         <span class="button daw-document-btn daw-document-btn--disabled" aria-disabled="true"><?= esc_html( $document_label ) ?> · Belum tersedia</span>
                     <?php endif; ?>
                 <?php endforeach; ?>
-                <span class="button daw-document-btn daw-document-btn--disabled" aria-disabled="true">Download Laporan Psikotes · Belum tersedia</span>
+                <?php if ( $selected_report_available && $selected_profile_id > 0 ) :
+                    $report_args = [
+                        'action' => 'daw_proctoring_report',
+                        'candidate_id' => $selected_profile_id,
+                        'application_id' => absint( $selected_candidate['application_id'] ),
+                    ];
+                    $report_url = wp_nonce_url(
+                        add_query_arg( $report_args, admin_url( 'admin-post.php' ) ),
+                        'daw_proctoring_report_' . absint( $selected_candidate['application_id'] ) . '_' . $selected_profile_id
+                    );
+                    ?>
+                    <a class="button daw-document-btn daw-document-btn--light" href="<?= esc_url( $report_url ) ?>">Download Laporan Psikotes (PDF)</a>
+                <?php elseif ( ! $selected_report_available ) : ?>
+                    <span class="button daw-document-btn daw-document-btn--disabled" aria-disabled="true">Download Laporan Psikotes · Tersedia setelah tes pertama selesai</span>
+                <?php else : ?>
+                    <span class="button daw-document-btn daw-document-btn--disabled" aria-disabled="true">Download Laporan Psikotes · Profil kandidat tidak tersedia</span>
+                <?php endif; ?>
             </div>
-            <p class="daw-documents-panel__hint">Profil diunduh sebagai laporan HTML. Laporan psikotes belum dapat dihubungkan secara aman karena skema Oracle saat ini belum mengaitkan hasil tes ke kandidat atau lamaran.</p>
+            <p class="daw-documents-panel__hint">Profil diunduh sebagai laporan HTML. PDF tersedia setelah minimal satu tes pada lamaran ini selesai dan akan diperbarui dengan nilai tes berikutnya. Bukti pengawasan hanya disertakan jika sesi tertaut ke lamaran.</p>
         </section>
 
         <section class="daw-applicant-detail-tabs" data-applicant-tabs>

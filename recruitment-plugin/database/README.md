@@ -193,21 +193,53 @@ their SQL is compatible with the current Oracle database.
   stored in the private `daw-applicant-private` directory, not in Oracle or a
   public media URL. Deployments using Nginx or another server must block direct
   web access to this directory.
-- The capture stage records one identity photo and allows no more than five
-  alert snapshots total per applicant session. Face absence and multiple-face
-  alerts are analyzed locally in the browser; video frames are not sent for
-  model processing. Snapshots are uploaded only for an alert and retained as
-  private evidence. Alerts require human review and do not automatically fail
-  an assessment. Gaze direction and phone/device detection are not
-  implemented. An optional microphone check logs only availability/permission
-  status; no audio is recorded. These event types use the existing
-  `EVENT_TYPE VARCHAR2(32)` field and do not require another Oracle migration.
-  The HR results page exposes evidence only to users with `manage_options`;
-  evidence access is logged. Completed sessions expire one year after
-  completion, while abandoned sessions expire one year after consent. Image
-  reads are denied after the deadline and daily file cleanup is scheduled.
-  Configure a host-level scheduler to run WordPress cron daily so
-  physical deletion is not delayed on a low-traffic site.
+- Migration
+  [`migrations/021_psychotest_proctoring_application_reports.sql`](migrations/021_psychotest_proctoring_application_reports.sql)
+  adds an application link to new proctoring sessions and stage/idempotency
+  metadata to events. Historical HMAC session IDs cannot be reversed to
+  backfill an application ID, so those rows remain unlinked. The migration
+  must be reviewed and applied by the authorized Oracle owner; it is not run
+  automatically. The report reader checks for the new columns and keeps score
+  PDF downloads available if this migration is pending; it omits proctoring
+  sessions that cannot be safely linked to an application.
+- Migration
+  [`migrations/022_psychotest_event_client_metadata.sql`](migrations/022_psychotest_event_client_metadata.sql)
+  adds nullable client IP and User-Agent fields to new proctoring events.
+  Existing events remain empty because their original client metadata is
+  unknown. The report reader can still generate PDFs before this migration is
+  applied, but unavailable metadata is shown as not recorded. The migration
+  must be reviewed and applied by the authorized Oracle owner before event
+  capture can store these fields.
+- Migration
+  [`migrations/023_psychotest_violation_lifecycle.sql`](migrations/023_psychotest_violation_lifecycle.sql)
+  adds client-reported detection duration/confidence, severity and repeat counts,
+  warning history, and HR review state to proctoring events. It depends on
+  migrations 021 and 022 and is not run automatically. The Oracle server
+  timestamp remains authoritative for repeat windows; client timing is evidence
+  metadata and is not independently proof of a policy violation. New event
+  writes require this migration, while report reads omit unavailable lifecycle
+  fields until it is applied.
+- HR-adjustable thresholds live in the WordPress option
+  `recruitment_proctoring_violation_config`, are validated against bounded
+  ranges, and are passed to the local browser detector. Oracle stores resulting
+  event history and review status, not mutable detector configuration.
+- Face absence, multiple faces, and sustained face-turn alerts are analyzed
+  locally in the browser; video frames are not sent for model processing.
+  Snapshots are uploaded only for distinct incident events and retained as
+  private evidence. Tab-hidden and tab-visible timestamps are logged, but the
+  browser cannot identify which other tab or site was opened. Alerts require
+  human review and do not automatically fail an assessment. No face identity
+  matching, gaze tracking, phone/device detection, or audio recording is
+  performed. Evidence access and report downloads are restricted to users with
+  `manage_recruitment` or `manage_options` and are logged. Completed sessions
+  expire one year after completion, while abandoned sessions expire one year
+  after consent. Image reads are denied after the deadline and daily file
+  cleanup is scheduled. Configure a host-level scheduler to run WordPress cron
+  daily so physical deletion is not delayed on a low-traffic site. From consent
+  version `proctoring-v2`, each newly recorded participant event also stores
+  the User-Agent and the IP address visible to the application server; the
+  latter may be a proxy or gateway address. No metadata is backfilled for
+  historical events.
 - HR can add and edit IQ, Pauli, DISC, and PAPI questions. IQ remains divided
   into four subtests with the existing fixed time limits; additional questions
   use those same limits. Pauli presents one vertical sum at a time for 60

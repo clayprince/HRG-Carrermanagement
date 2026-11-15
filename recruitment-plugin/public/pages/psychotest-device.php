@@ -1,11 +1,13 @@
 <?php
-$test_key = sanitize_key( wp_unslash( $_GET['test'] ?? 'iq' ) );
-$test_key = in_array( $test_key, [ 'iq', 'pauli', 'disc', 'papi' ], true ) ? $test_key : 'iq';
+$test_key = 'iq';
 $requested_application_id = isset( $_GET['application_id'] ) && is_scalar( $_GET['application_id'] )
     ? absint( wp_unslash( (string) $_GET['application_id'] ) )
     : 0;
+if ( $requested_application_id < 1 ) {
+    wp_die( esc_html__( 'Lamaran psikotes tidak valid.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+}
 $stage_status = recruitment_applicant_psychotest_stage_status(
-    $requested_application_id > 0 ? (string) $requested_application_id : null
+    (string) $requested_application_id
 );
 if ( null === $stage_status ) {
     wp_die( esc_html__( 'Status lamaran tidak dapat diverifikasi. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
@@ -13,15 +15,20 @@ if ( null === $stage_status ) {
 if ( ! $stage_status || ! recruitment_is_psychotest_test_enabled( $test_key ) ) {
     wp_die( esc_html__( 'Pemeriksaan perangkat hanya tersedia saat tahap psikotes aktif dan tes dibuka oleh HR.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
 }
+$proctoring = new Recruitment_Psychotest_Proctoring();
+if ( $proctoring->has_current_consent( $requested_application_id ) ) {
+    wp_safe_redirect( recruitment_get_public_url( 'psychotest', [ 'application_id' => $requested_application_id ] ) );
+    exit;
+}
+if ( $proctoring->get_current_session_error() ) {
+    wp_die( esc_html__( 'Status persiapan tidak dapat dibaca dari Oracle. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+}
 $global_settings = (array) get_option( 'recruitment_psychotest_settings', [] );
 $test_settings = (array) get_option( 'recruitment_psychotest_tests', [] );
 $camera_required = isset( $test_settings[ $test_key ]['camera_required'] )
     ? ! empty( $test_settings[ $test_key ]['camera_required'] )
     : ! empty( $global_settings['camera_required'] ?? true );
-$device_arguments = [ 'test' => $test_key ];
-if ( $requested_application_id > 0 ) {
-    $device_arguments['application_id'] = $requested_application_id;
-}
+$device_arguments = [ 'test' => $test_key, 'application_id' => $requested_application_id ];
 $back_url = recruitment_get_public_url( 'psychotest-preparation', $device_arguments );
 $next_url = recruitment_get_public_url( 'psychotest-consent', $device_arguments );
 ?>

@@ -1325,10 +1325,7 @@
           const nextUrl =
             redirectUrl ||
             confirmSubmitButton?.dataset?.nextUrl ||
-            identityCapture.dataset.nextUrl ||
-            document
-              .querySelector("[data-proctoring-identity-skip-btn]")
-              ?.getAttribute("href");
+            identityCapture.dataset.nextUrl;
 
           status.textContent = "Membuka soal tes...";
           stream?.getTracks().forEach((track) => track.stop());
@@ -1463,15 +1460,6 @@
           });
         }
 
-        const skipButtons = document.querySelectorAll(
-          "[data-proctoring-identity-skip-btn], .daw-identity-btn-skip-top",
-        );
-        skipButtons.forEach((btn) => {
-          btn.addEventListener("click", function () {
-            stream?.getTracks().forEach((track) => track.stop());
-          });
-        });
-
         if (manualButton) {
           manualButton.addEventListener("click", function requestManual() {
             actionInput.value = "manual";
@@ -1496,22 +1484,32 @@
     if (tabWatch) {
       const ajaxUrl = tabWatch.dataset.ajaxUrl;
       const nonce = tabWatch.dataset.nonce;
+      const applicationId = tabWatch.dataset.applicationId;
       const status = tabWatch.querySelector("[data-tab-watch-status]");
-      let lastSentAt = 0;
+      let inactiveSince = null;
       document.addEventListener("visibilitychange", function recordTabSwitch() {
-        if (!document.hidden) {
+        const eventToken = window.crypto?.randomUUID?.();
+        if (!eventToken) {
+          if (status) {
+            status.textContent = "Browser tidak menyediakan token aman. Peristiwa belum dikirim.";
+          }
           return;
         }
-        const now = Date.now();
-        if (10_000 > now - lastSentAt) {
-          return;
-        }
-        lastSentAt = now;
+        const returning = !document.hidden;
+        const durationMs = returning && null !== inactiveSince
+          ? Math.round(performance.now() - inactiveSince)
+          : 0;
+        inactiveSince = document.hidden ? performance.now() : null;
         const body = new URLSearchParams({
           action: "recruitment_proctoring_event",
           nonce: nonce || "",
-          event_type: "TAB_HIDDEN",
+          event_type: document.hidden ? "TAB_HIDDEN" : "TAB_VISIBLE",
+          event_token: eventToken,
+          detection_duration_ms: String(durationMs),
         });
+        if (applicationId) {
+          body.set("application_id", applicationId);
+        }
         fetch(ajaxUrl || "", {
           method: "POST",
           credentials: "same-origin",
@@ -1526,7 +1524,6 @@
             }
           })
           .catch(function reportTabEventFailure() {
-            lastSentAt = 0;
             if (status) {
               status.textContent =
                 "Perpindahan tab belum berhasil dicatat. Kamera belum terhubung; integrasi disiapkan oleh PIC.";
@@ -1542,8 +1539,11 @@
     const video = watch.querySelector("[data-proctoring-watch-video]");
     const status = watch.querySelector("[data-proctoring-watch-status]");
     const faceStatus = watch.querySelector("[data-proctoring-face-status]");
+    const warning = watch.querySelector("[data-proctoring-watch-warning]");
+    const restartCameraButton = watch.querySelector("[data-proctoring-restart-camera]");
     const ajaxUrl = watch.dataset.ajaxUrl;
     const nonce = watch.dataset.nonce;
+    const applicationId = watch.dataset.applicationId;
     const cameraMode = watch.dataset.cameraMode;
     if (!video || !status || !ajaxUrl || !nonce) {
       return;
@@ -1562,8 +1562,14 @@
       if (!event.isPrimary || ("mouse" === event.pointerType && 0 !== event.button)) {
         return;
       }
-      event.preventDefault();
+    if (event.target.closest("button, a, input, select, textarea")) {
+      return;
+    }
       const bounds = watch.getBoundingClientRect();
+      if (event.clientX >= bounds.right - 20 && event.clientY >= bounds.bottom - 20) {
+        return;
+      }
+      event.preventDefault();
       pointerStart = {
         pointerId: event.pointerId,
         x: event.clientX,
@@ -1623,19 +1629,43 @@
     });
     let stream = null;
     let stopFaceMonitor = null;
-    const lastAlertAt = new Map();
 
-    const sendEvent = async function sendEvent(eventType, withSnapshot) {
-      const now = Date.now();
-      const lastSentAt = lastAlertAt.get(eventType) || 0;
-      if (10_000 > now - lastSentAt) {
-        return null;
+    let warningTimer = null;
+    const showWarning = function showWarning(resultData) {
+      if (!warning || !resultData?.warning_message) {
+        return;
       }
-      lastAlertAt.set(eventType, now);
+      warning.classList.remove("is-repeated", "is-serious");
+      if (["repeated", "serious"].includes(resultData.warning_level)) {
+        warning.classList.add(`is-${resultData.warning_level}`);
+      }
+      warning.textContent = resultData.warning_message;
+      warning.hidden = false;
+      window.clearTimeout(warningTimer);
+      warningTimer = window.setTimeout(function hideWarning() {
+        warning.hidden = true;
+      }, 10000);
+    };
+
+    const sendEvent = async function sendEvent(eventType, withSnapshot, details = {}) {
+      if (!window.crypto?.randomUUID) {
+        status.textContent = "Browser tidak menyediakan token aman. Peristiwa belum dikirim.";
+        return false;
+      }
       const body = new FormData();
       body.set("action", "recruitment_proctoring_event");
       body.set("nonce", nonce);
       body.set("event_type", eventType);
+      body.set("event_token", details.eventToken || window.crypto.randomUUID());
+      if (Number.isFinite(details.durationMs)) {
+        body.set("detection_duration_ms", String(Math.round(details.durationMs)));
+      }
+      if (Number.isFinite(details.confidence)) {
+        body.set("detection_confidence", String(details.confidence));
+      }
+      if (applicationId) {
+        body.set("application_id", applicationId);
+      }
       if (withSnapshot && stream && video.videoWidth && video.videoHeight) {
         const canvas = document.createElement("canvas");
         const scale = Math.min(1, 480 / video.videoWidth);
@@ -1657,119 +1687,161 @@
           body.set("snapshot", image, "alert.jpg");
         }
       }
-      try {
-        const response = await fetch(ajaxUrl, {
-          method: "POST",
-          body,
-          credentials: "same-origin",
-          keepalive: true,
-        });
-        if (!response.ok) {
-          throw new Error("Proctoring event was not accepted.");
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          const response = await fetch(ajaxUrl, {
+            method: "POST",
+            body,
+            credentials: "same-origin",
+            keepalive: true,
+          });
+          if (!response.ok) {
+            throw new Error("Proctoring event was not accepted.");
+          }
+          const result = await response.json();
+          if (!result?.success) {
+            throw new Error("Proctoring event was not saved.");
+          }
+          showWarning(result.data);
+          status.textContent = result.data?.captured
+            ? "Event terkonfirmasi dan snapshot tersimpan untuk ditinjau HR."
+            : "Event tercatat untuk ditinjau HR; hasil deteksi bukan keputusan kecurangan.";
+          return true;
+        } catch {
+          if (1 === attempt) {
+            status.textContent = "Peringatan belum terkonfirmasi. Periksa koneksi internet.";
+          }
         }
-        const result = await response.json();
-        if (!result?.success) {
-          throw new Error("Proctoring event was not saved.");
-        }
-        status.textContent = result.data?.captured
-          ? "Peringatan dan snapshot tersimpan untuk ditinjau HR."
-          : "Peringatan tercatat; tidak ada snapshot tambahan yang disimpan.";
-        return true;
-      } catch {
-        lastAlertAt.delete(eventType);
-        status.textContent = "Peringatan belum terkonfirmasi. Periksa koneksi internet.";
-        return false;
       }
+      return false;
     };
 
+    let tabInactiveSince = null;
     document.addEventListener("visibilitychange", function recordTabChange() {
-      if (document.hidden) {
-        sendEvent("TAB_HIDDEN", "manual" !== cameraMode);
-      }
+      const returning = !document.hidden;
+      const durationMs = returning && null !== tabInactiveSince
+        ? performance.now() - tabInactiveSince
+        : 0;
+      tabInactiveSince = document.hidden ? performance.now() : null;
+      void sendEvent(
+        document.hidden ? "TAB_HIDDEN" : "TAB_VISIBLE",
+        document.hidden && "manual" !== cameraMode,
+        { durationMs },
+      );
     });
     if ("manual" === cameraMode) {
       return;
     }
-    if (!window.isSecureContext) {
-      status.textContent =
-        "Kamera memerlukan HTTPS atau localhost. Tidak ada audio yang direkam.";
+    let violationConfig = {};
+    try {
+      violationConfig = JSON.parse(watch.dataset.violationConfig || "{}");
+    } catch {
+      status.textContent = "Konfigurasi threshold kamera tidak valid; deteksi tidak dimulai.";
       if (faceStatus) {
-        faceStatus.textContent = "Deteksi wajah memerlukan HTTPS atau localhost.";
+        faceStatus.textContent = "Hubungi HR agar konfigurasi pemantauan diperiksa.";
       }
-      sendEvent("CAMERA_UNAVAILABLE", false);
       return;
     }
-    if (!navigator.mediaDevices?.getUserMedia) {
-      status.textContent = "Kamera tidak didukung. Identitas perlu diperiksa manual oleh HR.";
-      if (faceStatus) {
-        faceStatus.textContent = "Deteksi wajah tidak tersedia pada browser ini.";
+
+    const startFaceMonitor = async function startFaceMonitor() {
+      if (!faceStatus || stopFaceMonitor) {
+        return;
       }
-      sendEvent("CAMERA_UNAVAILABLE", false);
-      return;
-    }
-    navigator.mediaDevices
-      .getUserMedia({
-        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
-        audio: false,
-      })
-      .then(async function startAssessmentCamera(mediaStream) {
-        stream = mediaStream;
-        video.srcObject = mediaStream;
-        status.textContent = "Kamera aktif. Tidak ada audio yang direkam.";
-        stream.getVideoTracks().forEach((track) => {
-          track.addEventListener("ended", function recordCameraStopped() {
-            stopFaceMonitor?.();
-            stopFaceMonitor = null;
-            if (faceStatus) {
-              faceStatus.textContent = "Deteksi wajah dihentikan karena kamera terputus.";
+      try {
+        const { startPsychotestFaceMonitor } = await import(
+          "./psychotest-face-monitor.js"
+        );
+        stopFaceMonitor = await startPsychotestFaceMonitor({
+          video,
+          runtimeUrl: watch.dataset.faceRuntimeUrl,
+          assetsRoot: watch.dataset.faceAssetsRoot,
+          violationConfig,
+          onStatus: (message) => {
+            faceStatus.textContent = message;
+          },
+          onAlert: (eventType, details) => sendEvent(eventType, true, details),
+          onError: async () => {
+            faceStatus.textContent =
+              "Deteksi wajah gagal berjalan. Status dicatat untuk tinjauan HR.";
+            if (false === (await sendEvent("FACE_DETECTION_UNAVAILABLE", false))) {
+              faceStatus.textContent =
+                "Deteksi wajah gagal dan statusnya belum berhasil dicatat. Periksa koneksi.";
             }
-            status.textContent = "Kamera terputus. Peringatan dikirim untuk tinjauan HR.";
-            sendEvent("CAMERA_STOPPED", false);
-          });
+          },
         });
-        if (!faceStatus) {
-          return;
+      } catch {
+        faceStatus.textContent =
+          "Model deteksi wajah tidak dapat dimuat. Status dicatat untuk tinjauan HR.";
+        if (false === (await sendEvent("FACE_DETECTION_UNAVAILABLE", false))) {
+          faceStatus.textContent =
+            "Model deteksi wajah gagal dimuat dan statusnya belum berhasil dicatat.";
         }
-        try {
-          const { startPsychotestFaceMonitor } = await import(
-            "./psychotest-face-monitor.js"
-          );
+      }
+    };
+
+    const attachCamera = async function attachCamera(mediaStream) {
+      const previousStream = stream;
+      stream = mediaStream;
+      video.srcObject = mediaStream;
+      status.textContent = "Kamera aktif. Tidak ada audio yang direkam.";
+      if (restartCameraButton) {
+        restartCameraButton.hidden = true;
+      }
+      for (const track of mediaStream.getVideoTracks()) {
+        track.addEventListener("ended", function reportEndedCamera() {
           if (stream !== mediaStream) {
             return;
           }
-          stopFaceMonitor = await startPsychotestFaceMonitor({
-            video,
-            runtimeUrl: watch.dataset.faceRuntimeUrl,
-            assetsRoot: watch.dataset.faceAssetsRoot,
-            onStatus: (message) => {
-              faceStatus.textContent = message;
-            },
-            onAlert: (eventType) => sendEvent(eventType, true),
-            onError: async () => {
-              faceStatus.textContent =
-                "Deteksi wajah gagal berjalan. Peristiwa dilaporkan untuk ditinjau HR.";
-              if (false === (await sendEvent("FACE_DETECTION_UNAVAILABLE", false))) {
-                faceStatus.textContent =
-                  "Deteksi wajah gagal dan statusnya belum berhasil dilaporkan. Periksa koneksi.";
-              }
-            },
-          });
-        } catch {
-          faceStatus.textContent =
-            "Model deteksi wajah tidak dapat dimuat. Status dilaporkan untuk ditinjau HR.";
-          if (false === (await sendEvent("FACE_DETECTION_UNAVAILABLE", false))) {
-            faceStatus.textContent =
-              "Model deteksi wajah tidak dapat dimuat dan statusnya belum berhasil dilaporkan.";
+          status.textContent = "Kamera terputus; sistem menunggu threshold sebelum mencatat event.";
+          if (restartCameraButton) {
+            restartCameraButton.hidden = false;
           }
-        }
-      })
-      .catch(function reportCameraUnavailable() {
-        status.textContent = "Kamera tidak tersedia. Peristiwa dicatat untuk tinjauan manual HR.";
+        });
+      }
+      if (previousStream && previousStream !== mediaStream) {
+        previousStream.getTracks().forEach((track) => track.stop());
+      }
+      await startFaceMonitor();
+    };
+
+    const activateCamera = async function activateCamera() {
+      if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+        status.textContent = "Kamera memerlukan HTTPS atau browser yang mendukung kamera.";
         if (faceStatus) {
-          faceStatus.textContent = "Deteksi wajah tidak berjalan karena kamera tidak tersedia.";
+          faceStatus.textContent = "Deteksi wajah tidak tersedia pada perangkat ini.";
         }
-        sendEvent("CAMERA_UNAVAILABLE", false);
-      });
+        await sendEvent("CAMERA_UNAVAILABLE", false);
+        return;
+      }
+      if (restartCameraButton) {
+        restartCameraButton.disabled = true;
+      }
+      try {
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false,
+        });
+        await attachCamera(mediaStream);
+      } catch {
+        status.textContent = "Kamera tidak tersedia. Coba aktifkan kembali atau minta verifikasi manual HR.";
+        if (faceStatus) {
+          faceStatus.textContent = "Deteksi wajah menunggu kamera aktif.";
+        }
+        if (restartCameraButton) {
+          restartCameraButton.hidden = false;
+        }
+        await sendEvent("CAMERA_UNAVAILABLE", false);
+      } finally {
+        if (restartCameraButton) {
+          restartCameraButton.disabled = false;
+        }
+      }
+    };
+
+    restartCameraButton?.addEventListener("click", function restartCamera() {
+      void activateCamera();
+    });
+    void activateCamera();
     window.addEventListener("pagehide", function stopAssessmentCamera() {
       stopFaceMonitor?.();
       stream?.getTracks().forEach((track) => track.stop());
