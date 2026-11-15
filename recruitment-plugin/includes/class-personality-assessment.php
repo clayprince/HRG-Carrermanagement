@@ -127,7 +127,7 @@ class Recruitment_Personality_Assessment {
             return [ 'ready' => false, 'test_key' => $test_key ];
         }
 
-        $catalog = $this->database->get_personality_assessments();
+        $catalog = $this->database->get_personality_assessments( false, true );
         if ( $this->database->has_error() ) {
             return [ 'error' => 'Koneksi Oracle belum tersedia. Silakan coba kembali nanti.' ];
         }
@@ -251,6 +251,29 @@ class Recruitment_Personality_Assessment {
         if ( ( isset( $settings['status'] ) && 'active' !== $settings['status'] )
             || ( isset( $test_settings[ $test_key ]['active'] ) && empty( $test_settings[ $test_key ]['active'] ) ) ) {
             wp_die( esc_html__( 'Tes kepribadian sedang dinonaktifkan oleh tim HR.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+        }
+        if ( 'active' !== ( $test_state['status'] ?? '' ) ) {
+            $catalog = $this->database->get_personality_assessments();
+            if ( $this->database->has_error() ) {
+                wp_die( esc_html__( 'Koneksi Oracle belum tersedia. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+            }
+            $latest_test = $catalog[ $test_key ] ?? null;
+            if ( ! is_array( $latest_test )
+                || (int) $latest_test['ID'] !== (int) ( $test_state['id'] ?? 0 )
+                || self::REMINDER_MINUTES[ $test_key ] !== (int) $latest_test['DURATION']
+                || self::MINIMUM_QUESTION_COUNTS[ $test_key ] > count( (array) ( $latest_test['questions'] ?? [] ) )
+                || (int) $latest_test['QUESTION_COUNT'] !== count( $latest_test['questions'] ) ) {
+                wp_die( esc_html__( 'Bank soal tes kepribadian belum tersedia atau berubah. Silakan hubungi tim HR.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+            }
+            foreach ( $latest_test['questions'] as $question ) {
+                if ( self::ITEM_COUNTS[ $test_key ] !== count( (array) ( $question['items'] ?? [] ) ) ) {
+                    wp_die( esc_html__( 'Bank soal kepribadian tidak memiliki jumlah pernyataan yang valid. Silakan hubungi tim HR.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+                }
+            }
+            $state['tests'][ $test_key ]['question_order'] = array_map( 'intval', array_column( $latest_test['questions'], 'id' ) );
+            $state['tests'][ $test_key ]['answers'] = [];
+            $state['tests'][ $test_key ]['response_ids'] = [];
+            $state['tests'][ $test_key ]['result_id'] = 0;
         }
         $state['active_test'] = $test_key;
         $state['tests'][ $test_key ]['status'] = 'active';

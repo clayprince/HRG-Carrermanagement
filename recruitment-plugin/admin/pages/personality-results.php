@@ -1,6 +1,6 @@
 <?php
 $database = new Recruitment_Database();
-$catalog = $database->get_personality_assessments( true );
+$catalog = $database->get_personality_assessments( true, true );
 $catalog_error = $database->has_error();
 $psychotest_results = $database->get_psychotest_results();
 $results_error = $database->has_error();

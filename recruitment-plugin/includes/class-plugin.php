@@ -409,9 +409,18 @@ class Recruitment_Plugin {
             }
             $requested_page = sanitize_key( wp_unslash( $_GET['page'] ?? '' ) );
             $department_page = 'daw-user-department' === $requested_page;
+            global $pagenow;
+            $department_download_action = 'admin-post.php' === $pagenow
+                && in_array(
+                    sanitize_key( wp_unslash( $_GET['action'] ?? '' ) ),
+                    [ 'daw_download_department_profile', 'daw_download_department_document' ],
+                    true
+                );
             $requested_action = isset( $_POST['action'] ) && is_scalar( $_POST['action'] )
                 ? sanitize_key( wp_unslash( (string) $_POST['action'] ) )
-                : '';
+                : ( isset( $_POST['daw_ud_action'] ) && is_scalar( $_POST['daw_ud_action'] )
+                    ? sanitize_key( wp_unslash( (string) $_POST['daw_ud_action'] ) )
+                    : '' );
             $department_post_action = 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? '' ) )
                 && in_array(
                     $requested_action,
@@ -420,10 +429,11 @@ class Recruitment_Plugin {
                         'daw_delete_interview_slot',
                         'daw_change_department_password',
                         'daw_logout',
+                        'save_user_interview',
                     ],
                     true
                 );
-            if ( ( 'user_department' === $account_type && ! $department_page && ! $department_post_action ) || ( 'hr' === $account_type && $department_page ) ) {
+            if ( ( 'user_department' === $account_type && ! $department_page && ! $department_download_action && ! $department_post_action ) || ( 'hr' === $account_type && $department_page ) ) {
                 wp_logout();
                 $redirect = 'user_department' === $account_type
                     ? recruitment_get_department_login_url( [ 'login_error' => 'no_access' ] )

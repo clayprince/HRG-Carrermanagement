@@ -4,6 +4,27 @@ This file records material, verified project changes and guides future human
 and AI contributors. It is not a substitute for source review or a database
 migration log.
 
+## 2026-11-11
+
+### Psychotest question metadata
+
+- Added per-question explanation and active controls to the Admin HR question
+  bank. New PDF-imported questions are active by default; applicant sessions
+  use active questions, while already-started sessions retain their assigned
+  question set. Explanations are excluded from applicant assessment views.
+- Removed the IQ subtest selector from PDF import. IQ category is detected from
+  the PDF heading and ambiguous or missing categories are rejected.
+- Removed the manual IQ subtest picker; new manually entered IQ questions go
+  to `IQ - 1 Berhitung Angka`, with each answer option stored against its
+  question.
+- Fixed the question-bank save flow so it falls back to a client-side
+  post/redirect/get when WordPress has already sent page headers, avoiding a
+  blank admin page after saving.
+- Added Oracle migration 018 for the explanation and active-status columns.
+  Applied and verified the migration against the local Oracle XE `XEPDB1`
+  schema on 2026-11-11. Transactional CRUD and active-filter smoke tests were
+  rolled back; no question data was retained.
+
 ## 2026-11-10
 
 ### HR interview handoff and applicant profiles

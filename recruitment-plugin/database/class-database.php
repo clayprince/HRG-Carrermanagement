@@ -909,12 +909,12 @@ class Recruitment_Database {
     /**
      * Return department accounts without exposing their password hashes.
      *
-     * @return array<int, array{id: string, username: string, email: string, department_id: string, department: string, status: string}>
+     * @return array<int, array{id: string, username: string, full_name: string, email: string, department_id: string, department: string, status: string}>
      */
     public function get_department_accounts(): array {
         $this->last_error = null;
         return $this->fetch_all(
-            "SELECT u.role_akses_id AS \"id\", u.username AS \"username\", u.email AS \"email\", u.departemen_id AS \"department_id\", NVL(d.nama_departemen, u.nama_departemen) AS \"department\", u.status_akun AS \"status\" FROM hrs_role_akses u LEFT JOIN HRS_DEPARTEMEN d ON d.departemen_id = u.departemen_id WHERE u.peran = 'KEPALA_DEPARTEMEN' ORDER BY u.username"
+            "SELECT u.role_akses_id AS \"id\", u.username AS \"username\", NVL(u.nama_lengkap, NVL(u.username, u.email)) AS \"full_name\", u.email AS \"email\", u.departemen_id AS \"department_id\", NVL(d.nama_departemen, u.nama_departemen) AS \"department\", u.status_akun AS \"status\" FROM hrs_role_akses u LEFT JOIN HRS_DEPARTEMEN d ON d.departemen_id = u.departemen_id WHERE u.peran = 'KEPALA_DEPARTEMEN' ORDER BY u.username"
         );
     }
 
@@ -2078,7 +2078,7 @@ class Recruitment_Database {
      */
     public function get_vacancies(): array {
         return $this->fetch_all(
-            'SELECT d.detail_lowongan_id AS "id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", k.nama_dealer AS "dealer", d.kategori_kj AS "job_type", d.deskripsi_pekerjaan AS "description", d.pendidikan_minimum AS "education", TO_CHAR(d.batas_lamaran, \'YYYY-MM-DD\') AS "deadline", NVL(d.nama_departement, k.nama_departemen) AS "department", TO_CHAR(d.request_at, \'YYYY-MM-DD\') AS "posted_at" FROM HRS_DETAIL_INFO_LOWONGAN d JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE k.status_kolom = :status AND (d.batas_lamaran IS NULL OR d.batas_lamaran >= CURRENT_DATE) AND (d.jumlah_kebutuhan IS NULL OR (SELECT COUNT(*) FROM HRS_LAMARAN l WHERE l.detail_lowongan_id = d.detail_lowongan_id AND UPPER(TRIM(NVL(l.status_akhir, l.status_terkini))) IN (\'DITERIMA\', \'ACCEPTED\', \'LOLOS\')) < d.jumlah_kebutuhan) ORDER BY d.detail_lowongan_id DESC',
+            'SELECT d.detail_lowongan_id AS "id", d.judul_pekerjaan AS "title", NVL(d.lokasi_penempatan, k.nama_dealer) AS "location", k.nama_dealer AS "dealer", d.kategori_kj AS "job_type", d.deskripsi_pekerjaan AS "description", d.pendidikan_minimum AS "education", TO_CHAR(d.batas_lamaran, \'YYYY-MM-DD\') AS "deadline", NVL(d.nama_departement, k.nama_departemen) AS "department", TO_CHAR(d.request_at, \'YYYY-MM-DD\') AS "posted_at" FROM HRS_DETAIL_INFO_LOWONGAN d JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE k.status_kolom = :status AND (d.batas_lamaran IS NULL OR d.batas_lamaran >= CURRENT_DATE) AND (d.jumlah_kebutuhan IS NULL OR (SELECT COUNT(*) FROM HRS_LAMARAN l WHERE l.detail_lowongan_id = d.detail_lowongan_id AND UPPER(TRIM(NVL(l.status_akhir, l.status_terkini))) IN (\'DITERIMA\', \'ACCEPTED\', \'LOLOS\')) < d.jumlah_kebutuhan) ORDER BY d.detail_lowongan_id DESC',
             [ 'status' => 1 ]
         );
     }
@@ -2806,7 +2806,9 @@ class Recruitment_Database {
                     l.status_terkini AS "status",
                     TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at",
                     d.judul_pekerjaan AS "position",
-                    d.nama_departement AS "department",
+                    NVL(vacancy_department.nama_departemen, NVL(d.nama_departement, k.nama_departemen)) AS "department",
+                    NVL(d.departemen_id, k.departemen_id) AS "department_id",
+                    d.lokasi_penempatan AS "location",
                     k.nama_dealer AS "dealer",
                     p.kandidat_id AS "candidate_id",
                     NVL(p.nama_lengkap, p.nama_kandidat) AS "candidate_name",
@@ -2821,6 +2823,7 @@ class Recruitment_Database {
              FROM HRS_LAMARAN l
              JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
              LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id
+             LEFT JOIN HRS_DEPARTEMEN vacancy_department ON vacancy_department.departemen_id = NVL(d.departemen_id, k.departemen_id)
              JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
              JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id
              WHERE UPPER(TRIM(l.status_terkini)) = \'INTERVIEW_HR\'
@@ -2912,7 +2915,7 @@ class Recruitment_Database {
             }
 
             if ( $department_account_id > 0 ) {
-                $this->validate_hr_interview_recipient( $connection, $department_name, $department_account_id );
+                $this->validate_hr_interview_recipient( $connection, $application_id, $department_name, $department_account_id );
             }
             $this->insert_hr_interview_note_history(
                 $connection,
@@ -3006,7 +3009,7 @@ class Recruitment_Database {
             }
 
             if ( 'LOLOS' === $result ) {
-                $this->validate_hr_interview_recipient( $connection, $department_name, $department_account_id );
+                $this->validate_hr_interview_recipient( $connection, $application_id, $department_name, $department_account_id );
             }
 
             $recommendation = trim( $recommendation );
@@ -3103,6 +3106,111 @@ class Recruitment_Database {
     }
 
     /**
+     * Assign an HR-cleared application to one active User Department account.
+     *
+     * @return array{success: bool, error?: string}
+     */
+    public function assign_application_to_user_department(
+        string $application_id,
+        int $department_account_id,
+        string $interviewer,
+        string $notes
+    ): array {
+        $interviewer = trim( $interviewer );
+        $notes = trim( $notes );
+        $interviewer_length = function_exists( 'mb_strlen' ) ? mb_strlen( $interviewer, 'UTF-8' ) : strlen( $interviewer );
+        $notes_length = function_exists( 'mb_strlen' ) ? mb_strlen( $notes, 'UTF-8' ) : strlen( $notes );
+        if (
+            ! ctype_digit( $application_id )
+            || '0' === $application_id
+            || $department_account_id < 1
+            || '' === $interviewer
+            || 100 < $interviewer_length
+            || 2000 < $notes_length
+        ) {
+            return [ 'success' => false, 'error' => 'Data penugasan Wawancara User tidak valid.' ];
+        }
+
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $application = $connection->prepare(
+                'SELECT UPPER(TRIM(l.status_terkini)) AS "status"
+                 FROM HRS_LAMARAN l
+                 WHERE l.lamaran_id = :application_id
+                 FOR UPDATE OF l.status_terkini'
+            );
+            $application->execute( [ 'application_id' => $application_id ] );
+            $application_row = $application->fetch( PDO::FETCH_ASSOC );
+            if ( ! is_array( $application_row ) ) {
+                throw new InvalidArgumentException( 'Lamaran tidak ditemukan.' );
+            }
+
+            $current_status = (string) ( $application_row['status'] ?? '' );
+            if ( 'INTERVIEW_USER' !== $current_status ) {
+                throw new InvalidArgumentException( 'Penugasan User Department hanya dapat diperbarui setelah hasil Wawancara HR yang lolos tersimpan.' );
+            }
+
+            $department_query = $connection->prepare(
+                'SELECT NVL(vacancy_department.nama_departemen, NVL(d.nama_departemen, k.nama_departemen)) AS "department_name"
+                 FROM HRS_LAMARAN l
+                 JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
+                 LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id
+                 LEFT JOIN HRS_DEPARTEMEN vacancy_department ON vacancy_department.departemen_id = NVL(d.departemen_id, k.departemen_id)
+                 WHERE l.lamaran_id = :application_id'
+            );
+            $department_query->execute( [ 'application_id' => $application_id ] );
+            $department_name = trim( (string) $department_query->fetchColumn() );
+            $this->validate_hr_interview_recipient( $connection, $application_id, $department_name, $department_account_id );
+
+            $existing_result = $connection->prepare(
+                'SELECT status_hasil
+                 FROM HRS_HASIL_WAWANCARA_HR
+                 WHERE lamaran_id = :application_id
+                 FOR UPDATE'
+            );
+            $existing_result->execute( [ 'application_id' => $application_id ] );
+            $existing_status = $existing_result->fetchColumn();
+            if ( false === $existing_status || 'LOLOS' !== strtoupper( trim( (string) $existing_status ) ) ) {
+                throw new InvalidArgumentException( 'Hasil Wawancara HR yang tersimpan tidak cocok dengan tahap lamaran ini.' );
+            }
+
+            $save_result = $connection->prepare(
+                'UPDATE HRS_HASIL_WAWANCARA_HR
+                 SET ROLE_AKSES_ID = :account_id,
+                     NAMA_DEPARTEMEN_TUJUAN = :department_name,
+                     DIPERBARUI_PADA = CURRENT_TIMESTAMP
+                 WHERE LAMARAN_ID = :application_id'
+            );
+            $save_result->execute(
+                [
+                    'account_id' => $department_account_id,
+                    'department_name' => $department_name,
+                    'application_id' => $application_id,
+                ]
+            );
+            if ( 1 !== $save_result->rowCount() ) {
+                throw new RuntimeException( 'User Department assignment was not updated.' );
+            }
+
+            $connection->commit();
+            return [ 'success' => true ];
+        } catch ( InvalidArgumentException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            return [ 'success' => false, 'error' => $exception->getMessage() ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_oracle_failure( 'User Department assignment failed', $exception );
+            return [ 'success' => false, 'error' => 'Penugasan Wawancara User gagal disimpan ke Oracle.' ];
+        }
+    }
+
+    /**
      * @return bool
      */
     private function validate_hr_interview_note_data(
@@ -3140,24 +3248,44 @@ class Recruitment_Database {
     /**
      * Ensure the selected recipient is an active User Department account in the chosen department.
      */
-    private function validate_hr_interview_recipient( PDO $connection, string $department_name, int $department_account_id ): void {
+    private function validate_hr_interview_recipient( PDO $connection, string $application_id, string $department_name, int $department_account_id ): void {
+        $vacancy = $connection->prepare(
+            'SELECT NVL(d.departemen_id, k.departemen_id) AS "DEPARTMENT_ID",
+                    NVL(vacancy_department.nama_departemen, NVL(d.nama_departemen, k.nama_departemen)) AS "DEPARTMENT_NAME"
+             FROM HRS_LAMARAN l
+             JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
+             LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id
+             LEFT JOIN HRS_DEPARTEMEN vacancy_department ON vacancy_department.departemen_id = NVL(d.departemen_id, k.departemen_id)
+             WHERE l.lamaran_id = :application_id'
+        );
+        $vacancy->execute( [ 'application_id' => $application_id ] );
+        $vacancy_row = $vacancy->fetch( PDO::FETCH_ASSOC );
+        $vacancy_department_id = is_array( $vacancy_row ) ? trim( (string) ( $vacancy_row['DEPARTMENT_ID'] ?? '' ) ) : '';
+        $vacancy_department_name = is_array( $vacancy_row ) ? trim( (string) ( $vacancy_row['DEPARTMENT_NAME'] ?? '' ) ) : '';
+        if (
+            '' === $vacancy_department_id
+            || '' === $vacancy_department_name
+            || 0 !== strcasecmp( $vacancy_department_name, trim( $department_name ) )
+        ) {
+            throw new InvalidArgumentException( 'Departemen tujuan harus mengikuti departemen pada lowongan.' );
+        }
+
         $recipient = $connection->prepare(
             'SELECT u.role_akses_id
              FROM HRS_ROLE_AKSES u
-             LEFT JOIN HRS_DEPARTEMEN d ON d.departemen_id = u.departemen_id
              WHERE u.role_akses_id = :account_id
                AND u.peran = \'KEPALA_DEPARTEMEN\'
                AND UPPER(TRIM(u.status_akun)) = \'ACTIVE\'
-               AND UPPER(TRIM(NVL(d.nama_departemen, u.nama_departemen))) = UPPER(TRIM(:department_name))'
+               AND u.departemen_id = :department_id'
         );
         $recipient->execute(
             [
                 'account_id' => $department_account_id,
-                'department_name' => trim( $department_name ),
+                'department_id' => $vacancy_department_id,
             ]
         );
         if ( ! $recipient->fetchColumn() ) {
-            throw new InvalidArgumentException( 'Pilih akun User Department aktif dari departemen tujuan.' );
+            throw new InvalidArgumentException( 'Pilih akun User Department aktif pada departemen lowongan.' );
         }
     }
 
@@ -3241,24 +3369,37 @@ class Recruitment_Database {
                    l.status_akhir AS "final_status",
                    NVL(l.created_at, l.tanggal_melamar) AS "created_at",
                    NVL(d.judul_pekerjaan, k.judul_pekerjaan) AS "title",
-                   NVL(k.nama_dealer, d.lokasi_penempatan) AS "location",
-                   NVL(k.nama_dealer, d.lokasi_penempatan) AS "dealer",
+                   NVL(d.lokasi_penempatan, k.nama_dealer) AS "location",
+                   k.nama_dealer AS "dealer",
                    d.kategori_kj AS "category",
-                   d.nama_departement AS "department",
+                   NVL(d.nama_departement, k.nama_departemen) AS "department",
+                   NVL(d.departemen_id, k.departemen_id) AS "department_id",
+                   hr.status_hasil AS "hr_interview_result",
+                   hr.role_akses_id AS "department_account_id",
+                   assigned_account.nama_lengkap AS "department_account_name",
+                   assigned_account.peran AS "department_account_role",
+                   assigned_account.status_akun AS "department_account_status",
+                   assigned_account.departemen_id AS "assigned_department_id",
                    NVL(p.nama_lengkap, p.nama_kandidat) AS "applicant_name",
                    NVL(p.email, pkl.email) AS "applicant_email",
                    NVL(p.nomor_hp, p.nomor_telepon) AS "applicant_phone",
                    p.provinsi AS "province",
                    ' . $booking_fields . '
                    ' . $user_interview_fields . '
-                   (SELECT s.hasil_hr FROM HRS_STATUS_KANDIDAT s WHERE s.kandidat_id = p.kandidat_id AND UPPER(TRIM(s.nama_departemen)) = UPPER(TRIM(d.nama_departement)) ORDER BY s.status_kandidat_id DESC FETCH FIRST 1 ROW ONLY) AS "hr_result",
-                   (SELECT r.keputusan_akhir FROM HRS_REKAPAN_KEPUTUSAN_HR r WHERE r.kandidat_id = p.kandidat_id AND UPPER(TRIM(r.nama_departement)) = UPPER(TRIM(d.nama_departement)) ORDER BY r.rekapan_keputusan_id DESC FETCH FIRST 1 ROW ONLY) AS "hr_final_decision",
+                   hr.status_hasil AS "hr_result",
+                   CASE
+                       WHEN UPPER(TRIM(NVL(l.status_akhir, l.status_terkini))) IN (\'DITERIMA\', \'ACCEPTED\', \'LOLOS\', \'DITOLAK\', \'REJECTED\')
+                       THEN UPPER(TRIM(NVL(l.status_akhir, l.status_terkini)))
+                       ELSE NULL
+                   END AS "hr_final_decision",
                    (SELECT MAX(r.tahap_seleksi) KEEP (DENSE_RANK LAST ORDER BY r.tanggal_status, r.riwayat_status_id) FROM HRS_RIWAYAT_STATUS_PELAMAR r WHERE r.lamaran_id = l.lamaran_id) AS "stage"
             FROM HRS_LAMARAN l
             LEFT JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
             LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id OR k.kolom_pendaftaran_id = l.detail_lowongan_id
             LEFT JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
             LEFT JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id
+            LEFT JOIN HRS_HASIL_WAWANCARA_HR hr ON hr.lamaran_id = l.lamaran_id
+            LEFT JOIN HRS_ROLE_AKSES assigned_account ON assigned_account.role_akses_id = hr.role_akses_id
             ORDER BY NVL(l.created_at, l.tanggal_melamar) DESC, l.lamaran_id DESC'
         );
     }
@@ -3317,11 +3458,6 @@ class Recruitment_Database {
                 SELECT w.*,
                        ROW_NUMBER() OVER (PARTITION BY w.lamaran_id ORDER BY w.hasil_user DESC) AS row_num
                 FROM HRS_HASIL_WAWANCARA_USER w
-            ),
-            ranked_decisions AS (
-                SELECT r.*,
-                       ROW_NUMBER() OVER (PARTITION BY r.kandidat_id, UPPER(TRIM(r.nama_departement)) ORDER BY r.rekapan_keputusan_id DESC) AS row_num
-                FROM HRS_REKAPAN_KEPUTUSAN_HR r
             )
             SELECT l.lamaran_id AS "APPLICATION_ID",
                    p.kandidat_id AS "CANDIDATE_ID",
@@ -3329,10 +3465,12 @@ class Recruitment_Database {
                    NVL(p.email, pkl.email) AS "CANDIDATE_EMAIL",
                    NVL(p.nomor_hp, p.nomor_telepon) AS "CANDIDATE_PHONE",
                    d.judul_pekerjaan AS "POSITION",
+                   NVL(assigned_department.nama_departemen, assigned_account.nama_departemen) AS "DEPARTMENT",
+                   d.lokasi_penempatan AS "BRANCH",
                    k.nama_dealer AS "DEALER",
                    NVL(NULLIF(TRIM(hr.nama_departemen_tujuan), \'\'), d.nama_departement) AS "ASSIGNED_DEPARTMENT",
                    NVL(w.status_seleksi, \'\') AS "INTERVIEW_STATUS",
-                   CASE UPPER(NVL(r.keputusan_akhir, l.status_akhir))
+                   CASE UPPER(TRIM(NVL(l.status_akhir, l.status_terkini)))
                        WHEN \'DITERIMA\' THEN \'Diterima\'
                        WHEN \'ACCEPTED\' THEN \'Diterima\'
                        WHEN \'DITOLAK\' THEN \'Tidak Diterima\'
@@ -3370,19 +3508,19 @@ class Recruitment_Database {
             JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
             JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id
             JOIN HRS_HASIL_WAWANCARA_HR hr ON hr.lamaran_id = l.lamaran_id
-            JOIN HRS_ROLE_AKSES current_account ON current_account.role_akses_id = :account_id
-            LEFT JOIN HRS_DEPARTEMEN current_department ON current_department.departemen_id = current_account.departemen_id
+            JOIN HRS_ROLE_AKSES assigned_account ON assigned_account.role_akses_id = hr.role_akses_id
+            LEFT JOIN HRS_DEPARTEMEN assigned_department ON assigned_department.departemen_id = assigned_account.departemen_id
             LEFT JOIN ranked_schedules j ON j.kandidat_id = p.kandidat_id AND j.row_num = 1
             LEFT JOIN ranked_results w ON w.lamaran_id = l.lamaran_id AND w.row_num = 1
-            LEFT JOIN ranked_decisions r ON r.kandidat_id = p.kandidat_id AND UPPER(TRIM(r.nama_departement)) = UPPER(TRIM(NVL(NULLIF(TRIM(hr.nama_departemen_tujuan), \'\'), d.nama_departement))) AND r.row_num = 1
             WHERE (
                     UPPER(TRIM(l.status_terkini)) = \'INTERVIEW_USER\'
                     OR UPPER(TRIM(l.status_akhir)) IN (\'DITERIMA\', \'ACCEPTED\', \'DITOLAK\', \'REJECTED\')
               )
               AND hr.status_hasil = \'LOLOS\'
-              AND current_account.peran = \'KEPALA_DEPARTEMEN\'
-              AND UPPER(TRIM(current_account.status_akun)) = \'ACTIVE\'
-              AND UPPER(TRIM(NVL(NULLIF(TRIM(hr.nama_departemen_tujuan), \'\'), d.nama_departement))) = UPPER(TRIM(NVL(current_department.nama_departemen, current_account.nama_departemen)))
+              AND hr.role_akses_id = :account_id
+              AND assigned_account.peran = \'KEPALA_DEPARTEMEN\'
+              AND UPPER(TRIM(assigned_account.status_akun)) = \'ACTIVE\'
+              AND assigned_account.departemen_id = NVL(d.departemen_id, k.departemen_id)
             ORDER BY NVL(l.created_at, l.tanggal_melamar) DESC, l.lamaran_id DESC',
             [
                 'account_id' => $account_id,
@@ -3464,6 +3602,8 @@ class Recruitment_Database {
                     l.status_terkini AS "application_status",
                     l.status_akhir AS "final_status",
                     d.judul_pekerjaan AS "position",
+                    NVL(vacancy_department.nama_departemen, NVL(d.nama_departement, k.nama_departemen)) AS "department",
+                    d.lokasi_penempatan AS "vacancy_location",
                     k.nama_dealer AS "dealer",
                     p.kandidat_id AS "candidate_id",
                     NVL(p.nama_lengkap, p.nama_kandidat) AS "candidate_name",
@@ -3500,11 +3640,14 @@ class Recruitment_Database {
              JOIN HRS_HASIL_WAWANCARA_HR hr ON hr.lamaran_id = l.lamaran_id
              JOIN HRS_ROLE_AKSES current_account ON current_account.role_akses_id = :account_id
              LEFT JOIN HRS_DEPARTEMEN current_department ON current_department.departemen_id = current_account.departemen_id
+             LEFT JOIN HRS_DEPARTEMEN vacancy_department ON vacancy_department.departemen_id = NVL(d.departemen_id, k.departemen_id)
              LEFT JOIN HRS_HASIL_WAWANCARA_USER w ON w.lamaran_id = l.lamaran_id
              WHERE l.lamaran_id = :application_id
                AND hr.status_hasil = \'LOLOS\'
+               AND hr.role_akses_id = :account_id
                AND current_account.peran = \'KEPALA_DEPARTEMEN\'
                AND UPPER(TRIM(current_account.status_akun)) = \'ACTIVE\'
+               AND current_account.departemen_id = NVL(d.departemen_id, k.departemen_id)
                AND UPPER(TRIM(NVL(NULLIF(TRIM(hr.nama_departemen_tujuan), \'\'), d.nama_departement))) = UPPER(TRIM(NVL(current_department.nama_departemen, current_account.nama_departemen)))
              FETCH FIRST 1 ROW ONLY',
             [
@@ -3523,8 +3666,10 @@ class Recruitment_Database {
             array_flip( [ 'education_level', 'institution', 'major', 'gpa', 'graduation_year', 'work_experiences' ] )
         );
         $profile_documents = is_array( $decoded_profile_details['documents'] ?? null ) ? $decoded_profile_details['documents'] : [];
-        if ( is_array( $profile_documents['resume'] ?? null ) ) {
-            $profile_details['documents'] = [ 'resume' => $profile_documents['resume'] ];
+        foreach ( [ 'profile_photo', 'resume' ] as $document_key ) {
+            if ( is_array( $profile_documents[ $document_key ] ?? null ) ) {
+                $profile_details['documents'][ $document_key ] = $profile_documents[ $document_key ];
+            }
         }
         $profile_answers = is_array( $decoded_profile_details['application_answers'] ?? null ) ? $decoded_profile_details['application_answers'] : [];
         $profile_details['application_answers'] = array_intersect_key(
@@ -3596,11 +3741,34 @@ class Recruitment_Database {
         try {
             $connection = $this->get_connection();
             $connection->beginTransaction();
+            $schedule_assignment_clause = $this->has_interview_booking_table()
+                ? 'AND (
+                       EXISTS (
+                           SELECT 1
+                           FROM HRS_INTERVIEW_BOOKING booking
+                           WHERE booking.lamaran_id = l.lamaran_id
+                             AND booking.interview_type = \'USER\'
+                             AND booking.booking_status = \'BOOKED\'
+                       )
+                       OR EXISTS (
+                           SELECT 1
+                           FROM HRS_JADWAL_KANDIDAT schedule
+                           WHERE schedule.kandidat_id = p.kandidat_id
+                             AND schedule.tanggal_wawancara IS NOT NULL
+                       )
+                   )'
+                : 'AND EXISTS (
+                       SELECT 1
+                       FROM HRS_JADWAL_KANDIDAT schedule
+                       WHERE schedule.kandidat_id = p.kandidat_id
+                         AND schedule.tanggal_wawancara IS NOT NULL
+                   )';
             $assignment = $connection->prepare(
                 'SELECT p.kandidat_id AS "CANDIDATE_ID",
                         NVL(NULLIF(TRIM(hr.nama_departemen_tujuan), \'\'), d.nama_departement) AS "ASSIGNED_DEPARTMENT"
                  FROM HRS_LAMARAN l
                  JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
+                 LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id
                  JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
                  JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id
                  JOIN HRS_HASIL_WAWANCARA_HR hr ON hr.lamaran_id = l.lamaran_id
@@ -3609,9 +3777,12 @@ class Recruitment_Database {
                  WHERE l.lamaran_id = :application_id
                    AND UPPER(TRIM(l.status_terkini)) = \'INTERVIEW_USER\'
                    AND hr.status_hasil = \'LOLOS\'
+                   AND hr.role_akses_id = :account_id
                    AND current_account.peran = \'KEPALA_DEPARTEMEN\'
                    AND UPPER(TRIM(current_account.status_akun)) = \'ACTIVE\'
+                   AND current_account.departemen_id = NVL(d.departemen_id, k.departemen_id)
                    AND UPPER(TRIM(NVL(NULLIF(TRIM(hr.nama_departemen_tujuan), \'\'), d.nama_departement))) = UPPER(TRIM(NVL(current_department.nama_departemen, current_account.nama_departemen)))
+                   ' . $schedule_assignment_clause . '
                  FOR UPDATE OF l.status_terkini'
             );
             $assignment->execute(
@@ -3723,6 +3894,25 @@ class Recruitment_Database {
                 ]
             );
 
+            if ( 'Tidak Lolos Wawancara User' === $selection_status ) {
+                $reject_application = $connection->prepare(
+                    'UPDATE HRS_LAMARAN
+                     SET status_terkini = :status, status_akhir = :final_status, updated_at = CURRENT_TIMESTAMP
+                     WHERE lamaran_id = :application_id
+                       AND UPPER(TRIM(status_terkini)) = \'INTERVIEW_USER\''
+                );
+                $reject_application->execute(
+                    [
+                        'status' => 'DITOLAK',
+                        'final_status' => 'DITOLAK',
+                        'application_id' => $application_id,
+                    ]
+                );
+                if ( 1 !== $reject_application->rowCount() ) {
+                    throw new RuntimeException( 'Rejected User interview application status was not updated.' );
+                }
+            }
+
             $history = $connection->prepare(
                 'INSERT INTO HRS_RIWAYAT_STATUS_PELAMAR (lamaran_id, tahap_seleksi, status_seleksi, tanggal_status, keterangan_pelamar)
                  VALUES (:application_id, \'INTERVIEW_USER\', :selection_status, CURRENT_DATE, :note)'
@@ -3785,6 +3975,11 @@ class Recruitment_Database {
                         NVL(p.nama_lengkap, p.nama_kandidat) AS "candidate_name",
                         d.nama_departement AS "department_name",
                         UPPER(TRIM(l.status_terkini)) AS "application_status",
+                        CASE WHEN EXISTS (
+                            SELECT 1 FROM HRS_HASIL_WAWANCARA_HR h
+                            WHERE h.lamaran_id = l.lamaran_id
+                              AND UPPER(TRIM(h.status_hasil)) = \'LOLOS\'
+                        ) THEN 1 ELSE 0 END AS "hr_passed",
                         (SELECT w.hasil_user FROM HRS_HASIL_WAWANCARA_USER w
                          WHERE w.lamaran_id = l.lamaran_id
                          ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_result_id",
@@ -3796,7 +3991,10 @@ class Recruitment_Database {
                          ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_score",
                         (SELECT w.rekomendasi FROM HRS_HASIL_WAWANCARA_USER w
                          WHERE w.lamaran_id = l.lamaran_id
-                         ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_recommendation"
+                         ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_recommendation",
+                        (SELECT w.status_seleksi FROM HRS_HASIL_WAWANCARA_USER w
+                         WHERE w.lamaran_id = l.lamaran_id
+                         ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_selection_status"
                  FROM HRS_LAMARAN l
                  JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
                  JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
@@ -3813,13 +4011,37 @@ class Recruitment_Database {
                 $connection->rollBack();
                 return [ 'success' => false, 'error' => 'Keputusan akhir hanya dapat dibuat setelah kandidat mencapai tahap wawancara departemen.' ];
             }
+            if ( 1 !== (int) $candidate['hr_passed'] ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'Keputusan akhir hanya dapat dibuat setelah kandidat lolos wawancara HR.' ];
+            }
             if ( empty( $candidate['user_result_id'] ) ) {
                 $connection->rollBack();
                 return [ 'success' => false, 'error' => 'Keputusan akhir hanya dapat dibuat setelah hasil wawancara User tersimpan.' ];
             }
-            if ( 'Lolos Wawancara User' !== trim( (string) $candidate['user_result_status'] ) ) {
+            if ( ! in_array( strtoupper( trim( (string) $candidate['user_selection_status'] ) ), [ 'LOLOS WAWANCARA USER', 'LOLOS' ], true ) ) {
                 $connection->rollBack();
-                return [ 'success' => false, 'error' => 'Keputusan akhir hanya dapat dibuat setelah kandidat disetujui User Department.' ];
+                return [ 'success' => false, 'error' => 'Keputusan akhir hanya dapat dibuat setelah kandidat lolos wawancara User.' ];
+            }
+
+            $application_count = $connection->prepare(
+                'SELECT COUNT(*)
+                 FROM HRS_LAMARAN l
+                 JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
+                 JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id
+                 JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
+                 WHERE p.kandidat_id = :candidate_id
+                   AND UPPER(TRIM(d.nama_departement)) = UPPER(TRIM(:department_name))'
+            );
+            $application_count->execute(
+                [
+                    'candidate_id' => (int) $candidate['candidate_id'],
+                    'department_name' => (string) $candidate['department_name'],
+                ]
+            );
+            if ( (int) $application_count->fetchColumn() > 1 ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'Keputusan belum dapat disimpan karena tabel rekap belum dapat membedakan beberapa lamaran kandidat pada departemen ini.' ];
             }
             if (
                 in_array( strtoupper( trim( (string) $candidate['final_status'] ) ), [ 'DITERIMA', 'ACCEPTED', 'LOLOS', 'DITOLAK', 'REJECTED', 'TIDAK DITERIMA', 'TIDAK_DITERIMA', 'TIDAK LOLOS', 'TIDAK_LOLOS' ], true )
@@ -4011,7 +4233,7 @@ class Recruitment_Database {
      */
     public function get_psychotest_question_bank(): array {
         $questions = [];
-        foreach ( $this->load_psychotest_catalog( true ) as $test ) {
+        foreach ( $this->load_psychotest_catalog( true, true ) as $test ) {
             foreach ( $test['questions'] as $question ) {
                 $correct_answers = array_values(
                     array_map(
@@ -4033,12 +4255,14 @@ class Recruitment_Database {
                     'type' => $question['type'],
                     'choices' => array_column( $question['choices'], 'text' ),
                     'answer' => implode( ' | ', $correct_answers ),
-                    'status' => (int) $test['active'] === 1 ? 'active' : 'inactive',
+                    'explanation' => $question['explanation'],
+                    'status' => 1 === (int) $question['is_active'] ? 'active' : 'inactive',
                     'updated' => (string) $test['updated_at'],
                     'number' => $question['number'],
                 ];
             }
         }
+        usort( $questions, static fn ( array $first, array $second ): int => (int) $second['id'] <=> (int) $first['id'] );
         return $questions;
     }
 
@@ -4166,17 +4390,22 @@ class Recruitment_Database {
     public function save_iq_question( array $question ): array {
         $question_id = absint( $question['id'] ?? 0 );
         $prompt = trim( (string) ( $question['prompt'] ?? '' ) );
+        $explanation = trim( (string) ( $question['explanation'] ?? '' ) );
+        $is_active = ! empty( $question['is_active'] );
         $subtest = sanitize_key( (string) ( $question['subtest'] ?? '' ) );
         $type = sanitize_key( (string) ( $question['type'] ?? '' ) );
         $choices = array_values( array_filter( (array) ( $question['choices'] ?? [] ), static fn ( $choice ): bool => is_string( $choice ) && '' !== trim( $choice ) ) );
         $answer = trim( (string) ( $question['answer'] ?? '' ) );
-        if ( $question_id < 1 || '' === $prompt || 4000 < strlen( $prompt ) || ! in_array( $subtest, [ 'iq_numbers', 'iq_assembly', 'iq_words', 'iq_abstraction' ], true ) || ! in_array( $type, [ 'multiple_choice', 'multi_select' ], true ) || count( $choices ) < 2 || '' === $answer ) {
+        if ( $question_id < 1 || '' === $prompt || 4000 < strlen( $prompt ) || 4000 < strlen( $explanation ) || ! in_array( $subtest, [ 'iq_numbers', 'iq_assembly', 'iq_words', 'iq_abstraction' ], true ) || ! in_array( $type, [ 'multiple_choice', 'multi_select' ], true ) || count( $choices ) < 2 || '' === $answer ) {
             return [ 'success' => false, 'error' => 'Data soal IQ tidak valid.' ];
         }
 
         $existing = $this->find_psychotest_question( $question_id );
         if ( ! $existing || 'iq' !== $existing['test_key'] || $subtest !== $existing['subtest'] || $type !== $existing['type'] || count( $choices ) !== count( $existing['choices'] ) ) {
             return [ 'success' => false, 'error' => 'Soal atau jumlah pilihan tidak sesuai dengan struktur tes.' ];
+        }
+        if ( ! array_key_exists( 'is_active', $question ) ) {
+            $is_active = 1 === (int) $existing['is_active'];
         }
 
         $answer_values = array_values( array_filter( array_map( 'trim', explode( '|', $answer ) ), static fn ( string $value ): bool => '' !== $value ) );
@@ -4202,9 +4431,16 @@ class Recruitment_Database {
             $connection = $this->get_connection();
             $connection->beginTransaction();
             $update_question = $connection->prepare(
-                'UPDATE HRS_PERTANYAAN_PSIKOTES SET TEKS_PERTANYAAN = TO_CLOB(:prompt) WHERE PEERTANYAAN_PSIKOTES_ID = :question_id'
+                'UPDATE HRS_PERTANYAAN_PSIKOTES SET TEKS_PERTANYAAN = TO_CLOB(:prompt), PEMBAHASAN = TO_CLOB(:explanation), IS_ACTIVE = :is_active WHERE PERTANYAAN_PSIKOTES_ID = :question_id'
             );
-            $update_question->execute( [ 'prompt' => $prompt, 'question_id' => $question_id ] );
+            $update_question->execute(
+                [
+                    'prompt' => $prompt,
+                    'explanation' => $explanation,
+                    'is_active' => $is_active ? 1 : 0,
+                    'question_id' => $question_id,
+                ]
+            );
             if ( 1 !== $update_question->rowCount() ) {
                 throw new InvalidArgumentException( 'Question not found.' );
             }
@@ -4274,14 +4510,18 @@ class Recruitment_Database {
      */
     public function create_psychotest_question( array $question ): array {
         $test_key = sanitize_key( (string) ( $question['test'] ?? '' ) );
-        $subtest = sanitize_key( (string) ( $question['subtest'] ?? '' ) );
+        $subtest = 'iq' === $test_key
+            ? 'iq_numbers'
+            : sanitize_key( (string) ( $question['subtest'] ?? '' ) );
         $type = sanitize_key( (string) ( $question['type'] ?? '' ) );
         $prompt = trim( (string) ( $question['prompt'] ?? '' ) );
+        $explanation = trim( (string) ( $question['explanation'] ?? '' ) );
+        $is_active = ! array_key_exists( 'is_active', $question ) || ! empty( $question['is_active'] );
         $choices = array_values( array_filter( (array) ( $question['choices'] ?? [] ), static fn ( $choice ): bool => is_string( $choice ) && '' !== trim( $choice ) ) );
         $items = array_values( array_filter( (array) ( $question['items'] ?? [] ), static fn ( $item ): bool => is_string( $item ) && '' !== trim( $item ) ) );
         $answer = trim( (string) ( $question['answer'] ?? '' ) );
 
-        if ( '' === $prompt || 4000 < strlen( $prompt ) ) {
+        if ( '' === $prompt || 4000 < strlen( $prompt ) || 4000 < strlen( $explanation ) ) {
             return [ 'success' => false, 'error' => 'Isi soal tidak valid.' ];
         }
 
@@ -4353,13 +4593,15 @@ class Recruitment_Database {
             $order_query->execute( [ 'test_id' => $test_id ] );
             $display_order = (int) $order_query->fetchColumn();
             $insert_question = $connection->prepare(
-                'INSERT INTO HRS_PERTANYAAN_PSIKOTES (TES_PSIKOLOGI_ID, TEKS_PERTANYAAN, JENIS_PERTANYAAN, NILAI_PERTANYAAN, DISPLAY_ORDER) VALUES (:test_id, TO_CLOB(:prompt), :question_type, 1, :display_order) RETURNING PEERTANYAAN_PSIKOTES_ID INTO :question_id'
+                'INSERT INTO HRS_PERTANYAAN_PSIKOTES (TES_PSIKOLOGI_ID, TEKS_PERTANYAAN, JENIS_PERTANYAAN, NILAI_PERTANYAAN, DISPLAY_ORDER, PEMBAHASAN, IS_ACTIVE) VALUES (:test_id, TO_CLOB(:prompt), :question_type, 1, :display_order, TO_CLOB(:explanation), :is_active) RETURNING PERTANYAAN_PSIKOTES_ID INTO :question_id'
             );
             $question_id = 0;
             $insert_question->bindValue( ':test_id', $test_id, PDO::PARAM_INT );
             $insert_question->bindValue( ':prompt', $encoded_prompt, PDO::PARAM_STR );
             $insert_question->bindValue( ':question_type', $question_type, PDO::PARAM_STR );
             $insert_question->bindValue( ':display_order', $display_order, PDO::PARAM_INT );
+            $insert_question->bindValue( ':explanation', $explanation, PDO::PARAM_STR );
+            $insert_question->bindValue( ':is_active', $is_active ? 1 : 0, PDO::PARAM_INT );
             $insert_question->bindParam( ':question_id', $question_id, PDO::PARAM_INT | PDO::PARAM_INPUT_OUTPUT, 19 );
             $insert_question->execute();
             if ( $question_id < 1 ) {
@@ -4385,7 +4627,7 @@ class Recruitment_Database {
             }
 
             $count_query = $connection->prepare(
-                'SELECT COUNT(*) FROM HRS_PERTANYAAN_PSIKOTES WHERE TES_PSIKOLOGI_ID = :test_id'
+                'SELECT COUNT(*) FROM HRS_PERTANYAAN_PSIKOTES WHERE TES_PSIKOLOGI_ID = :test_id AND IS_ACTIVE = 1'
             );
             $count_query->execute( [ 'test_id' => $test_id ] );
             $question_count = (int) $count_query->fetchColumn();
@@ -4473,7 +4715,7 @@ class Recruitment_Database {
             $order_query->execute( [ 'test_id' => $test_id ] );
             $display_order = (int) $order_query->fetchColumn();
             $insert_question = $connection->prepare(
-                'INSERT INTO HRS_PERTANYAAN_PSIKOTES (TES_PSIKOLOGI_ID, TEKS_PERTANYAAN, JENIS_PERTANYAAN, NILAI_PERTANYAAN, DISPLAY_ORDER) VALUES (:test_id, TO_CLOB(:prompt), :question_type, 1, :display_order) RETURNING PEERTANYAAN_PSIKOTES_ID INTO :question_id'
+                'INSERT INTO HRS_PERTANYAAN_PSIKOTES (TES_PSIKOLOGI_ID, TEKS_PERTANYAAN, JENIS_PERTANYAAN, NILAI_PERTANYAAN, DISPLAY_ORDER, PEMBAHASAN, IS_ACTIVE) VALUES (:test_id, TO_CLOB(:prompt), :question_type, 1, :display_order, NULL, 1) RETURNING PERTANYAAN_PSIKOTES_ID INTO :question_id'
             );
             foreach ( $encoded_questions as $encoded_prompt ) {
                 $question_id = 0;
@@ -4490,7 +4732,7 @@ class Recruitment_Database {
             }
 
             $count_query = $connection->prepare(
-                'SELECT COUNT(*) FROM HRS_PERTANYAAN_PSIKOTES WHERE TES_PSIKOLOGI_ID = :test_id'
+                'SELECT COUNT(*) FROM HRS_PERTANYAAN_PSIKOTES WHERE TES_PSIKOLOGI_ID = :test_id AND IS_ACTIVE = 1'
             );
             $count_query->execute( [ 'test_id' => $test_id ] );
             $update_test = $connection->prepare(
@@ -4596,7 +4838,7 @@ class Recruitment_Database {
                     $display_orders[ $test_id ] = (int) $order_query->fetchColumn();
                 }
                 $insert_question = $connection->prepare(
-                    'INSERT INTO HRS_PERTANYAAN_PSIKOTES (TES_PSIKOLOGI_ID, TEKS_PERTANYAAN, JENIS_PERTANYAAN, NILAI_PERTANYAAN, DISPLAY_ORDER) VALUES (:test_id, TO_CLOB(:prompt), :question_type, 1, :display_order) RETURNING PEERTANYAAN_PSIKOTES_ID INTO :question_id'
+                    'INSERT INTO HRS_PERTANYAAN_PSIKOTES (TES_PSIKOLOGI_ID, TEKS_PERTANYAAN, JENIS_PERTANYAAN, NILAI_PERTANYAAN, DISPLAY_ORDER, PEMBAHASAN, IS_ACTIVE) VALUES (:test_id, TO_CLOB(:prompt), :question_type, 1, :display_order, NULL, 1) RETURNING PERTANYAAN_PSIKOTES_ID INTO :question_id'
                 );
                 $question_id = 0;
                 $insert_question->bindValue( ':test_id', $test_id, PDO::PARAM_INT );
@@ -4628,7 +4870,7 @@ class Recruitment_Database {
             );
             foreach ( array_keys( $display_orders ) as $test_id ) {
                 $count_query = $connection->prepare(
-                    'SELECT COUNT(*) FROM HRS_PERTANYAAN_PSIKOTES WHERE TES_PSIKOLOGI_ID = :test_id'
+                    'SELECT COUNT(*) FROM HRS_PERTANYAAN_PSIKOTES WHERE TES_PSIKOLOGI_ID = :test_id AND IS_ACTIVE = 1'
                 );
                 $count_query->execute( [ 'test_id' => $test_id ] );
                 $update_test->execute(
@@ -4656,36 +4898,36 @@ class Recruitment_Database {
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function get_iq_assessment(): array {
-        $tests = array_values( array_filter( $this->load_psychotest_catalog(), static fn ( array $test ): bool => 'iq' === $test['test_key'] ) );
+    public function get_iq_assessment( bool $include_inactive_questions = false ): array {
+        $tests = array_values( array_filter( $this->load_psychotest_catalog( false, $include_inactive_questions ), static fn ( array $test ): bool => 'iq' === $test['test_key'] ) );
         usort( $tests, static fn ( array $first, array $second ): int => $first['order'] <=> $second['order'] );
-        return $tests;
+        return $this->strip_psychotest_question_metadata( $tests );
     }
 
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function get_pauli_assessment(): array {
-        $tests = array_values( array_filter( $this->load_psychotest_catalog(), static fn ( array $test ): bool => 'pauli' === $test['test_key'] ) );
+    public function get_pauli_assessment( bool $include_inactive_questions = false ): array {
+        $tests = array_values( array_filter( $this->load_psychotest_catalog( false, $include_inactive_questions ), static fn ( array $test ): bool => 'pauli' === $test['test_key'] ) );
         if ( isset( $tests[0] ) ) {
             $tests[0]['QUESTION_COUNT'] = (int) $tests[0]['QUESTION_COUNT'] > 0
                 ? (int) $tests[0]['QUESTION_COUNT']
                 : count( $tests[0]['questions'] ) * 900;
         }
-        return $tests;
+        return $this->strip_psychotest_question_metadata( $tests );
     }
 
     /**
      * @return array<string, array<string, mixed>>
      */
-    public function get_personality_assessments( bool $include_inactive = false ): array {
+    public function get_personality_assessments( bool $include_inactive = false, bool $include_inactive_questions = false ): array {
         $assessments = [];
-        foreach ( $this->load_psychotest_catalog( $include_inactive ) as $test ) {
+        foreach ( $this->load_psychotest_catalog( $include_inactive, $include_inactive_questions ) as $test ) {
             if ( in_array( $test['test_key'], [ 'disc', 'papi' ], true ) ) {
                 $assessments[ $test['test_key'] ] = $test;
             }
         }
-        return $assessments;
+        return $this->strip_psychotest_question_metadata( $assessments );
     }
 
     /**
@@ -6184,7 +6426,7 @@ class Recruitment_Database {
         } elseif ( in_array( $normalized, [ 'ADMINISTRASI', 'SCREENING', 'SUBMITTED' ], true ) ) {
             $normalized = 'ADMINISTRASI';
         }
-        $allowed_statuses = [ 'SUBMITTED', 'SCREENING', 'ADMINISTRASI', 'PSIKOTES', 'INTERVIEW_HR', 'INTERVIEW_USER', 'FINAL', 'DITERIMA', 'DITOLAK' ];
+        $allowed_statuses = [ 'PSIKOTES', 'INTERVIEW_HR', 'DITOLAK' ];
         if ( ! in_array( $normalized, $allowed_statuses, true ) ) {
             return [ 'success' => false, 'error' => 'Status lamaran tidak dikenal.' ];
         }
@@ -6223,9 +6465,28 @@ class Recruitment_Database {
             if ( false === $current_status ) {
                 throw new InvalidArgumentException( 'Application not found.' );
             }
-            if ( ! in_array( $current_status, [ 'SUBMITTED', 'SCREENING', 'ADMINISTRASI', 'PSIKOTES', 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) ) {
+            if ( ! in_array( $current_status, [ 'SUBMITTED', 'SCREENING', 'ADMINISTRASI', 'PSIKOTES' ], true ) ) {
                 $connection->rollBack();
-                return [ 'success' => false, 'error' => 'Tahap seleksi lamaran ini sudah diputuskan.' ];
+                return [ 'success' => false, 'error' => 'Tahap ini harus diproses melalui halaman Wawancara HR, User Department, atau Keputusan Akhir.' ];
+            }
+            $current_stage = in_array( $current_status, [ 'SUBMITTED', 'SCREENING' ], true ) ? 'ADMINISTRASI' : $current_status;
+            $expected_next_stage = [
+                'SUBMITTED' => 'PSIKOTES',
+                'SCREENING' => 'PSIKOTES',
+                'ADMINISTRASI' => 'PSIKOTES',
+                'PSIKOTES' => 'INTERVIEW_HR',
+            ][ $current_status ] ?? '';
+            if ( 'DITOLAK' === $normalized ) {
+                if ( '' !== $stage && strtoupper( trim( $stage ) ) !== $current_stage ) {
+                    $connection->rollBack();
+                    return [ 'success' => false, 'error' => 'Keputusan harus disimpan pada tahap seleksi yang sedang berjalan.' ];
+                }
+                $effective_stage = $current_stage;
+            } elseif ( $normalized !== $expected_next_stage || ( '' !== $stage && strtoupper( trim( $stage ) ) !== $expected_next_stage ) ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'Kandidat hanya dapat dilanjutkan ke tahap seleksi berikutnya.' ];
+            } else {
+                $effective_stage = $expected_next_stage;
             }
             $update = $connection->prepare(
                 'UPDATE HRS_LAMARAN SET STATUS_TERKINI = :status_value, STATUS_AKHIR = CASE WHEN :is_final = 1 THEN :final_status ELSE STATUS_AKHIR END, UPDATED_AT = CURRENT_TIMESTAMP WHERE LAMARAN_ID = :application_id'
@@ -7261,10 +7522,11 @@ class Recruitment_Database {
                 /**
                  * @return array<int, array<string, mixed>>
                  */
-                private function load_psychotest_catalog( bool $include_inactive = false ): array {
+                private function load_psychotest_catalog( bool $include_inactive = false, bool $include_inactive_questions = false ): array {
                     $active_filter = $include_inactive ? '' : 'WHERE NVL(t.IS_ACTIVE, 0) = 1';
+                    $question_filter = $include_inactive_questions ? '' : ' AND NVL(q.IS_ACTIVE, 1) = 1';
                     $rows = $this->fetch_all(
-                        'SELECT t.TES_PSIKOLOGI_ID AS "test_id", t.JUDUL AS "test_title", t.PETUNJUK_PENGERJAAN AS "instructions", t.DURASI_PENGERJAAN AS "duration", t.JUMLAH_SOAL AS "question_count", t.IS_ACTIVE AS "test_active", t.URUTAN_TAMPILAN AS "test_order", TO_CHAR(t.UPDATED_AT, \'YYYY-MM-DD HH24:MI:SS\') AS "updated_at", q.PEERTANYAAN_PSIKOTES_ID AS "question_id", q.TEKS_PERTANYAAN AS "question_text", q.JENIS_PERTANYAAN AS "question_type", q.DISPLAY_ORDER AS "question_order", a.JAWABAN_PSIKOTES_ID AS "choice_id", a.JAWABAN_TEKS AS "choice_text", a.APAKAH_BENAR AS "choice_is_correct", a.URUTAN_TAMPILAN AS "choice_order", a.NILAI AS "choice_score" FROM HRS_TES_PSIKOLOGI t LEFT JOIN HRS_PERTANYAAN_PSIKOTES q ON q.TES_PSIKOLOGI_ID = t.TES_PSIKOLOGI_ID LEFT JOIN HRS_JAWABAN_PSIKOTES a ON a.PERTANYAAN_PSIKOTES_ID = q.PEERTANYAAN_PSIKOTES_ID ' . $active_filter . ' ORDER BY NVL(t.URUTAN_TAMPILAN, t.TES_PSIKOLOGI_ID), t.TES_PSIKOLOGI_ID, NVL(q.DISPLAY_ORDER, q.PEERTANYAAN_PSIKOTES_ID), q.PEERTANYAAN_PSIKOTES_ID, NVL(a.URUTAN_TAMPILAN, a.JAWABAN_PSIKOTES_ID), a.JAWABAN_PSIKOTES_ID'
+                        'SELECT t.TES_PSIKOLOGI_ID AS "test_id", t.JUDUL AS "test_title", t.PETUNJUK_PENGERJAAN AS "instructions", t.DURASI_PENGERJAAN AS "duration", t.JUMLAH_SOAL AS "question_count", t.IS_ACTIVE AS "test_active", t.URUTAN_TAMPILAN AS "test_order", TO_CHAR(t.UPDATED_AT, \'YYYY-MM-DD HH24:MI:SS\') AS "updated_at", q.PERTANYAAN_PSIKOTES_ID AS "question_id", q.TEKS_PERTANYAAN AS "question_text", q.PEMBAHASAN AS "question_explanation", q.IS_ACTIVE AS "question_active", q.JENIS_PERTANYAAN AS "question_type", q.DISPLAY_ORDER AS "question_order", a.JAWABAN_PSIKOTES_ID AS "choice_id", a.JAWABAN_TEKS AS "choice_text", a.APAKAH_BENAR AS "choice_is_correct", a.URUTAN_TAMPILAN AS "choice_order", a.NILAI AS "choice_score" FROM HRS_TES_PSIKOLOGI t LEFT JOIN HRS_PERTANYAAN_PSIKOTES q ON q.TES_PSIKOLOGI_ID = t.TES_PSIKOLOGI_ID' . $question_filter . ' LEFT JOIN HRS_JAWABAN_PSIKOTES a ON a.PERTANYAAN_PSIKOTES_ID = q.PERTANYAAN_PSIKOTES_ID ' . $active_filter . ' ORDER BY NVL(t.URUTAN_TAMPILAN, t.TES_PSIKOLOGI_ID), t.TES_PSIKOLOGI_ID, NVL(q.DISPLAY_ORDER, q.PERTANYAAN_PSIKOTES_ID), q.PERTANYAAN_PSIKOTES_ID, NVL(a.URUTAN_TAMPILAN, a.JAWABAN_PSIKOTES_ID), a.JAWABAN_PSIKOTES_ID'
                     );
                     $tests = [];
                     foreach ( $rows as $row ) {
@@ -7309,6 +7571,8 @@ class Recruitment_Database {
                                 'id' => $question_id,
                                 'prompt' => $prompt,
                                 'items' => $items,
+                                'explanation' => (string) ( $row['question_explanation'] ?? '' ),
+                                'is_active' => absint( $row['question_active'] ?? 1 ),
                                 'type' => $this->psychotest_question_type( (string) ( $row['question_type'] ?? '' ), $tests[ $test_id ]['test_key'] ),
                                 'number' => absint( $row['question_order'] ?? $question_id ),
                                 'choices' => [],
@@ -7345,6 +7609,21 @@ class Recruitment_Database {
                     unset( $test );
                     usort( $tests, static fn ( array $first, array $second ): int => $first['order'] <=> $second['order'] );
                     return array_values( $tests );
+                }
+
+                /**
+                 * @param array<int|string, array<string, mixed>> $tests
+                 * @return array<int|string, array<string, mixed>>
+                 */
+                private function strip_psychotest_question_metadata( array $tests ): array {
+                    foreach ( $tests as &$test ) {
+                        foreach ( $test['questions'] as &$question ) {
+                            unset( $question['explanation'], $question['is_active'] );
+                        }
+                        unset( $question );
+                    }
+                    unset( $test );
+                    return $tests;
                 }
 
                 private function psychotest_test_key( string $title ): string {
@@ -7420,7 +7699,7 @@ class Recruitment_Database {
                  * @return array<string, mixed>|null
                  */
                 private function find_psychotest_question( int $question_id ): ?array {
-                    foreach ( $this->load_psychotest_catalog( true ) as $test ) {
+                    foreach ( $this->load_psychotest_catalog( true, true ) as $test ) {
                         foreach ( $test['questions'] as $question ) {
                             if ( $question_id === (int) $question['id'] ) {
                                 return [
@@ -7428,6 +7707,8 @@ class Recruitment_Database {
                                     'test_key' => $test['test_key'],
                                     'subtest' => $test['subtest'],
                                     'choices' => $question['choices'],
+                                    'explanation' => $question['explanation'],
+                                    'is_active' => $question['is_active'],
                                 ];
                             }
                         }
@@ -7449,15 +7730,29 @@ class Recruitment_Database {
                     if ( ! $existing || $test_key !== $existing['test_key'] ) {
                         return [ 'success' => false, 'error' => 'Soal tidak ditemukan pada jenis tes yang dipilih.' ];
                     }
+                    $explanation = trim( (string) ( $question['explanation'] ?? '' ) );
+                    $is_active = array_key_exists( 'is_active', $question )
+                        ? ! empty( $question['is_active'] )
+                        : 1 === (int) $existing['is_active'];
+                    if ( 4000 < strlen( $explanation ) ) {
+                        return [ 'success' => false, 'error' => 'Pembahasan maksimal 4.000 karakter.' ];
+                    }
 
                     $connection = null;
                     try {
                         $connection = $this->get_connection();
                         $connection->beginTransaction();
                         $update = $connection->prepare(
-                            'UPDATE HRS_PERTANYAAN_PSIKOTES SET TEKS_PERTANYAAN = TO_CLOB(:prompt) WHERE PEERTANYAAN_PSIKOTES_ID = :question_id'
+                            'UPDATE HRS_PERTANYAAN_PSIKOTES SET TEKS_PERTANYAAN = TO_CLOB(:prompt), PEMBAHASAN = TO_CLOB(:explanation), IS_ACTIVE = :is_active WHERE PERTANYAAN_PSIKOTES_ID = :question_id'
                         );
-                        $update->execute( [ 'prompt' => $prompt, 'question_id' => $question_id ] );
+                        $update->execute(
+                            [
+                                'prompt' => $prompt,
+                                'explanation' => $explanation,
+                                'is_active' => $is_active ? 1 : 0,
+                                'question_id' => $question_id,
+                            ]
+                        );
                         if ( 1 !== $update->rowCount() ) {
                             throw new InvalidArgumentException( 'Question not found.' );
                         }
@@ -7479,8 +7774,23 @@ class Recruitment_Database {
                 }
 
                 private function touch_psychotest( PDO $connection, int $test_id ): void {
-                    $statement = $connection->prepare( 'UPDATE HRS_TES_PSIKOLOGI SET UPDATED_AT = CURRENT_TIMESTAMP WHERE TES_PSIKOLOGI_ID = :test_id' );
-                    $statement->execute( [ 'test_id' => $test_id ] );
+                    $test_query = $connection->prepare(
+                        'SELECT JUDUL FROM HRS_TES_PSIKOLOGI WHERE TES_PSIKOLOGI_ID = :test_id'
+                    );
+                    $test_query->execute( [ 'test_id' => $test_id ] );
+                    $test_key = $this->psychotest_test_key( (string) $test_query->fetchColumn() );
+                    $count_query = $connection->prepare(
+                        'SELECT COUNT(*) FROM HRS_PERTANYAAN_PSIKOTES WHERE TES_PSIKOLOGI_ID = :test_id AND IS_ACTIVE = 1'
+                    );
+                    $count_query->execute( [ 'test_id' => $test_id ] );
+                    $question_count = (int) $count_query->fetchColumn();
+                    if ( 'pauli' === $test_key ) {
+                        $question_count *= 900;
+                    }
+                    $statement = $connection->prepare(
+                        'UPDATE HRS_TES_PSIKOLOGI SET JUMLAH_SOAL = :question_count, UPDATED_AT = CURRENT_TIMESTAMP WHERE TES_PSIKOLOGI_ID = :test_id'
+                    );
+                    $statement->execute( [ 'question_count' => $question_count, 'test_id' => $test_id ] );
                 }
 
                 private function question_belongs_to_test( int $test_id, int $question_id ): bool {
