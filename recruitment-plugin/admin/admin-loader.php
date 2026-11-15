@@ -20,6 +20,7 @@ class Recruitment_Admin {
 		add_action( 'admin_post_daw_save_hr_interview', [ $this, 'handle_hr_interview_save' ] );
 		add_action( 'admin_post_daw_send_application_status_email', [ $this, 'handle_application_status_email' ] );
 		add_action( 'admin_post_daw_update_psychotest_attendance_time', [ $this, 'handle_psychotest_attendance_time_update' ] );
+		add_action( 'admin_post_daw_save_offline_psychotest', [ $this, 'handle_save_offline_psychotest' ] );
 		add_action( 'admin_post_daw_update_applicant_email', [ $this, 'handle_applicant_email_update' ] );
 		add_action( 'admin_post_daw_save_email_settings', [ $this, 'handle_save_email_settings' ] );
 		add_action( 'admin_post_daw_save_email_template', [ $this, 'handle_save_email_template' ] );
@@ -692,6 +693,63 @@ class Recruitment_Admin {
 		exit;
 	}
 
+	public function handle_save_offline_psychotest(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk menyimpan nilai psikotes.', 'recruitment-plugin' ) );
+		}
+
+		$candidate_id = absint( $_POST['candidate_id'] ?? 0 );
+		$application_id = absint( $_POST['application_id'] ?? 0 );
+		check_admin_referer( 'daw_save_offline_psychotest_' . $candidate_id );
+
+		$total_score = isset( $_POST['total_score'] ) ? (float) sanitize_text_field( wp_unslash( (string) $_POST['total_score'] ) ) : 0.0;
+		$score_iq = sanitize_text_field( wp_unslash( (string) ( $_POST['score_iq'] ?? '' ) ) );
+		$score_pauli = sanitize_text_field( wp_unslash( (string) ( $_POST['score_pauli'] ?? '' ) ) );
+		$score_disc = sanitize_text_field( wp_unslash( (string) ( $_POST['score_disc'] ?? '' ) ) );
+		$score_papi = sanitize_text_field( wp_unslash( (string) ( $_POST['score_papi'] ?? '' ) ) );
+		$recommendation = sanitize_text_field( wp_unslash( (string) ( $_POST['recommendation'] ?? '' ) ) );
+		$test_date = sanitize_text_field( wp_unslash( (string) ( $_POST['test_date'] ?? '' ) ) );
+		$notes = sanitize_textarea_field( wp_unslash( (string) ( $_POST['notes'] ?? '' ) ) );
+
+		$current_user = wp_get_current_user();
+		$evaluator = ! empty( $current_user->display_name ) ? $current_user->display_name : 'HR Recruitment';
+
+		$subtests = [
+			'iq'    => $score_iq,
+			'pauli' => $score_pauli,
+			'disc'  => $score_disc,
+			'papi'  => $score_papi,
+		];
+
+		$database = new Recruitment_Database();
+		$result = $database->save_offline_psychotest_score(
+			$candidate_id,
+			$total_score,
+			$subtests,
+			$recommendation,
+			$notes,
+			$test_date,
+			$evaluator
+		);
+
+		$redirect_args = [
+			'page' => 'recruitment-applicants',
+			'candidate_id' => $candidate_id,
+		];
+		if ( $application_id > 0 ) {
+			$redirect_args['application_id'] = $application_id;
+		}
+
+		if ( ! empty( $result['success'] ) ) {
+			$redirect_args['offline_psychotest_saved'] = '1';
+		} else {
+			$redirect_args['offline_psychotest_error'] = urlencode( (string) ( $result['error'] ?? 'Gagal menyimpan nilai' ) );
+		}
+
+		wp_safe_redirect( add_query_arg( $redirect_args, admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
 	public function handle_application_status_email(): void {
 		if ( ! current_user_can( 'manage_recruitment' ) ) {
 			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengirim pembaruan status lamaran.', 'recruitment-plugin' ) );
@@ -1191,18 +1249,38 @@ class Recruitment_Admin {
 			}
 		}
 		$html .= '</tbody></table>';
-		$html .= '<h2>Hasil Tahapan</h2><table>' . $rows(
-			[
-				'Nilai Psikotes' => $application['psychotest_score'] ?? '',
-				'Hasil Wawancara HR' => $application['hr_interview_result'] ?? '',
-				'Rekomendasi HR' => $application['hr_recommendation'] ?? '',
-				'Catatan HR' => $application['hr_interview_notes'] ?? '',
-				'Hasil Wawancara User' => $application['user_interview_result'] ?? '',
-				'Nilai Wawancara User' => $application['user_interview_score'] ?? '',
-				'Rekomendasi User' => $application['user_recommendation'] ?? '',
-				'Catatan User' => $application['user_interview_notes'] ?? '',
-			]
-		) . '</table>';
+		$stage_results = [
+			'Nilai Psikotes' => $application['psychotest_score'] ?? '',
+			'Hasil Wawancara HR' => $application['hr_interview_result'] ?? '',
+			'Rekomendasi HR' => $application['hr_recommendation'] ?? '',
+			'Catatan HR' => $application['hr_interview_notes'] ?? '',
+			'Hasil Wawancara User' => $application['user_interview_result'] ?? '',
+			'Nilai Wawancara User' => $application['user_interview_score'] ?? '',
+			'Rekomendasi User' => $application['user_recommendation'] ?? '',
+			'Catatan User' => $application['user_interview_notes'] ?? '',
+		];
+		$offline_psiko = is_array( $details['offline_psychotest'] ?? null ) ? $details['offline_psychotest'] : [];
+		if ( ! empty( $offline_psiko ) ) {
+			if ( ! empty( $offline_psiko['score_iq'] ) ) {
+				$stage_results['Nilai IQ (Offline)'] = $offline_psiko['score_iq'];
+			}
+			if ( ! empty( $offline_psiko['score_pauli'] ) ) {
+				$stage_results['Nilai Pauli (Offline)'] = $offline_psiko['score_pauli'];
+			}
+			if ( ! empty( $offline_psiko['score_disc'] ) ) {
+				$stage_results['Tipe DISC (Offline)'] = $offline_psiko['score_disc'];
+			}
+			if ( ! empty( $offline_psiko['score_papi'] ) ) {
+				$stage_results['PAPI Kostick (Offline)'] = $offline_psiko['score_papi'];
+			}
+			if ( ! empty( $offline_psiko['recommendation'] ) ) {
+				$stage_results['Rekomendasi Psikotes'] = $offline_psiko['recommendation'];
+			}
+			if ( ! empty( $offline_psiko['notes'] ) ) {
+				$stage_results['Catatan Psikotes'] = $offline_psiko['notes'];
+			}
+		}
+		$html .= '<h2>Hasil Tahapan</h2><table>' . $rows( $stage_results ) . '</table>';
 
 		$answer_rows = '';
 		$document_rows = '';

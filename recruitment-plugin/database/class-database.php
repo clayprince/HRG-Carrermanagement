@@ -2484,6 +2484,7 @@ class Recruitment_Database {
                    NVL(p.email, pkl.email) AS "applicant_email",
                    NVL(p.nomor_hp, p.nomor_telepon) AS "applicant_phone",
                    p.provinsi AS "province",
+                   (SELECT h.nilai FROM HRS_HASIL_TES_PSIKOLOGI h WHERE h.kandidat_id = p.kandidat_id ORDER BY h.dikumpulkan_pada DESC NULLS LAST, h.hasil_tes_psikologi_id DESC FETCH FIRST 1 ROW ONLY) AS "psychotest_score",
                    (SELECT s.hasil_hr FROM HRS_STATUS_KANDIDAT s WHERE s.kandidat_id = p.kandidat_id AND UPPER(TRIM(s.nama_departemen)) = UPPER(TRIM(d.nama_departemen)) ORDER BY s.status_kandidat_id DESC FETCH FIRST 1 ROW ONLY) AS "hr_result",
                    (SELECT w.status_seleksi FROM HRS_HASIL_WAWANCARA_USER w WHERE w.lamaran_id = l.lamaran_id FETCH FIRST 1 ROW ONLY) AS "user_selection_status",
                    (SELECT w.rekomendasi FROM HRS_HASIL_WAWANCARA_USER w WHERE w.lamaran_id = l.lamaran_id FETCH FIRST 1 ROW ONLY) AS "user_recommendation",
@@ -2581,7 +2582,12 @@ class Recruitment_Database {
                    w.nilai_keterampilan AS "SCORE_KNOWLEDGE",
                    w.nilai_kerjasama AS "SCORE_TEAMWORK",
                    w.nilai_problemsolving AS "SCORE_PROBLEM_SOLVING",
-                   w.nilai_adaptasi AS "SCORE_ADAPTABILITY"
+                   w.nilai_adaptasi AS "SCORE_ADAPTABILITY",
+                   (SELECT h.nilai
+                    FROM HRS_HASIL_TES_PSIKOLOGI h
+                    WHERE h.kandidat_id = p.kandidat_id
+                    ORDER BY h.dikumpulkan_pada DESC NULLS LAST, h.hasil_tes_psikologi_id DESC
+                    FETCH FIRST 1 ROW ONLY) AS "PSYCHOTEST_SCORE"
             FROM HRS_LAMARAN l
             JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
             LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id
@@ -5450,6 +5456,245 @@ class Recruitment_Database {
     private function is_missing_schema_object( PDOException $exception ): bool {
         return false !== stripos( $exception->getMessage(), 'ORA-00942' )
             || false !== stripos( $exception->getMessage(), 'ORA-00904' );
+    }
+
+    /**
+     * Resolves an ID to actual KANDIDAT_ID in HRS_PROFIL_KANDIDAT.
+     */
+    public function resolve_kandidat_id( int $id ): int {
+        if ( $id <= 0 ) {
+            return 0;
+        }
+        $rows = $this->fetch_all(
+            'SELECT kandidat_id AS "id" FROM HRS_PROFILE_KANDIDAT_LOGIN WHERE profile_kandidat_login = :id',
+            [ 'id' => $id ]
+        );
+        if ( ! empty( $rows[0]['id'] ) ) {
+            return (int) $rows[0]['id'];
+        }
+        $rows = $this->fetch_all(
+            'SELECT kandidat_id AS "id" FROM HRS_PROFIL_KANDIDAT WHERE kandidat_id = :id',
+            [ 'id' => $id ]
+        );
+        if ( ! empty( $rows[0]['id'] ) ) {
+            return (int) $rows[0]['id'];
+        }
+        return $id;
+    }
+
+    /**
+     * Get offline psychotest assessment results for a candidate.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function get_offline_psychotest_score( int $candidate_id ): ?array {
+        $kandidat_id = $this->resolve_kandidat_id( $candidate_id );
+        if ( $kandidat_id <= 0 ) {
+            return null;
+        }
+
+        // 1. Try to load rich offline data from HRS_PROFIL_KANDIDAT_DETAIL
+        $details = $this->fetch_all(
+            'SELECT DATA_PROFIL AS "details" FROM HRS_PROFIL_KANDIDAT_DETAIL WHERE KANDIDAT_ID = :id',
+            [ 'id' => $kandidat_id ]
+        );
+        if ( ! empty( $details[0]['details'] ) ) {
+            try {
+                $parsed = $this->decode_applicant_profile_details( $details[0]['details'] );
+                if ( ! empty( $parsed['offline_psychotest'] ) && is_array( $parsed['offline_psychotest'] ) ) {
+                    return $parsed['offline_psychotest'];
+                }
+            } catch ( Throwable $t ) {
+                // Ignore parse errors and fall through
+            }
+        }
+
+        // 2. Fallback to HRS_HASIL_TES_PSIKOLOGI
+        $rows = $this->fetch_all(
+            'SELECT h.NILAI AS "score", TO_CHAR(h.DIKUMPULKAN_PADA, \'YYYY-MM-DD\') AS "test_date", t.JUDUL AS "title" FROM HRS_HASIL_TES_PSIKOLOGI h LEFT JOIN HRS_TES_PSIKOLOGI t ON t.TES_PSIKOLOGI_ID = h.TES_PSIKOLOGI_ID WHERE h.KANDIDAT_ID = :id ORDER BY h.DIKUMPULKAN_PADA DESC NULLS LAST, h.HASIL_TES_PSIKOLOGI_ID DESC FETCH FIRST 1 ROW ONLY',
+            [ 'id' => $kandidat_id ]
+        );
+        if ( ! empty( $rows[0] ) ) {
+            return [
+                'score_total'    => (float) $rows[0]['score'],
+                'score_iq'       => '',
+                'score_pauli'    => '',
+                'score_disc'     => '',
+                'score_papi'     => '',
+                'recommendation' => '',
+                'notes'          => '',
+                'test_date'      => (string) ( $rows[0]['test_date'] ?? '' ),
+                'evaluator'      => 'HR Recruitment',
+                'is_offline'     => true,
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * Save manually entered offline psychotest scores for HR.
+     *
+     * @param array<string, string|float|int> $subtest_scores
+     * @return array{success: bool, error?: string}
+     */
+    public function save_offline_psychotest_score(
+        int $candidate_id,
+        float $total_score,
+        array $subtest_scores = [],
+        string $recommendation = '',
+        string $notes = '',
+        string $test_date = '',
+        string $evaluator = ''
+    ): array {
+        $kandidat_id = $this->resolve_kandidat_id( $candidate_id );
+        if ( $kandidat_id <= 0 ) {
+            return [ 'success' => false, 'error' => 'Kandidat tidak ditemukan.' ];
+        }
+
+        if ( '' === trim( $test_date ) ) {
+            $test_date = current_time( 'Y-m-d' );
+        }
+        $test_datetime = $test_date . ' ' . current_time( 'H:i:s' );
+
+        $this->last_error = null;
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+
+            // 1. Fetch available tests from HRS_TES_PSIKOLOGI
+            $test_rows = $this->fetch_all(
+                'SELECT TES_PSIKOLOGI_ID AS "id", JUDUL AS "title" FROM HRS_TES_PSIKOLOGI ORDER BY NVL(URUTAN_TAMPILAN, TES_PSIKOLOGI_ID), TES_PSIKOLOGI_ID'
+            );
+            $tests_by_key = [];
+            $primary_test_id = 0;
+            foreach ( $test_rows as $tr ) {
+                $tid = (int) ( $tr['id'] ?? 0 );
+                $ttitle = strtoupper( (string) ( $tr['title'] ?? '' ) );
+                if ( $tid <= 0 ) {
+                    continue;
+                }
+                if ( 0 === $primary_test_id ) {
+                    $primary_test_id = $tid;
+                }
+                if ( false !== strpos( $ttitle, 'IQ' ) ) {
+                    $tests_by_key['iq'] = $tid;
+                    $primary_test_id = $tid;
+                } elseif ( false !== strpos( $ttitle, 'PAULI' ) ) {
+                    $tests_by_key['pauli'] = $tid;
+                } elseif ( false !== strpos( $ttitle, 'DISC' ) ) {
+                    $tests_by_key['disc'] = $tid;
+                } elseif ( false !== strpos( $ttitle, 'PAPI' ) ) {
+                    $tests_by_key['papi'] = $tid;
+                }
+            }
+
+            // Fallback primary test ID if none matched
+            if ( $primary_test_id <= 0 ) {
+                $create_stmt = $connection->prepare(
+                    'INSERT INTO HRS_TES_PSIKOLOGI (JUDUL, PETUNJUK_PENGERJAAN, DURASI_PENGERJAAN, JUMLAH_SOAL, IS_ACTIVE, URUTAN_TAMPILAN, CREATED_AT, UPDATED_AT) ' .
+                    'VALUES (:title, :instructions, 0, 0, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) RETURNING TES_PSIKOLOGI_ID INTO :test_id'
+                );
+                $title_val = 'Tes Psikologi Offline';
+                $instr_val = 'Tes psikologi offline / input manual';
+                $create_stmt->bindValue( ':title', $title_val );
+                $create_stmt->bindValue( ':instructions', $instr_val );
+                $create_stmt->bindParam( ':test_id', $primary_test_id, PDO::PARAM_INT | PDO::PARAM_INPUT_OUTPUT, 19 );
+                $create_stmt->execute();
+            }
+
+            // Upsert Primary Score in HRS_HASIL_TES_PSIKOLOGI
+            $existing_primary = $this->fetch_all(
+                'SELECT HASIL_TES_PSIKOLOGI_ID AS "id" FROM HRS_HASIL_TES_PSIKOLOGI WHERE KANDIDAT_ID = :candidate_id AND TES_PSIKOLOGI_ID = :test_id ORDER BY DIKUMPULKAN_PADA DESC NULLS LAST, HASIL_TES_PSIKOLOGI_ID DESC FETCH FIRST 1 ROW ONLY',
+                [ 'candidate_id' => $kandidat_id, 'test_id' => $primary_test_id ]
+            );
+
+            if ( ! empty( $existing_primary[0]['id'] ) ) {
+                $update_stmt = $connection->prepare(
+                    'UPDATE HRS_HASIL_TES_PSIKOLOGI SET NILAI = :score, DIKUMPULKAN_PADA = TO_TIMESTAMP(:completed_at, \'YYYY-MM-DD HH24:MI:SS\') WHERE HASIL_TES_PSIKOLOGI_ID = :result_id'
+                );
+                $update_stmt->bindValue( ':score', $total_score );
+                $update_stmt->bindValue( ':completed_at', $test_datetime );
+                $update_stmt->bindValue( ':result_id', (int) $existing_primary[0]['id'], PDO::PARAM_INT );
+                $update_stmt->execute();
+            } else {
+                $insert_stmt = $connection->prepare(
+                    'INSERT INTO HRS_HASIL_TES_PSIKOLOGI (KANDIDAT_ID, MULAI_PADA, DIKUMPULKAN_PADA, NILAI, TES_PSIKOLOGI_ID) ' .
+                    'VALUES (:candidate_id, TO_TIMESTAMP(:started_at, \'YYYY-MM-DD HH24:MI:SS\'), TO_TIMESTAMP(:completed_at, \'YYYY-MM-DD HH24:MI:SS\'), :score, :test_id)'
+                );
+                $insert_stmt->bindValue( ':candidate_id', $kandidat_id, PDO::PARAM_INT );
+                $insert_stmt->bindValue( ':started_at', $test_datetime );
+                $insert_stmt->bindValue( ':completed_at', $test_datetime );
+                $insert_stmt->bindValue( ':score', $total_score );
+                $insert_stmt->bindValue( ':test_id', $primary_test_id, PDO::PARAM_INT );
+                $insert_stmt->execute();
+            }
+
+            // Subtests handling in HRS_HASIL_TES_PSIKOLOGI
+            foreach ( [ 'pauli', 'disc', 'papi' ] as $sub_key ) {
+                if ( ! empty( $tests_by_key[ $sub_key ] ) && isset( $subtest_scores[ $sub_key ] ) && '' !== trim( (string) $subtest_scores[ $sub_key ] ) ) {
+                    $sub_tid = $tests_by_key[ $sub_key ];
+                    $sub_val = is_numeric( $subtest_scores[ $sub_key ] ) ? (float) $subtest_scores[ $sub_key ] : 1.0;
+
+                    $exist_sub = $this->fetch_all(
+                        'SELECT HASIL_TES_PSIKOLOGI_ID AS "id" FROM HRS_HASIL_TES_PSIKOLOGI WHERE KANDIDAT_ID = :candidate_id AND TES_PSIKOLOGI_ID = :test_id ORDER BY DIKUMPULKAN_PADA DESC NULLS LAST, HASIL_TES_PSIKOLOGI_ID DESC FETCH FIRST 1 ROW ONLY',
+                        [ 'candidate_id' => $kandidat_id, 'test_id' => $sub_tid ]
+                    );
+                    if ( ! empty( $exist_sub[0]['id'] ) ) {
+                        $up_sub = $connection->prepare(
+                            'UPDATE HRS_HASIL_TES_PSIKOLOGI SET NILAI = :score, DIKUMPULKAN_PADA = TO_TIMESTAMP(:completed_at, \'YYYY-MM-DD HH24:MI:SS\') WHERE HASIL_TES_PSIKOLOGI_ID = :result_id'
+                        );
+                        $up_sub->bindValue( ':score', $sub_val );
+                        $up_sub->bindValue( ':completed_at', $test_datetime );
+                        $up_sub->bindValue( ':result_id', (int) $exist_sub[0]['id'], PDO::PARAM_INT );
+                        $up_sub->execute();
+                    } else {
+                        $in_sub = $connection->prepare(
+                            'INSERT INTO HRS_HASIL_TES_PSIKOLOGI (KANDIDAT_ID, MULAI_PADA, DIKUMPULKAN_PADA, NILAI, TES_PSIKOLOGI_ID) ' .
+                            'VALUES (:candidate_id, TO_TIMESTAMP(:started_at, \'YYYY-MM-DD HH24:MI:SS\'), TO_TIMESTAMP(:completed_at, \'YYYY-MM-DD HH24:MI:SS\'), :score, :test_id)'
+                        );
+                        $in_sub->bindValue( ':candidate_id', $kandidat_id, PDO::PARAM_INT );
+                        $in_sub->bindValue( ':started_at', $test_datetime );
+                        $in_sub->bindValue( ':completed_at', $test_datetime );
+                        $in_sub->bindValue( ':score', $sub_val );
+                        $in_sub->bindValue( ':test_id', $sub_tid, PDO::PARAM_INT );
+                        $in_sub->execute();
+                    }
+                }
+            }
+
+            // Save rich details to HRS_PROFIL_KANDIDAT_DETAIL
+            $det_stmt = $connection->prepare( 'SELECT DATA_PROFIL FROM HRS_PROFIL_KANDIDAT_DETAIL WHERE KANDIDAT_ID = :candidate_id' );
+            $det_stmt->execute( [ 'candidate_id' => $kandidat_id ] );
+            $raw_prof = $det_stmt->fetchColumn();
+            $prof_details = '' !== $raw_prof && false !== $raw_prof ? $this->decode_applicant_profile_details( $raw_prof ) : [];
+
+            $prof_details['offline_psychotest'] = [
+                'score_total'    => $total_score,
+                'score_iq'       => (string) ( $subtest_scores['iq'] ?? '' ),
+                'score_pauli'    => (string) ( $subtest_scores['pauli'] ?? '' ),
+                'score_disc'     => (string) ( $subtest_scores['disc'] ?? '' ),
+                'score_papi'     => (string) ( $subtest_scores['papi'] ?? '' ),
+                'recommendation' => trim( $recommendation ),
+                'notes'          => trim( $notes ),
+                'test_date'      => $test_date,
+                'evaluator'      => trim( $evaluator ) ?: 'HR Recruitment',
+                'is_offline'     => true,
+                'updated_at'     => current_time( 'mysql' ),
+            ];
+
+            $this->save_applicant_profile_details( $connection, $kandidat_id, $prof_details );
+
+            $connection->commit();
+            return [ 'success' => true ];
+        } catch ( Throwable $t ) {
+            if ( $connection && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_error( 'Gagal menyimpan nilai psikotes offline', $t );
+            return [ 'success' => false, 'error' => $t->getMessage() ];
+        }
     }
 
 }

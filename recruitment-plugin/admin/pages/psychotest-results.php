@@ -59,22 +59,44 @@ foreach ( $proctoring_report['events'] as $event ) {
                 <?php foreach ( $results as $result ) :
                     $title = (string) ( $result['test_title'] ?? '' );
                     $test_label = strtoupper( $title );
-                    $is_scored_assessment = false !== strpos( $test_label, 'IQ' ) || false !== strpos( $test_label, 'PAULI' );
-                    $status = 'complete' === ( $result['status'] ?? '' ) ? 'Selesai' : 'Jawaban tersimpan — belum diselesaikan';
+                    $is_scored_assessment = false !== strpos( $test_label, 'IQ' ) || false !== strpos( $test_label, 'PAULI' ) || ( (float) ( $result['score'] ?? 0 ) > 0 );
+                    $is_offline_result = ( 0 === (int) ( $result['response_count'] ?? 0 ) && ! empty( $result['completed_at'] ) ) || false !== strpos( $test_label, 'OFFLINE' );
+                    $status = $is_offline_result
+                        ? 'Selesai (Offline)'
+                        : ( 'complete' === ( $result['status'] ?? '' ) ? 'Selesai' : 'Jawaban tersimpan — belum diselesaikan' );
                     ?>
                     <tr>
                         <td>
                             <strong><?= esc_html( (string) ( $result['candidate_name'] ?? 'Kandidat' ) ) ?></strong><br>
                             <small>ID <?= esc_html( (string) ( $result['candidate_id'] ?? '' ) ) ?><?= ! empty( $result['candidate_email'] ) ? ' · ' . esc_html( (string) $result['candidate_email'] ) : '' ?></small>
                         </td>
-                        <td><?= esc_html( $title ) ?></td>
-                        <td><?= esc_html( $status ) ?></td>
-                        <td><?= esc_html( (string) ( $result['response_count'] ?? 0 ) ) ?> / <?= esc_html( (string) ( $result['question_count'] ?? 0 ) ) ?></td>
-                        <td><?= $is_scored_assessment ? esc_html( (string) ( $result['score'] ?? 0 ) ) : 'Tidak dihitung' ?></td>
+                        <td>
+                            <?= esc_html( $title ) ?>
+                            <?php if ( $is_offline_result ) : ?>
+                                <br><span style="display:inline-block;margin-top:3px;font-size:10px;padding:2px 6px;background:#e0e7ff;color:#3730a3;border-radius:4px;font-weight:600;">Input Offline</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ( $is_offline_result ) : ?>
+                                <span style="display:inline-block;padding:2px 8px;background:#ecfdf5;color:#065f46;border-radius:4px;font-size:12px;font-weight:600;">✓ Selesai (Offline)</span>
+                            <?php else : ?>
+                                <?= esc_html( $status ) ?>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ( $is_offline_result ) : ?>
+                                <span style="color:#64748b;font-size:12px;">Input Manual HR</span>
+                            <?php else : ?>
+                                <?= esc_html( (string) ( $result['response_count'] ?? 0 ) ) ?> / <?= esc_html( (string) ( $result['question_count'] ?? 0 ) ) ?>
+                            <?php endif; ?>
+                        </td>
+                        <td><strong style="color:#0f172a;"><?= esc_html( (string) ( $result['score'] ?? 0 ) ) ?></strong></td>
                         <td><?= esc_html( (string) ( $result['started_at'] ?? '' ) ) ?></td>
                         <td><?= esc_html( (string) ( $result['completed_at'] ?? '—' ) ) ?></td>
                         <td>
-                            <?php if ( ! $can_view_proctoring ) : ?>
+                            <?php if ( $is_offline_result ) : ?>
+                                <span style="color:#64748b;font-size:12px;">Diselenggarakan offline di kantor DAW.</span>
+                            <?php elseif ( ! $can_view_proctoring ) : ?>
                                 Akses gambar dibatasi untuk Administrator.
                             <?php elseif ( $proctoring_error ) : ?>
                                 Data tidak tersedia.
