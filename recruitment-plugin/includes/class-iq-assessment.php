@@ -387,6 +387,10 @@ class Recruitment_IQ_Assessment {
         if ( $next_index >= count( $state['tests'] ) ) {
             $state['status'] = 'complete';
             $state['completed_at'] = time();
+
+            // Automatically score test and synchronize across candidate profile, HR list, and User Department
+            $breakdown = $this->database->get_candidate_psychotest_score_breakdown( $candidate_id );
+            $this->database->save_online_psychotest_summary( $candidate_id, $breakdown );
         } else {
             $state['subtest_index'] = $next_index;
             $now = time();

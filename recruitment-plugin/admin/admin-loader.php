@@ -33,6 +33,7 @@ class Recruitment_Admin {
 		add_action( 'admin_post_daw_send_composed_email', [ $this, 'handle_send_composed_email' ] );
 		add_action( 'admin_post_daw_download_applicant_profile', [ $this, 'handle_applicant_profile_download' ] );
 		add_action( 'admin_post_daw_download_offline_psychotest_analysis', [ $this, 'handle_download_offline_psychotest_analysis' ] );
+		add_action( 'admin_post_daw_download_assessment_report', [ $this, 'handle_download_assessment_report' ] );
 		add_action( 'admin_post_daw_download_department_profile', [ $this, 'handle_department_profile_download' ] );
 		add_action( 'admin_post_daw_download_department_document', [ $this, 'handle_department_document_download' ] );
 		add_action( 'admin_post_daw_save_interview_schedule', [ $this, 'handle_interview_schedule_save' ] );
@@ -1659,6 +1660,30 @@ class Recruitment_Admin {
 		$safe_name = sanitize_file_name( 'analisa-psikotes-offline-' . $candidate_name . '-' . $code . '.pdf' );
 		$dompdf->stream( $safe_name, [ 'Attachment' => true ] );
 		exit;
+	}
+
+	public function handle_download_assessment_report(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) && ! current_user_can( 'manage_options' ) && ! current_user_can( 'manage_user_department' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengunduh laporan asesmen.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+		}
+
+		$candidate_id = absint( $_POST['candidate_id'] ?? $_GET['candidate_id'] ?? 0 );
+		$application_id = absint( $_POST['application_id'] ?? $_GET['application_id'] ?? 0 );
+		check_admin_referer( 'daw_download_assessment_report_' . $candidate_id );
+
+		$database = new Recruitment_Database();
+		$report = $application_id > 0 ? $database->get_admin_application_profile( (string) $application_id ) : null;
+		$profile = $database->get_admin_applicant( (string) $candidate_id );
+
+		if ( ! is_array( $profile ) || empty( $profile['name'] ) ) {
+			wp_die( esc_html__( 'Data kandidat tidak ditemukan.', 'recruitment-plugin' ), '', [ 'response' => 404 ] );
+		}
+
+		$breakdown = $database->get_candidate_psychotest_score_breakdown( $candidate_id );
+
+		require_once __DIR__ . '/../services/class-assessment-report-generator.php';
+		$generator = new Recruitment_Assessment_Report_Generator();
+		$generator->stream_pdf( $profile, $report, $breakdown );
 	}
 
 	public function handle_department_profile_download(): void {

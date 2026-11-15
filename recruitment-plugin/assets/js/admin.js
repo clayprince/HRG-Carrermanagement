@@ -1276,24 +1276,43 @@ document.documentElement.classList.add("js");
     test.value = question
       ? question.dataset.test
       : bank.dataset.filterTest || "iq";
+
+    const subtestSelect = form.querySelector("[data-question-subtest]");
+    if (subtestSelect) {
+      subtestSelect.value = question
+        ? question.dataset.subtest || ""
+        : "verbal_analogy";
+    }
+
     questionSubtestValue.value = question
       ? question.dataset.subtest || ""
       : "iq" === test.value
-        ? "iq_numbers"
+        ? "verbal_analogy"
         : "";
     type.value = question
       ? question.dataset.type
       : "iq" === test.value
         ? "multiple_choice"
-        : "pauli" === test.value
-          ? "numeric"
-          : "paired";
+        : "paired";
     test.disabled = Boolean(question);
     prompt.value = question
       ? question.dataset.prompt || ""
-      : "pauli" === test.value
-        ? "Kolom Pauli baru"
-        : "";
+      : "";
+
+    const imgInput = form.querySelector("[data-question-image-url]");
+    const imgPrev = document.getElementById("preview-question-image");
+    if (imgInput) {
+      imgInput.value = question ? question.dataset.imageUrl || "" : "";
+      if (imgPrev) {
+        if (imgInput.value) {
+          imgPrev.querySelector("img").src = imgInput.value;
+          imgPrev.style.display = "block";
+        } else {
+          imgPrev.style.display = "none";
+        }
+      }
+    }
+
     explanation.value = question ? question.dataset.explanation || "" : "";
     active.checked = question ? "1" === question.dataset.active : true;
     choices.value = question ? question.dataset.choices || "" : "";
@@ -1302,6 +1321,25 @@ document.documentElement.classList.add("js");
       input.value = choiceValues[index] || "";
       choiceRows[index].hidden = index > 3 && !input.value.trim();
     });
+
+    const choiceImageInputs = Array.from(form.querySelectorAll("[data-choice-image-input]"));
+    let choiceImages = [];
+    if (question && question.dataset.choiceImages) {
+      try { choiceImages = JSON.parse(question.dataset.choiceImages); } catch (e) { choiceImages = []; }
+    }
+    choiceImageInputs.forEach(function (ciInput, idx) {
+      ciInput.value = choiceImages[idx] || "";
+      const prev = document.getElementById("preview-choice-img-" + idx);
+      if (prev) {
+        if (ciInput.value) {
+          prev.querySelector("img").src = ciInput.value;
+          prev.style.display = "block";
+        } else {
+          prev.style.display = "none";
+        }
+      }
+    });
+
     syncChoiceFields();
     if (question) {
       const answerTexts = (question.dataset.answer || "")
