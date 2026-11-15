@@ -1,7 +1,9 @@
 <?php
 nocache_headers();
 $view = ( new Recruitment_Pauli_Assessment() )->get_page_view();
-$psychotest_home_url = recruitment_get_public_url( 'psychotest' );
+$application_id = recruitment_get_psychotest_application_id();
+$psychotest_home_args = $application_id > 0 ? [ 'application_id' => $application_id ] : [];
+$psychotest_home_url = recruitment_get_public_url( 'psychotest', $psychotest_home_args );
 ?>
 <div class="daw-recruitment daw-recruitment--psych-test daw-recruitment--pauli">
     <?php require recruitment_get_plugin_path( 'public/components/header.php' ); ?>

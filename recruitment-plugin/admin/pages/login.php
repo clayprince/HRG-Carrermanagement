@@ -621,7 +621,7 @@ body:has(.daw-admin-login) main {
                     <div class="daw-auth-alert daw-auth-alert--success" role="status" style="margin-bottom:16px;">
                         <svg class="daw-auth-alert-icon" viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
                         <div>
-                            Jika email cocok dengan akun HR aktif, link reset dan kode token telah dikirimkan ke kotak masuk email Anda.
+                            Permintaan telah diterima. Jika alamat cocok dengan akun Admin HR aktif, petunjuk reset akan dikirim ke email tersebut. Periksa juga folder Spam/Junk. Jika email tidak masuk, hubungi administrator HR.
                         </div>
                     </div>
                     <div style="margin:12px 0 16px;text-align:center;">

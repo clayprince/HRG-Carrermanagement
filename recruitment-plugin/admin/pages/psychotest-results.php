@@ -4,7 +4,7 @@ $results = $database->get_psychotest_results();
 $results_error = $database->has_error();
 $admin_user = wp_get_current_user();
 $hr_identity = recruitment_get_current_hr_identity();
-$can_view_proctoring = current_user_can( 'manage_options' );
+$can_view_proctoring = current_user_can( 'manage_recruitment' ) || current_user_can( 'manage_options' );
 $proctoring_report = [ 'sessions' => [], 'events' => [] ];
 $proctoring_error = false;
 if ( $can_view_proctoring && $results ) {
@@ -46,6 +46,9 @@ $in_progress_count = count( $results ) - $completed_count;
     <?php if ( $results_error ) : ?>
         <div class="notice notice-error"><p>Data hasil tidak dapat dibaca dari Oracle. Periksa koneksi database dan log WordPress.</p></div>
     <?php else : ?>
+        <?php if ( isset( $_GET['proctoring_review'] ) && 'saved' === sanitize_key( wp_unslash( $_GET['proctoring_review'] ) ) ) : ?>
+            <div class="notice notice-success is-dismissible"><p>Tinjauan event pengawasan berhasil disimpan.</p></div>
+        <?php endif; ?>
         <?php if ( $proctoring_error ) : ?>
             <div class="notice notice-error"><p>Metadata bukti keamanan belum dapat dibaca. Pastikan migrasi proctoring telah ditinjau dan diterapkan oleh pemilik Oracle.</p></div>
         <?php endif; ?>
@@ -88,7 +91,7 @@ $in_progress_count = count( $results ) - $completed_count;
                         <td><?= esc_html( (string) ( $result['completed_at'] ?? '—' ) ) ?></td>
                         <td>
                             <?php if ( ! $can_view_proctoring ) : ?>
-                                Akses gambar dibatasi untuk Administrator.
+                                Akses gambar dibatasi untuk HR berwenang.
                             <?php elseif ( $proctoring_error ) : ?>
                                 Data tidak tersedia.
                             <?php else :
@@ -100,10 +103,54 @@ $in_progress_count = count( $results ) - $completed_count;
                                     foreach ( $candidate_sessions as $session ) :
                                         $identity_status = (string) ( $session['identity_status'] ?? '' );
                                         $session_events = $events_by_session[ (string) $session['session_id'] ] ?? [];
+                                        $violation_events = array_values(
+                                            array_filter(
+                                                $session_events,
+                                                static fn ( $event ): bool => in_array(
+                                                    (string) ( $event['event_type'] ?? '' ),
+                                                    [ 'CAMERA_STOPPED', 'FACE_NOT_DETECTED', 'MULTIPLE_FACES', 'FACE_TURNED_AWAY' ],
+                                                    true
+                                                ) && is_numeric( $event['detection_duration_ms'] ?? null )
+                                            )
+                                        );
+                                        $total_detection_duration_ms = array_sum(
+                                            array_map(
+                                                static fn ( $event ): int => absint( $event['detection_duration_ms'] ?? 0 ),
+                                                $violation_events
+                                            )
+                                        );
+                                        $repeat_escalations = count(
+                                            array_filter(
+                                                $violation_events,
+                                                static fn ( $event ): bool => in_array(
+                                                    (string) ( $event['severity'] ?? '' ),
+                                                    [ 'repeated', 'serious' ],
+                                                    true
+                                                )
+                                            )
+                                        );
+                                        $repeat_peak = 0;
+                                        $occurrence_times = [];
+                                        foreach ( $violation_events as $violation_event ) {
+                                            $repeat_peak = max( $repeat_peak, absint( $violation_event['repeat_count'] ?? 1 ) );
+                                            if ( '' !== (string) ( $violation_event['event_at'] ?? '' ) ) {
+                                                $occurrence_times[] = (string) $violation_event['event_at'];
+                                            }
+                                        }
+                                        sort( $occurrence_times, SORT_STRING );
                                         ?>
                                         <details>
-                                            <summary><?= 'CAPTURED' === $identity_status ? 'Identitas terekam' : ( 'MANUAL_VERIFIED' === $identity_status ? 'Identitas diverifikasi manual' : ( 'MANUAL_REVIEW' === $identity_status ? 'Perlu verifikasi manual' : 'Belum diverifikasi' ) ) ?> · <?= esc_html( (string) count( $session_events ) ) ?> peristiwa</summary>
+                                            <summary><?= 'CAPTURED' === $identity_status ? 'Identitas terekam' : ( 'MANUAL_VERIFIED' === $identity_status ? 'Identitas diverifikasi manual' : ( 'MANUAL_REVIEW' === $identity_status ? 'Perlu verifikasi manual' : 'Belum diverifikasi' ) ) ?> · Lamaran #<?= esc_html( (string) ( $session['application_id'] ?? 'lama' ) ) ?> · <?= esc_html( (string) count( $session_events ) ) ?> peristiwa</summary>
                                             <small>Masa simpan sampai <?= esc_html( (string) ( $session['retention_until'] ?? '—' ) ) ?></small>
+                                            <p><strong>Ringkasan deteksi:</strong>
+                                                <?= esc_html( (string) count( $violation_events ) ) ?> event mencapai threshold
+                                                · Durasi indikasi <?= esc_html( number_format_i18n( $total_detection_duration_ms / 1000, 1 ) ) ?> detik (dilaporkan browser)
+                                                · Event berulang/serius <?= esc_html( (string) $repeat_escalations ) ?>
+                                                · Frekuensi tertinggi <?= esc_html( (string) $repeat_peak ) ?> event dalam jendela aturannya
+                                                <?php if ( $occurrence_times ) : ?>
+                                                    · Pertama <?= esc_html( $occurrence_times[0] ) ?> · Terakhir <?= esc_html( $occurrence_times[ count( $occurrence_times ) - 1 ] ) ?>
+                                                <?php endif; ?>
+                                            </p>
                                             <?php if ( 'MANUAL_REVIEW' === $identity_status ) : ?>
                                                 <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>">
                                                     <input type="hidden" name="action" value="daw_proctoring_review">
@@ -119,40 +166,136 @@ $in_progress_count = count( $results ) - $completed_count;
                                                     $event_labels = [
                                                         'IDENTITY_CAPTURE' => 'Foto identitas',
                                                         'MANUAL_IDENTITY' => 'Diminta verifikasi manual',
-                                                        'TAB_HIDDEN' => 'Berpindah tab',
+                                                        'TAB_HIDDEN' => 'Halaman ujian disembunyikan atau fokus berpindah',
+                                                        'TAB_VISIBLE' => 'Kembali ke halaman ujian',
                                                         'CAMERA_STOPPED' => 'Kamera terputus',
                                                         'CAMERA_UNAVAILABLE' => 'Kamera tidak tersedia',
                                                         'FACE_NOT_DETECTED' => 'Wajah tidak terdeteksi beberapa saat',
                                                         'MULTIPLE_FACES' => 'Lebih dari satu wajah terdeteksi',
+                                                        'FACE_TURNED_AWAY' => 'Wajah menghadap menyamping dalam durasi lama',
+                                                        'WARNING_SHOWN' => 'Peringatan ditampilkan kepada peserta',
                                                         'FACE_DETECTION_UNAVAILABLE' => 'Deteksi wajah tidak tersedia',
                                                         'MICROPHONE_AVAILABLE' => 'Mikrofon tersedia (status saja)',
                                                         'MICROPHONE_UNAVAILABLE' => 'Mikrofon tidak tersedia atau izin ditolak',
-                                                        'IMAGE_ACCESS' => 'Akses gambar oleh Administrator',
+                                                        'IMAGE_ACCESS' => 'Akses gambar oleh HR',
+                                                        'REPORT_DOWNLOAD' => 'Laporan proctoring diunduh',
                                                         'MANUAL_VERIFIED' => 'Identitas diverifikasi manual',
                                                     ];
+                                                    $stage_labels = [
+                                                        'preparation' => 'Persiapan',
+                                                        'iq' => 'IQ',
+                                                        'pauli' => 'Pauli',
+                                                        'disc' => 'DISC',
+                                                        'papi' => 'PAPI',
+                                                        'report' => 'Laporan',
+                                                    ];
+                                                    $review_status = (string) ( $event['review_status'] ?? 'NOT_APPLICABLE' );
+                                                    $review_labels = [
+                                                        'PENDING' => 'Menunggu tinjauan HR',
+                                                        'CONFIRMED' => 'Dikonfirmasi HR',
+                                                        'DISMISSED' => 'Dikesampingkan HR',
+                                                        'NOT_APPLICABLE' => 'Aktivitas log',
+                                                    ];
+                                                    $severity_labels = [
+                                                        'warning' => 'Peringatan',
+                                                        'repeated' => 'Berulang',
+                                                        'serious' => 'Serius',
+                                                    ];
+                                                    $is_detection_event = in_array(
+                                                        $event_type,
+                                                        [ 'CAMERA_STOPPED', 'FACE_NOT_DETECTED', 'MULTIPLE_FACES', 'FACE_TURNED_AWAY' ],
+                                                        true
+                                                    ) && is_numeric( $event['detection_duration_ms'] ?? null );
                                                     ?>
                                                     <li>
                                                         <?= esc_html( $event_labels[ $event_type ] ?? 'Peristiwa pengawasan' ) ?>
+                                                        <?php if ( '' !== (string) ( $event['assessment_stage'] ?? '' ) ) : ?>
+                                                            · <?= esc_html( $stage_labels[ (string) $event['assessment_stage'] ] ?? (string) $event['assessment_stage'] ) ?>
+                                                        <?php endif; ?>
                                                         · <?= esc_html( (string) ( $event['event_at'] ?? '' ) ) ?>
                                                         <?php if ( 'IMAGE_ACCESS' === $event_type ) : ?>
-                                                            · Administrator ID <?= esc_html( (string) ( $event['actor_user_id'] ?? '' ) ) ?> mengakses bukti <?= esc_html( (string) ( $event['target_event_id'] ?? '' ) ) ?>
+                                                            · Pengguna HR ID <?= esc_html( (string) ( $event['actor_user_id'] ?? '' ) ) ?> mengakses bukti <?= esc_html( (string) ( $event['target_event_id'] ?? '' ) ) ?>
+                                                        <?php endif; ?>
+                                                        <?php if ( $is_detection_event ) : ?>
+                                                            <br>
+                                                            <small>
+                                                                <?= esc_html( $review_labels[ $review_status ] ?? 'Status tinjauan tidak diketahui' ) ?>
+                                                                · Durasi indikasi <?= esc_html( number_format_i18n( (float) $event['detection_duration_ms'] / 1000, 1 ) ) ?> detik (dilaporkan browser)
+                                                                · Pengulangan <?= esc_html( (string) absint( $event['repeat_count'] ?? 1 ) ) ?> kali
+                                                                <?php if ( is_numeric( $event['detection_confidence'] ?? null ) ) : ?>
+                                                                    · Confidence detector <?= esc_html( number_format_i18n( (float) $event['detection_confidence'] * 100, 1 ) ) ?>%
+                                                                <?php endif; ?>
+                                                                <?php if ( isset( $severity_labels[ (string) ( $event['severity'] ?? '' ) ] ) ) : ?>
+                                                                    · <?= esc_html( $severity_labels[ (string) $event['severity'] ] ) ?>
+                                                                <?php endif; ?>
+                                                                <?php if ( isset( $severity_labels[ (string) ( $event['warning_level'] ?? '' ) ] ) ) : ?>
+                                                                    · Notifikasi: <?= esc_html( $severity_labels[ (string) $event['warning_level'] ] ) ?>
+                                                                <?php endif; ?>
+                                                            </small>
+                                                            <?php if ( 'PENDING' === $review_status ) : ?>
+                                                                <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" style="margin:8px 0 12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                                                                    <input type="hidden" name="action" value="daw_proctoring_review_event">
+                                                                    <input type="hidden" name="candidate_id" value="<?= esc_attr( (string) $candidate_id ) ?>">
+                                                                    <input type="hidden" name="session_id" value="<?= esc_attr( (string) $session['session_id'] ) ?>">
+                                                                    <input type="hidden" name="event_id" value="<?= esc_attr( (string) absint( $event['event_id'] ?? 0 ) ) ?>">
+                                                                    <?php wp_nonce_field( 'daw_proctoring_review_event_' . (string) $session['session_id'] . '_' . (string) absint( $event['event_id'] ?? 0 ) ); ?>
+                                                                    <select name="review_status" aria-label="Hasil tinjauan event">
+                                                                        <option value="CONFIRMED">Konfirmasi event</option>
+                                                                        <option value="DISMISSED">Kesampingkan event</option>
+                                                                    </select>
+                                                                    <input type="text" name="review_note" maxlength="1000" placeholder="Catatan tinjauan (opsional)" aria-label="Catatan tinjauan HR">
+                                                                    <button type="submit" class="button button-small">Simpan tinjauan</button>
+                                                                </form>
+                                                            <?php elseif ( '' !== (string) ( $event['reviewed_at'] ?? '' ) ) : ?>
+                                                                <small>Ditinjau <?= esc_html( (string) $event['reviewed_at'] ) ?> oleh HR ID <?= esc_html( (string) ( $event['reviewed_by'] ?? '' ) ) ?><?= '' !== (string) ( $event['review_note'] ?? '' ) ? ' · ' . esc_html( (string) $event['review_note'] ) : '' ?></small>
+                                                            <?php endif; ?>
                                                         <?php endif; ?>
                                                         <?php if ( ! empty( $event['file_key'] ) ) :
-                                                            $image_url = add_query_arg(
-                                                                [
-                                                                    'action' => 'daw_proctoring_image',
-                                                                    'candidate_id' => $candidate_id,
-                                                                    'session_id' => (string) $session['session_id'],
-                                                                    'event_id' => absint( $event['event_id'] ?? 0 ),
-                                                                ],
-                                                                admin_url( 'admin-post.php' )
-                                                            );
+                                                            $base_image_args = [
+                                                                'action' => 'daw_proctoring_image',
+                                                                'candidate_id' => $candidate_id,
+                                                                'session_id' => (string) $session['session_id'],
+                                                                'event_id' => absint( $event['event_id'] ?? 0 ),
+                                                            ];
+                                                            $view_url = wp_nonce_url( add_query_arg( array_merge( $base_image_args, [ 'disposition' => 'inline' ] ), admin_url( 'admin-post.php' ) ), 'daw_proctoring_image_' . $candidate_id );
+                                                            $download_url = wp_nonce_url( add_query_arg( $base_image_args, admin_url( 'admin-post.php' ) ), 'daw_proctoring_image_' . $candidate_id );
                                                             ?>
-                                                            · <a href="<?= esc_url( wp_nonce_url( $image_url, 'daw_proctoring_image_' . $candidate_id ) ) ?>">Unduh gambar</a>
+                                                            <div style="margin:6px 0 10px; display:flex; align-items:center; gap:10px;">
+                                                                <a href="<?= esc_url( $view_url ) ?>" target="_blank" rel="noopener" title="Klik untuk memperbesar foto">
+                                                                    <img src="<?= esc_url( $view_url ) ?>" alt="Bukti Foto Identitas" style="max-height:64px; max-width:96px; border-radius:6px; border:1px solid #cbd5e1; object-fit:cover; vertical-align:middle; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                                                                </a>
+                                                                <div>
+                                                                    <a class="button button-small" href="<?= esc_url( $view_url ) ?>" target="_blank" rel="noopener">👁 Lihat Foto</a>
+                                                                    <a class="button button-small" href="<?= esc_url( $download_url ) ?>" style="margin-left:4px;">⬇ Unduh</a>
+                                                                </div>
+                                                            </div>
                                                         <?php endif; ?>
                                                     </li>
                                                 <?php endforeach; ?>
                                             </ul>
+                                            <?php if (
+                                                absint( $session['application_id'] ?? 0 ) > 0
+                                                && ! empty( recruitment_get_psychotest_result_ids_for_application(
+                                                    $candidate_id,
+                                                    absint( $session['application_id'] )
+                                                ) )
+                                            ) :
+                                                $report_args = [
+                                                    'action' => 'daw_proctoring_report',
+                                                    'candidate_id' => $candidate_id,
+                                                    'session_id' => (string) $session['session_id'],
+                                                ];
+                                                $report_url = wp_nonce_url(
+                                                    add_query_arg( $report_args, admin_url( 'admin-post.php' ) ),
+                                                    'daw_proctoring_report_' . (string) $session['session_id']
+                                                );
+                                                ?>
+                                                <a class="button button-secondary" href="<?= esc_url( $report_url ) ?>">Unduh Laporan PDF Lamaran #<?= esc_html( (string) $session['application_id'] ) ?></a>
+                                            <?php elseif ( absint( $session['application_id'] ?? 0 ) > 0 ) : ?>
+                                                <small>Laporan tersedia setelah minimal satu tes pada lamaran ini selesai.</small>
+                                            <?php else : ?>
+                                                <small>Laporan per lamaran tidak tersedia untuk sesi lama.</small>
+                                            <?php endif; ?>
                                         </details>
                                     <?php endforeach; ?>
                                 <?php endif; ?>

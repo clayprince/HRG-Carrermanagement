@@ -48,14 +48,19 @@ class Recruitment_Pauli_Assessment {
         }
 
         if ( '1' === sanitize_text_field( wp_unslash( $_GET['start'] ?? '' ) ) ) {
+            $application_id = recruitment_get_psychotest_application_id();
             if ( ! in_array( $state['status'] ?? '', [ 'active', 'complete' ], true )
                 || (int) ( $state['candidate_id'] ?? 0 ) !== $candidate_id ) {
                 if ( ! recruitment_is_psychotest_test_enabled( 'pauli' ) ) {
                     wp_die( esc_html__( 'Tes PAULI sedang tidak tersedia untuk sesi online. Silakan periksa jadwal dengan tim HR.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
                 }
-                $this->start_session( $user_id, $candidate_id );
+                recruitment_require_psychotest_preparation( $application_id );
+                $this->start_session( $user_id, $candidate_id, $application_id );
+            } elseif ( absint( $state['application_id'] ?? 0 ) > 0 && absint( $state['application_id'] ) !== $application_id ) {
+                wp_die( esc_html__( 'Sesi Tes Pauli ini terhubung ke lamaran lain.', 'recruitment-plugin' ), '', [ 'response' => 409 ] );
             }
-            wp_safe_redirect( recruitment_get_public_url( 'psych-pauli' ) );
+            $arguments = $application_id > 0 ? [ 'application_id' => $application_id ] : [];
+            wp_safe_redirect( recruitment_get_public_url( 'psych-pauli', $arguments ) );
             exit;
         }
 
@@ -223,8 +228,8 @@ class Recruitment_Pauli_Assessment {
         return recruitment_get_assessment_user_id();
     }
 
-    private function start_session( int $user_id, int $candidate_id ): void {
-        if ( ! recruitment_consume_psychotest_consent( 'pauli' ) ) {
+    private function start_session( int $user_id, int $candidate_id, int $application_id ): void {
+        if ( ! recruitment_consume_psychotest_consent( 'pauli', $application_id ) ) {
             wp_die( esc_html__( 'Berikan persetujuan tes terlebih dahulu.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
         }
         $iq_state = recruitment_get_assessment_state( $user_id, self::IQ_USER_META_KEY );
@@ -283,6 +288,7 @@ class Recruitment_Pauli_Assessment {
                 'version' => 2,
                 'interface' => 'sequential',
                 'candidate_id' => $candidate_id,
+                'application_id' => $application_id,
                 'test_id' => (int) $test['ID'],
                 'answer_width' => self::ANSWER_WIDTH,
                 'status' => 'active',

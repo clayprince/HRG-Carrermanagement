@@ -244,8 +244,9 @@ $pipeline_rows = [
                     <a href="<?= esc_url( recruitment_get_admin_url( 'applications' ) ) ?>"><span class="recruitment-dashboard__nav-label">Pengajuan Lowongan</span></a>
                 </div>
             </div>
-            <a class="<?= $is_recruitment_list && 'psychological_test' === $initial_stage ? 'is-active' : '' ?>" href="<?= esc_url( add_query_arg( 'stage', 'psychological_test', recruitment_get_admin_url( 'dashboard' ) ) ) ?>" data-dashboard-stage="psychological_test" title="Psikotes"><span class="dashicons dashicons-lightbulb" aria-hidden="true"></span><span class="recruitment-dashboard__nav-label">Psikotes</span></a>
-            <a href="<?= esc_url( admin_url( 'admin.php?page=recruitment-interview-schedule' ) ) ?>" title="Jadwal Wawancara"><span class="dashicons dashicons-calendar-alt" aria-hidden="true"></span><span class="recruitment-dashboard__nav-label">Jadwal Wawancara</span></a>
+            <a href="#candidate-list-title" data-dashboard-stage="psychological_test" title="Psikotes"><span class="dashicons dashicons-lightbulb" aria-hidden="true"></span><span class="recruitment-dashboard__nav-label">Psikotes</span></a>
+            <a href="<?= esc_url( recruitment_get_admin_url( 'interview-schedule' ) ) ?>" title="Jadwal Wawancara HR"><span class="dashicons dashicons-calendar-alt" aria-hidden="true"></span><span class="recruitment-dashboard__nav-label">Jadwal Wawancara HR</span></a>
+            <a href="<?= esc_url( recruitment_get_admin_url( 'interview-schedule-user' ) ) ?>" title="Jadwal Wawancara User"><span class="dashicons dashicons-calendar-alt" aria-hidden="true"></span><span class="recruitment-dashboard__nav-label">Jadwal Wawancara User</span></a>
             <a href="<?= esc_url( recruitment_get_admin_url( 'settings' ) ) ?>" title="Email Recruitment"><span class="dashicons dashicons-email" aria-hidden="true"></span><span class="recruitment-dashboard__nav-label">Email Recruitment</span></a>
             <a href="<?= esc_url( admin_url( 'admin.php?page=recruitment-user-management' ) ) ?>" title="Pengelolaan Akun User"><span class="dashicons dashicons-admin-users" aria-hidden="true"></span><span class="recruitment-dashboard__nav-label">Pengelolaan Akun User</span></a>
         </nav>

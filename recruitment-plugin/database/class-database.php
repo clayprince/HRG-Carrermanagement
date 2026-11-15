@@ -16,6 +16,12 @@ class Recruitment_Database {
     private Recruitment_Oracle_Connection $oracle;
     private ?string $last_error = null;
     private ?bool $application_token_column_exists = null;
+    private ?bool $user_interview_application_link_exists = null;
+    private ?bool $interview_schedule_table_exists = null;
+    private ?bool $interview_booking_table_exists = null;
+    private ?bool $interview_schedule_interviewer_column_exists = null;
+    private ?bool $psychotest_candidate_score_columns_exist = null;
+    private ?array $proctoring_report_columns = null;
 
     /**
      * @param array<string, string> $config Optional configuration overrides.
@@ -455,7 +461,7 @@ class Recruitment_Database {
             return [];
         }
         return $this->fetch_all(
-            'SELECT l.lamaran_id AS "id", ' . $token_column . ' AS "token", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", NVL(d.nama_departemen, k.nama_departemen) AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status", (SELECT MAX(r.tahap_seleksi) KEEP (DENSE_RANK LAST ORDER BY r.tanggal_status, r.riwayat_status_id) FROM HRS_RIWAYAT_STATUS_PELAMAR r WHERE r.lamaran_id = l.lamaran_id) AS "latest_stage" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id ORDER BY NVL(l.created_at, l.tanggal_melamar) DESC, l.lamaran_id DESC',
+            'SELECT l.lamaran_id AS "id", ' . $token_column . ' AS "token", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", NVL(d.nama_departement, k.nama_departemen) AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status", (SELECT MAX(r.tahap_seleksi) KEEP (DENSE_RANK LAST ORDER BY r.tanggal_status, r.riwayat_status_id) FROM HRS_RIWAYAT_STATUS_PELAMAR r WHERE r.lamaran_id = l.lamaran_id) AS "latest_stage" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id ORDER BY NVL(l.created_at, l.tanggal_melamar) DESC, l.lamaran_id DESC',
             [ 'login_id' => $login_id ]
         );
     }
@@ -470,7 +476,7 @@ class Recruitment_Database {
             return null;
         }
         $rows = $this->fetch_all(
-            'SELECT l.lamaran_id AS "id", ' . $token_column . ' AS "token", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", NVL(d.nama_departemen, k.nama_departemen) AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id AND l.lamaran_id = :application_id',
+            'SELECT l.lamaran_id AS "id", ' . $token_column . ' AS "token", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", NVL(d.nama_departement, k.nama_departemen) AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id AND l.lamaran_id = :application_id',
             [ 'login_id' => $login_id, 'application_id' => $application_id ]
         );
         return $rows[0] ?? null;
@@ -486,7 +492,7 @@ class Recruitment_Database {
             return null;
         }
         $rows = $this->fetch_all(
-            'SELECT l.lamaran_id AS "id", l.application_token AS "token", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", NVL(d.nama_departemen, k.nama_departemen) AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id AND l.application_token = :application_token',
+            'SELECT l.lamaran_id AS "id", l.application_token AS "token", l.detail_lowongan_id AS "vacancy_id", d.judul_pekerjaan AS "title", k.nama_dealer AS "location", NVL(d.nama_departement, k.nama_departemen) AS "department", TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at", l.status_terkini AS "status", l.status_akhir AS "final_status" FROM HRS_LAMARAN l JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE l.profile_kandidat_id = :login_id AND l.application_token = :application_token',
             [ 'login_id' => $login_id, 'application_token' => $application_token ]
         );
         return $rows[0] ?? null;
@@ -508,6 +514,7 @@ class Recruitment_Database {
         if ( ! ctype_digit( $login_id ) || '0' === $login_id || ! ctype_digit( $application_id ) || '0' === $application_id ) {
             return null;
         }
+        $this->last_error = null;
         try {
             $statement = $this->get_connection()->prepare(
                 'SELECT c.attendance_confirmed AS "confirmed", TO_CHAR(c.confirmed_at, \'YYYY-MM-DD HH24:MI:SS\') AS "confirmed_at", CASE WHEN c.email_reminder_sent_at IS NULL THEN \'N\' ELSE \'Y\' END AS "reminder_sent" FROM HRS_KONFIRMASI_PSIKOTES c JOIN HRS_LAMARAN l ON l.lamaran_id = c.lamaran_id WHERE l.profile_kandidat_id = :login_id AND l.lamaran_id = :application_id'
@@ -810,6 +817,10 @@ class Recruitment_Database {
         } catch ( PDOException $exception ) {
             if ( $this->is_unique_violation( $exception ) ) {
                 return [ 'success' => false, 'error' => 'email_exists' ];
+            }
+            if ( $this->is_missing_schema_object( $exception ) ) {
+                $this->log_error( 'HR account creation requires Oracle schema alignment', $exception );
+                return [ 'success' => false, 'error' => 'schema_not_ready' ];
             }
             $this->log_error( 'HR account creation failed', $exception );
             return [ 'success' => false, 'error' => 'service_unavailable' ];
@@ -1698,14 +1709,24 @@ class Recruitment_Database {
         $profile_service = null;
         $stored_documents = [];
         try {
-            $connection = $this->get_connection();
-            $connection->beginTransaction();
             $candidate_login_id = (string) ( $submission['candidate_login_id'] ?? '' );
             $vacancy_id = (string) ( $submission['vacancy_source_id'] ?? '' );
             if ( ! ctype_digit( $candidate_login_id ) || '0' === $candidate_login_id || ! ctype_digit( $vacancy_id ) || '0' === $vacancy_id ) {
                 throw new InvalidArgumentException( 'Candidate or Oracle vacancy identifier is invalid.' );
             }
-            $candidate_check = $connection->prepare( 'SELECT PROFILE_KANDIDAT_LOGIN, KANDIDAT_ID FROM HRS_PROFILE_KANDIDAT_LOGIN WHERE PROFILE_KANDIDAT_LOGIN = :id AND (STATUS_AKUN = :status OR STATUS_AKUN IS NULL) FOR UPDATE' );
+            $wp_post_id = (int) $vacancy_id - self::WORDPRESS_VACANCY_ID_OFFSET;
+            $wp_post = function_exists( 'get_post' ) && $wp_post_id > 0 ? get_post( $wp_post_id ) : null;
+            if (
+                ! $wp_post
+                || 'daw_vacancy' !== $wp_post->post_type
+                || ! recruitment_has_approved_vacancy_request( (int) $wp_post->ID )
+            ) {
+                throw new InvalidArgumentException( 'Vacancy has no approved department request.' );
+            }
+
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $candidate_check = $connection->prepare( 'SELECT PROFILE_KANDIDAT_LOGIN, KANDIDAT_ID FROM HRS_PROFILE_KANDIDAT_LOGIN WHERE PROFILE_KANDIDAT_LOGIN = :id AND (UPPER(TRIM(STATUS_AKUN)) = :status OR STATUS_AKUN IS NULL) FOR UPDATE' );
             $candidate_check->execute( [ 'id' => $candidate_login_id, 'status' => 'ACTIVE' ] );
             $candidate_row = $candidate_check->fetch( PDO::FETCH_ASSOC );
             if ( ! $candidate_row ) {
@@ -1729,20 +1750,21 @@ class Recruitment_Database {
             }
 
             // Ensure vacancy exists in Oracle HRS_DETAIL_INFO_LOWONGAN
-            $vacancy_check = $connection->prepare( 'SELECT DETAIL_LOWONGAN_ID FROM HRS_DETAIL_INFO_LOWONGAN WHERE DETAIL_LOWONGAN_ID = :vacancy_id' );
+            $vacancy_check = $connection->prepare(
+                'SELECT DETAIL_LOWONGAN_ID AS "id", KOLOM_PENDAFTARAN_ID AS "column_id", JUMLAH_KEBUTUHAN AS "headcount"
+                 FROM HRS_DETAIL_INFO_LOWONGAN
+                 WHERE DETAIL_LOWONGAN_ID = :vacancy_id
+                 FOR UPDATE'
+            );
             $vacancy_check->execute( [ 'vacancy_id' => $vacancy_id ] );
-            $has_oracle_vacancy = false !== $vacancy_check->fetchColumn();
-            $wp_post = null;
-            $wp_post_id = (int) $vacancy_id - self::WORDPRESS_VACANCY_ID_OFFSET;
-            if ( function_exists( 'get_post' ) && $wp_post_id > 0 ) {
-                $candidate_post = get_post( $wp_post_id );
-                if ( $candidate_post && 'daw_vacancy' === $candidate_post->post_type ) {
-                    $wp_post = $candidate_post;
-                }
+            $oracle_vacancy = $vacancy_check->fetch( PDO::FETCH_ASSOC );
+            $has_oracle_vacancy = is_array( $oracle_vacancy );
+            if ( '1' === (string) get_post_meta( $wp_post->ID, '_daw_vacancy_filled', true ) ) {
+                throw new InvalidArgumentException( 'Vacancy headcount has already been filled.' );
             }
             $wp_department_id = '';
             $wp_dept = '';
-            if ( ! $has_oracle_vacancy && $wp_post ) {
+            if ( ! $has_oracle_vacancy ) {
                 $wp_department_id = (string) get_post_meta( $wp_post->ID, '_daw_department_id', true );
                 if ( ! ctype_digit( $wp_department_id ) || '0' === $wp_department_id ) {
                     throw new InvalidArgumentException( 'Vacancy department is invalid.' );
@@ -1768,13 +1790,16 @@ class Recruitment_Database {
                 $wp_type = '';
                 $wp_desc = '';
                 $wp_deadline = null;
-                if ( $wp_post && 'daw_vacancy' === $wp_post->post_type ) {
-                    $wp_title = get_the_title( $wp_post ) ?: $wp_title;
-                    $wp_desc = $wp_post->post_content ?: '';
-                    $wp_dealer = (string) get_post_meta( $wp_post->ID, '_daw_dealer', true );
-                    $wp_loc = (string) get_post_meta( $wp_post->ID, '_daw_location', true );
-                    $wp_type = (string) get_post_meta( $wp_post->ID, '_daw_type', true );
-                    $wp_deadline = (string) get_post_meta( $wp_post->ID, '_daw_deadline', true );
+                $wp_headcount = 0;
+                $wp_title = get_the_title( $wp_post ) ?: $wp_title;
+                $wp_desc = $wp_post->post_content ?: '';
+                $wp_dealer = (string) get_post_meta( $wp_post->ID, '_daw_dealer', true );
+                $wp_loc = (string) get_post_meta( $wp_post->ID, '_daw_location', true );
+                $wp_type = (string) get_post_meta( $wp_post->ID, '_daw_type', true );
+                $wp_deadline = (string) get_post_meta( $wp_post->ID, '_daw_deadline', true );
+                $wp_headcount = filter_var( get_post_meta( $wp_post->ID, '_daw_headcount', true ), FILTER_VALIDATE_INT );
+                if ( ! is_int( $wp_headcount ) || 1 > $wp_headcount ) {
+                    throw new InvalidArgumentException( 'Vacancy headcount is not configured.' );
                 }
 
                 $kolom_check = $connection->prepare( 'SELECT KOLOM_PENDAFTARAN_ID FROM HRS_KOLOM_LANDING_PENDAFTARAN WHERE KOLOM_PENDAFTARAN_ID = :kolom_id' );
@@ -1792,7 +1817,7 @@ class Recruitment_Database {
 
                 $deadline_val = ( ! empty( $wp_deadline ) && preg_match( '/^\d{4}-\d{2}-\d{2}$/', $wp_deadline ) ) ? $wp_deadline : null;
                 $ins_detail = $connection->prepare(
-                    'INSERT INTO HRS_DETAIL_INFO_LOWONGAN (DETAIL_LOWONGAN_ID, KOLOM_PENDAFTARAN_ID, JUDUL_PEKERJAAN, DESKRIPSI_PEKERJAAN, LOKASI_PENEMPATAN, DEPARTEMEN_ID, NAMA_DEPARTEMEN, KATEGORI_KJ, BATAS_LAMARAN, REQUEST_AT) VALUES (:detail_id, :kolom_id, :title, :description, :location, :department_id, :department, :job_type, CASE WHEN :deadline IS NULL THEN NULL ELSE TO_DATE(:deadline_val, \'YYYY-MM-DD\') END, CURRENT_TIMESTAMP)'
+                    'INSERT INTO HRS_DETAIL_INFO_LOWONGAN (DETAIL_LOWONGAN_ID, KOLOM_PENDAFTARAN_ID, JUDUL_PEKERJAAN, DESKRIPSI_PEKERJAAN, LOKASI_PENEMPATAN, DEPARTEMENT_ID, NAMA_DEPARTEMENT, KATEGORI_KJ, JUMLAH_KEBUTUHAN, BATAS_LAMARAN, REQUEST_AT) VALUES (:detail_id, :kolom_id, :title, :description, :location, :department_id, :department, :job_type, :headcount, CASE WHEN :deadline IS NULL THEN NULL ELSE TO_DATE(:deadline_val, \'YYYY-MM-DD\') END, CURRENT_TIMESTAMP)'
                 );
                 $ins_detail->execute( [
                     'detail_id'    => $vacancy_id,
@@ -1803,9 +1828,35 @@ class Recruitment_Database {
                     'department_id' => $wp_department_id,
                     'department'    => substr( $wp_dept, 0, 1000 ),
                     'job_type'      => substr( $wp_type, 0, 1000 ),
+                    'headcount'     => $wp_headcount,
                     'deadline'      => $deadline_val,
                     'deadline_val'  => $deadline_val,
                 ] );
+                $oracle_vacancy = [
+                    'id' => $vacancy_id,
+                    'column_id' => $vacancy_id,
+                    'headcount' => $wp_headcount,
+                ];
+            }
+
+            $vacancy_headcount = filter_var( $oracle_vacancy['headcount'] ?? null, FILTER_VALIDATE_INT );
+            if ( is_int( $vacancy_headcount ) && 1 <= $vacancy_headcount ) {
+                $accepted_count = $connection->prepare(
+                    'SELECT COUNT(*) FROM HRS_LAMARAN
+                     WHERE DETAIL_LOWONGAN_ID = :vacancy_id
+                       AND UPPER(TRIM(NVL(STATUS_AKHIR, STATUS_TERKINI))) IN (\'DITERIMA\', \'ACCEPTED\', \'LOLOS\')'
+                );
+                $accepted_count->execute( [ 'vacancy_id' => $vacancy_id ] );
+                if ( (int) $accepted_count->fetchColumn() >= $vacancy_headcount ) {
+                    $connection->rollBack();
+                    $marked_filled = $this->mark_wordpress_vacancy_filled( $vacancy_id );
+                    return [
+                        'success' => false,
+                        'error' => $marked_filled
+                            ? 'Lowongan sudah menerima kandidat sesuai jumlah kebutuhan dan tidak menerima lamaran baru.'
+                            : 'Kuota lowongan sudah terpenuhi, tetapi penutupan lowongan belum berhasil. Hubungi HR sebelum mencoba kembali.',
+                    ];
+                }
             }
 
             $token_column = $this->get_application_token_column_expression();
@@ -2000,11 +2051,15 @@ class Recruitment_Database {
                 $profile_service->delete_documents( $stored_documents );
             }
             $message = 'Lowongan tidak tersedia atau akun pelamar tidak aktif.';
-            if ( 'Applicant has already applied to this vacancy.' === $exception->getMessage() ) {
-                $message = 'Anda sudah pernah melamar lowongan ini.';
-            } elseif ( 'Vacancy department is invalid.' === $exception->getMessage() ) {
-                $message = 'Lowongan belum memiliki departemen Oracle yang valid. Hubungi HR untuk memperbarui data lowongan.';
-            }
+            $message = [
+                'Candidate or Oracle vacancy identifier is invalid.' => 'Data lowongan atau sesi akun tidak valid. Muat ulang halaman dan coba kembali.',
+                'Applicant account is not active.' => 'Akun pelamar sedang tidak aktif. Keluar lalu masuk kembali, atau hubungi HR.',
+                'Applicant has already applied to this vacancy.' => 'Anda sudah pernah melamar lowongan ini.',
+                'Vacancy has no approved department request.' => 'Lowongan tidak memiliki request FPTK yang disetujui dan tidak dapat dilamar.',
+                'Vacancy department is invalid.' => 'Lowongan belum memiliki departemen Oracle yang valid. Hubungi HR untuk memperbarui data lowongan.',
+                'Vacancy headcount is not configured.' => 'Jumlah kebutuhan lowongan belum diatur. Hubungi HR sebelum mengirim lamaran.',
+                'Vacancy headcount has already been filled.' => 'Lowongan sudah menerima kandidat sesuai jumlah kebutuhan dan tidak menerima lamaran baru.',
+            ][ $exception->getMessage() ] ?? $message;
             return [ 'success' => false, 'error' => $message ];
         } catch ( PDOException | RuntimeException $exception ) {
             if ( $connection instanceof PDO && $connection->inTransaction() ) {
@@ -2023,9 +2078,674 @@ class Recruitment_Database {
      */
     public function get_vacancies(): array {
         return $this->fetch_all(
-            'SELECT d.detail_lowongan_id AS "id", d.judul_pekerjaan AS "title", NVL(d.lokasi_penempatan, k.nama_dealer) AS "location", k.nama_dealer AS "dealer", d.kategori_kj AS "job_type", d.deskripsi_pekerjaan AS "description", d.pendidikan_minimum AS "education", TO_CHAR(d.batas_lamaran, \'YYYY-MM-DD\') AS "deadline", NVL(d.nama_departemen, k.nama_departemen) AS "department", TO_CHAR(d.request_at, \'YYYY-MM-DD\') AS "posted_at" FROM HRS_DETAIL_INFO_LOWONGAN d JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE k.status_kolom = :status AND (d.batas_lamaran IS NULL OR d.batas_lamaran >= CURRENT_DATE) ORDER BY d.detail_lowongan_id DESC',
+            'SELECT d.detail_lowongan_id AS "id", d.judul_pekerjaan AS "title", NVL(d.lokasi_penempatan, k.nama_dealer) AS "location", k.nama_dealer AS "dealer", d.kategori_kj AS "job_type", d.deskripsi_pekerjaan AS "description", d.pendidikan_minimum AS "education", TO_CHAR(d.batas_lamaran, \'YYYY-MM-DD\') AS "deadline", NVL(d.nama_departement, k.nama_departemen) AS "department", TO_CHAR(d.request_at, \'YYYY-MM-DD\') AS "posted_at" FROM HRS_DETAIL_INFO_LOWONGAN d JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id WHERE k.status_kolom = :status AND (d.batas_lamaran IS NULL OR d.batas_lamaran >= CURRENT_DATE) AND (d.jumlah_kebutuhan IS NULL OR (SELECT COUNT(*) FROM HRS_LAMARAN l WHERE l.detail_lowongan_id = d.detail_lowongan_id AND UPPER(TRIM(NVL(l.status_akhir, l.status_terkini))) IN (\'DITERIMA\', \'ACCEPTED\', \'LOLOS\')) < d.jumlah_kebutuhan) ORDER BY d.detail_lowongan_id DESC',
             [ 'status' => 1 ]
         );
+    }
+
+    /**
+     * Synchronize a WordPress vacancy's headcount with its Oracle application record, if created.
+     *
+     * @return array{success: bool, error?: string, warning?: string}
+     */
+    public function sync_wordpress_vacancy_headcount( int $post_id, int $headcount ): array {
+        if ( $post_id < 1 || $headcount < 1 ) {
+            return [ 'success' => false, 'error' => 'Jumlah kebutuhan harus berupa bilangan bulat positif.' ];
+        }
+
+        $vacancy_id = (string) ( self::WORDPRESS_VACANCY_ID_OFFSET + $post_id );
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $lookup = $connection->prepare(
+                'SELECT KOLOM_PENDAFTARAN_ID
+                 FROM HRS_DETAIL_INFO_LOWONGAN
+                 WHERE DETAIL_LOWONGAN_ID = :vacancy_id
+                 FOR UPDATE'
+            );
+            $lookup->execute( [ 'vacancy_id' => $vacancy_id ] );
+            $column_id = $lookup->fetchColumn();
+            if ( false === $column_id ) {
+                $connection->commit();
+                return [ 'success' => true ];
+            }
+
+            $accepted_count = $connection->prepare(
+                'SELECT COUNT(*) FROM HRS_LAMARAN
+                 WHERE DETAIL_LOWONGAN_ID = :vacancy_id
+                   AND UPPER(TRIM(NVL(STATUS_AKHIR, STATUS_TERKINI))) IN (\'DITERIMA\', \'ACCEPTED\', \'LOLOS\')'
+            );
+            $accepted_count->execute( [ 'vacancy_id' => $vacancy_id ] );
+            $accepted = (int) $accepted_count->fetchColumn();
+            if ( $accepted > $headcount ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'Jumlah kebutuhan tidak boleh lebih kecil dari jumlah kandidat yang sudah diterima.' ];
+            }
+
+            $update = $connection->prepare(
+                'UPDATE HRS_DETAIL_INFO_LOWONGAN
+                 SET JUMLAH_KEBUTUHAN = :headcount
+                 WHERE DETAIL_LOWONGAN_ID = :vacancy_id'
+            );
+            $update->execute( [ 'headcount' => $headcount, 'vacancy_id' => $vacancy_id ] );
+            if ( $accepted === $headcount ) {
+                $column_lock = $connection->prepare(
+                    'SELECT KOLOM_PENDAFTARAN_ID
+                     FROM HRS_KOLOM_LANDING_PENDAFTARAN
+                     WHERE KOLOM_PENDAFTARAN_ID = :column_id
+                     FOR UPDATE'
+                );
+                $column_lock->execute( [ 'column_id' => (string) $column_id ] );
+                if ( false === $column_lock->fetchColumn() ) {
+                    throw new RuntimeException( 'The vacancy publication record was not found.' );
+                }
+                $close = $connection->prepare(
+                    'UPDATE HRS_KOLOM_LANDING_PENDAFTARAN
+                     SET STATUS_KOLOM = 0
+                     WHERE KOLOM_PENDAFTARAN_ID = :column_id'
+                );
+                $close->execute( [ 'column_id' => (string) $column_id ] );
+            }
+            $connection->commit();
+
+            if ( $accepted === $headcount && ! $this->mark_wordpress_vacancy_filled( $vacancy_id ) ) {
+                return [
+                    'success' => true,
+                    'warning' => 'Jumlah kebutuhan tersimpan dan lowongan dihentikan di Oracle, tetapi status lowongan WordPress belum berhasil ditutup.',
+                ];
+            }
+            return [ 'success' => true ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_oracle_failure( 'WordPress vacancy headcount synchronization failed', $exception );
+            return [ 'success' => false, 'error' => 'Jumlah kebutuhan gagal disinkronkan ke Oracle.' ];
+        }
+    }
+
+    private function mark_wordpress_vacancy_filled( string $vacancy_id ): bool {
+        $post_id = (int) $vacancy_id - self::WORDPRESS_VACANCY_ID_OFFSET;
+        if ( $post_id < 1 || ! function_exists( 'get_post' ) ) {
+            return true;
+        }
+        $post = get_post( $post_id );
+        if ( ! $post || 'daw_vacancy' !== $post->post_type ) {
+            return true;
+        }
+
+        update_post_meta( $post_id, '_daw_vacancy_status', 'closed' );
+        update_post_meta( $post_id, '_daw_vacancy_filled', '1' );
+        $updated = wp_update_post( [ 'ID' => $post_id, 'post_status' => 'private' ], true );
+        if ( is_wp_error( $updated ) || ! $updated ) {
+            error_log( 'Filled recruitment vacancy could not be unpublished in WordPress: ' . ( is_wp_error( $updated ) ? $updated->get_error_message() : 'WordPress did not update the post.' ) );
+        }
+
+        return 'closed' === (string) get_post_meta( $post_id, '_daw_vacancy_status', true )
+            && '1' === (string) get_post_meta( $post_id, '_daw_vacancy_filled', true );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_interview_schedules( string $interview_type, string $start_date, string $end_date ): array {
+        $interview_type = strtoupper( trim( $interview_type ) );
+        $this->last_error = null;
+        if ( ! in_array( $interview_type, [ 'HR', 'USER' ], true ) || ! $this->is_valid_oracle_date( $start_date ) || ! $this->is_valid_oracle_date( $end_date ) ) {
+            $this->last_error = 'Invalid interview schedule query.';
+            return [];
+        }
+        if ( ! $this->has_interview_schedule_table() ) {
+            return [];
+        }
+        if ( ! $this->has_interview_booking_table() ) {
+            $this->last_error = 'HRS_INTERVIEW_BOOKING is unavailable; apply migration 019 before reading interview schedules.';
+            return [];
+        }
+        $has_interviewer_column = $this->has_interview_schedule_interviewer_column();
+        if ( $this->has_error() ) {
+            return [];
+        }
+
+        $interviewer_expression = $has_interviewer_column ? 's.interviewer_name' : 'CAST(NULL AS VARCHAR2(100))';
+        $result_table = 'HR' === $interview_type ? 'HRS_HASIL_WAWANCARA_HR' : 'HRS_HASIL_WAWANCARA_USER';
+        $rows = $this->fetch_all(
+            'SELECT s.schedule_id AS "id",
+                    TO_CHAR(s.schedule_date, \'YYYY-MM-DD\') AS "schedule_date",
+                    s.start_time AS "start_time",
+                    s.end_time AS "end_time",
+                    s.method AS "method",
+                    s.platform AS "platform",
+                    s.meeting_link AS "meeting_link",
+                    s.location AS "location",
+                    s.capacity AS "capacity",
+                    ' . $interviewer_expression . ' AS "interviewer_name",
+                    (SELECT COUNT(*) FROM HRS_INTERVIEW_BOOKING b
+                     WHERE b.schedule_id = s.schedule_id AND b.booking_status = \'BOOKED\') AS "booked_count",
+                    (SELECT COUNT(*) FROM HRS_INTERVIEW_BOOKING b
+                     WHERE b.schedule_id = s.schedule_id
+                       AND b.booking_status = \'BOOKED\'
+                       AND NOT EXISTS (
+                           SELECT 1 FROM ' . $result_table . ' r WHERE r.lamaran_id = b.lamaran_id
+                       )) AS "pending_count"
+             FROM HRS_INTERVIEW_SCHEDULE s
+             WHERE s.interview_type = :interview_type
+               AND s.schedule_date >= TO_DATE(:start_date, \'YYYY-MM-DD\')
+               AND s.schedule_date < TO_DATE(:end_date, \'YYYY-MM-DD\')
+             ORDER BY s.schedule_date, s.start_time, s.schedule_id',
+            [
+                'interview_type' => $interview_type,
+                'start_date' => $start_date,
+                'end_date' => $end_date,
+            ]
+        );
+        foreach ( $rows as &$row ) {
+            $booked_count = (int) ( $row['booked_count'] ?? 0 );
+            $capacity = (int) ( $row['capacity'] ?? 0 );
+            $row['is_complete'] = 0 < $booked_count && $booked_count >= $capacity && 0 === (int) ( $row['pending_count'] ?? 0 );
+        }
+        unset( $row );
+
+        return $rows;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_interview_schedule_bookings( string $interview_type, string $start_date, string $end_date ): array {
+        $interview_type = strtoupper( trim( $interview_type ) );
+        $this->last_error = null;
+        if ( ! in_array( $interview_type, [ 'HR', 'USER' ], true ) || ! $this->is_valid_oracle_date( $start_date ) || ! $this->is_valid_oracle_date( $end_date ) ) {
+            $this->last_error = 'Invalid interview booking query.';
+            return [];
+        }
+        if ( ! $this->has_interview_schedule_table() ) {
+            return [];
+        }
+        if ( ! $this->has_interview_booking_table() ) {
+            $this->last_error = 'HRS_INTERVIEW_BOOKING is unavailable; apply migration 019 before reading interview bookings.';
+            return [];
+        }
+        $has_interviewer_column = $this->has_interview_schedule_interviewer_column();
+        if ( $this->has_error() ) {
+            return [];
+        }
+
+        $interviewer_expression = $has_interviewer_column ? 's.interviewer_name' : 'CAST(NULL AS VARCHAR2(100))';
+        $result_table = 'HR' === $interview_type ? 'HRS_HASIL_WAWANCARA_HR' : 'HRS_HASIL_WAWANCARA_USER';
+        $result_column = 'HR' === $interview_type ? 'status_hasil' : 'status_seleksi';
+        return $this->fetch_all(
+            'SELECT s.schedule_id AS "schedule_id",
+                    b.lamaran_id AS "application_id",
+                    NVL(p.nama_lengkap, p.nama_kandidat) AS "candidate_name",
+                    r.' . $result_column . ' AS "result",
+                    r.nama_pewawancara AS "result_interviewer",
+                    ' . $interviewer_expression . ' AS "scheduled_interviewer",
+                    hr.nama_departemen_tujuan AS "assigned_department",
+                    assigned_account.username AS "department_account"
+             FROM HRS_INTERVIEW_BOOKING b
+             JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id
+             JOIN HRS_LAMARAN l ON l.lamaran_id = b.lamaran_id
+             LEFT JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
+             LEFT JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id
+             LEFT JOIN ' . $result_table . ' r ON r.lamaran_id = b.lamaran_id
+             LEFT JOIN HRS_HASIL_WAWANCARA_HR hr ON hr.lamaran_id = b.lamaran_id
+             LEFT JOIN HRS_ROLE_AKSES assigned_account ON assigned_account.role_akses_id = hr.role_akses_id
+             WHERE b.interview_type = :interview_type
+               AND b.booking_status = \'BOOKED\'
+               AND s.schedule_date >= TO_DATE(:start_date, \'YYYY-MM-DD\')
+               AND s.schedule_date < TO_DATE(:end_date, \'YYYY-MM-DD\')
+             ORDER BY s.schedule_date, s.start_time, s.schedule_id, b.booked_at',
+            [
+                'interview_type' => $interview_type,
+                'start_date' => $start_date,
+                'end_date' => $end_date,
+            ]
+        );
+    }
+
+    /**
+     * @param array<int, string> $dates
+     * @param array<int, array<string, mixed>> $slots
+     * @return array{success: bool, error?: string}
+     */
+    public function save_interview_schedules( string $interview_type, array $dates, array $slots ): array {
+        $interview_type = strtoupper( trim( $interview_type ) );
+        if ( ! in_array( $interview_type, [ 'HR', 'USER' ], true ) || empty( $dates ) || 31 < count( $dates ) || empty( $slots ) || 20 < count( $slots ) ) {
+            return [ 'success' => false, 'error' => 'invalid_schedule_data' ];
+        }
+
+        foreach ( $dates as $date ) {
+            if ( ! is_string( $date ) || ! $this->is_valid_oracle_date( $date ) ) {
+                return [ 'success' => false, 'error' => 'invalid_schedule_data' ];
+            }
+        }
+        $dates = array_values( array_unique( $dates ) );
+
+        $normalized_slots = [];
+        $seen_schedule_ids = [];
+        foreach ( $slots as $slot ) {
+            if ( ! is_array( $slot ) ) {
+                return [ 'success' => false, 'error' => 'invalid_schedule_data' ];
+            }
+            foreach ( [ 'schedule_id', 'start', 'end', 'method', 'platform', 'meeting_link', 'location', 'interviewer_name' ] as $field ) {
+                if ( isset( $slot[ $field ] ) && ! is_string( $slot[ $field ] ) && ! is_numeric( $slot[ $field ] ) ) {
+                    return [ 'success' => false, 'error' => 'invalid_schedule_data' ];
+                }
+            }
+
+            $schedule_id = filter_var( $slot['schedule_id'] ?? 0, FILTER_VALIDATE_INT );
+            $start = trim( (string) ( $slot['start'] ?? '' ) );
+            $end = trim( (string) ( $slot['end'] ?? '' ) );
+            $method = strtoupper( trim( (string) ( $slot['method'] ?? '' ) ) );
+            $platform = trim( (string) ( $slot['platform'] ?? '' ) );
+            $meeting_link = trim( (string) ( $slot['meeting_link'] ?? '' ) );
+            $location = trim( (string) ( $slot['location'] ?? '' ) );
+            $interviewer_name = trim( (string) ( $slot['interviewer_name'] ?? '' ) );
+            $capacity = filter_var( $slot['capacity'] ?? null, FILTER_VALIDATE_INT );
+            $interviewer_length = function_exists( 'mb_strlen' ) ? mb_strlen( $interviewer_name, 'UTF-8' ) : strlen( $interviewer_name );
+            if (
+                false === $schedule_id
+                || 0 > $schedule_id
+                || ! preg_match( '/^(?:[01]\d|2[0-3]):[0-5]\d$/', $start )
+                || ! preg_match( '/^(?:[01]\d|2[0-3]):[0-5]\d$/', $end )
+                || $start >= $end
+                || ! in_array( $method, [ 'ONLINE', 'OFFLINE' ], true )
+                || '' === $interviewer_name
+                || 100 < $interviewer_length
+                || false === $capacity
+                || 1 > $capacity
+                || 100 < $capacity
+            ) {
+                return [ 'success' => false, 'error' => 'invalid_schedule_data' ];
+            }
+            if ( 0 < $schedule_id ) {
+                if ( isset( $seen_schedule_ids[ $schedule_id ] ) ) {
+                    return [ 'success' => false, 'error' => 'invalid_schedule_data' ];
+                }
+                $seen_schedule_ids[ $schedule_id ] = true;
+            }
+
+            if ( 'ONLINE' === $method ) {
+                if ( '' === $platform || 100 < strlen( $platform ) || ! filter_var( $meeting_link, FILTER_VALIDATE_URL ) || 500 < strlen( $meeting_link ) ) {
+                    return [ 'success' => false, 'error' => 'invalid_schedule_data' ];
+                }
+                $location = '';
+            } else {
+                if ( '' === $location || 255 < strlen( $location ) ) {
+                    return [ 'success' => false, 'error' => 'invalid_schedule_data' ];
+                }
+                $platform = '';
+                $meeting_link = '';
+            }
+
+            foreach ( $normalized_slots as $existing_slot ) {
+                if ( $start < $existing_slot['end'] && $end > $existing_slot['start'] ) {
+                    return [ 'success' => false, 'error' => 'overlapping_slots' ];
+                }
+            }
+
+            $normalized_slots[] = [
+                'schedule_id' => 0 < $schedule_id ? $schedule_id : null,
+                'start' => $start,
+                'end' => $end,
+                'method' => $method,
+                'platform' => $platform,
+                'meeting_link' => $meeting_link,
+                'location' => $location,
+                'interviewer_name' => $interviewer_name,
+                'capacity' => $capacity,
+            ];
+        }
+
+        if ( ! $this->has_interview_schedule_table() || ! $this->has_interview_booking_table() ) {
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+        if ( ! $this->has_interview_schedule_interviewer_column() ) {
+            return [ 'success' => false, 'error' => 'schedule_interviewer_schema_unavailable' ];
+        }
+        $has_existing_ids = (bool) array_filter(
+            $normalized_slots,
+            static fn ( array $slot ): bool => null !== $slot['schedule_id']
+        );
+        if ( $has_existing_ids && 1 !== count( $dates ) ) {
+            return [ 'success' => false, 'error' => 'invalid_schedule_data' ];
+        }
+
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $lock_schedules = $connection->prepare(
+                'SELECT s.schedule_id, s.start_time, s.end_time, s.capacity
+                 FROM HRS_INTERVIEW_SCHEDULE s
+                 WHERE s.interview_type = :interview_type
+                   AND s.schedule_date = TO_DATE(:schedule_date, \'YYYY-MM-DD\')
+                 FOR UPDATE OF s.schedule_id'
+            );
+            $booking_count = $connection->prepare(
+                'SELECT COUNT(*) FROM HRS_INTERVIEW_BOOKING WHERE schedule_id = :schedule_id AND booking_status = \'BOOKED\''
+            );
+            $delete = $connection->prepare( 'DELETE FROM HRS_INTERVIEW_SCHEDULE WHERE schedule_id = :schedule_id' );
+            $update = $connection->prepare(
+                'UPDATE HRS_INTERVIEW_SCHEDULE
+                 SET START_TIME = :start_time, END_TIME = :end_time, METHOD = :method,
+                     PLATFORM = :platform, MEETING_LINK = :meeting_link, LOCATION = :location,
+                     CAPACITY = :capacity, INTERVIEWER_NAME = :interviewer_name
+                 WHERE SCHEDULE_ID = :schedule_id'
+            );
+            $insert = $connection->prepare(
+                'INSERT INTO HRS_INTERVIEW_SCHEDULE (INTERVIEW_TYPE, SCHEDULE_DATE, START_TIME, END_TIME, METHOD, PLATFORM, MEETING_LINK, LOCATION, CAPACITY, INTERVIEWER_NAME, CREATED_AT)
+                 VALUES (:interview_type, TO_DATE(:schedule_date, \'YYYY-MM-DD\'), :start_time, :end_time, :method, :platform, :meeting_link, :location, :capacity, :interviewer_name, CURRENT_TIMESTAMP)'
+            );
+            foreach ( $dates as $date ) {
+                $lock_schedules->execute( [ 'interview_type' => $interview_type, 'schedule_date' => $date ] );
+                $current_slots = $lock_schedules->fetchAll( PDO::FETCH_ASSOC );
+                $current_by_id = [];
+                foreach ( $current_slots as $current_slot ) {
+                    $current_by_id[ (int) $current_slot['SCHEDULE_ID'] ] = $current_slot;
+                }
+
+                $submitted_ids = [];
+                foreach ( $normalized_slots as $slot ) {
+                    if ( null !== $slot['schedule_id'] ) {
+                        $submitted_ids[] = $slot['schedule_id'];
+                    }
+                }
+                if ( ! $has_existing_ids && ! empty( $current_slots ) ) {
+                    $connection->rollBack();
+                    return [ 'success' => false, 'error' => 'schedule_already_exists' ];
+                }
+
+                foreach ( $current_slots as $current_slot ) {
+                    $current_id = (int) $current_slot['SCHEDULE_ID'];
+                    if ( in_array( $current_id, $submitted_ids, true ) ) {
+                        continue;
+                    }
+                    $booking_count->execute( [ 'schedule_id' => $current_id ] );
+                    if ( 0 < (int) $booking_count->fetchColumn() ) {
+                        $connection->rollBack();
+                        return [ 'success' => false, 'error' => 'booked_slot_cannot_remove' ];
+                    }
+                    $delete->execute( [ 'schedule_id' => $current_id ] );
+                }
+
+                foreach ( $normalized_slots as $slot ) {
+                    $parameters = [
+                        'start_time' => $slot['start'],
+                        'end_time' => $slot['end'],
+                        'method' => $slot['method'],
+                        'platform' => '' !== $slot['platform'] ? $slot['platform'] : null,
+                        'meeting_link' => '' !== $slot['meeting_link'] ? $slot['meeting_link'] : null,
+                        'location' => '' !== $slot['location'] ? $slot['location'] : null,
+                        'capacity' => $slot['capacity'],
+                        'interviewer_name' => $slot['interviewer_name'],
+                    ];
+                    if ( null === $slot['schedule_id'] ) {
+                        $insert->execute(
+                            array_merge(
+                                $parameters,
+                                [
+                                    'interview_type' => $interview_type,
+                                    'schedule_date' => $date,
+                                ]
+                            )
+                        );
+                        continue;
+                    }
+
+                    $schedule_id = $slot['schedule_id'];
+                    if ( ! isset( $current_by_id[ $schedule_id ] ) ) {
+                        $connection->rollBack();
+                        return [ 'success' => false, 'error' => 'invalid_schedule_data' ];
+                    }
+                    $current_slot = $current_by_id[ $schedule_id ];
+                    $booking_count->execute( [ 'schedule_id' => $schedule_id ] );
+                    $booked_count = (int) $booking_count->fetchColumn();
+                    if (
+                        0 < $booked_count
+                        && ( $slot['start'] !== trim( (string) $current_slot['START_TIME'] ) || $slot['end'] !== trim( (string) $current_slot['END_TIME'] ) )
+                    ) {
+                        $connection->rollBack();
+                        return [ 'success' => false, 'error' => 'booked_slot_time_locked' ];
+                    }
+                    if ( $slot['capacity'] < $booked_count ) {
+                        $connection->rollBack();
+                        return [ 'success' => false, 'error' => 'capacity_below_bookings' ];
+                    }
+                    $update->execute( array_merge( $parameters, [ 'schedule_id' => $schedule_id ] ) );
+                }
+            }
+            $connection->commit();
+            return [ 'success' => true ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_error( 'Interview schedule save failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_applicant_interview_slots( string $login_id, string $application_id, string $interview_type, string $start_date, string $end_date ): array {
+        $interview_type = strtoupper( trim( $interview_type ) );
+        $this->last_error = null;
+        if (
+            ! ctype_digit( $login_id )
+            || '0' === $login_id
+            || ! ctype_digit( $application_id )
+            || '0' === $application_id
+            || ! in_array( $interview_type, [ 'HR', 'USER' ], true )
+            || ! $this->is_valid_oracle_date( $start_date )
+            || ! $this->is_valid_oracle_date( $end_date )
+        ) {
+            $this->last_error = 'Invalid interview booking query.';
+            return [];
+        }
+        if ( ! $this->has_interview_schedule_table() || ! $this->has_interview_booking_table() ) {
+            $this->last_error = 'Interview schedule or booking schema is unavailable; review migrations 018 and 019.';
+            return [];
+        }
+        $has_interviewer_column = $this->has_interview_schedule_interviewer_column();
+        if ( $this->has_error() ) {
+            return [];
+        }
+
+        $interviewer_expression = $has_interviewer_column ? 's.INTERVIEWER_NAME' : 'CAST(NULL AS VARCHAR2(100))';
+        $required_status = 'HR' === $interview_type ? 'INTERVIEW_HR' : 'INTERVIEW_USER';
+        return $this->fetch_all(
+            'SELECT s.SCHEDULE_ID AS "id",
+                    TO_CHAR(s.SCHEDULE_DATE, \'YYYY-MM-DD\') AS "schedule_date",
+                    s.START_TIME AS "start_time",
+                    s.END_TIME AS "end_time",
+                    s.METHOD AS "method",
+                    s.PLATFORM AS "platform",
+                    s.MEETING_LINK AS "meeting_link",
+                    s.LOCATION AS "location",
+                    ' . $interviewer_expression . ' AS "interviewer_name",
+                    s.CAPACITY AS "capacity",
+                    (SELECT COUNT(*) FROM HRS_INTERVIEW_BOOKING b WHERE b.SCHEDULE_ID = s.SCHEDULE_ID AND b.BOOKING_STATUS = \'BOOKED\') AS "booked_count",
+                    (s.CAPACITY - (SELECT COUNT(*) FROM HRS_INTERVIEW_BOOKING b WHERE b.SCHEDULE_ID = s.SCHEDULE_ID AND b.BOOKING_STATUS = \'BOOKED\')) AS "remaining_capacity"
+             FROM HRS_INTERVIEW_SCHEDULE s
+             WHERE s.INTERVIEW_TYPE = :interview_type
+               AND s.SCHEDULE_DATE >= TO_DATE(:start_date, \'YYYY-MM-DD\')
+               AND s.SCHEDULE_DATE < TO_DATE(:end_date, \'YYYY-MM-DD\')
+               AND s.SCHEDULE_DATE >= TRUNC(CURRENT_DATE)
+               AND s.CAPACITY > (
+                    SELECT COUNT(*) FROM HRS_INTERVIEW_BOOKING b
+                    WHERE b.SCHEDULE_ID = s.SCHEDULE_ID AND b.BOOKING_STATUS = \'BOOKED\'
+               )
+               AND EXISTS (
+                    SELECT 1 FROM HRS_LAMARAN l
+                    WHERE l.LAMARAN_ID = :application_id
+                      AND l.PROFILE_KANDIDAT_ID = :login_id
+                      AND UPPER(TRIM(l.STATUS_TERKINI)) = :required_status
+                      AND UPPER(TRIM(NVL(l.STATUS_AKHIR, \'-\'))) NOT IN (\'DITERIMA\', \'ACCEPTED\', \'DITOLAK\', \'REJECTED\')
+               )
+               AND NOT EXISTS (
+                    SELECT 1 FROM HRS_INTERVIEW_BOOKING b
+                    WHERE b.LAMARAN_ID = :booking_application_id
+                      AND b.INTERVIEW_TYPE = :booking_type
+                      AND b.BOOKING_STATUS = \'BOOKED\'
+               )
+             ORDER BY s.SCHEDULE_DATE, s.START_TIME, s.SCHEDULE_ID',
+            [
+                'interview_type' => $interview_type,
+                'start_date' => $start_date,
+                'end_date' => $end_date,
+                'application_id' => $application_id,
+                'login_id' => $login_id,
+                'required_status' => $required_status,
+                'booking_application_id' => $application_id,
+                'booking_type' => $interview_type,
+            ]
+        );
+    }
+
+    /** @return array<string, mixed>|null */
+    public function get_applicant_interview_booking( string $login_id, string $application_id, string $interview_type ): ?array {
+        $interview_type = strtoupper( trim( $interview_type ) );
+        $this->last_error = null;
+        if (
+            ! ctype_digit( $login_id )
+            || '0' === $login_id
+            || ! ctype_digit( $application_id )
+            || '0' === $application_id
+            || ! in_array( $interview_type, [ 'HR', 'USER' ], true )
+        ) {
+            $this->last_error = 'Invalid interview booking lookup.';
+            return null;
+        }
+        if ( ! $this->has_interview_schedule_table() || ! $this->has_interview_booking_table() ) {
+            $this->last_error = 'Interview schedule or booking schema is unavailable; review migrations 018 and 019.';
+            return null;
+        }
+        $has_interviewer_column = $this->has_interview_schedule_interviewer_column();
+        if ( $this->has_error() ) {
+            return null;
+        }
+
+        $interviewer_expression = $has_interviewer_column ? 's.INTERVIEWER_NAME' : 'CAST(NULL AS VARCHAR2(100))';
+        $rows = $this->fetch_all(
+            'SELECT s.SCHEDULE_ID AS "id",
+                    TO_CHAR(s.SCHEDULE_DATE, \'YYYY-MM-DD\') AS "schedule_date",
+                    s.START_TIME AS "start_time",
+                    s.END_TIME AS "end_time",
+                    s.METHOD AS "method",
+                    s.PLATFORM AS "platform",
+                    s.MEETING_LINK AS "meeting_link",
+                    s.LOCATION AS "location",
+                    ' . $interviewer_expression . ' AS "interviewer_name",
+                    b.BOOKED_AT AS "booked_at"
+             FROM HRS_INTERVIEW_BOOKING b
+             JOIN HRS_INTERVIEW_SCHEDULE s ON s.SCHEDULE_ID = b.SCHEDULE_ID
+             JOIN HRS_LAMARAN l ON l.LAMARAN_ID = b.LAMARAN_ID
+             WHERE l.PROFILE_KANDIDAT_ID = :login_id
+               AND b.LAMARAN_ID = :application_id
+               AND b.INTERVIEW_TYPE = :interview_type
+               AND b.BOOKING_STATUS = \'BOOKED\'',
+            [
+                'login_id' => $login_id,
+                'application_id' => $application_id,
+                'interview_type' => $interview_type,
+            ]
+        );
+        return $rows[0] ?? null;
+    }
+
+    /** @return array{success: bool, error?: string} */
+    public function book_applicant_interview_slot( string $login_id, string $application_id, string $interview_type, int $schedule_id ): array {
+        $interview_type = strtoupper( trim( $interview_type ) );
+        if (
+            ! ctype_digit( $login_id )
+            || '0' === $login_id
+            || ! ctype_digit( $application_id )
+            || '0' === $application_id
+            || ! in_array( $interview_type, [ 'HR', 'USER' ], true )
+            || $schedule_id < 1
+        ) {
+            return [ 'success' => false, 'error' => 'invalid_booking_data' ];
+        }
+        if ( ! $this->has_interview_schedule_table() || ! $this->has_interview_booking_table() ) {
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+
+            $application = $connection->prepare(
+                'SELECT UPPER(TRIM(STATUS_TERKINI)), UPPER(TRIM(NVL(STATUS_AKHIR, \'-\'))) FROM HRS_LAMARAN WHERE LAMARAN_ID = :application_id AND PROFILE_KANDIDAT_ID = :login_id FOR UPDATE'
+            );
+            $application->execute( [ 'application_id' => $application_id, 'login_id' => $login_id ] );
+            $application_status = $application->fetch( PDO::FETCH_NUM );
+            $required_status = 'HR' === $interview_type ? 'INTERVIEW_HR' : 'INTERVIEW_USER';
+            if ( ! is_array( $application_status ) || $required_status !== $application_status[0] || in_array( $application_status[1], [ 'DITERIMA', 'ACCEPTED', 'DITOLAK', 'REJECTED' ], true ) ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'stage_not_eligible' ];
+            }
+
+            $existing_booking = $connection->prepare(
+                'SELECT BOOKING_ID FROM HRS_INTERVIEW_BOOKING WHERE LAMARAN_ID = :application_id AND INTERVIEW_TYPE = :interview_type AND BOOKING_STATUS = \'BOOKED\' FOR UPDATE'
+            );
+            $existing_booking->execute( [ 'application_id' => $application_id, 'interview_type' => $interview_type ] );
+            if ( false !== $existing_booking->fetchColumn() ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'already_booked' ];
+            }
+
+            $schedule = $connection->prepare(
+                'SELECT CAPACITY FROM HRS_INTERVIEW_SCHEDULE WHERE SCHEDULE_ID = :schedule_id AND INTERVIEW_TYPE = :interview_type AND SCHEDULE_DATE >= TRUNC(CURRENT_DATE) FOR UPDATE'
+            );
+            $schedule->execute( [ 'schedule_id' => $schedule_id, 'interview_type' => $interview_type ] );
+            $capacity = $schedule->fetchColumn();
+            if ( false === $capacity ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'slot_unavailable' ];
+            }
+
+            $count = $connection->prepare(
+                'SELECT COUNT(*) FROM HRS_INTERVIEW_BOOKING WHERE SCHEDULE_ID = :schedule_id AND BOOKING_STATUS = \'BOOKED\''
+            );
+            $count->execute( [ 'schedule_id' => $schedule_id ] );
+            if ( (int) $count->fetchColumn() >= (int) $capacity ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'slot_full' ];
+            }
+
+            $insert = $connection->prepare(
+                'INSERT INTO HRS_INTERVIEW_BOOKING (LAMARAN_ID, SCHEDULE_ID, INTERVIEW_TYPE, BOOKING_STATUS, BOOKED_AT) VALUES (:application_id, :schedule_id, :interview_type, \'BOOKED\', CURRENT_TIMESTAMP)'
+            );
+            $insert->execute(
+                [
+                    'application_id' => $application_id,
+                    'schedule_id' => $schedule_id,
+                    'interview_type' => $interview_type,
+                ]
+            );
+            $connection->commit();
+            return [ 'success' => true ];
+        } catch ( PDOException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            if ( $this->is_unique_violation( $exception ) ) {
+                return [ 'success' => false, 'error' => 'already_booked' ];
+            }
+            $this->log_oracle_failure( 'Applicant interview slot booking failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        } catch ( RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_oracle_failure( 'Applicant interview slot booking failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
     }
 
     /**
@@ -2057,43 +2777,55 @@ class Recruitment_Database {
      */
     public function get_hr_interview_candidates(): array {
         $this->last_error = null;
+        $booking_table_available = $this->has_interview_booking_table();
+        $schedule_interviewer_available = $booking_table_available && $this->has_interview_schedule_interviewer_column();
+        $psychotest_score_expression = $this->has_psychotest_candidate_score_columns()
+            ? '(SELECT h.nilai FROM HRS_HASIL_TES_PSIKOLOGI h WHERE h.kandidat_id = p.kandidat_id ORDER BY h.dikumpulkan_pada DESC NULLS LAST FETCH FIRST 1 ROW ONLY)'
+            : 'CAST(NULL AS NUMBER)';
+        $scheduled_date_expression = $booking_table_available
+            ? '(SELECT TO_CHAR(s.schedule_date, \'YYYY-MM-DD\') FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'HR\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY)'
+            : '(SELECT TO_CHAR(j.tanggal_wawancara, \'YYYY-MM-DD\') FROM HRS_JADWAL_KANDIDAT j WHERE j.kandidat_id = p.kandidat_id ORDER BY j.tanggal_wawancara DESC NULLS LAST, j.jadwal_id DESC FETCH FIRST 1 ROW ONLY)';
+        $scheduled_time_expression = $booking_table_available
+            ? '(SELECT s.start_time FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'HR\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY)'
+            : '(SELECT j.jam_wawancara FROM HRS_JADWAL_KANDIDAT j WHERE j.kandidat_id = p.kandidat_id ORDER BY j.tanggal_wawancara DESC NULLS LAST, j.jadwal_id DESC FETCH FIRST 1 ROW ONLY)';
+        $scheduled_method_expression = $booking_table_available
+            ? '(SELECT s.method FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'HR\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY)'
+            : '(SELECT j.metode_wawancara FROM HRS_JADWAL_KANDIDAT j WHERE j.kandidat_id = p.kandidat_id ORDER BY j.tanggal_wawancara DESC NULLS LAST, j.jadwal_id DESC FETCH FIRST 1 ROW ONLY)';
+        $scheduled_location_expression = $booking_table_available
+            ? '(SELECT CASE WHEN s.method = \'ONLINE\' THEN s.platform ELSE s.location END FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'HR\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY)'
+            : '(SELECT j.lokasi_wawancara FROM HRS_JADWAL_KANDIDAT j WHERE j.kandidat_id = p.kandidat_id ORDER BY j.tanggal_wawancara DESC NULLS LAST, j.jadwal_id DESC FETCH FIRST 1 ROW ONLY)';
+        $scheduled_link_expression = $booking_table_available
+            ? '(SELECT s.meeting_link FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'HR\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY)'
+            : 'CAST(NULL AS VARCHAR2(500))';
+        $scheduled_interviewer_expression = $schedule_interviewer_available
+            ? '(SELECT s.interviewer_name FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'HR\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY)'
+            : 'CAST(NULL AS VARCHAR2(100))';
         return $this->fetch_all(
             'SELECT l.lamaran_id AS "application_id",
                     l.profile_kandidat_id AS "applicant_id",
                     l.status_terkini AS "status",
                     TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at",
                     d.judul_pekerjaan AS "position",
-                    NVL(vacancy_department.nama_departemen, NVL(d.nama_departemen, k.nama_departemen)) AS "department",
+                    NVL(vacancy_department.nama_departemen, NVL(d.nama_departement, k.nama_departemen)) AS "department",
                     NVL(d.departemen_id, k.departemen_id) AS "department_id",
                     d.lokasi_penempatan AS "location",
                     k.nama_dealer AS "dealer",
                     p.kandidat_id AS "candidate_id",
                     NVL(p.nama_lengkap, p.nama_kandidat) AS "candidate_name",
                     NVL(p.email, pkl.email) AS "candidate_email",
-                    (SELECT h.nilai
-                     FROM HRS_HASIL_TES_PSIKOLOGI h
-                     WHERE h.kandidat_id = p.kandidat_id
-                     ORDER BY h.dikumpulkan_pada DESC NULLS LAST, h.hasil_tes_psikologi_id DESC
-                     FETCH FIRST 1 ROW ONLY) AS "psychotest_score",
-                    (SELECT TO_CHAR(j.tanggal_wawancara, \'YYYY-MM-DD\')
-                     FROM HRS_JADWAL_KANDIDAT j
-                     WHERE j.kandidat_id = p.kandidat_id
-                     ORDER BY j.tanggal_wawancara DESC NULLS LAST, j.jadwal_id DESC
-                     FETCH FIRST 1 ROW ONLY) AS "scheduled_interview_date",
-                    (SELECT j.jam_wawancara
-                     FROM HRS_JADWAL_KANDIDAT j
-                     WHERE j.kandidat_id = p.kandidat_id
-                     ORDER BY j.tanggal_wawancara DESC NULLS LAST, j.jadwal_id DESC
-                     FETCH FIRST 1 ROW ONLY) AS "scheduled_interview_time",
-                    hr.status_hasil AS "hr_result",
-                    hr.rekomendasi AS "hr_recommendation"
+                    ' . $psychotest_score_expression . ' AS "psychotest_score",
+                    ' . $scheduled_date_expression . ' AS "scheduled_interview_date",
+                    ' . $scheduled_time_expression . ' AS "scheduled_interview_time",
+                     ' . $scheduled_method_expression . ' AS "scheduled_interview_method",
+                     ' . $scheduled_location_expression . ' AS "scheduled_interview_location",
+                     ' . $scheduled_link_expression . ' AS "scheduled_interview_link",
+                     ' . $scheduled_interviewer_expression . ' AS "scheduled_interviewer"
              FROM HRS_LAMARAN l
              JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
              LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id
              LEFT JOIN HRS_DEPARTEMEN vacancy_department ON vacancy_department.departemen_id = NVL(d.departemen_id, k.departemen_id)
              JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
              JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id
-             LEFT JOIN HRS_HASIL_WAWANCARA_HR hr ON hr.lamaran_id = l.lamaran_id
              WHERE UPPER(TRIM(l.status_terkini)) = \'INTERVIEW_HR\'
              ORDER BY NVL(l.created_at, l.tanggal_melamar), l.lamaran_id'
         );
@@ -2596,6 +3328,39 @@ class Recruitment_Database {
     }
 
     public function get_applications(): array {
+        $this->last_error = null;
+        $booking_table_available = $this->has_interview_booking_table();
+        $scheduled_interviewer_expression = $booking_table_available && $this->has_interview_schedule_interviewer_column()
+            ? '(SELECT s.interviewer_name FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'USER\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY)'
+            : 'CAST(NULL AS VARCHAR2(100))';
+        $booking_fields = $booking_table_available
+            ? '(SELECT TO_CHAR(s.schedule_date, \'YYYY-MM-DD\') FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'USER\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY) AS "user_scheduled_interview_date",
+               (SELECT s.start_time FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'USER\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY) AS "user_scheduled_interview_time",
+               (SELECT s.end_time FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'USER\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY) AS "user_scheduled_interview_end_time",
+               (SELECT s.method FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'USER\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY) AS "user_scheduled_interview_method",
+               (SELECT CASE WHEN s.method = \'ONLINE\' THEN s.platform ELSE s.location END FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'USER\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY) AS "user_scheduled_interview_location",
+               (SELECT s.meeting_link FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'USER\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY) AS "user_scheduled_interview_link",
+               ' . $scheduled_interviewer_expression . ' AS "user_scheduled_interviewer",'
+            : 'CAST(NULL AS VARCHAR2(10)) AS "user_scheduled_interview_date",
+               CAST(NULL AS VARCHAR2(5)) AS "user_scheduled_interview_time",
+               CAST(NULL AS VARCHAR2(5)) AS "user_scheduled_interview_end_time",
+               CAST(NULL AS VARCHAR2(10)) AS "user_scheduled_interview_method",
+               CAST(NULL AS VARCHAR2(255)) AS "user_scheduled_interview_location",
+               CAST(NULL AS VARCHAR2(500)) AS "user_scheduled_interview_link",
+               CAST(NULL AS VARCHAR2(100)) AS "user_scheduled_interviewer",';
+        $user_interview_fields = $this->has_user_interview_application_link()
+            ? '(SELECT w.status_seleksi FROM HRS_HASIL_WAWANCARA_USER w WHERE w.lamaran_id = l.lamaran_id FETCH FIRST 1 ROW ONLY) AS "user_selection_status",
+               (SELECT w.rekomendasi FROM HRS_HASIL_WAWANCARA_USER w WHERE w.lamaran_id = l.lamaran_id FETCH FIRST 1 ROW ONLY) AS "user_recommendation",
+               (SELECT w.nilai_total FROM HRS_HASIL_WAWANCARA_USER w WHERE w.lamaran_id = l.lamaran_id FETCH FIRST 1 ROW ONLY) AS "user_score",
+               (SELECT TO_CHAR(w.tanggal_wawancara, \'YYYY-MM-DD\') FROM HRS_HASIL_WAWANCARA_USER w WHERE w.lamaran_id = l.lamaran_id FETCH FIRST 1 ROW ONLY) AS "user_interview_date",
+               (SELECT w.nama_pewawancara FROM HRS_HASIL_WAWANCARA_USER w WHERE w.lamaran_id = l.lamaran_id FETCH FIRST 1 ROW ONLY) AS "user_interviewer",
+               (SELECT w.catatan_wawancara FROM HRS_HASIL_WAWANCARA_USER w WHERE w.lamaran_id = l.lamaran_id FETCH FIRST 1 ROW ONLY) AS "user_interview_notes",'
+            : 'CAST(NULL AS VARCHAR2(255)) AS "user_selection_status",
+               CAST(NULL AS VARCHAR2(100)) AS "user_recommendation",
+               CAST(NULL AS NUMBER) AS "user_score",
+               CAST(NULL AS VARCHAR2(10)) AS "user_interview_date",
+               CAST(NULL AS VARCHAR2(255)) AS "user_interviewer",
+               CAST(NULL AS VARCHAR2(250)) AS "user_interview_notes",';
         return $this->fetch_all(
             'SELECT l.lamaran_id AS "id",
                    l.detail_lowongan_id AS "vacancy_id",
@@ -2607,7 +3372,7 @@ class Recruitment_Database {
                    NVL(d.lokasi_penempatan, k.nama_dealer) AS "location",
                    k.nama_dealer AS "dealer",
                    d.kategori_kj AS "category",
-                   d.nama_departemen AS "department",
+                   NVL(d.nama_departement, k.nama_departemen) AS "department",
                    NVL(d.departemen_id, k.departemen_id) AS "department_id",
                    hr.status_hasil AS "hr_interview_result",
                    hr.role_akses_id AS "department_account_id",
@@ -2619,15 +3384,11 @@ class Recruitment_Database {
                    NVL(p.email, pkl.email) AS "applicant_email",
                    NVL(p.nomor_hp, p.nomor_telepon) AS "applicant_phone",
                    p.provinsi AS "province",
+                   ' . $booking_fields . '
+                   ' . $user_interview_fields . '
                    hr.status_hasil AS "hr_result",
-                   (SELECT w.status_seleksi FROM HRS_HASIL_WAWANCARA_USER w WHERE w.lamaran_id = l.lamaran_id ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_selection_status",
-                   (SELECT w.rekomendasi FROM HRS_HASIL_WAWANCARA_USER w WHERE w.lamaran_id = l.lamaran_id ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_recommendation",
-                   (SELECT w.nilai_total FROM HRS_HASIL_WAWANCARA_USER w WHERE w.lamaran_id = l.lamaran_id ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_score",
-                   (SELECT TO_CHAR(w.tanggal_wawancara, \'YYYY-MM-DD\') FROM HRS_HASIL_WAWANCARA_USER w WHERE w.lamaran_id = l.lamaran_id ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_interview_date",
-                   (SELECT w.nama_pewawancara FROM HRS_HASIL_WAWANCARA_USER w WHERE w.lamaran_id = l.lamaran_id ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_interviewer",
-                   (SELECT w.catatan_wawancara FROM HRS_HASIL_WAWANCARA_USER w WHERE w.lamaran_id = l.lamaran_id ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_interview_notes",
                    CASE
-                       WHEN UPPER(TRIM(NVL(l.status_akhir, l.status_terkini))) IN (\'DITERIMA\', \'DITOLAK\')
+                       WHEN UPPER(TRIM(NVL(l.status_akhir, l.status_terkini))) IN (\'DITERIMA\', \'ACCEPTED\', \'LOLOS\', \'DITOLAK\', \'REJECTED\')
                        THEN UPPER(TRIM(NVL(l.status_akhir, l.status_terkini)))
                        ELSE NULL
                    END AS "hr_final_decision",
@@ -2663,12 +3424,30 @@ class Recruitment_Database {
     }
 
     public function get_user_interview_candidates( string $department, int $account_id ): array {
-        $department = trim( $department );
-        if ( '' === $department || $account_id < 1 ) {
+        if ( $account_id < 1 ) {
             return [];
         }
 
         $this->last_error = null;
+        $booking_table_available = $this->has_interview_booking_table();
+        $scheduled_date_expression = $booking_table_available
+            ? 'NVL((SELECT TO_CHAR(s.schedule_date, \'YYYY-MM-DD\') FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'USER\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY), TO_CHAR(j.tanggal_wawancara, \'YYYY-MM-DD\'))'
+            : 'TO_CHAR(j.tanggal_wawancara, \'YYYY-MM-DD\')';
+        $scheduled_time_expression = $booking_table_available
+            ? 'NVL((SELECT s.start_time FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'USER\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY), j.jam_wawancara)'
+            : 'j.jam_wawancara';
+        $scheduled_method_expression = $booking_table_available
+            ? 'NVL((SELECT s.method FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'USER\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY), j.metode_wawancara)'
+            : 'j.metode_wawancara';
+        $scheduled_location_expression = $booking_table_available
+            ? 'NVL((SELECT CASE WHEN s.method = \'ONLINE\' THEN s.platform ELSE s.location END FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'USER\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY), j.lokasi_wawancara)'
+            : 'j.lokasi_wawancara';
+        $scheduled_link_expression = $booking_table_available
+            ? '(SELECT s.meeting_link FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'USER\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY)'
+            : 'CAST(NULL AS VARCHAR2(500))';
+        $scheduled_interviewer_expression = $booking_table_available && $this->has_interview_schedule_interviewer_column()
+            ? '(SELECT s.interviewer_name FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'USER\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY)'
+            : 'CAST(NULL AS VARCHAR2(100))';
         return $this->fetch_all(
             'WITH ranked_schedules AS (
                 SELECT j.*,
@@ -2689,6 +3468,7 @@ class Recruitment_Database {
                    NVL(assigned_department.nama_departemen, assigned_account.nama_departemen) AS "DEPARTMENT",
                    d.lokasi_penempatan AS "BRANCH",
                    k.nama_dealer AS "DEALER",
+                   NVL(NULLIF(TRIM(hr.nama_departemen_tujuan), \'\'), d.nama_departement) AS "ASSIGNED_DEPARTMENT",
                    NVL(w.status_seleksi, \'\') AS "INTERVIEW_STATUS",
                    CASE UPPER(TRIM(NVL(l.status_akhir, l.status_terkini)))
                        WHEN \'DITERIMA\' THEN \'Diterima\'
@@ -2702,16 +3482,18 @@ class Recruitment_Database {
                    hr.rekomendasi AS "HR_RECOMMENDATION",
                    hr.nama_pewawancara AS "HR_INTERVIEWER",
                    hr.catatan_wawancara AS "HR_INTERVIEW_NOTES",
-                   TO_CHAR(j.tanggal_wawancara, \'YYYY-MM-DD\') AS "INTERVIEW_DATE",
-                   j.jam_wawancara AS "INTERVIEW_TIME",
-                   j.metode_wawancara AS "INTERVIEW_METHOD",
-                   j.lokasi_wawancara AS "INTERVIEW_LOCATION",
+                   ' . $scheduled_interviewer_expression . ' AS "SCHEDULED_INTERVIEWER",
+                   ' . $scheduled_date_expression . ' AS "INTERVIEW_DATE",
+                   ' . $scheduled_time_expression . ' AS "INTERVIEW_TIME",
+                   ' . $scheduled_method_expression . ' AS "INTERVIEW_METHOD",
+                   ' . $scheduled_location_expression . ' AS "INTERVIEW_LOCATION",
+                   ' . $scheduled_link_expression . ' AS "INTERVIEW_LINK",
                    w.nilai_total AS "SCORE",
                    w.rekomendasi AS "REKOMENDASI",
                    w.catatan_wawancara AS "INTERVIEW_NOTES",
                    w.nama_pewawancara AS "INTERVIEWER",
                    TO_CHAR(w.tanggal_wawancara, \'YYYY-MM-DD\') AS "INTERVIEW_RESULT_DATE",
-                   TO_CHAR(w.submitted_at, \'YYYY-MM-DD HH24:MI:SS\') AS "RESULT_DATE",
+                   TO_CHAR(w.submited_at, \'YYYY-MM-DD HH24:MI:SS\') AS "RESULT_DATE",
                    w.nilai_penampilan AS "SCORE_PRESENTATION",
                    w.nilai_komunikasi AS "SCORE_COMMUNICATION",
                    w.nilai_motivasi AS "SCORE_MOTIVATION",
@@ -2730,8 +3512,7 @@ class Recruitment_Database {
             LEFT JOIN HRS_DEPARTEMEN assigned_department ON assigned_department.departemen_id = assigned_account.departemen_id
             LEFT JOIN ranked_schedules j ON j.kandidat_id = p.kandidat_id AND j.row_num = 1
             LEFT JOIN ranked_results w ON w.lamaran_id = l.lamaran_id AND w.row_num = 1
-            WHERE UPPER(TRIM(NVL(assigned_department.nama_departemen, assigned_account.nama_departemen))) = UPPER(TRIM(:department))
-              AND (
+            WHERE (
                     UPPER(TRIM(l.status_terkini)) = \'INTERVIEW_USER\'
                     OR UPPER(TRIM(l.status_akhir)) IN (\'DITERIMA\', \'ACCEPTED\', \'DITOLAK\', \'REJECTED\')
               )
@@ -2739,12 +3520,49 @@ class Recruitment_Database {
               AND hr.role_akses_id = :account_id
               AND assigned_account.peran = \'KEPALA_DEPARTEMEN\'
               AND UPPER(TRIM(assigned_account.status_akun)) = \'ACTIVE\'
-            AND assigned_account.departemen_id = NVL(d.departemen_id, k.departemen_id)
+              AND assigned_account.departemen_id = NVL(d.departemen_id, k.departemen_id)
             ORDER BY NVL(l.created_at, l.tanggal_melamar) DESC, l.lamaran_id DESC',
             [
-                'department' => $department,
                 'account_id' => $account_id,
             ]
+        );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_user_interview_booking_map( int $department_id ): array {
+        if ( $department_id < 1 ) {
+            return [];
+        }
+        $this->last_error = null;
+        return $this->fetch_all(
+            'SELECT candidate_id AS "CANDIDATE_ID",
+                    slot_date AS "INTERVIEW_DATE",
+                    start_time AS "INTERVIEW_TIME",
+                    method AS "INTERVIEW_METHOD",
+                    location AS "INTERVIEW_LOCATION"
+             FROM (
+                SELECT pkl.KANDIDAT_ID AS candidate_id,
+                       TO_CHAR(s.START_AT, \'YYYY-MM-DD\') AS slot_date,
+                       TO_CHAR(s.START_AT, \'HH24:MI\') AS start_time,
+                       s.METODE_WAWANCARA AS method,
+                       CASE WHEN s.METODE_WAWANCARA = \'ONLINE\'
+                            THEN s.LOKASI || \' - \' || s.MEETING_URL
+                            ELSE s.LOKASI
+                       END AS location,
+                       ROW_NUMBER() OVER (PARTITION BY pkl.KANDIDAT_ID ORDER BY s.START_AT, b.BOOKING_INTERVIEW_ID) AS row_num
+                FROM HRS_BOOKING_INTERVIEW b
+                JOIN HRS_SLOT_WAWANCARA s ON s.SLOT_WAWANCARA_ID = b.SLOT_WAWANCARA_ID
+                JOIN HRS_LAMARAN l ON l.LAMARAN_ID = b.LAMARAN_ID
+                JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.DETAIL_LOWONGAN_ID = l.DETAIL_LOWONGAN_ID
+                JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.PROFILE_KANDIDAT_LOGIN = l.PROFILE_KANDIDAT_ID
+                WHERE b.JENIS_WAWANCARA = \'INTERVIEW_USER\'
+                  AND UPPER(TRIM(b.STATUS_PEMESANAN)) = \'CONFIRMED\'
+                  AND s.DEPARTEMEN_ID = :department_id
+             )
+             WHERE row_num = 1',
+            [ 'department_id' => $department_id ]
         );
     }
 
@@ -2771,13 +3589,20 @@ class Recruitment_Database {
         }
 
         $this->last_error = null;
+        $psychotest_score_expression = $this->has_psychotest_candidate_score_columns()
+            ? '(SELECT h.nilai
+               FROM HRS_HASIL_TES_PSIKOLOGI h
+               WHERE h.kandidat_id = p.kandidat_id
+               ORDER BY h.dikumpulkan_pada DESC NULLS LAST, h.hasil_tes_psikologi DESC
+               FETCH FIRST 1 ROW ONLY)'
+            : 'CAST(NULL AS NUMBER)';
         $rows = $this->fetch_all(
             'SELECT l.lamaran_id AS "application_id",
                     TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "application_date",
                     l.status_terkini AS "application_status",
                     l.status_akhir AS "final_status",
                     d.judul_pekerjaan AS "position",
-                    NVL(vacancy_department.nama_departemen, NVL(d.nama_departemen, k.nama_departemen)) AS "department",
+                    NVL(vacancy_department.nama_departemen, NVL(d.nama_departement, k.nama_departemen)) AS "department",
                     d.lokasi_penempatan AS "vacancy_location",
                     k.nama_dealer AS "dealer",
                     p.kandidat_id AS "candidate_id",
@@ -2795,19 +3620,16 @@ class Recruitment_Database {
                     hr.rekomendasi AS "hr_recommendation",
                     hr.nama_pewawancara AS "hr_interviewer",
                     hr.catatan_wawancara AS "hr_interview_notes",
-                    assigned_account.username AS "department_account_username",
-                    assigned_account.email AS "department_account_email",
+                    NVL(NULLIF(TRIM(hr.nama_departemen_tujuan), \'\'), d.nama_departement) AS "assigned_department",
+                    current_account.username AS "department_account_username",
+                    current_account.email AS "department_account_email",
                     w.status_seleksi AS "user_interview_result",
                     w.rekomendasi AS "user_recommendation",
                     w.nilai_total AS "user_interview_score",
                     w.nama_pewawancara AS "user_interviewer",
                     w.catatan_wawancara AS "user_interview_notes",
                     TO_CHAR(w.tanggal_wawancara, \'YYYY-MM-DD\') AS "user_interview_date",
-                    (SELECT h.nilai
-                     FROM HRS_HASIL_TES_PSIKOLOGI h
-                     WHERE h.kandidat_id = p.kandidat_id
-                     ORDER BY h.dikumpulkan_pada DESC NULLS LAST, h.hasil_tes_psikologi_id DESC
-                     FETCH FIRST 1 ROW ONLY) AS "psychotest_score",
+                    ' . $psychotest_score_expression . ' AS "psychotest_score",
                     pd.data_profil AS "profile_details"
              FROM HRS_LAMARAN l
              JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
@@ -2816,16 +3638,17 @@ class Recruitment_Database {
              JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id
              LEFT JOIN HRS_PROFIL_KANDIDAT_DETAIL pd ON pd.kandidat_id = p.kandidat_id
              JOIN HRS_HASIL_WAWANCARA_HR hr ON hr.lamaran_id = l.lamaran_id
-             JOIN HRS_ROLE_AKSES assigned_account ON assigned_account.role_akses_id = hr.role_akses_id
-             LEFT JOIN HRS_DEPARTEMEN assigned_department ON assigned_department.departemen_id = assigned_account.departemen_id
+             JOIN HRS_ROLE_AKSES current_account ON current_account.role_akses_id = :account_id
+             LEFT JOIN HRS_DEPARTEMEN current_department ON current_department.departemen_id = current_account.departemen_id
              LEFT JOIN HRS_DEPARTEMEN vacancy_department ON vacancy_department.departemen_id = NVL(d.departemen_id, k.departemen_id)
              LEFT JOIN HRS_HASIL_WAWANCARA_USER w ON w.lamaran_id = l.lamaran_id
              WHERE l.lamaran_id = :application_id
                AND hr.status_hasil = \'LOLOS\'
                AND hr.role_akses_id = :account_id
-               AND assigned_account.peran = \'KEPALA_DEPARTEMEN\'
-               AND UPPER(TRIM(assigned_account.status_akun)) = \'ACTIVE\'
-               AND assigned_account.departemen_id = NVL(d.departemen_id, k.departemen_id)
+               AND current_account.peran = \'KEPALA_DEPARTEMEN\'
+               AND UPPER(TRIM(current_account.status_akun)) = \'ACTIVE\'
+               AND current_account.departemen_id = NVL(d.departemen_id, k.departemen_id)
+               AND UPPER(TRIM(NVL(NULLIF(TRIM(hr.nama_departemen_tujuan), \'\'), d.nama_departement))) = UPPER(TRIM(NVL(current_department.nama_departemen, current_account.nama_departemen)))
              FETCH FIRST 1 ROW ONLY',
             [
                 'application_id' => $application_id,
@@ -2886,7 +3709,7 @@ class Recruitment_Database {
      * @return array{success: bool, error?: string}
      */
     public function save_user_interview_result( int $application_id, int $account_id, array $result ): array {
-        $department = trim( (string) ( $result['department'] ?? '' ) );
+        $department = '';
         $interviewer = trim( (string) ( $result['interviewer'] ?? '' ) );
         $scores = is_array( $result['scores'] ?? null ) ? $result['scores'] : [];
         $score_keys = [ 'presentation', 'communication', 'motivation', 'experience', 'knowledge', 'teamwork', 'problem_solving', 'adaptability' ];
@@ -2896,7 +3719,7 @@ class Recruitment_Database {
         $valid_selection_statuses = [ 'Lolos Wawancara User', 'Tidak Lolos Wawancara User' ];
         $valid_recommendations = [ 'Sangat Baik', 'Baik', 'Dipertimbangkan', 'Tidak Dilanjutkan' ];
 
-        if ( $application_id < 1 || $account_id < 1 || '' === $department || '' === $interviewer || ! in_array( $selection_status, $valid_selection_statuses, true ) || ! in_array( $recommendation, $valid_recommendations, true ) ) {
+        if ( $application_id < 1 || $account_id < 1 || '' === $interviewer || ! in_array( $selection_status, $valid_selection_statuses, true ) || ! in_array( $recommendation, $valid_recommendations, true ) ) {
             return [ 'success' => false, 'error' => 'Data hasil wawancara tidak valid.' ];
         }
         foreach ( $score_keys as $key ) {
@@ -2905,6 +3728,10 @@ class Recruitment_Database {
             }
         }
         $note_length = function_exists( 'mb_strlen' ) ? mb_strlen( $notes, 'UTF-8' ) : strlen( $notes );
+        $interviewer_length = function_exists( 'mb_strlen' ) ? mb_strlen( $interviewer, 'UTF-8' ) : strlen( $interviewer );
+        if ( 100 < $interviewer_length ) {
+            return [ 'success' => false, 'error' => 'Nama pewawancara maksimal 100 karakter.' ];
+        }
         if ( 250 < $note_length ) {
             return [ 'success' => false, 'error' => 'Catatan wawancara maksimal 250 karakter.' ];
         }
@@ -2914,39 +3741,60 @@ class Recruitment_Database {
         try {
             $connection = $this->get_connection();
             $connection->beginTransaction();
-            $assignment = $connection->prepare(
-                'SELECT p.kandidat_id
-                 FROM HRS_LAMARAN l
-                 JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
-                 JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
-                 JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id
-                 JOIN HRS_HASIL_WAWANCARA_HR hr ON hr.lamaran_id = l.lamaran_id
-                 JOIN HRS_ROLE_AKSES u ON u.role_akses_id = hr.role_akses_id
-                 LEFT JOIN HRS_DEPARTEMEN assigned_department ON assigned_department.departemen_id = u.departemen_id
-                 WHERE l.lamaran_id = :application_id
-                   AND UPPER(TRIM(l.status_terkini)) = \'INTERVIEW_USER\'
-                   AND hr.status_hasil = \'LOLOS\'
-                   AND hr.role_akses_id = :account_id
-                   AND u.peran = \'KEPALA_DEPARTEMEN\'
-                   AND UPPER(TRIM(u.status_akun)) = \'ACTIVE\'
-                   AND UPPER(TRIM(NVL(assigned_department.nama_departemen, u.nama_departemen))) = UPPER(TRIM(:department_name))
-                   AND EXISTS (
+            $schedule_assignment_clause = $this->has_interview_booking_table()
+                ? 'AND (
+                       EXISTS (
+                           SELECT 1
+                           FROM HRS_INTERVIEW_BOOKING booking
+                           WHERE booking.lamaran_id = l.lamaran_id
+                             AND booking.interview_type = \'USER\'
+                             AND booking.booking_status = \'BOOKED\'
+                       )
+                       OR EXISTS (
+                           SELECT 1
+                           FROM HRS_JADWAL_KANDIDAT schedule
+                           WHERE schedule.kandidat_id = p.kandidat_id
+                             AND schedule.tanggal_wawancara IS NOT NULL
+                       )
+                   )'
+                : 'AND EXISTS (
                        SELECT 1
                        FROM HRS_JADWAL_KANDIDAT schedule
                        WHERE schedule.kandidat_id = p.kandidat_id
                          AND schedule.tanggal_wawancara IS NOT NULL
-                   )
+                   )';
+            $assignment = $connection->prepare(
+                'SELECT p.kandidat_id AS "CANDIDATE_ID",
+                        NVL(NULLIF(TRIM(hr.nama_departemen_tujuan), \'\'), d.nama_departement) AS "ASSIGNED_DEPARTMENT"
+                 FROM HRS_LAMARAN l
+                 JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
+                 LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id
+                 JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
+                 JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id
+                 JOIN HRS_HASIL_WAWANCARA_HR hr ON hr.lamaran_id = l.lamaran_id
+                 JOIN HRS_ROLE_AKSES current_account ON current_account.role_akses_id = :account_id
+                 LEFT JOIN HRS_DEPARTEMEN current_department ON current_department.departemen_id = current_account.departemen_id
+                 WHERE l.lamaran_id = :application_id
+                   AND UPPER(TRIM(l.status_terkini)) = \'INTERVIEW_USER\'
+                   AND hr.status_hasil = \'LOLOS\'
+                   AND hr.role_akses_id = :account_id
+                   AND current_account.peran = \'KEPALA_DEPARTEMEN\'
+                   AND UPPER(TRIM(current_account.status_akun)) = \'ACTIVE\'
+                   AND current_account.departemen_id = NVL(d.departemen_id, k.departemen_id)
+                   AND UPPER(TRIM(NVL(NULLIF(TRIM(hr.nama_departemen_tujuan), \'\'), d.nama_departement))) = UPPER(TRIM(NVL(current_department.nama_departemen, current_account.nama_departemen)))
+                   ' . $schedule_assignment_clause . '
                  FOR UPDATE OF l.status_terkini'
             );
             $assignment->execute(
                 [
                     'application_id' => $application_id,
                     'account_id' => $account_id,
-                    'department_name' => $department,
                 ]
             );
-            $candidate_id = (int) $assignment->fetchColumn();
-            if ( $candidate_id < 1 ) {
+            $assignment_row = $assignment->fetch( PDO::FETCH_ASSOC );
+            $candidate_id = (int) ( $assignment_row['CANDIDATE_ID'] ?? 0 );
+            $department = trim( (string) ( $assignment_row['ASSIGNED_DEPARTMENT'] ?? '' ) );
+            if ( $candidate_id < 1 || '' === $department ) {
                 $connection->rollBack();
                 return [ 'success' => false, 'error' => 'Lamaran tidak diberikan kepada akun User Department ini atau tidak lagi dalam tahap wawancara.' ];
             }
@@ -2966,7 +3814,7 @@ class Recruitment_Database {
                      nilai_kerjasama = :teamwork, nilai_problemsolving = :problem_solving,
                      nilai_adaptasi = :adaptability, nilai_total = :total_score,
                      rekomendasi = :recommendation, catatan_wawancara = :notes,
-                     tanggal_wawancara = CURRENT_DATE, submitted_at = CURRENT_DATE,
+                     tanggal_wawancara = CURRENT_DATE, submited_at = CURRENT_DATE,
                      status_kandidat_id = :status_candidate_id, status_seleksi = :selection_status,
                      nama_kandidat = (SELECT NVL(p.nama_lengkap, p.nama_kandidat) FROM HRS_PROFIL_KANDIDAT p WHERE p.kandidat_id = :candidate_for_name)
                  WHERE hasil_user = (
@@ -3000,7 +3848,7 @@ class Recruitment_Database {
                         lamaran_id, kandidat_id, nama_pewawancara, nama_departemen, nilai_penampilan,
                         nilai_komunikasi, nilai_motivasi, nilai_pengalaman, nilai_keterampilan,
                         nilai_kerjasama, nilai_problemsolving, nilai_adaptasi, nilai_total,
-                        rekomendasi, catatan_wawancara, tanggal_wawancara, submitted_at,
+                        rekomendasi, catatan_wawancara, tanggal_wawancara, submited_at,
                         status_kandidat_id, status_seleksi, nama_kandidat
                     )
                     SELECT :application_id, p.kandidat_id, :interviewer, :department_name, :presentation,
@@ -3090,7 +3938,7 @@ class Recruitment_Database {
     /**
      * Save the HR's final decision, recruitment status, and applicant timeline atomically.
      *
-     * @return array{success: bool, error?: string}
+      * @return array{success: bool, error?: string, warning?: string}
      */
     public function save_final_decision( string $application_id, string $decision, ?int $role_access_id = null ): array {
         $decision = strtoupper( trim( $decision ) );
@@ -3122,9 +3970,10 @@ class Recruitment_Database {
                 return [ 'success' => false, 'error' => 'Profil kandidat tidak ditemukan.' ];
             }
             $application = $connection->prepare(
-                'SELECT l.lamaran_id AS "application_id", p.kandidat_id AS "candidate_id",
+                'SELECT l.lamaran_id AS "application_id", l.detail_lowongan_id AS "vacancy_id",
+                        l.status_akhir AS "final_status", p.kandidat_id AS "candidate_id",
                         NVL(p.nama_lengkap, p.nama_kandidat) AS "candidate_name",
-                        d.nama_departemen AS "department_name",
+                        d.nama_departement AS "department_name",
                         UPPER(TRIM(l.status_terkini)) AS "application_status",
                         CASE WHEN EXISTS (
                             SELECT 1 FROM HRS_HASIL_WAWANCARA_HR h
@@ -3134,6 +3983,9 @@ class Recruitment_Database {
                         (SELECT w.hasil_user FROM HRS_HASIL_WAWANCARA_USER w
                          WHERE w.lamaran_id = l.lamaran_id
                          ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_result_id",
+                        (SELECT w.status_seleksi FROM HRS_HASIL_WAWANCARA_USER w
+                         WHERE w.lamaran_id = l.lamaran_id
+                         ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_result_status",
                         (SELECT w.nilai_total FROM HRS_HASIL_WAWANCARA_USER w
                          WHERE w.lamaran_id = l.lamaran_id
                          ORDER BY w.hasil_user DESC FETCH FIRST 1 ROW ONLY) AS "user_score",
@@ -3179,7 +4031,7 @@ class Recruitment_Database {
                  JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id
                  JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
                  WHERE p.kandidat_id = :candidate_id
-                   AND UPPER(TRIM(d.nama_departemen)) = UPPER(TRIM(:department_name))'
+                   AND UPPER(TRIM(d.nama_departement)) = UPPER(TRIM(:department_name))'
             );
             $application_count->execute(
                 [
@@ -3190,6 +4042,72 @@ class Recruitment_Database {
             if ( (int) $application_count->fetchColumn() > 1 ) {
                 $connection->rollBack();
                 return [ 'success' => false, 'error' => 'Keputusan belum dapat disimpan karena tabel rekap belum dapat membedakan beberapa lamaran kandidat pada departemen ini.' ];
+            }
+            if (
+                in_array( strtoupper( trim( (string) $candidate['final_status'] ) ), [ 'DITERIMA', 'ACCEPTED', 'LOLOS', 'DITOLAK', 'REJECTED', 'TIDAK DITERIMA', 'TIDAK_DITERIMA', 'TIDAK LOLOS', 'TIDAK_LOLOS' ], true )
+                || in_array( strtoupper( trim( (string) $candidate['application_status'] ) ), [ 'DITERIMA', 'ACCEPTED', 'LOLOS', 'DITOLAK', 'REJECTED', 'TIDAK DITERIMA', 'TIDAK_DITERIMA', 'TIDAK LOLOS', 'TIDAK_LOLOS' ], true )
+            ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'Keputusan akhir untuk lamaran ini sudah ditetapkan.' ];
+            }
+
+            $vacancy_id = (string) $candidate['vacancy_id'];
+            $vacancy_lock = $connection->prepare(
+                'SELECT KOLOM_PENDAFTARAN_ID AS "column_id", JUMLAH_KEBUTUHAN AS "headcount"
+                 FROM HRS_DETAIL_INFO_LOWONGAN
+                 WHERE DETAIL_LOWONGAN_ID = :vacancy_id
+                 FOR UPDATE'
+            );
+            $vacancy_lock->execute( [ 'vacancy_id' => $vacancy_id ] );
+            $vacancy = $vacancy_lock->fetch( PDO::FETCH_ASSOC );
+            if ( ! is_array( $vacancy ) ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'Data lowongan untuk lamaran ini tidak ditemukan.' ];
+            }
+
+            $headcount = filter_var( $vacancy['headcount'] ?? null, FILTER_VALIDATE_INT );
+            $accepted_count = $connection->prepare(
+                'SELECT COUNT(*) FROM HRS_LAMARAN
+                 WHERE DETAIL_LOWONGAN_ID = :vacancy_id
+                   AND LAMARAN_ID <> :application_id
+                   AND UPPER(TRIM(NVL(STATUS_AKHIR, STATUS_TERKINI))) IN (\'DITERIMA\', \'ACCEPTED\', \'LOLOS\')'
+            );
+            $accepted_count->execute(
+                [
+                    'vacancy_id' => $vacancy_id,
+                    'application_id' => $application_id,
+                ]
+            );
+            $accepted_before_decision = (int) $accepted_count->fetchColumn();
+            if ( 'DITERIMA' === $decision && ( ! is_int( $headcount ) || 1 > $headcount ) ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'Jumlah kebutuhan lowongan belum diatur. Perbarui data lowongan sebelum menerima kandidat.' ];
+            }
+            if ( 'DITERIMA' === $decision && $accepted_before_decision >= $headcount ) {
+                $column_lock = $connection->prepare(
+                    'SELECT KOLOM_PENDAFTARAN_ID
+                     FROM HRS_KOLOM_LANDING_PENDAFTARAN
+                     WHERE KOLOM_PENDAFTARAN_ID = :column_id
+                     FOR UPDATE'
+                );
+                $column_lock->execute( [ 'column_id' => (string) $vacancy['column_id'] ] );
+                if ( false === $column_lock->fetchColumn() ) {
+                    throw new RuntimeException( 'The vacancy publication record was not found.' );
+                }
+                $close_vacancy = $connection->prepare(
+                    'UPDATE HRS_KOLOM_LANDING_PENDAFTARAN
+                     SET STATUS_KOLOM = 0
+                     WHERE KOLOM_PENDAFTARAN_ID = :column_id'
+                );
+                $close_vacancy->execute( [ 'column_id' => (string) $vacancy['column_id'] ] );
+                $connection->commit();
+                $wordpress_closed = $this->mark_wordpress_vacancy_filled( $vacancy_id );
+                return [
+                    'success' => false,
+                    'error' => $wordpress_closed
+                        ? 'Jumlah kandidat diterima sudah memenuhi kebutuhan lowongan. Keputusan Diterima tidak dapat disimpan.'
+                        : 'Lowongan sudah penuh dan dihentikan di Oracle, tetapi status WordPress belum berhasil ditutup.',
+                ];
             }
 
             $existing_decision = $connection->prepare(
@@ -3273,7 +4191,33 @@ class Recruitment_Database {
                 ]
             );
 
+            $vacancy_filled = is_int( $headcount )
+                && ( $accepted_before_decision >= $headcount || ( 'DITERIMA' === $decision && $accepted_before_decision + 1 >= $headcount ) );
+            if ( $vacancy_filled ) {
+                $column_lock = $connection->prepare(
+                    'SELECT KOLOM_PENDAFTARAN_ID
+                     FROM HRS_KOLOM_LANDING_PENDAFTARAN
+                     WHERE KOLOM_PENDAFTARAN_ID = :column_id
+                     FOR UPDATE'
+                );
+                $column_lock->execute( [ 'column_id' => (string) $vacancy['column_id'] ] );
+                if ( false === $column_lock->fetchColumn() ) {
+                    throw new RuntimeException( 'The vacancy publication record was not found.' );
+                }
+                $close_vacancy = $connection->prepare(
+                    'UPDATE HRS_KOLOM_LANDING_PENDAFTARAN
+                     SET STATUS_KOLOM = 0
+                     WHERE KOLOM_PENDAFTARAN_ID = :column_id'
+                );
+                $close_vacancy->execute( [ 'column_id' => (string) $vacancy['column_id'] ] );
+            }
             $connection->commit();
+            if ( $vacancy_filled && ! $this->mark_wordpress_vacancy_filled( $vacancy_id ) ) {
+                return [
+                    'success' => true,
+                    'warning' => 'Keputusan dan penutupan lowongan Oracle tersimpan, tetapi status lowongan WordPress belum berhasil ditutup.',
+                ];
+            }
             return [ 'success' => true ];
         } catch ( PDOException | RuntimeException $exception ) {
             if ( $connection instanceof PDO && $connection->inTransaction() ) {
@@ -3320,6 +4264,123 @@ class Recruitment_Database {
         }
         usort( $questions, static fn ( array $first, array $second ): int => (int) $second['id'] <=> (int) $first['id'] );
         return $questions;
+    }
+
+    /**
+     * Create the Pauli test definition and any missing lane records.
+     *
+     * @return array{success: bool, test_id?: int, lane_count?: int, created_test?: bool, error?: string}
+     */
+    public function initialize_pauli_question_bank(): array {
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+
+            $test_query = $connection->prepare(
+                'SELECT TES_PSIKOLOGI_ID AS "id", IS_ACTIVE AS "active" FROM HRS_TES_PSIKOLOGI WHERE UPPER(JUDUL) LIKE :title ORDER BY TES_PSIKOLOGI_ID FOR UPDATE'
+            );
+            $test_query->execute( [ 'title' => '%PAULI%' ] );
+            $tests = $test_query->fetchAll( PDO::FETCH_ASSOC );
+            if ( 1 < count( $tests ) ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'Terdapat lebih dari satu definisi tes Pauli di Oracle. Periksa katalog tes terlebih dahulu.' ];
+            }
+
+            $created_test = false;
+            if ( $tests ) {
+                $test_id = absint( $tests[0]['id'] ?? 0 );
+                if ( $test_id < 1 ) {
+                    $connection->rollBack();
+                    return [ 'success' => false, 'error' => 'ID definisi tes Pauli di Oracle tidak valid.' ];
+                }
+                if ( 1 !== absint( $tests[0]['active'] ?? 0 ) ) {
+                    $connection->rollBack();
+                    return [ 'success' => false, 'error' => 'Definisi tes Pauli di Oracle tidak aktif. Aktifkan tes melalui pengaturan HR sebelum menyiapkan bank.' ];
+                }
+            } else {
+                $order_query = $connection->query(
+                    'SELECT NVL(MAX(URUTAN_TAMPILAN), 0) + 1 FROM HRS_TES_PSIKOLOGI'
+                );
+                $display_order = absint( $order_query->fetchColumn() );
+                $insert_test = $connection->prepare(
+                    'INSERT INTO HRS_TES_PSIKOLOGI (JUDUL, PETUNJUK_PENGERJAAN, DURASI_PENGERJAAN, UPDATED_AT, JUMLAH_SOAL, IS_ACTIVE, URUTAN_TAMPILAN, CREATED_AT) VALUES (:title, TO_CLOB(:instructions), :duration, CURRENT_TIMESTAMP, :question_count, 1, :display_order, CURRENT_TIMESTAMP) RETURNING TES_PSIKOLOGI_ID INTO :test_id'
+                );
+                $test_id = 0;
+                $insert_test->bindValue( ':title', 'Tes Koran Pauli', PDO::PARAM_STR );
+                $insert_test->bindValue( ':instructions', 'Jumlahkan dua angka yang berurutan pada setiap lajur. Jawaban dapat diisi dengan angka satuan atau hasil penjumlahan penuh.', PDO::PARAM_STR );
+                $insert_test->bindValue( ':duration', 60, PDO::PARAM_INT );
+                $insert_test->bindValue( ':question_count', 20 * 900, PDO::PARAM_INT );
+                $insert_test->bindValue( ':display_order', $display_order, PDO::PARAM_INT );
+                $insert_test->bindParam( ':test_id', $test_id, PDO::PARAM_INT | PDO::PARAM_INPUT_OUTPUT, 19 );
+                $insert_test->execute();
+                if ( $test_id < 1 ) {
+                    throw new RuntimeException( 'Oracle did not return a Pauli test ID.' );
+                }
+                $created_test = true;
+            }
+
+            $count_query = $connection->prepare(
+                'SELECT COUNT(*) FROM HRS_PERTANYAAN_PSIKOTES WHERE TES_PSIKOLOGI_ID = :test_id'
+            );
+            $count_query->execute( [ 'test_id' => $test_id ] );
+            $lane_count = (int) $count_query->fetchColumn();
+            if ( 20 < $lane_count ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'Bank Pauli memiliki lebih dari 20 lajur. Periksa urutan dan konfigurasi soal sebelum melanjutkan.' ];
+            }
+
+            if ( $lane_count < 20 ) {
+                $order_query = $connection->prepare(
+                    'SELECT NVL(MAX(DISPLAY_ORDER), 0) + 1 FROM HRS_PERTANYAAN_PSIKOTES WHERE TES_PSIKOLOGI_ID = :test_id'
+                );
+                $order_query->execute( [ 'test_id' => $test_id ] );
+                $display_order = absint( $order_query->fetchColumn() );
+                $insert_question = $connection->prepare(
+                    'INSERT INTO HRS_PERTANYAAN_PSIKOTES (TES_PSIKOLOGI_ID, TEKS_PERTANYAAN, JENIS_PERTANYAAN, NILAI_PERTANYAAN, DISPLAY_ORDER) VALUES (:test_id, TO_CLOB(:prompt), :question_type, 1, :display_order)'
+                );
+                while ( $lane_count < 20 ) {
+                    $insert_question->execute(
+                        [
+                            'test_id' => $test_id,
+                            'prompt' => sprintf( 'Lajur Pauli %02d', $display_order ),
+                            'question_type' => 'NUMERIC',
+                            'display_order' => $display_order,
+                        ]
+                    );
+                    $lane_count++;
+                    $display_order++;
+                }
+            }
+
+            $update_test = $connection->prepare(
+                'UPDATE HRS_TES_PSIKOLOGI SET DURASI_PENGERJAAN = :duration, JUMLAH_SOAL = :question_count, UPDATED_AT = CURRENT_TIMESTAMP WHERE TES_PSIKOLOGI_ID = :test_id'
+            );
+            $update_test->execute(
+                [
+                    'duration' => $lane_count * 3,
+                    'question_count' => $lane_count * 900,
+                    'test_id' => $test_id,
+                ]
+            );
+            if ( 1 !== $update_test->rowCount() ) {
+                throw new RuntimeException( 'Pauli test configuration could not be updated.' );
+            }
+
+            $connection->commit();
+            return [
+                'success' => true,
+                'test_id' => $test_id,
+                'lane_count' => $lane_count,
+                'created_test' => $created_test,
+            ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_oracle_failure( 'Pauli question bank initialization failed', $exception );
+            return [ 'success' => false, 'error' => 'Bank Pauli gagal disiapkan di Oracle. Periksa koneksi dan log server.' ];
+        }
     }
 
     /**
@@ -3896,14 +4957,14 @@ class Recruitment_Database {
                 $parameters['result_id'] = $result_id;
             }
             $responses = $this->fetch_all(
-                'SELECT r.RESPON_PSIKOTES_ID AS "id", r.PERTANYAAN_PSIKOTES_ID AS "question_id", r.HASIL AS "result", r.TEKS_JAWABAN AS "answer", r.NILAI_DIPEROLEH AS "score", TO_CHAR(r.DIJAWAB_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "answered_at" FROM HRS_RESPON_PSIKOTES r JOIN HRS_PERTANYAAN_PSIKOTES q ON q.PERTANYAAN_PSIKOTES_ID = r.PERTANYAAN_PSIKOTES_ID WHERE q.TES_PSIKOLOGI_ID = :test_id AND (' . implode( ' OR ', $response_filters ) . ') ORDER BY q.DISPLAY_ORDER, r.RESPON_PSIKOTES_ID',
+                'SELECT r.RESPON_PSIKOTES_ID AS "id", r.PERTANYAAN_PSIKOTES_ID AS "question_id", r.HASIL AS "result", r.TEKS_JAWABAN AS "answer", r.NILAI_DIPEROLEH AS "score", TO_CHAR(r.DIJAWAB_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "answered_at" FROM HRS_RESPON_PSIKOTES r JOIN HRS_PERTANYAAN_PSIKOTES q ON q.PEERTANYAAN_PSIKOTES_ID = r.PERTANYAAN_PSIKOTES_ID WHERE q.TES_PSIKOLOGI_ID = :test_id AND (' . implode( ' OR ', $response_filters ) . ') ORDER BY q.DISPLAY_ORDER, r.RESPON_PSIKOTES_ID',
                 $parameters
             );
         }
         $result = [];
         if ( $result_id > 0 ) {
             $rows = $this->fetch_all(
-                'SELECT HASIL_TES_PSIKOLOGI_ID AS "id", NILAI AS "score", TO_CHAR(MULAI_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "started_at", TO_CHAR(DIKUMPULKAN_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "completed_at" FROM HRS_HASIL_TES_PSIKOLOGI WHERE HASIL_TES_PSIKOLOGI_ID = :result_id AND TES_PSIKOLOGI_ID = :test_id',
+                'SELECT HASIL_TES_PSIKOLOGI AS "id", NILAI AS "score", TO_CHAR(MULAI_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "started_at", TO_CHAR(DIKUMPULKAN_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "completed_at" FROM HRS_HASIL_TES_PSIKOLOGI WHERE HASIL_TES_PSIKOLOGI = :result_id AND TES_PSIKOLOGI_ID = :test_id',
                 [ 'result_id' => $result_id, 'test_id' => $test_id ]
             );
             $result = $rows[0] ?? [];
@@ -3914,8 +4975,19 @@ class Recruitment_Database {
         return [ 'success' => true, 'responses' => $responses, 'result' => $result ];
     }
 
-    public function create_proctoring_session( int $candidate_id, string $session_id ): bool {
+    public function create_proctoring_session(
+        int $candidate_id,
+        string $session_id,
+        ?int $application_id = null,
+        string $consent_version = 'proctoring-v1'
+    ): bool {
         if ( $candidate_id < 1 || ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id ) ) {
+            return false;
+        }
+        if ( null !== $application_id && $application_id < 1 ) {
+            return false;
+        }
+        if ( ! preg_match( '/\Aproctoring-v[1-9][0-9]*\z/', $consent_version ) ) {
             return false;
         }
 
@@ -3923,27 +4995,28 @@ class Recruitment_Database {
         try {
             $statement = $this->get_connection()->prepare(
                 'MERGE INTO HRS_PSY_PROCTOR_SESSIONS target
-                 USING (SELECT :session_id AS session_id FROM DUAL) source
+                 USING (SELECT :session_id AS session_id, :candidate_id AS candidate_id,
+                               :application_id AS application_id FROM DUAL) source
                  ON (target.SESSION_ID = source.session_id)
                  WHEN MATCHED THEN UPDATE SET target.CONSENT_VERSION = :matched_consent_version,
+                     target.APPLICATION_ID = source.application_id,
                      target.CONSENT_AT = CURRENT_TIMESTAMP,
                      target.RETENTION_UNTIL = CASE
                          WHEN target.COMPLETED_AT IS NOT NULL THEN target.RETENTION_UNTIL
                          ELSE GREATEST(target.RETENTION_UNTIL, ADD_MONTHS(CURRENT_TIMESTAMP, 12))
                      END,
                      target.UPDATED_AT = CURRENT_TIMESTAMP
-                     WHERE target.KANDIDAT_ID = :candidate_id AND target.RETENTION_UNTIL > CURRENT_TIMESTAMP
-                 WHEN NOT MATCHED THEN INSERT (SESSION_ID, KANDIDAT_ID, CONSENT_VERSION, IDENTITY_STATUS, CREATED_AT, RETENTION_UNTIL, UPDATED_AT)
-                     VALUES (:insert_session_id, :insert_candidate_id, :insert_consent_version, \'PENDING\', CURRENT_TIMESTAMP, ADD_MONTHS(CURRENT_TIMESTAMP, 12), CURRENT_TIMESTAMP)'
+                     WHERE target.KANDIDAT_ID = source.candidate_id AND target.RETENTION_UNTIL > CURRENT_TIMESTAMP
+                 WHEN NOT MATCHED THEN INSERT (SESSION_ID, KANDIDAT_ID, APPLICATION_ID, CONSENT_VERSION, IDENTITY_STATUS, CREATED_AT, RETENTION_UNTIL, UPDATED_AT)
+                     VALUES (source.session_id, source.candidate_id, source.application_id, :insert_consent_version, \'PENDING\', CURRENT_TIMESTAMP, ADD_MONTHS(CURRENT_TIMESTAMP, 12), CURRENT_TIMESTAMP)'
             );
             $statement->execute(
                 [
                     'session_id' => $session_id,
                     'candidate_id' => $candidate_id,
-                    'matched_consent_version' => 'proctoring-v1',
-                    'insert_session_id' => $session_id,
-                    'insert_candidate_id' => $candidate_id,
-                    'insert_consent_version' => 'proctoring-v1',
+                    'application_id' => $application_id,
+                    'matched_consent_version' => $consent_version,
+                    'insert_consent_version' => $consent_version,
                 ]
             );
             $rows = $this->fetch_all(
@@ -3966,7 +5039,8 @@ class Recruitment_Database {
         }
         $this->last_error = null;
         $rows = $this->fetch_all(
-            'SELECT SESSION_ID AS "session_id", KANDIDAT_ID AS "candidate_id", IDENTITY_STATUS AS "identity_status",
+            'SELECT SESSION_ID AS "session_id", KANDIDAT_ID AS "candidate_id", APPLICATION_ID AS "application_id",
+                    CONSENT_VERSION AS "consent_version", IDENTITY_STATUS AS "identity_status",
                     TO_CHAR(CONSENT_AT, \'YYYY-MM-DD HH24:MI:SS\') AS "consent_at",
                     TO_CHAR(RETENTION_UNTIL, \'YYYY-MM-DD HH24:MI:SS\') AS "retention_until"
              FROM HRS_PSY_PROCTOR_SESSIONS
@@ -3977,10 +5051,19 @@ class Recruitment_Database {
         return $rows[0] ?? null;
     }
 
-    public function save_proctoring_identity( int $candidate_id, string $session_id, ?string $file_key, bool $manual_review ): bool {
+    public function save_proctoring_identity(
+        int $candidate_id,
+        string $session_id,
+        ?string $file_key,
+        bool $manual_review,
+        ?string $client_ip = null,
+        ?string $client_user_agent = null
+    ): bool {
         if ( $candidate_id < 1 || ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id )
             || ( null !== $file_key && ! preg_match( '/\A[a-f0-9]{32}\.jpg\z/', $file_key ) )
-            || ( null === $file_key && ! $manual_review ) ) {
+            || ( null === $file_key && ! $manual_review )
+            || ( null !== $client_ip && false === filter_var( $client_ip, FILTER_VALIDATE_IP ) )
+            || ( null !== $client_user_agent && strlen( $client_user_agent ) > 512 ) ) {
             return false;
         }
 
@@ -3995,32 +5078,44 @@ class Recruitment_Database {
                    AND RETENTION_UNTIL > CURRENT_TIMESTAMP FOR UPDATE'
             );
             $lock->execute( [ 'session_id' => $session_id, 'candidate_id' => $candidate_id ] );
-            if ( 'PENDING' !== (string) $lock->fetchColumn() ) {
-                throw new RuntimeException( 'Proctoring session was not found.' );
-            }
-            $update = $connection->prepare(
-                'UPDATE HRS_PSY_PROCTOR_SESSIONS SET IDENTITY_STATUS = :identity_status, UPDATED_AT = CURRENT_TIMESTAMP
-                 WHERE SESSION_ID = :session_id AND KANDIDAT_ID = :candidate_id'
-            );
-            $update->execute(
-                [
-                    'identity_status' => $manual_review ? 'MANUAL_REVIEW' : 'CAPTURED',
-                    'session_id' => $session_id,
-                    'candidate_id' => $candidate_id,
-                ]
-            );
-            if ( 1 !== $update->rowCount() ) {
-                throw new RuntimeException( 'Proctoring identity status could not be updated.' );
+            $current_status = $lock->fetchColumn();
+            if ( false === $current_status ) {
+                $insert = $connection->prepare(
+                    'INSERT INTO HRS_PSY_PROCTOR_SESSIONS (SESSION_ID, KANDIDAT_ID, CONSENT_VERSION, IDENTITY_STATUS, CREATED_AT, RETENTION_UNTIL, UPDATED_AT)
+                     VALUES (:session_id, :candidate_id, \'proctoring-v2\', :identity_status, CURRENT_TIMESTAMP, ADD_MONTHS(CURRENT_TIMESTAMP, 12), CURRENT_TIMESTAMP)'
+                );
+                $insert->execute(
+                    [
+                        'session_id' => $session_id,
+                        'candidate_id' => $candidate_id,
+                        'identity_status' => $manual_review ? 'MANUAL_REVIEW' : 'CAPTURED',
+                    ]
+                );
+            } else {
+                $update = $connection->prepare(
+                    'UPDATE HRS_PSY_PROCTOR_SESSIONS SET IDENTITY_STATUS = :identity_status, UPDATED_AT = CURRENT_TIMESTAMP
+                     WHERE SESSION_ID = :session_id AND KANDIDAT_ID = :candidate_id'
+                );
+                $update->execute(
+                    [
+                        'identity_status' => $manual_review ? 'MANUAL_REVIEW' : 'CAPTURED',
+                        'session_id' => $session_id,
+                        'candidate_id' => $candidate_id,
+                    ]
+                );
             }
             $event = $connection->prepare(
-                'INSERT INTO HRS_PSY_PROCTOR_EVENTS (SESSION_ID, EVENT_TYPE, FILE_KEY, EVENT_AT)
-                 VALUES (:session_id, :event_type, :file_key, CURRENT_TIMESTAMP)'
+                'INSERT INTO HRS_PSY_PROCTOR_EVENTS
+                    (SESSION_ID, EVENT_TYPE, FILE_KEY, ASSESSMENT_STAGE, CLIENT_IP, CLIENT_USER_AGENT, EVENT_AT)
+                 VALUES (:session_id, :event_type, :file_key, \'preparation\', :client_ip, :client_user_agent, CURRENT_TIMESTAMP)'
             );
             $event->execute(
                 [
                     'session_id' => $session_id,
                     'event_type' => $manual_review ? 'MANUAL_IDENTITY' : 'IDENTITY_CAPTURE',
                     'file_key' => $file_key,
+                    'client_ip' => $client_ip,
+                    'client_user_agent' => $client_user_agent,
                 ]
             );
             $connection->commit();
@@ -4035,28 +5130,74 @@ class Recruitment_Database {
     }
 
     /**
-     * Store a signal and, while under the per-session lock, at most five alert images.
+     * Store one unique incident event and its optional private image.
      *
-     * @return array{success: bool, captured: bool}
+     * @param array<string, mixed> $rule
+     * @return array{success: bool, captured: bool, warning_level?: string|null, severity?: string, repeat_count?: int, error?: string}
      */
-    public function save_proctoring_event( int $candidate_id, string $session_id, string $event_type, ?string $file_key ): array {
+    public function save_proctoring_event(
+        int $candidate_id,
+        string $session_id,
+        string $event_type,
+        ?string $file_key,
+        string $assessment_stage,
+        string $event_token,
+        ?string $client_ip = null,
+        ?string $client_user_agent = null,
+        int $detection_duration_ms = 0,
+        ?float $detection_confidence = null,
+        array $rule = []
+    ): array {
         $allowed_types = [
             'TAB_HIDDEN',
+            'TAB_VISIBLE',
             'CAMERA_STOPPED',
             'CAMERA_UNAVAILABLE',
             'FACE_NOT_DETECTED',
             'MULTIPLE_FACES',
+            'FACE_TURNED_AWAY',
             'FACE_DETECTION_UNAVAILABLE',
             'MICROPHONE_AVAILABLE',
             'MICROPHONE_UNAVAILABLE',
         ];
+        $allowed_stages = [ 'iq', 'pauli', 'disc', 'papi' ];
+        $capture_types = [ 'TAB_HIDDEN', 'CAMERA_STOPPED', 'FACE_NOT_DETECTED', 'MULTIPLE_FACES', 'FACE_TURNED_AWAY' ];
+        $violation_types = [ 'CAMERA_STOPPED', 'FACE_NOT_DETECTED', 'MULTIPLE_FACES', 'FACE_TURNED_AWAY' ];
+        $is_violation = in_array( $event_type, $violation_types, true );
         if ( $candidate_id < 1 || ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id )
             || ! in_array( $event_type, $allowed_types, true )
-            || ( null !== $file_key && ! preg_match( '/\A[a-f0-9]{32}\.jpg\z/', $file_key ) ) ) {
+            || ! in_array( $assessment_stage, $allowed_stages, true )
+            || ! preg_match( '/\A[a-f0-9-]{36}\z/', $event_token )
+            || $detection_duration_ms < 0 || 3600000 < $detection_duration_ms
+            || ( null !== $detection_confidence && ( ! is_finite( $detection_confidence ) || 0 > $detection_confidence || 1 < $detection_confidence ) )
+            || ( $is_violation && (
+                $detection_duration_ms < 1
+                || ! isset( $rule['threshold_ms'], $rule['confidence_threshold'], $rule['cooldown_ms'], $rule['repeat_warning_count'], $rule['repeat_warning_window_ms'], $rule['repeat_serious_count'], $rule['repeat_serious_window_ms'], $rule['severity'] )
+                || $detection_duration_ms < absint( $rule['threshold_ms'] )
+                || ( null !== $detection_confidence && $detection_confidence < (float) $rule['confidence_threshold'] )
+            ) )
+            || ( null !== $client_ip && false === filter_var( $client_ip, FILTER_VALIDATE_IP ) )
+            || ( null !== $client_user_agent && strlen( $client_user_agent ) > 512 )
+            || ( null !== $file_key && ( ! preg_match( '/\A[a-f0-9]{32}\.jpg\z/', $file_key )
+                || ! in_array( $event_type, $capture_types, true ) ) ) ) {
             return [ 'success' => false, 'captured' => false ];
         }
 
         $this->last_error = null;
+        $columns = $this->get_proctoring_report_columns();
+        $required_lifecycle_columns = [
+            'detection_duration_ms',
+            'detection_confidence',
+            'severity',
+            'repeat_count',
+            'warning_level',
+            'warning_at',
+            'review_status',
+        ];
+        if ( null === $columns || array_diff( $required_lifecycle_columns, array_keys( array_filter( $columns ) ) ) ) {
+            error_log( 'Recruitment Oracle schema warning: Migration 023 is required before proctoring violation events can be saved.' );
+            return [ 'success' => false, 'captured' => false, 'error' => 'schema_unavailable' ];
+        }
         $connection = null;
         try {
             $connection = $this->get_connection();
@@ -4070,49 +5211,191 @@ class Recruitment_Database {
             if ( false === $lock->fetchColumn() ) {
                 throw new RuntimeException( 'Proctoring session was not found.' );
             }
-            $recent = $connection->prepare(
-                'SELECT COUNT(*) FROM HRS_PSY_PROCTOR_EVENTS
-                 WHERE SESSION_ID = :session_id AND EVENT_TYPE = :event_type
-                   AND EVENT_AT > CURRENT_TIMESTAMP - INTERVAL \'15\' SECOND'
+            $existing_event = $connection->prepare(
+                'SELECT SESSION_ID, FILE_KEY, SEVERITY, REPEAT_COUNT, WARNING_LEVEL
+                 FROM HRS_PSY_PROCTOR_EVENTS
+                 WHERE EVENT_TOKEN = :event_token'
             );
-            $recent->execute( [ 'session_id' => $session_id, 'event_type' => $event_type ] );
-            if ( 0 < (int) $recent->fetchColumn() ) {
+            $existing_event->execute( [ 'event_token' => $event_token ] );
+            $existing = $existing_event->fetch( PDO::FETCH_ASSOC );
+            if ( false !== $existing ) {
                 $connection->commit();
-                return [ 'success' => true, 'captured' => false ];
+                return [
+                    'success' => hash_equals( $session_id, (string) $existing['SESSION_ID'] ),
+                    'captured' => false,
+                    'warning_level' => $existing['WARNING_LEVEL'] ?? null,
+                    'severity' => (string) ( $existing['SEVERITY'] ?? '' ),
+                    'repeat_count' => absint( $existing['REPEAT_COUNT'] ?? 0 ),
+                ];
             }
 
-            $captured = false;
-            $stored_file_key = null;
-            if ( null !== $file_key ) {
-                $count = $connection->prepare(
-                    'SELECT COUNT(*) FROM HRS_PSY_PROCTOR_EVENTS
-                     WHERE SESSION_ID = :session_id AND EVENT_TYPE IN (
-                        \'TAB_HIDDEN\', \'CAMERA_STOPPED\', \'CAMERA_UNAVAILABLE\',
-                        \'FACE_NOT_DETECTED\', \'MULTIPLE_FACES\'
-                     )
-                       AND FILE_KEY IS NOT NULL'
+            $severity = $is_violation && in_array( $rule['severity'], [ 'warning', 'repeated', 'serious' ], true )
+                ? (string) $rule['severity']
+                : '';
+            $repeat_count = $is_violation ? 1 : 0;
+            $warning_level = null;
+            if ( $is_violation ) {
+                $warning_window_seconds = max( 1, (int) ceil( (int) $rule['repeat_warning_window_ms'] / 1000 ) );
+                $serious_window_seconds = max( 1, (int) ceil( (int) $rule['repeat_serious_window_ms'] / 1000 ) );
+                $history = $connection->prepare(
+                    'SELECT
+                        SUM(CASE WHEN EVENT_AT >= CURRENT_TIMESTAMP - NUMTODSINTERVAL(:warning_window, \'SECOND\') THEN 1 ELSE 0 END) AS "warning_count",
+                        SUM(CASE WHEN EVENT_AT >= CURRENT_TIMESTAMP - NUMTODSINTERVAL(:serious_window, \'SECOND\') THEN 1 ELSE 0 END) AS "serious_count"
+                     FROM HRS_PSY_PROCTOR_EVENTS
+                     WHERE SESSION_ID = :session_id AND EVENT_TYPE = :event_type
+                       AND DETECTION_DURATION_MS IS NOT NULL
+                       AND EVENT_AT >= CURRENT_TIMESTAMP - NUMTODSINTERVAL(:max_window, \'SECOND\')'
                 );
-                $count->execute( [ 'session_id' => $session_id ] );
-                if ( 5 > (int) $count->fetchColumn() ) {
-                    $stored_file_key = $file_key;
-                    $captured = true;
+                $history->execute(
+                    [
+                        'warning_window' => $warning_window_seconds,
+                        'serious_window' => $serious_window_seconds,
+                        'session_id' => $session_id,
+                        'event_type' => $event_type,
+                        'max_window' => max( $warning_window_seconds, $serious_window_seconds ),
+                    ]
+                );
+                $counts = $history->fetch( PDO::FETCH_ASSOC ) ?: [];
+                $warning_count = 1 + absint( $counts['warning_count'] ?? 0 );
+                $serious_count = 1 + absint( $counts['serious_count'] ?? 0 );
+                if ( $serious_count >= absint( $rule['repeat_serious_count'] ) ) {
+                    $severity = 'serious';
+                    $repeat_count = $serious_count;
+                } elseif ( $warning_count >= absint( $rule['repeat_warning_count'] ) ) {
+                    if ( 'warning' === $severity ) {
+                        $severity = 'repeated';
+                    }
+                    $repeat_count = $warning_count;
                 }
+
+                $last_warning = $connection->prepare(
+                    'SELECT WARNING_LEVEL,
+                            CASE WHEN WARNING_AT <= CURRENT_TIMESTAMP - NUMTODSINTERVAL(:cooldown_seconds, \'SECOND\')
+                                 THEN 1 ELSE 0 END AS "cooldown_elapsed"
+                     FROM HRS_PSY_PROCTOR_EVENTS
+                     WHERE SESSION_ID = :session_id AND EVENT_TYPE = :event_type
+                       AND WARNING_AT IS NOT NULL AND WARNING_LEVEL IS NOT NULL
+                     ORDER BY WARNING_AT DESC
+                     FETCH FIRST 1 ROWS ONLY'
+                );
+                $last_warning->execute(
+                    [
+                        'cooldown_seconds' => (int) ceil( absint( $rule['cooldown_ms'] ) / 1000 ),
+                        'session_id' => $session_id,
+                        'event_type' => $event_type,
+                    ]
+                );
+                $previous_warning = $last_warning->fetch( PDO::FETCH_ASSOC );
+                $severity_rank = [ 'warning' => 1, 'repeated' => 2, 'serious' => 3 ];
+                $warning_level = false === $previous_warning
+                    || ! empty( $previous_warning['cooldown_elapsed'] )
+                    || ( $severity_rank[ $severity ] ?? 0 ) > ( $severity_rank[ (string) $previous_warning['WARNING_LEVEL'] ] ?? 0 )
+                    ? $severity
+                    : null;
             }
+
+            $captured = null !== $file_key;
             $event = $connection->prepare(
-                'INSERT INTO HRS_PSY_PROCTOR_EVENTS (SESSION_ID, EVENT_TYPE, FILE_KEY, EVENT_AT)
-                 VALUES (:session_id, :event_type, :file_key, CURRENT_TIMESTAMP)'
+                'INSERT INTO HRS_PSY_PROCTOR_EVENTS
+                    (SESSION_ID, EVENT_TYPE, FILE_KEY, ASSESSMENT_STAGE, EVENT_TOKEN, CLIENT_IP, CLIENT_USER_AGENT,
+                     DETECTION_DURATION_MS, DETECTION_CONFIDENCE, SEVERITY, REPEAT_COUNT, WARNING_LEVEL, WARNING_AT,
+                     REVIEW_STATUS, EVENT_AT)
+                 VALUES (:session_id, :event_type, :file_key, :assessment_stage, :event_token, :client_ip, :client_user_agent,
+                         :detection_duration_ms, :detection_confidence, :severity, :repeat_count, :warning_level_value,
+                         CASE WHEN :warning_level_check IS NULL THEN NULL ELSE CURRENT_TIMESTAMP END,
+                         :review_status, CURRENT_TIMESTAMP)'
             );
             $event->execute(
-                [ 'session_id' => $session_id, 'event_type' => $event_type, 'file_key' => $stored_file_key ]
+                [
+                    'session_id' => $session_id,
+                    'event_type' => $event_type,
+                    'file_key' => $file_key,
+                    'assessment_stage' => $assessment_stage,
+                    'event_token' => $event_token,
+                    'client_ip' => $client_ip,
+                    'client_user_agent' => $client_user_agent,
+                    'detection_duration_ms' => $is_violation ? $detection_duration_ms : ( 0 < $detection_duration_ms ? $detection_duration_ms : null ),
+                    'detection_confidence' => $detection_confidence,
+                    'severity' => $is_violation ? $severity : null,
+                    'repeat_count' => $is_violation ? $repeat_count : null,
+                    'warning_level_value' => $warning_level,
+                    'warning_level_check' => $warning_level,
+                    'review_status' => $is_violation ? 'PENDING' : 'NOT_APPLICABLE',
+                ]
             );
             $connection->commit();
-            return [ 'success' => true, 'captured' => $captured ];
+            return [
+                'success' => true,
+                'captured' => $captured,
+                'warning_level' => $warning_level,
+                'severity' => $severity,
+                'repeat_count' => $repeat_count,
+            ];
         } catch ( PDOException | RuntimeException $exception ) {
             if ( $connection instanceof PDO && $connection->inTransaction() ) {
                 $connection->rollBack();
             }
             $this->log_oracle_failure( 'Psychotest proctoring event save failed', $exception );
             return [ 'success' => false, 'captured' => false ];
+        }
+    }
+
+    public function update_proctoring_event_review(
+        int $candidate_id,
+        string $session_id,
+        int $event_id,
+        int $reviewer_user_id,
+        string $review_status,
+        string $review_note
+    ): bool {
+        $note_length = function_exists( 'mb_strlen' ) ? mb_strlen( $review_note, 'UTF-8' ) : strlen( $review_note );
+        if (
+            $candidate_id < 1
+            || $event_id < 1
+            || $reviewer_user_id < 1
+            || ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id )
+            || ! in_array( $review_status, [ 'CONFIRMED', 'DISMISSED' ], true )
+            || 1000 < $note_length
+        ) {
+            return false;
+        }
+
+        $columns = $this->get_proctoring_report_columns();
+        if ( null === $columns || ! $columns['review_status'] || ! $columns['reviewed_by']
+            || ! $columns['reviewed_at'] || ! $columns['review_note'] ) {
+            error_log( 'Recruitment Oracle schema warning: Migration 023 is required before event review can be saved.' );
+            return false;
+        }
+
+        $this->last_error = null;
+        try {
+            $statement = $this->get_connection()->prepare(
+                'UPDATE HRS_PSY_PROCTOR_EVENTS
+                 SET REVIEW_STATUS = :review_status, REVIEWED_BY = :reviewer_user_id,
+                     REVIEWED_AT = CURRENT_TIMESTAMP, REVIEW_NOTE = :review_note
+                 WHERE EVENT_ID = :event_id AND SESSION_ID = :session_id
+                   AND DETECTION_DURATION_MS IS NOT NULL AND REVIEW_STATUS = \'PENDING\'
+                   AND EXISTS (
+                       SELECT 1 FROM HRS_PSY_PROCTOR_SESSIONS s
+                       WHERE s.SESSION_ID = HRS_PSY_PROCTOR_EVENTS.SESSION_ID
+                         AND s.KANDIDAT_ID = :candidate_id
+                         AND s.RETENTION_UNTIL > CURRENT_TIMESTAMP
+                   )'
+            );
+            $statement->execute(
+                [
+                    'review_status' => $review_status,
+                    'reviewer_user_id' => $reviewer_user_id,
+                    'review_note' => '' === $review_note ? null : $review_note,
+                    'event_id' => $event_id,
+                    'session_id' => $session_id,
+                    'candidate_id' => $candidate_id,
+                ]
+            );
+            return 1 === $statement->rowCount();
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->log_oracle_failure( 'Psychotest proctoring event review failed', $exception );
+            return false;
         }
     }
 
@@ -4148,6 +5431,52 @@ class Recruitment_Database {
             return [ 'sessions' => [], 'events' => [] ];
         }
         $this->last_error = null;
+        $columns = $this->get_proctoring_report_columns();
+        if ( null === $columns ) {
+            return [ 'sessions' => [], 'events' => [] ];
+        }
+        $session_application_id_column = $columns['application_id']
+            ? 'APPLICATION_ID'
+            : 'CAST(NULL AS NUMBER(19,0))';
+        $application_id_column = $columns['application_id']
+            ? 's.APPLICATION_ID'
+            : 'CAST(NULL AS NUMBER(19,0))';
+        $assessment_stage_column = $columns['assessment_stage']
+            ? 'e.ASSESSMENT_STAGE'
+            : 'CAST(NULL AS VARCHAR2(16))';
+        $client_ip_column = $columns['client_ip']
+            ? 'e.CLIENT_IP'
+            : 'CAST(NULL AS VARCHAR2(45))';
+        $client_user_agent_column = $columns['client_user_agent']
+            ? 'e.CLIENT_USER_AGENT'
+            : 'CAST(NULL AS VARCHAR2(512))';
+        $duration_column = $columns['detection_duration_ms']
+            ? 'e.DETECTION_DURATION_MS'
+            : 'CAST(NULL AS NUMBER(10,0))';
+        $confidence_column = $columns['detection_confidence']
+            ? 'e.DETECTION_CONFIDENCE'
+            : 'CAST(NULL AS NUMBER(6,5))';
+        $severity_column = $columns['severity']
+            ? 'e.SEVERITY'
+            : 'CAST(NULL AS VARCHAR2(16))';
+        $repeat_count_column = $columns['repeat_count']
+            ? 'e.REPEAT_COUNT'
+            : 'CAST(NULL AS NUMBER(5,0))';
+        $warning_level_column = $columns['warning_level']
+            ? 'e.WARNING_LEVEL'
+            : 'CAST(NULL AS VARCHAR2(16))';
+        $review_status_column = $columns['review_status']
+            ? 'e.REVIEW_STATUS'
+            : '\'NOT_APPLICABLE\'';
+        $reviewed_by_column = $columns['reviewed_by']
+            ? 'e.REVIEWED_BY'
+            : 'CAST(NULL AS NUMBER(19,0))';
+        $reviewed_at_column = $columns['reviewed_at']
+            ? 'TO_CHAR(e.REVIEWED_AT, \'YYYY-MM-DD HH24:MI:SS\')'
+            : 'CAST(NULL AS VARCHAR2(19))';
+        $review_note_column = $columns['review_note']
+            ? 'e.REVIEW_NOTE'
+            : 'CAST(NULL AS VARCHAR2(1000))';
         $placeholders = [];
         $parameters = [];
         foreach ( $candidate_ids as $index => $candidate_id ) {
@@ -4157,7 +5486,8 @@ class Recruitment_Database {
         }
         $in_clause = implode( ', ', $placeholders );
         $sessions = $this->fetch_all(
-            'SELECT SESSION_ID AS "session_id", KANDIDAT_ID AS "candidate_id", IDENTITY_STATUS AS "identity_status",
+            'SELECT SESSION_ID AS "session_id", KANDIDAT_ID AS "candidate_id",
+                    ' . $session_application_id_column . ' AS "application_id", IDENTITY_STATUS AS "identity_status",
                     TO_CHAR(CREATED_AT, \'YYYY-MM-DD HH24:MI:SS\') AS "created_at",
                     TO_CHAR(COMPLETED_AT, \'YYYY-MM-DD HH24:MI:SS\') AS "completed_at",
                     TO_CHAR(RETENTION_UNTIL, \'YYYY-MM-DD HH24:MI:SS\') AS "retention_until"
@@ -4167,7 +5497,18 @@ class Recruitment_Database {
         );
         $events = $this->fetch_all(
             'SELECT e.EVENT_ID AS "event_id", e.SESSION_ID AS "session_id", s.KANDIDAT_ID AS "candidate_id",
+                    ' . $application_id_column . ' AS "application_id", ' . $assessment_stage_column . ' AS "assessment_stage",
                     e.EVENT_TYPE AS "event_type", e.FILE_KEY AS "file_key",
+                    ' . $duration_column . ' AS "detection_duration_ms",
+                    ' . $confidence_column . ' AS "detection_confidence",
+                    ' . $severity_column . ' AS "severity",
+                    ' . $repeat_count_column . ' AS "repeat_count",
+                    ' . $warning_level_column . ' AS "warning_level",
+                    ' . $review_status_column . ' AS "review_status",
+                    ' . $reviewed_by_column . ' AS "reviewed_by",
+                    ' . $reviewed_at_column . ' AS "reviewed_at",
+                    ' . $review_note_column . ' AS "review_note",
+                    ' . $client_ip_column . ' AS "client_ip", ' . $client_user_agent_column . ' AS "client_user_agent",
                     e.ACTOR_USER_ID AS "actor_user_id", e.TARGET_EVENT_ID AS "target_event_id",
                     TO_CHAR(e.EVENT_AT, \'YYYY-MM-DD HH24:MI:SS\') AS "event_at"
              FROM HRS_PSY_PROCTOR_EVENTS e
@@ -4177,6 +5518,144 @@ class Recruitment_Database {
             $parameters
         );
         return [ 'sessions' => $sessions, 'events' => $events ];
+    }
+
+    /**
+     * @return array{session: array<string, mixed>, events: array<int, array<string, mixed>>}|null
+     */
+    public function get_proctoring_report( int $candidate_id, string $session_id ): ?array {
+        if ( $candidate_id < 1 || ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id ) ) {
+            return null;
+        }
+        $this->last_error = null;
+        $columns = $this->get_proctoring_report_columns();
+        if ( null === $columns ) {
+            return null;
+        }
+        $application_id_column = $columns['application_id']
+            ? 's.APPLICATION_ID'
+            : 'CAST(NULL AS NUMBER(19,0))';
+        $assessment_stage_column = $columns['assessment_stage']
+            ? 'ASSESSMENT_STAGE'
+            : 'CAST(NULL AS VARCHAR2(16))';
+        $client_ip_column = $columns['client_ip']
+            ? 'CLIENT_IP'
+            : 'CAST(NULL AS VARCHAR2(45))';
+        $client_user_agent_column = $columns['client_user_agent']
+            ? 'CLIENT_USER_AGENT'
+            : 'CAST(NULL AS VARCHAR2(512))';
+        $duration_column = $columns['detection_duration_ms']
+            ? 'DETECTION_DURATION_MS'
+            : 'CAST(NULL AS NUMBER(10,0))';
+        $confidence_column = $columns['detection_confidence']
+            ? 'DETECTION_CONFIDENCE'
+            : 'CAST(NULL AS NUMBER(6,5))';
+        $severity_column = $columns['severity']
+            ? 'SEVERITY'
+            : 'CAST(NULL AS VARCHAR2(16))';
+        $repeat_count_column = $columns['repeat_count']
+            ? 'REPEAT_COUNT'
+            : 'CAST(NULL AS NUMBER(5,0))';
+        $warning_level_column = $columns['warning_level']
+            ? 'WARNING_LEVEL'
+            : 'CAST(NULL AS VARCHAR2(16))';
+        $warning_at_column = $columns['warning_at']
+            ? 'TO_CHAR(WARNING_AT, \'YYYY-MM-DD HH24:MI:SS\')'
+            : 'CAST(NULL AS VARCHAR2(19))';
+        $review_status_column = $columns['review_status']
+            ? 'REVIEW_STATUS'
+            : '\'NOT_APPLICABLE\'';
+        $reviewed_by_column = $columns['reviewed_by']
+            ? 'REVIEWED_BY'
+            : 'CAST(NULL AS NUMBER(19,0))';
+        $reviewed_at_column = $columns['reviewed_at']
+            ? 'TO_CHAR(REVIEWED_AT, \'YYYY-MM-DD HH24:MI:SS\')'
+            : 'CAST(NULL AS VARCHAR2(19))';
+        $review_note_column = $columns['review_note']
+            ? 'REVIEW_NOTE'
+            : 'CAST(NULL AS VARCHAR2(1000))';
+        $sessions = $this->fetch_all(
+            'SELECT s.SESSION_ID AS "session_id", s.KANDIDAT_ID AS "candidate_id",
+                    ' . $application_id_column . ' AS "application_id", s.IDENTITY_STATUS AS "identity_status",
+                    TO_CHAR(s.CREATED_AT, \'YYYY-MM-DD HH24:MI:SS\') AS "created_at",
+                    TO_CHAR(s.COMPLETED_AT, \'YYYY-MM-DD HH24:MI:SS\') AS "completed_at",
+                    TO_CHAR(s.RETENTION_UNTIL, \'YYYY-MM-DD HH24:MI:SS\') AS "retention_until",
+                    NVL(p.NAMA_LENGKAP, p.NAMA_KANDIDAT) AS "candidate_name", p.EMAIL AS "candidate_email",
+                    d.JUDUL_PEKERJAAN AS "position",
+                    NVL(d.NAMA_DEPARTEMENT, k.NAMA_DEPARTEMEN) AS "department",
+                    k.NAMA_DEALER AS "location"
+             FROM HRS_PSY_PROCTOR_SESSIONS s
+             JOIN HRS_PROFIL_KANDIDAT p ON p.KANDIDAT_ID = s.KANDIDAT_ID
+             LEFT JOIN HRS_LAMARAN l ON l.LAMARAN_ID = ' . $application_id_column . '
+             LEFT JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.DETAIL_LOWONGAN_ID = l.DETAIL_LOWONGAN_ID
+             LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.KOLOM_PENDAFTARAN_ID = d.KOLOM_PENDAFTARAN_ID
+             WHERE s.SESSION_ID = :session_id AND s.KANDIDAT_ID = :candidate_id
+               AND s.RETENTION_UNTIL > CURRENT_TIMESTAMP',
+            [ 'session_id' => $session_id, 'candidate_id' => $candidate_id ]
+        );
+        if ( $this->has_error() || ! isset( $sessions[0] ) ) {
+            return null;
+        }
+        $events = $this->fetch_all(
+            'SELECT EVENT_ID AS "event_id", SESSION_ID AS "session_id", EVENT_TYPE AS "event_type",
+                    ' . $assessment_stage_column . ' AS "assessment_stage", FILE_KEY AS "file_key",
+                    ' . $duration_column . ' AS "detection_duration_ms",
+                    ' . $confidence_column . ' AS "detection_confidence",
+                    ' . $severity_column . ' AS "severity",
+                    ' . $repeat_count_column . ' AS "repeat_count",
+                    ' . $warning_level_column . ' AS "warning_level",
+                    ' . $warning_at_column . ' AS "warning_at",
+                    ' . $review_status_column . ' AS "review_status",
+                    ' . $reviewed_by_column . ' AS "reviewed_by",
+                    ' . $reviewed_at_column . ' AS "reviewed_at",
+                    ' . $review_note_column . ' AS "review_note",
+                    ' . $client_ip_column . ' AS "client_ip", ' . $client_user_agent_column . ' AS "client_user_agent",
+                    ACTOR_USER_ID AS "actor_user_id", TARGET_EVENT_ID AS "target_event_id",
+                    TO_CHAR(EVENT_AT, \'YYYY-MM-DD HH24:MI:SS\') AS "event_at"
+             FROM HRS_PSY_PROCTOR_EVENTS
+             WHERE SESSION_ID = :session_id
+             ORDER BY EVENT_AT, EVENT_ID',
+            [ 'session_id' => $session_id ]
+        );
+        if ( $this->has_error() ) {
+            return null;
+        }
+        return [ 'session' => $sessions[0], 'events' => $events ];
+    }
+
+    public function log_proctoring_report_download( int $candidate_id, string $session_id, int $admin_user_id ): bool {
+        if ( $candidate_id < 1 || $admin_user_id < 1 || ! preg_match( '/\A[a-f0-9]{64}\z/', $session_id ) ) {
+            return false;
+        }
+        $this->last_error = null;
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $lock = $connection->prepare(
+                'SELECT SESSION_ID FROM HRS_PSY_PROCTOR_SESSIONS
+                 WHERE SESSION_ID = :session_id AND KANDIDAT_ID = :candidate_id
+                   AND RETENTION_UNTIL > CURRENT_TIMESTAMP FOR UPDATE'
+            );
+            $lock->execute( [ 'session_id' => $session_id, 'candidate_id' => $candidate_id ] );
+            if ( false === $lock->fetchColumn() ) {
+                $connection->rollBack();
+                return false;
+            }
+            $event = $connection->prepare(
+                'INSERT INTO HRS_PSY_PROCTOR_EVENTS (SESSION_ID, EVENT_TYPE, ASSESSMENT_STAGE, EVENT_AT, ACTOR_USER_ID)
+                 VALUES (:session_id, \'REPORT_DOWNLOAD\', \'report\', CURRENT_TIMESTAMP, :admin_user_id)'
+            );
+            $event->execute( [ 'session_id' => $session_id, 'admin_user_id' => $admin_user_id ] );
+            $connection->commit();
+            return 1 === $event->rowCount();
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_oracle_failure( 'Psychotest report access audit failed', $exception );
+            return false;
+        }
     }
 
     /** @return array<string, mixed>|null */
@@ -4348,10 +5827,67 @@ class Recruitment_Database {
     public function get_psychotest_results(): array {
         return $this->fetch_all(
             'SELECT "candidate_id", "candidate_name", "candidate_email", "test_id", "test_title", "result_id", "status", "started_at", "completed_at", "score", "response_count", "question_count" FROM (' .
-                'SELECT p.KANDIDAT_ID AS "candidate_id", NVL(p.NAMA_LENGKAP, p.NAMA_KANDIDAT) AS "candidate_name", p.EMAIL AS "candidate_email", t.TES_PSIKOLOGI_ID AS "test_id", t.JUDUL AS "test_title", h.HASIL_TES_PSIKOLOGI_ID AS "result_id", \'complete\' AS "status", TO_CHAR(h.MULAI_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "started_at", TO_CHAR(h.DIKUMPULKAN_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "completed_at", h.NILAI AS "score", COUNT(r.RESPON_PSIKOTES_ID) AS "response_count", (SELECT COUNT(*) FROM HRS_PERTANYAAN_PSIKOTES q WHERE q.TES_PSIKOLOGI_ID = t.TES_PSIKOLOGI_ID) AS "question_count" FROM HRS_HASIL_TES_PSIKOLOGI h JOIN HRS_TES_PSIKOLOGI t ON t.TES_PSIKOLOGI_ID = h.TES_PSIKOLOGI_ID JOIN HRS_PROFIL_KANDIDAT p ON p.KANDIDAT_ID = h.KANDIDAT_ID LEFT JOIN HRS_RESPON_PSIKOTES r ON r.HASIL_TES_PSIKOLOGI_ID = h.HASIL_TES_PSIKOLOGI_ID AND r.KANDIDAT_ID = h.KANDIDAT_ID GROUP BY p.KANDIDAT_ID, p.NAMA_LENGKAP, p.NAMA_KANDIDAT, p.EMAIL, t.TES_PSIKOLOGI_ID, t.JUDUL, h.HASIL_TES_PSIKOLOGI_ID, h.MULAI_PADA, h.DIKUMPULKAN_PADA, h.NILAI ' .
+                'SELECT p.KANDIDAT_ID AS "candidate_id", NVL(p.NAMA_LENGKAP, p.NAMA_KANDIDAT) AS "candidate_name", p.EMAIL AS "candidate_email", t.TES_PSIKOLOGI_ID AS "test_id", t.JUDUL AS "test_title", h.HASIL_TES_PSIKOLOGI AS "result_id", \'complete\' AS "status", TO_CHAR(h.MULAI_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "started_at", TO_CHAR(h.DIKUMPULKAN_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "completed_at", h.NILAI AS "score", COUNT(r.RESPON_PSIKOTES_ID) AS "response_count", (SELECT COUNT(*) FROM HRS_PERTANYAAN_PSIKOTES q WHERE q.TES_PSIKOLOGI_ID = t.TES_PSIKOLOGI_ID) AS "question_count" FROM HRS_HASIL_TES_PSIKOLOGI h JOIN HRS_TES_PSIKOLOGI t ON t.TES_PSIKOLOGI_ID = h.TES_PSIKOLOGI_ID JOIN HRS_PROFIL_KANDIDAT p ON p.KANDIDAT_ID = h.KANDIDAT_ID LEFT JOIN HRS_RESPON_PSIKOTES r ON r.HASIL_TES_PSIKOLOGI_ID = h.HASIL_TES_PSIKOLOGI AND r.KANDIDAT_ID = h.KANDIDAT_ID GROUP BY p.KANDIDAT_ID, p.NAMA_LENGKAP, p.NAMA_KANDIDAT, p.EMAIL, t.TES_PSIKOLOGI_ID, t.JUDUL, h.HASIL_TES_PSIKOLOGI, h.MULAI_PADA, h.DIKUMPULKAN_PADA, h.NILAI ' .
                 'UNION ALL ' .
-                'SELECT p.KANDIDAT_ID AS "candidate_id", NVL(p.NAMA_LENGKAP, p.NAMA_KANDIDAT) AS "candidate_name", p.EMAIL AS "candidate_email", t.TES_PSIKOLOGI_ID AS "test_id", t.JUDUL AS "test_title", CAST(NULL AS NUMBER) AS "result_id", \'active\' AS "status", TO_CHAR(MIN(r.DIBUAT_PADA), \'YYYY-MM-DD HH24:MI:SS\') AS "started_at", CAST(NULL AS VARCHAR2(19)) AS "completed_at", SUM(r.NILAI_DIPEROLEH) AS "score", COUNT(r.RESPON_PSIKOTES_ID) AS "response_count", (SELECT COUNT(*) FROM HRS_PERTANYAAN_PSIKOTES q WHERE q.TES_PSIKOLOGI_ID = t.TES_PSIKOLOGI_ID) AS "question_count" FROM HRS_RESPON_PSIKOTES r JOIN HRS_PERTANYAAN_PSIKOTES q ON q.PERTANYAAN_PSIKOTES_ID = r.PERTANYAAN_PSIKOTES_ID JOIN HRS_TES_PSIKOLOGI t ON t.TES_PSIKOLOGI_ID = q.TES_PSIKOLOGI_ID JOIN HRS_PROFIL_KANDIDAT p ON p.KANDIDAT_ID = r.KANDIDAT_ID WHERE r.HASIL_TES_PSIKOLOGI_ID IS NULL GROUP BY p.KANDIDAT_ID, p.NAMA_LENGKAP, p.NAMA_KANDIDAT, p.EMAIL, t.TES_PSIKOLOGI_ID, t.JUDUL' .
+                'SELECT p.KANDIDAT_ID AS "candidate_id", NVL(p.NAMA_LENGKAP, p.NAMA_KANDIDAT) AS "candidate_name", p.EMAIL AS "candidate_email", t.TES_PSIKOLOGI_ID AS "test_id", t.JUDUL AS "test_title", CAST(NULL AS NUMBER) AS "result_id", \'active\' AS "status", TO_CHAR(MIN(r.DIBUAT_PADA), \'YYYY-MM-DD HH24:MI:SS\') AS "started_at", CAST(NULL AS VARCHAR2(19)) AS "completed_at", SUM(r.NILAI_DIPEROLEH) AS "score", COUNT(r.RESPON_PSIKOTES_ID) AS "response_count", (SELECT COUNT(*) FROM HRS_PERTANYAAN_PSIKOTES q WHERE q.TES_PSIKOLOGI_ID = t.TES_PSIKOLOGI_ID) AS "question_count" FROM HRS_RESPON_PSIKOTES r JOIN HRS_PERTANYAAN_PSIKOTES q ON q.PEERTANYAAN_PSIKOTES_ID = r.PERTANYAAN_PSIKOTES_ID JOIN HRS_TES_PSIKOLOGI t ON t.TES_PSIKOLOGI_ID = q.TES_PSIKOLOGI_ID JOIN HRS_PROFIL_KANDIDAT p ON p.KANDIDAT_ID = r.KANDIDAT_ID WHERE r.HASIL_TES_PSIKOLOGI_ID IS NULL GROUP BY p.KANDIDAT_ID, p.NAMA_LENGKAP, p.NAMA_KANDIDAT, p.EMAIL, t.TES_PSIKOLOGI_ID, t.JUDUL' .
                 ') ORDER BY "started_at" DESC FETCH FIRST 250 ROWS ONLY'
+        );
+    }
+
+    /**
+     * Load completed psychotest results by exact candidate and saved result IDs.
+     *
+     * @param array<int, int> $result_ids
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_psychotest_results_for_report( int $candidate_id, array $result_ids ): array {
+        $result_ids = array_values(
+            array_unique(
+                array_filter(
+                    array_map( 'absint', $result_ids ),
+                    static fn( int $result_id ): bool => $result_id > 0
+                )
+            )
+        );
+        if ( $candidate_id < 1 || empty( $result_ids ) ) {
+            return [];
+        }
+
+        $parameters = [ 'candidate_id' => $candidate_id ];
+        $placeholders = [];
+        foreach ( $result_ids as $index => $result_id ) {
+            $placeholder = 'result_id_' . $index;
+            $placeholders[] = ':' . $placeholder;
+            $parameters[ $placeholder ] = $result_id;
+        }
+
+        return $this->fetch_all(
+            'SELECT p.KANDIDAT_ID AS "candidate_id",
+                    NVL(p.NAMA_LENGKAP, p.NAMA_KANDIDAT) AS "candidate_name",
+                    p.EMAIL AS "candidate_email",
+                    t.TES_PSIKOLOGI_ID AS "test_id",
+                    t.JUDUL AS "test_title",
+                    h.HASIL_TES_PSIKOLOGI AS "result_id",
+                    \'complete\' AS "status",
+                    TO_CHAR(h.MULAI_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "started_at",
+                    TO_CHAR(h.DIKUMPULKAN_PADA, \'YYYY-MM-DD HH24:MI:SS\') AS "completed_at",
+                    h.NILAI AS "score",
+                    COUNT(r.RESPON_PSIKOTES_ID) AS "response_count",
+                    (SELECT COUNT(*) FROM HRS_PERTANYAAN_PSIKOTES q
+                     WHERE q.TES_PSIKOLOGI_ID = t.TES_PSIKOLOGI_ID) AS "question_count"
+             FROM HRS_HASIL_TES_PSIKOLOGI h
+             JOIN HRS_TES_PSIKOLOGI t ON t.TES_PSIKOLOGI_ID = h.TES_PSIKOLOGI_ID
+             JOIN HRS_PROFIL_KANDIDAT p ON p.KANDIDAT_ID = h.KANDIDAT_ID
+             LEFT JOIN HRS_RESPON_PSIKOTES r
+               ON r.HASIL_TES_PSIKOLOGI_ID = h.HASIL_TES_PSIKOLOGI
+              AND r.KANDIDAT_ID = h.KANDIDAT_ID
+             WHERE p.KANDIDAT_ID = :candidate_id
+               AND h.HASIL_TES_PSIKOLOGI IN (' . implode( ', ', $placeholders ) . ')
+             GROUP BY p.KANDIDAT_ID, p.NAMA_LENGKAP, p.NAMA_KANDIDAT, p.EMAIL,
+                      t.TES_PSIKOLOGI_ID, t.JUDUL, h.HASIL_TES_PSIKOLOGI,
+                      h.MULAI_PADA, h.DIKUMPULKAN_PADA, h.NILAI
+             ORDER BY h.MULAI_PADA, h.HASIL_TES_PSIKOLOGI',
+            $parameters
         );
     }
 
@@ -4366,7 +5902,7 @@ class Recruitment_Database {
         }
 
         $question_types = $this->fetch_all(
-            'SELECT JENIS_PERTANYAAN AS "type" FROM HRS_PERTANYAAN_PSIKOTES WHERE PERTANYAAN_PSIKOTES_ID = :question_id',
+            'SELECT JENIS_PERTANYAAN AS "type" FROM HRS_PERTANYAAN_PSIKOTES WHERE PEERTANYAAN_PSIKOTES_ID = :question_id',
             [ 'question_id' => $question_id ]
         );
         if ( $this->has_error() ) {
@@ -4635,7 +6171,7 @@ class Recruitment_Database {
                     l.status_terkini AS "application_status",
                     l.status_akhir AS "final_status",
                     d.judul_pekerjaan AS "position",
-                    d.nama_departemen AS "department",
+                    d.nama_departement AS "department",
                     k.nama_dealer AS "dealer",
                     p.kandidat_id AS "candidate_id",
                     NVL(p.nama_lengkap, p.nama_kandidat) AS "candidate_name",
@@ -4654,7 +6190,7 @@ class Recruitment_Database {
                     hr.catatan_wawancara AS "hr_interview_notes",
                     (SELECT h.nilai FROM HRS_HASIL_TES_PSIKOLOGI h
                      WHERE h.kandidat_id = p.kandidat_id
-                     ORDER BY h.dikumpulkan_pada DESC NULLS LAST, h.hasil_tes_psikologi_id DESC
+                     ORDER BY h.dikumpulkan_pada DESC NULLS LAST, h.hasil_tes_psikologi DESC
                      FETCH FIRST 1 ROW ONLY) AS "psychotest_score",
                     w.status_seleksi AS "user_interview_result",
                     w.rekomendasi AS "user_recommendation",
@@ -5057,6 +6593,618 @@ class Recruitment_Database {
         return $rows[0] ?? null;
     }
 
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_interview_slots_for_month( string $type, ?int $department_id, string $month ): array {
+        if ( ! in_array( $type, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) || ( 'INTERVIEW_USER' === $type && ( ! $department_id || $department_id < 1 ) ) ) {
+            return [];
+        }
+
+        $month_start = DateTimeImmutable::createFromFormat( '!Y-m-d', $month . '-01', wp_timezone() );
+        if ( ! $month_start || $month_start->format( 'Y-m' ) !== $month ) {
+            return [];
+        }
+
+        $this->last_error = null;
+        return $this->fetch_all(
+            'SELECT s.SLOT_WAWANCARA_ID AS "slot_id",
+                    TO_CHAR(s.START_AT, \'YYYY-MM-DD\') AS "slot_date",
+                    TO_CHAR(s.START_AT, \'HH24:MI\') AS "start_time",
+                    TO_CHAR(s.ENDS_AT, \'HH24:MI\') AS "end_time",
+                    s.ZONA_WAKTU AS "timezone",
+                    s.METODE_WAWANCARA AS "method",
+                    s.LOKASI AS "location",
+                    s.MEETING_URL AS "meeting_url",
+                    s.KAPASITAS AS "capacity",
+                    s.NAMA_PEWAWANCARA AS "interviewer",
+                    COUNT(CASE WHEN UPPER(TRIM(b.STATUS_PEMESANAN)) = \'CONFIRMED\' THEN 1 END) AS "booked"
+             FROM HRS_SLOT_WAWANCARA s
+             LEFT JOIN HRS_BOOKING_INTERVIEW b ON b.SLOT_WAWANCARA_ID = s.SLOT_WAWANCARA_ID
+             WHERE s.JENIS_WAWANCARA = :type
+               AND (s.DEPARTEMEN_ID = :department_id OR (:is_hr = 1 AND s.DEPARTEMEN_ID IS NULL))
+               AND s.START_AT >= TO_TIMESTAMP(:month_start, \'YYYY-MM-DD\')
+               AND s.START_AT < TO_TIMESTAMP(:month_end, \'YYYY-MM-DD\')
+             GROUP BY s.SLOT_WAWANCARA_ID, s.START_AT, s.ENDS_AT, s.ZONA_WAKTU,
+                      s.METODE_WAWANCARA, s.LOKASI, s.MEETING_URL, s.KAPASITAS, s.NAMA_PEWAWANCARA
+             ORDER BY s.START_AT, s.SLOT_WAWANCARA_ID',
+            [
+                'type' => $type,
+                'department_id' => $department_id,
+                'is_hr' => 'INTERVIEW_HR' === $type ? 1 : 0,
+                'month_start' => $month_start->format( 'Y-m-d' ),
+                'month_end' => $month_start->modify( 'first day of next month' )->format( 'Y-m-d' ),
+            ]
+        );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_interview_bookings_for_month( string $type, ?int $department_id, string $month ): array {
+        if ( ! in_array( $type, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) || ( 'INTERVIEW_USER' === $type && ( ! $department_id || $department_id < 1 ) ) ) {
+            return [];
+        }
+        $month_start = DateTimeImmutable::createFromFormat( '!Y-m-d', $month . '-01', wp_timezone() );
+        if ( ! $month_start || $month_start->format( 'Y-m' ) !== $month ) {
+            return [];
+        }
+        $this->last_error = null;
+        return $this->fetch_all(
+            'SELECT s.SLOT_WAWANCARA_ID AS "slot_id",
+                    l.LAMARAN_ID AS "application_id",
+                    NVL(p.NAMA_LENGKAP, p.NAMA_KANDIDAT) AS "candidate_name",
+                    TO_CHAR(b.WAKTU_PEMESANAN, \'YYYY-MM-DD HH24:MI\') AS "booked_at"
+             FROM HRS_BOOKING_INTERVIEW b
+             JOIN HRS_SLOT_WAWANCARA s ON s.SLOT_WAWANCARA_ID = b.SLOT_WAWANCARA_ID
+             JOIN HRS_LAMARAN l ON l.LAMARAN_ID = b.LAMARAN_ID
+             JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.PROFILE_KANDIDAT_LOGIN = l.PROFILE_KANDIDAT_ID
+             JOIN HRS_PROFIL_KANDIDAT p ON p.KANDIDAT_ID = pkl.KANDIDAT_ID
+             WHERE s.JENIS_WAWANCARA = :type
+               AND (s.DEPARTEMEN_ID = :department_id OR (:is_hr = 1 AND s.DEPARTEMEN_ID IS NULL))
+               AND s.START_AT >= TO_TIMESTAMP(:month_start, \'YYYY-MM-DD\')
+               AND s.START_AT < TO_TIMESTAMP(:month_end, \'YYYY-MM-DD\')
+               AND UPPER(TRIM(b.STATUS_PEMESANAN)) = \'CONFIRMED\'
+             ORDER BY s.START_AT, b.WAKTU_PEMESANAN, l.LAMARAN_ID',
+            [
+                'type' => $type,
+                'department_id' => $department_id,
+                'is_hr' => 'INTERVIEW_HR' === $type ? 1 : 0,
+                'month_start' => $month_start->format( 'Y-m-d' ),
+                'month_end' => $month_start->modify( 'first day of next month' )->format( 'Y-m-d' ),
+            ]
+        );
+    }
+
+    /**
+     * @param array<int, string> $dates
+     * @param array<int, array<string, mixed>> $slots
+     * @return array{success: bool, error?: string}
+     */
+    public function create_interview_slots( string $type, ?int $department_id, array $dates, array $slots, string $timezone ): array {
+        if ( ! in_array( $type, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) || ( 'INTERVIEW_USER' === $type && ( ! $department_id || $department_id < 1 ) ) ) {
+            return [ 'success' => false, 'error' => 'Jenis wawancara atau departemen tidak valid.' ];
+        }
+        if ( empty( $dates ) || empty( $slots ) || count( $dates ) > 31 || count( $slots ) > 20 ) {
+            return [ 'success' => false, 'error' => 'Pilih setidaknya satu tanggal dan slot wawancara.' ];
+        }
+
+        $timezone_object = wp_timezone();
+        $now = new DateTimeImmutable( 'now', $timezone_object );
+        $prepared = [];
+        foreach ( array_values( array_unique( $dates ) ) as $date ) {
+            $date_value = DateTimeImmutable::createFromFormat( '!Y-m-d', $date, $timezone_object );
+            if ( ! $date_value || $date_value->format( 'Y-m-d' ) !== $date || $date_value < $now->setTime( 0, 0 ) ) {
+                return [ 'success' => false, 'error' => 'Tanggal wawancara tidak valid atau sudah lewat.' ];
+            }
+            foreach ( $slots as $slot ) {
+                $normalized = $this->normalize_interview_slot( $date, $slot, $timezone_object, $now );
+                if ( ! $normalized ) {
+                    return [ 'success' => false, 'error' => 'Periksa waktu, kapasitas, metode, dan detail setiap slot.' ];
+                }
+                foreach ( $prepared as $existing ) {
+                    if ( $existing['date'] === $date && $normalized['start'] < $existing['end'] && $normalized['end'] > $existing['start'] ) {
+                        return [ 'success' => false, 'error' => 'Slot pada tanggal yang sama tidak boleh bertumpang tindih.' ];
+                    }
+                }
+                $prepared[] = $normalized;
+            }
+        }
+
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $connection->exec( 'LOCK TABLE HRS_SLOT_WAWANCARA IN EXCLUSIVE MODE' );
+            $insert = $connection->prepare(
+                'INSERT INTO HRS_SLOT_WAWANCARA
+                    (START_AT, ENDS_AT, ZONA_WAKTU, METODE_WAWANCARA, LOKASI, KAPASITAS, NAMA_PEWAWANCARA, MEETING_URL, JENIS_WAWANCARA, DEPARTEMEN_ID)
+                 VALUES
+                    (TO_TIMESTAMP(:start_at, \'YYYY-MM-DD HH24:MI:SS\'), TO_TIMESTAMP(:end_at, \'YYYY-MM-DD HH24:MI:SS\'), :timezone, :method, :location, :capacity, :interviewer, :meeting_url, :type, :department_id)'
+            );
+            foreach ( $prepared as $slot ) {
+                if ( $this->interview_slot_overlaps(
+                    $connection,
+                    $type,
+                    $department_id,
+                    $slot['date'] . ' ' . $slot['start'],
+                    $slot['date'] . ' ' . $slot['end'],
+                    0
+                ) ) {
+                    throw new InvalidArgumentException( 'Slot pada tanggal yang sama tidak boleh bertumpang tindih dengan jadwal lain.' );
+                }
+                $insert->execute(
+                    [
+                        'start_at' => $slot['date'] . ' ' . $slot['start'],
+                        'end_at' => $slot['date'] . ' ' . $slot['end'],
+                        'timezone' => $timezone,
+                        'method' => $slot['method'],
+                        'location' => $slot['location'],
+                        'capacity' => $slot['capacity'],
+                        'interviewer' => $slot['interviewer'],
+                        'meeting_url' => $slot['meeting_url'],
+                        'type' => $type,
+                        'department_id' => $department_id,
+                    ]
+                );
+            }
+            $connection->commit();
+            return [ 'success' => true ];
+        } catch ( InvalidArgumentException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            return [ 'success' => false, 'error' => $exception->getMessage() ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_error( 'Interview schedule creation failed', $exception );
+            return [ 'success' => false, 'error' => 'Jadwal wawancara gagal disimpan ke Oracle.' ];
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $slot
+     * @return array{success: bool, error?: string}
+     */
+    public function update_interview_slot( string $slot_id, string $type, ?int $department_id, array $slot ): array {
+        if ( ! ctype_digit( $slot_id ) || '0' === $slot_id
+            || ! in_array( $type, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true )
+            || ( 'INTERVIEW_USER' === $type && ( ! $department_id || $department_id < 1 ) ) ) {
+            return [ 'success' => false, 'error' => 'Slot wawancara tidak valid.' ];
+        }
+        $normalized = $this->normalize_interview_slot(
+            (string) ( $slot['date'] ?? '' ),
+            $slot,
+            wp_timezone(),
+            new DateTimeImmutable( 'now', wp_timezone() )
+        );
+        if ( ! $normalized ) {
+            return [ 'success' => false, 'error' => 'Periksa waktu, kapasitas, metode, dan detail slot.' ];
+        }
+
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $connection->exec( 'LOCK TABLE HRS_SLOT_WAWANCARA IN EXCLUSIVE MODE' );
+            $lock = $connection->prepare(
+                'SELECT SLOT_WAWANCARA_ID FROM HRS_SLOT_WAWANCARA
+                 WHERE SLOT_WAWANCARA_ID = :slot_id AND JENIS_WAWANCARA = :type
+                   AND ((:is_hr = 1 AND DEPARTEMEN_ID IS NULL) OR DEPARTEMEN_ID = :department_id)
+                 FOR UPDATE'
+            );
+            $lock->execute(
+                [
+                    'slot_id' => (int) $slot_id,
+                    'type' => $type,
+                    'is_hr' => 'INTERVIEW_HR' === $type ? 1 : 0,
+                    'department_id' => $department_id,
+                ]
+            );
+            if ( false === $lock->fetchColumn() ) {
+                throw new InvalidArgumentException( 'Slot wawancara tidak ditemukan.' );
+            }
+            if ( $this->interview_slot_booking_count( $connection, (int) $slot_id ) > 0 ) {
+                throw new InvalidArgumentException( 'Slot yang sudah dipesan tidak dapat diubah.' );
+            }
+            if ( $this->interview_slot_overlaps(
+                $connection,
+                $type,
+                $department_id,
+                $normalized['date'] . ' ' . $normalized['start'],
+                $normalized['date'] . ' ' . $normalized['end'],
+                (int) $slot_id
+            ) ) {
+                throw new InvalidArgumentException( 'Slot bertumpang tindih dengan jadwal lain.' );
+            }
+            $update = $connection->prepare(
+                'UPDATE HRS_SLOT_WAWANCARA
+                 SET START_AT = TO_TIMESTAMP(:start_at, \'YYYY-MM-DD HH24:MI:SS\'),
+                     ENDS_AT = TO_TIMESTAMP(:end_at, \'YYYY-MM-DD HH24:MI:SS\'),
+                     ZONA_WAKTU = :timezone, METODE_WAWANCARA = :method, LOKASI = :location,
+                     KAPASITAS = :capacity, NAMA_PEWAWANCARA = :interviewer, MEETING_URL = :meeting_url
+                 WHERE SLOT_WAWANCARA_ID = :slot_id'
+            );
+            $update->execute(
+                [
+                    'start_at' => $normalized['date'] . ' ' . $normalized['start'],
+                    'end_at' => $normalized['date'] . ' ' . $normalized['end'],
+                    'timezone' => wp_timezone_string(),
+                    'method' => $normalized['method'],
+                    'location' => $normalized['location'],
+                    'capacity' => $normalized['capacity'],
+                    'interviewer' => $normalized['interviewer'],
+                    'meeting_url' => $normalized['meeting_url'],
+                    'slot_id' => (int) $slot_id,
+                ]
+            );
+            $connection->commit();
+            return [ 'success' => true ];
+        } catch ( InvalidArgumentException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            return [ 'success' => false, 'error' => $exception->getMessage() ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_error( 'Interview schedule update failed', $exception );
+            return [ 'success' => false, 'error' => 'Jadwal wawancara gagal diperbarui ke Oracle.' ];
+        }
+    }
+
+    /** @return array{success: bool, error?: string} */
+    public function delete_interview_slot( string $slot_id, string $type, ?int $department_id ): array {
+        if ( ! ctype_digit( $slot_id ) || '0' === $slot_id
+            || ! in_array( $type, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true )
+            || ( 'INTERVIEW_USER' === $type && ( ! $department_id || $department_id < 1 ) ) ) {
+            return [ 'success' => false, 'error' => 'Slot wawancara tidak valid.' ];
+        }
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $lock = $connection->prepare(
+                'SELECT SLOT_WAWANCARA_ID FROM HRS_SLOT_WAWANCARA
+                 WHERE SLOT_WAWANCARA_ID = :slot_id AND JENIS_WAWANCARA = :type
+                   AND ((:is_hr = 1 AND DEPARTEMEN_ID IS NULL) OR DEPARTEMEN_ID = :department_id)
+                 FOR UPDATE'
+            );
+            $lock->execute(
+                [
+                    'slot_id' => (int) $slot_id,
+                    'type' => $type,
+                    'is_hr' => 'INTERVIEW_HR' === $type ? 1 : 0,
+                    'department_id' => $department_id,
+                ]
+            );
+            if ( false === $lock->fetchColumn() ) {
+                throw new InvalidArgumentException( 'Slot wawancara tidak ditemukan.' );
+            }
+            if ( $this->interview_slot_booking_count( $connection, (int) $slot_id ) > 0 ) {
+                throw new InvalidArgumentException( 'Slot yang sudah dipesan tidak dapat dihapus.' );
+            }
+            $delete = $connection->prepare( 'DELETE FROM HRS_SLOT_WAWANCARA WHERE SLOT_WAWANCARA_ID = :slot_id' );
+            $delete->execute( [ 'slot_id' => (int) $slot_id ] );
+            $connection->commit();
+            return [ 'success' => true ];
+        } catch ( InvalidArgumentException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            return [ 'success' => false, 'error' => $exception->getMessage() ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_error( 'Interview schedule deletion failed', $exception );
+            return [ 'success' => false, 'error' => 'Jadwal wawancara gagal dihapus dari Oracle.' ];
+        }
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function get_applicant_interview_applications( string $applicant_id ): array {
+        if ( ! ctype_digit( $applicant_id ) || '0' === $applicant_id ) {
+            return [];
+        }
+        $this->last_error = null;
+        return $this->fetch_all(
+            'SELECT l.LAMARAN_ID AS "application_id",
+                    l.STATUS_TERKINI AS "stage",
+                    l.STATUS_AKHIR AS "final_status",
+                    NVL(d.JUDUL_PEKERJAAN, k.JUDUL_PEKERJAAN) AS "position",
+                    NVL(d.NAMA_DEPARTEMENT, k.NAMA_DEPARTEMEN) AS "department",
+                    CASE UPPER(TRIM(l.STATUS_TERKINI))
+                        WHEN \'INTERVIEW_HR\' THEN \'INTERVIEW_HR\'
+                        WHEN \'INTERVIEW_USER\' THEN \'INTERVIEW_USER\'
+                    END AS "interview_type"
+             FROM HRS_LAMARAN l
+             JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.DETAIL_LOWONGAN_ID = l.DETAIL_LOWONGAN_ID
+             LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.KOLOM_PENDAFTARAN_ID = d.KOLOM_PENDAFTARAN_ID
+             WHERE l.PROFILE_KANDIDAT_ID = :active_applicant_id
+               AND UPPER(TRIM(l.STATUS_TERKINI)) IN (\'INTERVIEW_HR\', \'INTERVIEW_USER\')
+               AND UPPER(TRIM(NVL(l.STATUS_AKHIR, \'IN_PROGRESS\'))) NOT IN
+                    (\'DITERIMA\', \'ACCEPTED\', \'DITOLAK\', \'REJECTED\')
+             UNION
+             SELECT l.LAMARAN_ID AS "application_id",
+                    l.STATUS_TERKINI AS "stage",
+                    l.STATUS_AKHIR AS "final_status",
+                    NVL(d.JUDUL_PEKERJAAN, k.JUDUL_PEKERJAAN) AS "position",
+                    NVL(d.NAMA_DEPARTEMENT, k.NAMA_DEPARTEMEN) AS "department",
+                    b.JENIS_WAWANCARA AS "interview_type"
+             FROM HRS_LAMARAN l
+             JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.DETAIL_LOWONGAN_ID = l.DETAIL_LOWONGAN_ID
+             LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.KOLOM_PENDAFTARAN_ID = d.KOLOM_PENDAFTARAN_ID
+             JOIN HRS_BOOKING_INTERVIEW b ON b.LAMARAN_ID = l.LAMARAN_ID
+             WHERE l.PROFILE_KANDIDAT_ID = :booked_applicant_id
+               AND UPPER(TRIM(b.STATUS_PEMESANAN)) = \'CONFIRMED\'
+             ORDER BY "application_id" DESC',
+            [
+                'active_applicant_id' => (int) $applicant_id,
+                'booked_applicant_id' => (int) $applicant_id,
+            ]
+        );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     * @deprecated Renamed to avoid duplicate method name. Was using legacy HRS_SLOT_WAWANCARA schema.
+     */
+    public function get_applicant_interview_slots_legacy( string $applicant_id, string $application_id, string $type ): array {
+        if ( ! ctype_digit( $applicant_id ) || ! ctype_digit( $application_id ) || '0' === $applicant_id || '0' === $application_id || ! in_array( $type, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) ) {
+            return [];
+        }
+        $applications = $this->fetch_all(
+            'SELECT l.STATUS_TERKINI AS "stage", d.DEPARTEMENT_ID AS "department_id"
+             FROM HRS_LAMARAN l
+             JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.DETAIL_LOWONGAN_ID = l.DETAIL_LOWONGAN_ID
+             WHERE l.LAMARAN_ID = :application_id AND l.PROFILE_KANDIDAT_ID = :applicant_id',
+            [ 'application_id' => (int) $application_id, 'applicant_id' => (int) $applicant_id ]
+        );
+        $application = $applications[0] ?? null;
+        if ( ! $application || strtoupper( trim( (string) $application['stage'] ) ) !== $type ) {
+            return [];
+        }
+
+        $this->last_error = null;
+        return $this->fetch_all(
+            'SELECT s.SLOT_WAWANCARA_ID AS "slot_id",
+                    TO_CHAR(s.START_AT, \'YYYY-MM-DD\') AS "slot_date",
+                    TO_CHAR(s.START_AT, \'HH24:MI\') AS "start_time",
+                    TO_CHAR(s.ENDS_AT, \'HH24:MI\') AS "end_time",
+                    s.ZONA_WAKTU AS "timezone",
+                    s.METODE_WAWANCARA AS "method",
+                    s.LOKASI AS "location",
+                    s.MEETING_URL AS "meeting_url",
+                    s.KAPASITAS AS "capacity",
+                    s.NAMA_PEWAWANCARA AS "interviewer",
+                    COUNT(CASE WHEN UPPER(TRIM(b.STATUS_PEMESANAN)) = \'CONFIRMED\' THEN 1 END) AS "booked"
+             FROM HRS_SLOT_WAWANCARA s
+             LEFT JOIN HRS_BOOKING_INTERVIEW b ON b.SLOT_WAWANCARA_ID = s.SLOT_WAWANCARA_ID
+             WHERE s.JENIS_WAWANCARA = :type
+               AND ((:is_hr = 1 AND s.DEPARTEMEN_ID IS NULL) OR s.DEPARTEMEN_ID = :department_id)
+               AND FROM_TZ(s.START_AT, s.ZONA_WAKTU) > SYSTIMESTAMP
+             GROUP BY s.SLOT_WAWANCARA_ID, s.START_AT, s.ENDS_AT, s.ZONA_WAKTU,
+                      s.METODE_WAWANCARA, s.LOKASI, s.MEETING_URL, s.KAPASITAS, s.NAMA_PEWAWANCARA
+             HAVING COUNT(CASE WHEN UPPER(TRIM(b.STATUS_PEMESANAN)) = \'CONFIRMED\' THEN 1 END) < s.KAPASITAS
+             ORDER BY s.START_AT, s.SLOT_WAWANCARA_ID',
+            [
+                'type' => $type,
+                'is_hr' => 'INTERVIEW_HR' === $type ? 1 : 0,
+                'department_id' => 'INTERVIEW_USER' === $type ? (int) $application['department_id'] : 0,
+            ]
+        );
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     * @deprecated Renamed to avoid duplicate method name. Was using legacy HRS_BOOKING_INTERVIEW schema.
+     */
+    public function get_applicant_interview_booking_legacy( string $applicant_id, string $application_id, string $type ): ?array {
+        if ( ! ctype_digit( $applicant_id ) || ! ctype_digit( $application_id ) || ! in_array( $type, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) ) {
+            return null;
+        }
+        $this->last_error = null;
+        $rows = $this->fetch_all(
+            'SELECT b.BOOKING_INTERVIEW_ID AS "booking_id",
+                    s.SLOT_WAWANCARA_ID AS "slot_id",
+                    TO_CHAR(s.START_AT, \'YYYY-MM-DD\') AS "slot_date",
+                    TO_CHAR(s.START_AT, \'HH24:MI\') AS "start_time",
+                    TO_CHAR(s.ENDS_AT, \'HH24:MI\') AS "end_time",
+                    s.ZONA_WAKTU AS "timezone",
+                    s.METODE_WAWANCARA AS "method",
+                    s.LOKASI AS "location",
+                    s.MEETING_URL AS "meeting_url",
+                    s.NAMA_PEWAWANCARA AS "interviewer"
+             FROM HRS_BOOKING_INTERVIEW b
+             JOIN HRS_SLOT_WAWANCARA s ON s.SLOT_WAWANCARA_ID = b.SLOT_WAWANCARA_ID
+             JOIN HRS_LAMARAN l ON l.LAMARAN_ID = b.LAMARAN_ID
+             WHERE l.PROFILE_KANDIDAT_ID = :applicant_id
+               AND b.LAMARAN_ID = :application_id
+               AND b.JENIS_WAWANCARA = :type
+               AND UPPER(TRIM(b.STATUS_PEMESANAN)) = \'CONFIRMED\'',
+            [
+                'applicant_id' => (int) $applicant_id,
+                'application_id' => (int) $application_id,
+                'type' => $type,
+            ]
+        );
+        return $rows[0] ?? null;
+    }
+
+    /** @return array{success: bool, error?: string} */
+    public function book_application_interview( string $applicant_id, string $application_id, string $slot_id, string $type ): array {
+        foreach ( [ $applicant_id, $application_id, $slot_id ] as $identifier ) {
+            if ( ! ctype_digit( $identifier ) || '0' === $identifier ) {
+                return [ 'success' => false, 'error' => 'Data lamaran atau jadwal tidak valid.' ];
+            }
+        }
+        if ( ! in_array( $type, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) ) {
+            return [ 'success' => false, 'error' => 'Tahap wawancara tidak valid.' ];
+        }
+
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $application_query = $connection->prepare(
+                'SELECT l.STATUS_TERKINI, l.STATUS_AKHIR, d.DEPARTEMENT_ID
+                 FROM HRS_LAMARAN l
+                 JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.DETAIL_LOWONGAN_ID = l.DETAIL_LOWONGAN_ID
+                 WHERE l.LAMARAN_ID = :application_id AND l.PROFILE_KANDIDAT_ID = :applicant_id
+                 FOR UPDATE OF l.LAMARAN_ID'
+            );
+            $application_query->execute(
+                [ 'application_id' => (int) $application_id, 'applicant_id' => (int) $applicant_id ]
+            );
+            $application = $application_query->fetch( PDO::FETCH_ASSOC );
+            if ( ! $application || strtoupper( trim( (string) $application['STATUS_TERKINI'] ) ) !== $type
+                || in_array( strtoupper( trim( (string) $application['STATUS_AKHIR'] ) ), [ 'DITERIMA', 'ACCEPTED', 'DITOLAK', 'REJECTED' ], true ) ) {
+                throw new InvalidArgumentException( 'Lamaran belum berada pada tahap wawancara ini atau sudah selesai.' );
+            }
+
+            $existing = $connection->prepare(
+                'SELECT COUNT(*) FROM HRS_BOOKING_INTERVIEW WHERE LAMARAN_ID = :application_id AND JENIS_WAWANCARA = :type'
+            );
+            $existing->execute( [ 'application_id' => (int) $application_id, 'type' => $type ] );
+            if ( 0 < (int) $existing->fetchColumn() ) {
+                throw new InvalidArgumentException( 'Lamaran ini sudah memiliki jadwal. Hubungi HR bila perlu bantuan.' );
+            }
+
+            $slot_query = $connection->prepare(
+                'SELECT SLOT_WAWANCARA_ID, KAPASITAS,
+                        CASE WHEN FROM_TZ(START_AT, ZONA_WAKTU) > SYSTIMESTAMP THEN 1 ELSE 0 END AS IS_FUTURE
+                 FROM HRS_SLOT_WAWANCARA
+                 WHERE SLOT_WAWANCARA_ID = :slot_id
+                   AND JENIS_WAWANCARA = :type
+                   AND ((:is_hr = 1 AND DEPARTEMEN_ID IS NULL) OR DEPARTEMEN_ID = :department_id)
+                 FOR UPDATE'
+            );
+            $slot_query->execute(
+                [
+                    'slot_id' => (int) $slot_id,
+                    'type' => $type,
+                    'is_hr' => 'INTERVIEW_HR' === $type ? 1 : 0,
+                    'department_id' => 'INTERVIEW_USER' === $type ? (int) $application['DEPARTEMENT_ID'] : 0,
+                ]
+            );
+            $slot = $slot_query->fetch( PDO::FETCH_ASSOC );
+            if ( ! $slot || 1 !== (int) $slot['IS_FUTURE'] ) {
+                throw new InvalidArgumentException( 'Jadwal tidak tersedia atau sudah lewat.' );
+            }
+
+            $booking_count = $connection->prepare(
+                'SELECT COUNT(*) FROM HRS_BOOKING_INTERVIEW
+                 WHERE SLOT_WAWANCARA_ID = :slot_id AND UPPER(TRIM(STATUS_PEMESANAN)) = :status'
+            );
+            $booking_count->execute( [ 'slot_id' => (int) $slot_id, 'status' => 'CONFIRMED' ] );
+            if ( (int) $booking_count->fetchColumn() >= (int) $slot['KAPASITAS'] ) {
+                throw new InvalidArgumentException( 'Jadwal baru saja penuh. Silakan pilih slot lain.' );
+            }
+
+            $insert = $connection->prepare(
+                'INSERT INTO HRS_BOOKING_INTERVIEW
+                    (LAMARAN_ID, JENIS_WAWANCARA, SLOT_WAWANCARA_ID, STATUS_PEMESANAN, WAKTU_PEMESANAN)
+                 VALUES (:application_id, :type, :slot_id, :status, CURRENT_TIMESTAMP)'
+            );
+            $insert->execute(
+                [
+                    'application_id' => (int) $application_id,
+                    'type' => $type,
+                    'slot_id' => (int) $slot_id,
+                    'status' => 'CONFIRMED',
+                ]
+            );
+            $connection->commit();
+            return [ 'success' => true ];
+        } catch ( InvalidArgumentException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            return [ 'success' => false, 'error' => $exception->getMessage() ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_error( 'Interview booking failed', $exception );
+            return [ 'success' => false, 'error' => 'Booking wawancara gagal disimpan. Silakan coba kembali.' ];
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $slot
+     * @return array{date: string, start: string, end: string, method: string, location: string, meeting_url: string, interviewer: string, capacity: int}|null
+     */
+    private function normalize_interview_slot( string $date, array $slot, DateTimeZone $timezone, DateTimeImmutable $now ): ?array {
+        $start = trim( (string) ( $slot['start'] ?? '' ) );
+        $end = trim( (string) ( $slot['end'] ?? '' ) );
+        $start_at = DateTimeImmutable::createFromFormat( '!Y-m-d H:i', $date . ' ' . $start, $timezone );
+        $end_at = DateTimeImmutable::createFromFormat( '!Y-m-d H:i', $date . ' ' . $end, $timezone );
+        $capacity = filter_var( $slot['capacity'] ?? null, FILTER_VALIDATE_INT );
+        $mode = strtoupper( trim( (string) ( $slot['mode'] ?? '' ) ) );
+        if ( ! $start_at || ! $end_at || $start_at->format( 'Y-m-d H:i' ) !== $date . ' ' . $start
+            || $end_at->format( 'Y-m-d H:i' ) !== $date . ' ' . $end || $end_at <= $start_at
+            || $start_at <= $now || false === $capacity || $capacity < 1 || $capacity > 100
+            || ! in_array( $mode, [ 'ONLINE', 'OFFLINE' ], true ) ) {
+            return null;
+        }
+
+        $location = trim( sanitize_text_field( (string) ( 'ONLINE' === $mode ? ( $slot['platform'] ?? '' ) : ( $slot['location'] ?? '' ) ) ) );
+        $meeting_url = 'ONLINE' === $mode ? esc_url_raw( trim( (string) ( $slot['meeting_url'] ?? '' ) ), [ 'http', 'https' ] ) : '';
+        $interviewer = trim( sanitize_text_field( (string) ( $slot['interviewer'] ?? '' ) ) );
+        if ( '' === $location || 255 < strlen( $location ) || 255 < strlen( $interviewer )
+            || ( 'ONLINE' === $mode && ( '' === $meeting_url || ! wp_http_validate_url( $meeting_url ) ) ) ) {
+            return null;
+        }
+
+        return [
+            'date' => $date,
+            'start' => $start_at->format( 'H:i:00' ),
+            'end' => $end_at->format( 'H:i:00' ),
+            'method' => $mode,
+            'location' => $location,
+            'meeting_url' => $meeting_url,
+            'interviewer' => $interviewer,
+            'capacity' => (int) $capacity,
+        ];
+    }
+
+    private function interview_slot_overlaps( PDO $connection, string $type, ?int $department_id, string $start, string $end, int $exclude_slot_id ): bool {
+        $query = $connection->prepare(
+            'SELECT COUNT(*) FROM HRS_SLOT_WAWANCARA
+             WHERE JENIS_WAWANCARA = :type AND
+                   ((:is_hr = 1 AND DEPARTEMEN_ID IS NULL) OR DEPARTEMEN_ID = :department_id)
+               AND START_AT < TO_TIMESTAMP(:end_at, \'YYYY-MM-DD HH24:MI:SS\')
+               AND ENDS_AT > TO_TIMESTAMP(:start_at, \'YYYY-MM-DD HH24:MI:SS\')
+               AND SLOT_WAWANCARA_ID <> :exclude_slot_id'
+        );
+        $query->execute(
+            [
+                'type' => $type,
+                'is_hr' => 'INTERVIEW_HR' === $type ? 1 : 0,
+                'department_id' => $department_id,
+                'end_at' => $end,
+                'start_at' => $start,
+                'exclude_slot_id' => $exclude_slot_id,
+            ]
+        );
+        return 0 < (int) $query->fetchColumn();
+    }
+
+    private function interview_slot_booking_count( PDO $connection, int $slot_id ): int {
+        $query = $connection->prepare(
+            'SELECT COUNT(*) FROM HRS_BOOKING_INTERVIEW
+             WHERE SLOT_WAWANCARA_ID = :slot_id AND UPPER(TRIM(STATUS_PEMESANAN)) = :status'
+        );
+        $query->execute( [ 'slot_id' => $slot_id, 'status' => 'CONFIRMED' ] );
+        return (int) $query->fetchColumn();
+    }
+
     /** @return array<int, array{date: string, status: string, slots: array<int, array<string, string>>}>
      */
     public function get_interview_availability( string $token = '' ): array {
@@ -5085,6 +7233,105 @@ class Recruitment_Database {
         return null !== $this->last_error;
     }
 
+    public function is_application_interview_link_available(): ?bool {
+        if ( null === $this->user_interview_application_link_exists ) {
+            $this->has_user_interview_application_link();
+        }
+
+        return $this->user_interview_application_link_exists;
+    }
+
+    /**
+     * @return array<string, bool>|null
+     */
+    private function get_proctoring_report_columns(): ?array {
+        if ( null !== $this->proctoring_report_columns ) {
+            return $this->proctoring_report_columns;
+        }
+
+        $columns = [
+            'application_id' => false,
+            'assessment_stage' => false,
+            'client_ip' => false,
+            'client_user_agent' => false,
+            'detection_duration_ms' => false,
+            'detection_confidence' => false,
+            'severity' => false,
+            'repeat_count' => false,
+            'warning_level' => false,
+            'warning_at' => false,
+            'review_status' => false,
+            'reviewed_by' => false,
+            'reviewed_at' => false,
+            'review_note' => false,
+        ];
+        $event_column_keys = [
+            'ASSESSMENT_STAGE' => 'assessment_stage',
+            'CLIENT_IP' => 'client_ip',
+            'CLIENT_USER_AGENT' => 'client_user_agent',
+            'DETECTION_DURATION_MS' => 'detection_duration_ms',
+            'DETECTION_CONFIDENCE' => 'detection_confidence',
+            'SEVERITY' => 'severity',
+            'REPEAT_COUNT' => 'repeat_count',
+            'WARNING_LEVEL' => 'warning_level',
+            'WARNING_AT' => 'warning_at',
+            'REVIEW_STATUS' => 'review_status',
+            'REVIEWED_BY' => 'reviewed_by',
+            'REVIEWED_AT' => 'reviewed_at',
+            'REVIEW_NOTE' => 'review_note',
+        ];
+        try {
+            $statement = $this->get_connection()->prepare(
+                'SELECT TABLE_NAME, COLUMN_NAME FROM USER_TAB_COLUMNS
+                 WHERE (TABLE_NAME = :session_table AND COLUMN_NAME = :application_column)
+                    OR (TABLE_NAME = :event_table AND COLUMN_NAME IN (
+                        :stage_column, :ip_column, :user_agent_column, :duration_column, :confidence_column,
+                        :severity_column, :repeat_column, :warning_level_column, :warning_at_column,
+                        :review_status_column, :reviewed_by_column, :reviewed_at_column, :review_note_column
+                    ))'
+            );
+            $statement->execute(
+                [
+                    'session_table' => 'HRS_PSY_PROCTOR_SESSIONS',
+                    'application_column' => 'APPLICATION_ID',
+                    'event_table' => 'HRS_PSY_PROCTOR_EVENTS',
+                    'stage_column' => 'ASSESSMENT_STAGE',
+                    'ip_column' => 'CLIENT_IP',
+                    'user_agent_column' => 'CLIENT_USER_AGENT',
+                    'duration_column' => 'DETECTION_DURATION_MS',
+                    'confidence_column' => 'DETECTION_CONFIDENCE',
+                    'severity_column' => 'SEVERITY',
+                    'repeat_column' => 'REPEAT_COUNT',
+                    'warning_level_column' => 'WARNING_LEVEL',
+                    'warning_at_column' => 'WARNING_AT',
+                    'review_status_column' => 'REVIEW_STATUS',
+                    'reviewed_by_column' => 'REVIEWED_BY',
+                    'reviewed_at_column' => 'REVIEWED_AT',
+                    'review_note_column' => 'REVIEW_NOTE',
+                ]
+            );
+            while ( false !== ( $column = $statement->fetch( PDO::FETCH_ASSOC ) ) ) {
+                if ( 'HRS_PSY_PROCTOR_SESSIONS' === $column['TABLE_NAME'] ) {
+                    $columns['application_id'] = true;
+                } elseif ( isset( $event_column_keys[ $column['COLUMN_NAME'] ] ) ) {
+                    $columns[ $event_column_keys[ $column['COLUMN_NAME'] ] ] = true;
+                }
+            }
+            $this->proctoring_report_columns = $columns;
+            if ( ! $columns['application_id'] || ! $columns['assessment_stage']
+                || ! $columns['client_ip'] || ! $columns['client_user_agent']
+                || ! $columns['review_status'] || ! $columns['detection_duration_ms'] ) {
+                error_log( 'Recruitment Oracle schema warning: Psychotest report migrations 021/022/023 are incomplete; unavailable session links, event metadata, or review state will be omitted from reports.' );
+            }
+
+            return $columns;
+        } catch ( PDOException | RuntimeException $exception ) {
+            $this->last_error = $exception->getMessage();
+            $this->log_error( 'Psychotest report schema lookup failed', $exception );
+            return null;
+        }
+    }
+
     private function get_application_token_column_expression(): ?string {
         if ( null === $this->application_token_column_exists ) {
             try {
@@ -5101,6 +7348,118 @@ class Recruitment_Database {
         }
 
         return $this->application_token_column_exists ? 'l.application_token' : 'CAST(NULL AS VARCHAR2(64))';
+    }
+
+    private function has_user_interview_application_link(): bool {
+        if ( null === $this->user_interview_application_link_exists ) {
+            try {
+                $statement = $this->get_connection()->prepare(
+                    'SELECT COUNT(*) FROM USER_TAB_COLUMNS WHERE TABLE_NAME = :table_name AND COLUMN_NAME = :column_name'
+                );
+                $statement->execute( [ 'table_name' => 'HRS_HASIL_WAWANCARA_USER', 'column_name' => 'LAMARAN_ID' ] );
+                $this->user_interview_application_link_exists = 0 < (int) $statement->fetchColumn();
+                if ( ! $this->user_interview_application_link_exists ) {
+                    error_log( 'Recruitment Oracle schema warning: User interview results are omitted because HRS_HASIL_WAWANCARA_USER.LAMARAN_ID is unavailable.' );
+                }
+            } catch ( PDOException | RuntimeException $exception ) {
+                $this->log_error( 'User interview application-link schema lookup failed', $exception );
+                return false;
+            }
+        }
+
+        return $this->user_interview_application_link_exists;
+    }
+
+    private function has_interview_schedule_table(): bool {
+        if ( null === $this->interview_schedule_table_exists ) {
+            try {
+                $statement = $this->get_connection()->prepare(
+                    'SELECT COUNT(*) FROM USER_TABLES WHERE TABLE_NAME = :table_name'
+                );
+                $statement->execute( [ 'table_name' => 'HRS_INTERVIEW_SCHEDULE' ] );
+                $this->interview_schedule_table_exists = 0 < (int) $statement->fetchColumn();
+                if ( ! $this->interview_schedule_table_exists ) {
+                    $this->last_error = 'HRS_INTERVIEW_SCHEDULE is unavailable; apply migration 018 before using interview schedules.';
+                    error_log( 'Recruitment Oracle schema warning: HRS_INTERVIEW_SCHEDULE is unavailable; interview schedule reads and writes are disabled.' );
+                }
+            } catch ( PDOException | RuntimeException $exception ) {
+                $this->log_error( 'Interview schedule schema lookup failed', $exception );
+                return false;
+            }
+        }
+        if ( ! $this->interview_schedule_table_exists ) {
+            $this->last_error = 'HRS_INTERVIEW_SCHEDULE is unavailable; apply migration 018 before using interview schedules.';
+        }
+
+        return $this->interview_schedule_table_exists;
+    }
+
+    private function has_interview_schedule_interviewer_column(): bool {
+        if ( null === $this->interview_schedule_interviewer_column_exists ) {
+            try {
+                $statement = $this->get_connection()->prepare(
+                    'SELECT COUNT(*) FROM USER_TAB_COLUMNS WHERE TABLE_NAME = :table_name AND COLUMN_NAME = :column_name'
+                );
+                $statement->execute( [ 'table_name' => 'HRS_INTERVIEW_SCHEDULE', 'column_name' => 'INTERVIEWER_NAME' ] );
+                $this->interview_schedule_interviewer_column_exists = 0 < (int) $statement->fetchColumn();
+                if ( ! $this->interview_schedule_interviewer_column_exists ) {
+                    error_log( 'Recruitment Oracle schema warning: HRS_INTERVIEW_SCHEDULE.INTERVIEWER_NAME is unavailable; schedule reads will omit interviewer names and writes will be rejected until migration 020 is applied.' );
+                }
+            } catch ( PDOException | RuntimeException $exception ) {
+                $this->log_error( 'Interview schedule interviewer schema lookup failed', $exception );
+                return false;
+            }
+        }
+        return $this->interview_schedule_interviewer_column_exists;
+    }
+
+    private function has_interview_booking_table(): bool {
+        if ( null === $this->interview_booking_table_exists ) {
+            try {
+                $statement = $this->get_connection()->prepare(
+                    'SELECT COUNT(*) FROM USER_TABLES WHERE TABLE_NAME = :table_name'
+                );
+                $statement->execute( [ 'table_name' => 'HRS_INTERVIEW_BOOKING' ] );
+                $this->interview_booking_table_exists = 0 < (int) $statement->fetchColumn();
+            } catch ( PDOException | RuntimeException $exception ) {
+                $this->interview_booking_table_exists = false;
+                $this->log_error( 'Interview booking schema lookup failed', $exception );
+            }
+        }
+
+        return $this->interview_booking_table_exists;
+    }
+
+    private function has_psychotest_candidate_score_columns(): bool {
+        if ( null === $this->psychotest_candidate_score_columns_exist ) {
+            try {
+                $statement = $this->get_connection()->prepare(
+                    'SELECT COUNT(*) FROM USER_TAB_COLUMNS WHERE TABLE_NAME = :table_name AND COLUMN_NAME IN (:candidate_column, :score_column, :date_column)'
+                );
+                $statement->execute(
+                    [
+                        'table_name' => 'HRS_HASIL_TES_PSIKOLOGI',
+                        'candidate_column' => 'KANDIDAT_ID',
+                        'score_column' => 'NILAI',
+                        'date_column' => 'DIKUMPULKAN_PADA',
+                    ]
+                );
+                $this->psychotest_candidate_score_columns_exist = 3 === (int) $statement->fetchColumn();
+            } catch ( PDOException | RuntimeException $exception ) {
+                $this->psychotest_candidate_score_columns_exist = false;
+                $this->log_error( 'Psychotest score schema lookup failed', $exception );
+            }
+        }
+
+        return $this->psychotest_candidate_score_columns_exist;
+    }
+
+    private function is_valid_oracle_date( string $date ): bool {
+        $parsed = DateTimeImmutable::createFromFormat( '!Y-m-d', $date );
+        $errors = DateTimeImmutable::getLastErrors();
+        return $parsed instanceof DateTimeImmutable
+            && $parsed->format( 'Y-m-d' ) === $date
+            && ( false === $errors || ( 0 === $errors['warning_count'] && 0 === $errors['error_count'] ) );
     }
 
     /** @return array<string, string>|null */
@@ -5436,7 +7795,7 @@ class Recruitment_Database {
 
                 private function question_belongs_to_test( int $test_id, int $question_id ): bool {
                     $rows = $this->fetch_all(
-                        'SELECT COUNT(*) AS "question_count" FROM HRS_PERTANYAAN_PSIKOTES WHERE PERTANYAAN_PSIKOTES_ID = :question_id AND TES_PSIKOLOGI_ID = :test_id',
+                        'SELECT COUNT(*) AS "question_count" FROM HRS_PERTANYAAN_PSIKOTES WHERE PEERTANYAAN_PSIKOTES_ID = :question_id AND TES_PSIKOLOGI_ID = :test_id',
                         [ 'question_id' => $question_id, 'test_id' => $test_id ]
                     );
                     return 1 === (int) ( $rows[0]['question_count'] ?? 0 );
@@ -5550,7 +7909,7 @@ class Recruitment_Database {
                                 $parameters[ $placeholder ] = $response_id;
                             }
                             $check = $connection->prepare(
-                                'SELECT COUNT(*) AS "response_count", NVL(SUM(r.NILAI_DIPEROLEH), 0) AS "score" FROM HRS_RESPON_PSIKOTES r JOIN HRS_PERTANYAAN_PSIKOTES q ON q.PERTANYAAN_PSIKOTES_ID = r.PERTANYAAN_PSIKOTES_ID WHERE r.KANDIDAT_ID = :candidate_id AND q.TES_PSIKOLOGI_ID = :test_id AND r.RESPON_PSIKOTES_ID IN (' . implode( ', ', $placeholders ) . ') AND r.HASIL_TES_PSIKOLOGI_ID IS NULL'
+                                'SELECT COUNT(*) AS "response_count", NVL(SUM(r.NILAI_DIPEROLEH), 0) AS "score" FROM HRS_RESPON_PSIKOTES r JOIN HRS_PERTANYAAN_PSIKOTES q ON q.PEERTANYAAN_PSIKOTES_ID = r.PERTANYAAN_PSIKOTES_ID WHERE r.KANDIDAT_ID = :candidate_id AND q.TES_PSIKOLOGI_ID = :test_id AND r.RESPON_PSIKOTES_ID IN (' . implode( ', ', $placeholders ) . ') AND r.HASIL_TES_PSIKOLOGI_ID IS NULL'
                             );
                             $check->execute( $parameters );
                             $record = $check->fetch( PDO::FETCH_ASSOC );
@@ -5563,7 +7922,7 @@ class Recruitment_Database {
                         }
 
                         $insert = $connection->prepare(
-                            'INSERT INTO HRS_HASIL_TES_PSIKOLOGI (KANDIDAT_ID, MULAI_PADA, DIKUMPULKAN_PADA, NILAI, TES_PSIKOLOGI_ID) VALUES (:candidate_id, TO_TIMESTAMP(:started_at, \'YYYY-MM-DD HH24:MI:SS\'), CURRENT_TIMESTAMP, :score, :test_id) RETURNING HASIL_TES_PSIKOLOGI_ID INTO :result_id'
+                            'INSERT INTO HRS_HASIL_TES_PSIKOLOGI (KANDIDAT_ID, MULAI_PADA, DIKUMPULKAN_PADA, NILAI, TES_PSIKOLOGI_ID) VALUES (:candidate_id, TO_TIMESTAMP(:started_at, \'YYYY-MM-DD HH24:MI:SS\'), CURRENT_TIMESTAMP, :score, :test_id) RETURNING HASIL_TES_PSIKOLOGI INTO :result_id'
                         );
                         $result_id = 0;
                         $insert->bindValue( ':candidate_id', $candidate_id, PDO::PARAM_INT );

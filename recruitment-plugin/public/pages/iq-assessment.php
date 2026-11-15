@@ -1,7 +1,8 @@
 <?php
 $view = ( new Recruitment_IQ_Assessment() )->get_page_view();
-$preparation_url = recruitment_get_public_url( 'psychotest-preparation', [ 'test' => 'iq' ] );
-$psychotest_home_url = recruitment_get_public_url( 'psychotest' );
+$application_id = recruitment_get_psychotest_application_id();
+$psychotest_home_args = $application_id > 0 ? [ 'application_id' => $application_id ] : [];
+$psychotest_home_url = recruitment_get_public_url( 'psychotest', $psychotest_home_args );
 $test_ready = ! empty( $view['ready'] ) && empty( $view['error'] );
 $questions = (array) ( $view['questions'] ?? [] );
 $question_count = count( $questions );
@@ -48,9 +49,8 @@ foreach ( $questions as $question_index => $question ) {
             <?php elseif ( empty( $view['ready'] ) ) : ?>
                 <section class="daw-psych-test-card">
                     <h1>Tes IQ belum dimulai</h1>
-                    <p>Siapkan perangkat dan koneksi internet sebelum memulai.</p>
-                    <a class="daw-psych-test-button" href="<?= esc_url( $preparation_url ) ?>">Mulai persiapan</a>
-                    <a class="daw-psych-test-secondary" href="<?= esc_url( $psychotest_home_url ) ?>">Kembali ke daftar tes</a>
+                    <p>Persiapan Assesment dilakukan satu kali dari beranda psikotes sebelum tes pertama.</p>
+                    <a class="daw-psych-test-button" href="<?= esc_url( $psychotest_home_url ) ?>">Kembali ke beranda psikotes</a>
                 </section>
             <?php else : ?>
                 <div class="daw-exam-layout">
@@ -68,7 +68,7 @@ foreach ( $questions as $question_index => $question ) {
                                 <p class="daw-iq-assessment__save-status" data-iq-save-status role="status">Jawaban disimpan otomatis.</p>
                             </div>
                             <p class="daw-exam-card__instructions"><?= esc_html( $view['test']['instructions'] ) ?></p>
-                            <form method="post" action="<?= esc_url( recruitment_get_public_url( 'psych-iq' ) ) ?>" data-iq-form>
+                            <form method="post" action="<?= esc_url( recruitment_get_public_url( 'psych-iq', $psychotest_home_args ) ) ?>" data-iq-form>
                                 <?php wp_nonce_field( 'recruitment_iq_advance' ); ?>
                                 <input type="hidden" name="iq_action" value="advance">
                                 <div class="daw-iq-assessment__questions">
@@ -117,7 +117,7 @@ foreach ( $questions as $question_index => $question ) {
                             </nav>
                         </section>
                     </div>
-                    <?php require recruitment_get_plugin_path( 'public/components/psychotest-camera-placeholder.php' ); ?>
+                    <?php require recruitment_get_plugin_path( 'public/components/psychotest-proctoring-watch.php' ); ?>
                 </div>
             <?php endif; ?>
         </div>

@@ -277,6 +277,189 @@ function recruitment_get_public_url( string $screen = 'careers', array $args = [
     return add_query_arg( array_merge( [ 'recruitment_page' => sanitize_key( $screen ) ], $args ), $base_url );
 }
 
+/**
+ * Get the public announcement for a selection decision recorded in the timeline.
+ *
+ * @param array<string, mixed> $event
+ * @param array<string, mixed>|null $previous_event
+ * @return array{stage_label: string, outcome: string, next_page: string, next_label: string, awaiting_final_decision: bool, is_final: bool}|null
+ */
+function recruitment_get_application_stage_announcement( array $event, ?array $previous_event = null ): ?array {
+    $normalize = static function ( $value ): string {
+        return trim( strtoupper( (string) preg_replace( '/[^a-z0-9]+/i', '_', (string) $value ) ), '_' );
+    };
+    $stage_key = $normalize( $event['stage'] ?? '' );
+    $status_key = $normalize( $event['status'] ?? '' );
+    $note_key = $normalize( $event['note'] ?? '' );
+    $is_final_stage = 'FINAL' === $stage_key
+        || false !== strpos( $stage_key, 'FINAL_DECISION' )
+        || false !== strpos( $stage_key, 'KEPUTUSAN_AKHIR' )
+        || false !== strpos( $stage_key, 'KEPUTUSAN_FINAL' );
+
+    if ( $is_final_stage ) {
+        if ( ! in_array( $status_key, [ 'DITERIMA', 'ACCEPTED', 'DITOLAK', 'REJECTED' ], true ) ) {
+            return null;
+        }
+
+        return [
+            'stage_label' => 'Keputusan Akhir',
+            'outcome' => in_array( $status_key, [ 'DITERIMA', 'ACCEPTED' ], true ) ? 'passed' : 'failed',
+            'next_page' => '',
+            'next_label' => '',
+            'awaiting_final_decision' => false,
+            'is_final' => true,
+        ];
+    }
+
+    $stage_labels = [
+        'ADMINISTRASI' => 'Seleksi Administrasi',
+        'SCREENING' => 'Seleksi Administrasi',
+        'SUBMITTED' => 'Seleksi Administrasi',
+        'PSIKOTES' => 'Psikotes',
+        'INTERVIEW_HR' => 'Wawancara HR',
+        'INTERVIEW_USER' => 'Wawancara User',
+    ];
+
+    if ( 'TIDAK_LOLOS_WAWANCARA_USER' === $status_key ) {
+        return [
+            'stage_label' => 'Wawancara User',
+            'outcome' => 'failed',
+            'next_page' => '',
+            'next_label' => '',
+            'awaiting_final_decision' => false,
+            'is_final' => false,
+        ];
+    }
+
+    if ( 'LOLOS_WAWANCARA_USER' === $status_key ) {
+        return [
+            'stage_label' => 'Wawancara User',
+            'outcome' => 'passed',
+            'next_page' => '',
+            'next_label' => '',
+            'awaiting_final_decision' => true,
+            'is_final' => false,
+        ];
+    }
+
+    if (
+        'INTERVIEW_USER' === $stage_key
+        && 'INTERVIEW_USER' === $status_key
+        && false !== strpos( $note_key, 'HASIL_WAWANCARA_HR_LOLOS' )
+        && false === strpos( $note_key, 'TIDAK_LOLOS' )
+    ) {
+        return [
+            'stage_label' => 'Wawancara HR',
+            'outcome' => 'passed',
+            'next_page' => 'interview-booking',
+            'next_label' => 'Lanjut ke Jadwal Wawancara User',
+            'awaiting_final_decision' => false,
+            'is_final' => false,
+        ];
+    }
+
+    if ( 'DITOLAK' === $status_key && false !== strpos( $note_key, 'HASIL_WAWANCARA_HR' ) ) {
+        return [
+            'stage_label' => 'Wawancara HR',
+            'outcome' => 'failed',
+            'next_page' => '',
+            'next_label' => '',
+            'awaiting_final_decision' => false,
+            'is_final' => false,
+        ];
+    }
+
+    if ( 'DITOLAK' === $status_key && false !== strpos( $note_key, 'HASIL_SELEKSI_TIDAK_LOLOS' ) ) {
+        return [
+            'stage_label' => $stage_labels[ $stage_key ] ?? 'Seleksi',
+            'outcome' => 'failed',
+            'next_page' => '',
+            'next_label' => '',
+            'awaiting_final_decision' => false,
+            'is_final' => false,
+        ];
+    }
+
+    if ( false === strpos( $note_key, 'LOLOS_KE_TAHAP' ) ) {
+        return null;
+    }
+
+    $next_steps = [
+        'PSIKOTES' => [ 'Seleksi Administrasi', 'psychotest-preparation', 'Lanjut ke Persiapan Psikotes' ],
+        'INTERVIEW_HR' => [ 'Psikotes', 'interview-booking', 'Lanjut ke Jadwal Wawancara HR' ],
+        'INTERVIEW_USER' => [ 'Wawancara HR', 'interview-booking', 'Lanjut ke Jadwal Wawancara User' ],
+        'FINAL' => [ 'Wawancara User', '', '' ],
+    ];
+    if ( ! isset( $next_steps[ $status_key ] ) ) {
+        return null;
+    }
+
+    $previous_stage_key = $normalize( $previous_event['stage'] ?? '' );
+
+    return [
+        'stage_label' => $stage_labels[ $previous_stage_key ] ?? $next_steps[ $status_key ][0],
+        'outcome' => 'passed',
+        'next_page' => $next_steps[ $status_key ][1],
+        'next_label' => $next_steps[ $status_key ][2],
+        'awaiting_final_decision' => 'FINAL' === $status_key,
+        'is_final' => false,
+    ];
+}
+
+function recruitment_application_result_event_key( array $event ): string {
+    $event_values = array_map(
+        static fn ( string $field ): string => (string) ( $event[ $field ] ?? '' ),
+        [ 'stage', 'status', 'changed_at', 'note' ]
+    );
+
+    return hash( 'sha256', implode( "\0", $event_values ) );
+}
+
+function recruitment_application_result_viewed_option_name( string $candidate_id, string $application_id, string $event_key ): ?string {
+    if (
+        ! ctype_digit( $candidate_id )
+        || '0' === $candidate_id
+        || ! ctype_digit( $application_id )
+        || '0' === $application_id
+        || ! preg_match( '/^[a-f0-9]{64}$/', $event_key )
+    ) {
+        return null;
+    }
+
+    return 'daw_result_viewed_' . substr( hash( 'sha256', $candidate_id . "\0" . $application_id . "\0" . $event_key ), 0, 40 );
+}
+
+function recruitment_has_viewed_application_result( string $candidate_id, string $application_id, string $event_key ): bool {
+    $option_name = recruitment_application_result_viewed_option_name( $candidate_id, $application_id, $event_key );
+
+    return null !== $option_name && false !== get_option( $option_name, false );
+}
+
+function recruitment_mark_application_result_viewed( string $candidate_id, string $application_id, string $event_key ): bool {
+    $option_name = recruitment_application_result_viewed_option_name( $candidate_id, $application_id, $event_key );
+    if ( null === $option_name ) {
+        return false;
+    }
+
+    return add_option( $option_name, time(), '', false );
+}
+
+/**
+ * Check whether any timeline event records a completed User Department interview.
+ *
+ * @param array<int, array<string, mixed>> $timeline
+ */
+function recruitment_has_user_interview_result( array $timeline ): bool {
+    foreach ( $timeline as $event ) {
+        $status_key = strtoupper( trim( (string) preg_replace( '/[^a-z0-9]+/i', '_', (string) ( $event['status'] ?? '' ) ), '_' ) );
+        if ( in_array( $status_key, [ 'LOLOS_WAWANCARA_USER', 'TIDAK_LOLOS_WAWANCARA_USER' ], true ) ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 function recruitment_get_department_login_url( array $args = [] ): string {
     $page_id = absint( get_option( 'recruitment_department_login_page_id', 0 ) );
     $base_url = $page_id ? get_permalink( $page_id ) : recruitment_get_public_url( 'portal' );
@@ -311,7 +494,10 @@ function recruitment_logout_form( string $label, string $redirect_url, string $c
         return '';
     }
 
-    if ( recruitment_is_applicant_user() ) {
+    $is_applicant = recruitment_is_applicant_user()
+        || 'service_unavailable' === recruitment_get_applicant_session_error();
+
+    if ( $is_applicant ) {
         $redirect_url = recruitment_get_public_url( 'applicant-login' );
     } elseif ( home_url( '/' ) === untrailingslashit( $redirect_url ) . '/' ) {
         $account_type = is_user_logged_in() ? (string) get_user_meta( get_current_user_id(), 'daw_oracle_account_type', true ) : '';
@@ -325,9 +511,9 @@ function recruitment_logout_form( string $label, string $redirect_url, string $c
     ob_start();
     ?>
     <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" class="<?= esc_attr( $class ) ?>">
-        <input type="hidden" name="action" value="<?= esc_attr( recruitment_is_applicant_user() ? 'daw_applicant_logout' : 'daw_logout' ) ?>">
+        <input type="hidden" name="action" value="<?= esc_attr( $is_applicant ? 'daw_applicant_logout' : 'daw_logout' ) ?>">
         <input type="hidden" name="redirect_to" value="<?= esc_attr( $redirect_url ) ?>">
-        <?php wp_nonce_field( recruitment_is_applicant_user() ? 'daw_applicant_logout' : 'daw_logout' ); ?>
+        <?php wp_nonce_field( $is_applicant ? 'daw_applicant_logout' : 'daw_logout' ); ?>
         <button type="submit" class="<?= esc_attr( $class ) ?>"><?= esc_html( $label ) ?></button>
     </form>
     <?php
@@ -336,6 +522,23 @@ function recruitment_logout_form( string $label, string $redirect_url, string $c
 
 function recruitment_is_applicant_user(): bool {
     return null !== recruitment_get_current_applicant();
+}
+
+function recruitment_get_applicant_session_error(): string {
+    return (string) ( $GLOBALS['daw_applicant_session_error'] ?? '' );
+}
+
+function recruitment_abort_if_applicant_session_unavailable(): void {
+    if ( 'service_unavailable' !== recruitment_get_applicant_session_error() ) {
+        return;
+    }
+
+    $message = __( 'Akun pelamar sedang tidak dapat diverifikasi. Sesi Anda tetap tersimpan; silakan coba muat ulang halaman beberapa saat lagi.', 'recruitment-plugin' );
+    if ( function_exists( 'wp_doing_ajax' ) && wp_doing_ajax() ) {
+        wp_send_json_error( [ 'message' => $message ], 503 );
+    }
+
+    wp_die( esc_html( $message ), esc_html__( 'Layanan akun sementara tidak tersedia', 'recruitment-plugin' ), [ 'response' => 503 ] );
 }
 
 /**
@@ -354,6 +557,7 @@ function recruitment_get_current_applicant(): ?array {
     }
     $cached_token = $token;
     $cached_applicant = null;
+    $GLOBALS['daw_applicant_session_error'] = '';
     if ( ! preg_match( '/^[a-f0-9]{64}$/', $token ) ) {
         return null;
     }
@@ -364,8 +568,12 @@ function recruitment_get_current_applicant(): ?array {
     }
     $result = ( new Recruitment_Database() )->get_applicant_account( (string) $session['login_id'] );
     if ( empty( $result['success'] ) ) {
-        delete_transient( $session_key );
-        recruitment_clear_applicant_session_cookie();
+        if ( 'service_unavailable' === (string) ( $result['error'] ?? '' ) ) {
+            $GLOBALS['daw_applicant_session_error'] = 'service_unavailable';
+        } else {
+            delete_transient( $session_key );
+            recruitment_clear_applicant_session_cookie();
+        }
         return null;
     }
     $cached_applicant = $result['account'];
@@ -480,6 +688,146 @@ function recruitment_get_assessment_state( int $user_id, string $key ) {
 }
 
 /**
+ * Check that saved assessment progress belongs to the current candidate.
+ *
+ * @param mixed $state
+ */
+function recruitment_assessment_state_matches_candidate( $state, int $candidate_id ): bool {
+    return $candidate_id > 0
+        && is_array( $state )
+        && (int) ( $state['candidate_id'] ?? 0 ) === $candidate_id;
+}
+
+function recruitment_is_iq_assessment_complete_for_application( int $candidate_id, int $application_id ): bool {
+    if ( $candidate_id < 1 || $application_id < 1 ) {
+        return false;
+    }
+
+    $state = get_option(
+        recruitment_assessment_option_name( $candidate_id, 'recruitment_iq_assessment' ),
+        null
+    );
+    return recruitment_assessment_state_matches_candidate( $state, $candidate_id )
+        && absint( $state['application_id'] ?? 0 ) === $application_id
+        && 'complete' === (string) ( $state['status'] ?? '' );
+}
+
+/**
+ * Get completed test result IDs saved for one candidate/application pair.
+ *
+ * @return array<int, int>
+ */
+function recruitment_get_psychotest_result_ids_for_application( int $candidate_id, int $application_id ): array {
+    if ( $candidate_id < 1 || $application_id < 1 ) {
+        return [];
+    }
+
+    $result_ids = [];
+    $iq_state = get_option(
+        recruitment_assessment_option_name( $candidate_id, 'recruitment_iq_assessment' ),
+        null
+    );
+    if (
+        recruitment_assessment_state_matches_candidate( $iq_state, $candidate_id )
+        && absint( $iq_state['application_id'] ?? 0 ) === $application_id
+    ) {
+        foreach ( (array) ( $iq_state['tests'] ?? [] ) as $test ) {
+            $result_id = absint( is_array( $test ) ? ( $test['result_id'] ?? 0 ) : 0 );
+            if ( $result_id > 0 ) {
+                $result_ids[] = $result_id;
+            }
+        }
+        foreach ( (array) ( $iq_state['results'] ?? [] ) as $result_id ) {
+            $result_id = absint( $result_id );
+            if ( $result_id > 0 ) {
+                $result_ids[] = $result_id;
+            }
+        }
+    }
+
+    $pauli_state = get_option(
+        recruitment_assessment_option_name( $candidate_id, 'recruitment_pauli_assessment' ),
+        null
+    );
+    if (
+        recruitment_assessment_state_matches_candidate( $pauli_state, $candidate_id )
+        && absint( $pauli_state['application_id'] ?? 0 ) === $application_id
+        && 'complete' === (string) ( $pauli_state['status'] ?? '' )
+    ) {
+        $result_id = absint( $pauli_state['result_id'] ?? 0 );
+        if ( $result_id > 0 ) {
+            $result_ids[] = $result_id;
+        }
+    }
+
+    $personality_state = get_option(
+        recruitment_assessment_option_name( $candidate_id, 'recruitment_personality_assessment' ),
+        null
+    );
+    if (
+        recruitment_assessment_state_matches_candidate( $personality_state, $candidate_id )
+        && absint( $personality_state['application_id'] ?? 0 ) === $application_id
+    ) {
+        foreach ( (array) ( $personality_state['tests'] ?? [] ) as $test ) {
+            if ( ! is_array( $test ) || 'complete' !== (string) ( $test['status'] ?? '' ) ) {
+                continue;
+            }
+            $result_id = absint( $test['result_id'] ?? 0 );
+            if ( $result_id > 0 ) {
+                $result_ids[] = $result_id;
+            }
+        }
+    }
+
+    return array_values( array_unique( $result_ids ) );
+}
+
+function recruitment_get_psychotest_application_id(): int {
+    foreach ( [ $_POST['application_id'] ?? null, $_GET['application_id'] ?? null ] as $value ) {
+        if ( is_scalar( $value ) && ctype_digit( (string) $value ) && (int) $value > 0 ) {
+            return (int) $value;
+        }
+    }
+
+    $candidate_id = recruitment_get_assessment_user_id();
+    foreach ( [ 'recruitment_iq_assessment', 'recruitment_pauli_assessment', 'recruitment_personality_assessment' ] as $key ) {
+        $state = recruitment_get_assessment_state( $candidate_id, $key );
+        if (
+            recruitment_assessment_state_matches_candidate( $state, $candidate_id )
+            && ctype_digit( (string) ( $state['application_id'] ?? '' ) )
+            && (int) $state['application_id'] > 0
+        ) {
+            return (int) $state['application_id'];
+        }
+    }
+
+    return 0;
+}
+
+function recruitment_require_psychotest_preparation( int $application_id ): void {
+    if ( $application_id < 1 ) {
+        wp_die( esc_html__( 'Pilih lamaran psikotes yang aktif sebelum memulai tes.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+    }
+
+    $stage_status = recruitment_applicant_psychotest_stage_status( (string) $application_id );
+    if ( null === $stage_status ) {
+        wp_die( esc_html__( 'Status lamaran tidak dapat diverifikasi. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+    }
+    if ( ! $stage_status ) {
+        wp_die( esc_html__( 'Tes psikologi hanya tersedia untuk lamaran yang sedang berada pada tahap psikotes.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+    }
+
+    $proctoring = new Recruitment_Psychotest_Proctoring();
+    if ( $proctoring->has_current_consent( $application_id ) ) {
+        return;
+    }
+    if ( $proctoring->get_current_session_error() ) {
+        wp_die( esc_html__( 'Status persiapan tidak dapat dibaca dari Oracle. Tes belum dapat dimulai.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+    }
+    wp_die( esc_html__( 'Selesaikan Persiapan Assesment dari beranda psikotes sebelum memulai tes.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+}
+
+/**
  * Persist assessment progress without changing the applicant's isolated login cookie.
  *
  * @param mixed $value
@@ -519,31 +867,31 @@ function recruitment_assessment_option_name( int $user_id, string $key ): string
     return 'daw_assessment_' . $user_id . '_' . substr( hash( 'sha256', $key ), 0, 20 );
 }
 
-function recruitment_psychotest_consent_key( string $test_key ): string {
+function recruitment_psychotest_consent_key( string $test_key, int $application_id = 0 ): string {
     $user_id = recruitment_get_assessment_user_id();
     $applicant = recruitment_get_current_applicant();
     $session_id = is_array( $applicant )
         ? (string) ( $applicant['session_token'] ?? '' )
         : (string) ( function_exists( 'wp_get_session_token' ) ? wp_get_session_token() : '' );
-    return 'daw_psychotest_consent_' . hash( 'sha256', $session_id . ':' . $user_id . ':' . $test_key );
+    return 'daw_psychotest_consent_' . hash( 'sha256', $session_id . ':' . $user_id . ':' . $application_id . ':' . $test_key );
 }
 
-function recruitment_grant_psychotest_consent( string $test_key ): bool {
+function recruitment_grant_psychotest_consent( string $test_key, int $application_id = 0 ): bool {
     if ( recruitment_get_assessment_user_id() < 1 ) {
         return false;
     }
-    $consent_key = recruitment_psychotest_consent_key( $test_key );
+    $consent_key = recruitment_psychotest_consent_key( $test_key, $application_id );
     return set_transient( $consent_key, true, 10 * MINUTE_IN_SECONDS )
         || true === get_transient( $consent_key );
 }
 
-function recruitment_consume_psychotest_consent( string $test_key ): bool {
-    $consent_key = recruitment_psychotest_consent_key( $test_key );
+function recruitment_consume_psychotest_consent( string $test_key, int $application_id = 0 ): bool {
+    $consent_key = recruitment_psychotest_consent_key( $test_key, $application_id );
     if ( get_transient( $consent_key ) ) {
         delete_transient( $consent_key );
         return true;
     }
-    return ( new Recruitment_Psychotest_Proctoring() )->has_current_consent();
+    return ( new Recruitment_Psychotest_Proctoring() )->has_current_consent( $application_id > 0 ? $application_id : null );
 }
 
 /**
@@ -796,39 +1144,85 @@ function recruitment_get_public_jobs_result(): array {
             ]
         ) as $vacancy_post
     ) {
-            $status = (string) get_post_meta( $vacancy_post->ID, '_daw_vacancy_status', true );
-            if ( '' !== $status && 'published' !== $status ) {
-                continue;
-            }
-            $deadline = (string) get_post_meta( $vacancy_post->ID, '_daw_deadline', true );
+        $headcount = filter_var( get_post_meta( $vacancy_post->ID, '_daw_headcount', true ), FILTER_VALIDATE_INT );
+        $requested_headcount = recruitment_get_vacancy_requested_headcount( (int) $vacancy_post->ID );
+        if (
+            ! is_int( $headcount )
+            || 1 > $headcount
+            || ( is_int( $requested_headcount ) && $requested_headcount !== $headcount )
+            || ! recruitment_has_approved_vacancy_request( (int) $vacancy_post->ID )
+        ) {
+            continue;
+        }
+        $status = (string) get_post_meta( $vacancy_post->ID, '_daw_vacancy_status', true );
+        if ( '' !== $status && 'published' !== $status ) {
+            continue;
+        }
+        if ( '1' === (string) get_post_meta( $vacancy_post->ID, '_daw_vacancy_filled', true ) ) {
+            continue;
+        }
+        $deadline = (string) get_post_meta( $vacancy_post->ID, '_daw_deadline', true );
         if ( '' !== $deadline && $deadline < current_time( 'Y-m-d' ) ) {
             continue;
         }
         $wordpress_jobs[] = recruitment_map_vacancy( $vacancy_post );
     }
 
-    $database = new Recruitment_Database();
-    $vacancies = $database->get_vacancies();
-    $oracle_error = $database->has_error();
-    $jobs = $wordpress_jobs;
-    foreach ( $vacancies as $vacancy ) {
-        $deadline = strtotime( (string) ( $vacancy['deadline'] ?? '' ) );
-        $posted = strtotime( (string) ( $vacancy['posted_at'] ?? '' ) );
-        $jobs[] = [
-            'id' => (string) $vacancy['id'],
-            'title' => (string) $vacancy['title'],
-            'location' => (string) ( $vacancy['location'] ?? '' ),
-            'dealer' => (string) ( $vacancy['dealer'] ?? '' ),
-            'region' => '',
-            'type' => (string) ( $vacancy['job_type'] ?? '' ),
-            'description' => trim( strip_tags( (string) ( $vacancy['description'] ?? '' ) ) ),
-            'deadline' => $deadline ? wp_date( 'j F Y', $deadline ) : '',
-            'postedDate' => $posted ? wp_date( 'j F Y', $posted ) : '',
-            'requirements' => '' !== (string) ( $vacancy['education'] ?? '' ) ? [ (string) $vacancy['education'] ] : [],
-        ];
+    return [ 'success' => true, 'jobs' => $wordpress_jobs ];
+}
+
+function recruitment_has_approved_vacancy_request( int $post_id ): bool {
+    $request = recruitment_get_approved_vacancy_request( $post_id );
+    return is_array( $request ) && is_int( $request['headcount'] ) && 1 <= $request['headcount'];
+}
+
+/**
+ * @return array{headcount: int|null}|null
+ */
+function recruitment_get_approved_vacancy_request( int $post_id ): ?array {
+    if ( $post_id < 1 || ! function_exists( 'get_users' ) ) {
+        return null;
     }
 
-    return [ 'success' => ! $oracle_error, 'jobs' => $jobs ];
+    $request_code = sanitize_text_field( (string) get_post_meta( $post_id, '_daw_fptk_code', true ) );
+    if ( '' === $request_code ) {
+        return null;
+    }
+
+    static $approved_requests = null;
+    if ( null === $approved_requests ) {
+        $approved_requests = [];
+        foreach ( get_users( [ 'meta_key' => 'daw_department_job_requests', 'meta_compare' => 'EXISTS', 'fields' => 'all' ] ) as $department_user ) {
+            $requests = get_user_meta( $department_user->ID, 'daw_department_job_requests', true );
+            if ( ! is_array( $requests ) ) {
+                continue;
+            }
+
+            foreach ( $requests as $code => $request ) {
+                if (
+                    ! is_array( $request )
+                    || ! in_array( $request['status'] ?? '', [ 'Disetujui', 'Lowongan Dibuka', 'Ready for Recruitment' ], true )
+                    || absint( $request['vacancy_id'] ?? 0 ) < 1
+                ) {
+                    continue;
+                }
+
+                $fields = is_array( $request['fields'] ?? null ) ? $request['fields'] : [];
+                $headcount = filter_var( $fields['headcount'] ?? null, FILTER_VALIDATE_INT );
+                $key = absint( $request['vacancy_id'] ) . ':' . (string) $code;
+                $approved_requests[ $key ] = [
+                    'headcount' => is_int( $headcount ) && 1 <= $headcount ? $headcount : null,
+                ];
+            }
+        }
+    }
+
+    return $approved_requests[ $post_id . ':' . $request_code ] ?? null;
+}
+
+function recruitment_get_vacancy_requested_headcount( int $post_id ): ?int {
+    $request = recruitment_get_approved_vacancy_request( $post_id );
+    return is_array( $request ) ? $request['headcount'] : null;
 }
 
 /**
@@ -900,6 +1294,7 @@ function recruitment_get_admin_url( string $slug = 'dashboard' ): string {
         'hr-interview'        => 'recruitment-hr-interview',
         'final-decision'      => 'recruitment-final-decision',
         'interview-schedule'  => 'recruitment-interview-schedule',
+        'interview-schedule-user' => 'recruitment-interview-schedule-user',
         'user-management'     => 'recruitment-user-management',
         'hr-profile'          => 'recruitment-hr-profile',
         'psychotest-settings' => 'recruitment-psychotest-settings',
@@ -908,7 +1303,11 @@ function recruitment_get_admin_url( string $slug = 'dashboard' ): string {
         'settings'            => 'recruitment-settings',
     ];
 
-    return add_query_arg( 'page', $pages[ $slug ] ?? 'recruitment-dashboard', admin_url( 'admin.php' ) );
+    if ( 'user-department' === $slug ) {
+        $slug = 'daw-user-department';
+    }
+
+    return add_query_arg( 'page', $pages[ $slug ] ?? $slug, admin_url( 'admin.php' ) );
 }
 
 /**

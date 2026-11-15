@@ -1,5 +1,5 @@
 <?php
-$test_key = sanitize_key( wp_unslash( $_GET['test'] ?? '' ) );
+$test_key = sanitize_key( wp_unslash( $_GET['test'] ?? 'iq' ) );
 $test_labels = [
     'iq' => 'IQ',
     'pauli' => 'Pauli',
@@ -9,14 +9,34 @@ $test_labels = [
 $requested_application_id = isset( $_GET['application_id'] ) && is_scalar( $_GET['application_id'] )
     ? absint( wp_unslash( (string) $_GET['application_id'] ) )
     : 0;
-if ( ! isset( $test_labels[ $test_key ] ) ) {
+if ( 'iq' !== $test_key || $requested_application_id < 1 ) {
     wp_safe_redirect( recruitment_get_public_url( 'psychotest' ) );
     exit;
 }
-$consent_arguments = [ 'test' => $test_key ];
-if ( $requested_application_id > 0 ) {
-    $consent_arguments['application_id'] = $requested_application_id;
+$stage_status = recruitment_applicant_psychotest_stage_status( (string) $requested_application_id );
+if ( null === $stage_status ) {
+    wp_die( esc_html__( 'Status lamaran tidak dapat diverifikasi. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
 }
+if ( ! $stage_status ) {
+    wp_die( esc_html__( 'Persetujuan hanya tersedia untuk lamaran yang sedang berada pada tahap psikotes.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+}
+$proctoring = new Recruitment_Psychotest_Proctoring();
+$proctoring_violation_config = $proctoring->get_violation_config();
+$violation_threshold_label = static function ( array $config, string $event_type ): string {
+    if ( empty( $config[ $event_type ]['enabled'] ) ) {
+        return 'tidak aktif';
+    }
+    return number_format_i18n( (float) $config[ $event_type ]['threshold_ms'] / 1000, 1 ) . ' detik';
+};
+if ( $proctoring->has_current_consent( $requested_application_id ) ) {
+    wp_safe_redirect( recruitment_get_public_url( 'psychotest', [ 'application_id' => $requested_application_id ] ) );
+    exit;
+}
+if ( $proctoring->get_current_session_error() ) {
+    wp_die( esc_html__( 'Status persiapan tidak dapat dibaca dari Oracle. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+}
+$consent_arguments = [ 'test' => $test_key ];
+$consent_arguments['application_id'] = $requested_application_id;
 $device_url = recruitment_get_public_url( 'psychotest-device', $consent_arguments );
 ?>
 <div class="daw-recruitment daw-recruitment--psychotest-consent">
@@ -29,6 +49,7 @@ $device_url = recruitment_get_public_url( 'psychotest-device', $consent_argument
                 <div class="daw-recruitment__psychotest-step"><span>2</span><small>Perangkat</small></div>
                 <div class="daw-recruitment__psychotest-step"><span>3</span><small>Kamera</small></div>
                 <div class="daw-recruitment__psychotest-step is-active"><span>4</span><small>Persetujuan</small></div>
+                <div class="daw-recruitment__psychotest-step"><span>5</span><small>Foto &amp; KTP</small></div>
             </div>
             <section class="daw-recruitment__psychotest-card">
                 <header class="daw-consent__header">
@@ -49,23 +70,27 @@ $device_url = recruitment_get_public_url( 'psychotest-device', $consent_argument
                             <p>Satu foto selfie sambil memegang sisi depan KTP disimpan untuk pemeriksaan identitas.</p>
                         </article>
                         <article class="daw-consent__fact">
-                            <h3>Pemeriksaan kamera</h3>
-                            <p>Browser memeriksa secara lokal jika wajah tidak terlihat beberapa saat atau lebih dari satu wajah terdeteksi. Video tidak dikirim untuk analisis. Maksimal lima snapshot peringatan dapat disimpan untuk seluruh sesi.</p>
+                            <h3>Log aktivitas</h3>
+                            <p>Browser (User-Agent) dan alamat IP yang terlihat oleh server dicatat bersama aktivitas pengawasan untuk laporan seleksi. Jika koneksi melewati proxy atau gateway, alamat yang tercatat dapat merupakan alamat proxy atau gateway tersebut.</p>
                         </article>
                         <article class="daw-consent__fact">
-                            <h3>Pemeriksaan mikrofon</h3>
-                            <p>Anda dapat memeriksa izin dan ketersediaan mikrofon. Hanya status yang dicatat; audio tidak direkam atau disimpan.</p>
+                            <h3>Pemeriksaan kamera</h3>
+                            <p>Browser menganalisis gambar kamera secara lokal. Event baru dicatat setelah indikasi berlangsung sesuai threshold: wajah tidak terlihat <?= esc_html( $violation_threshold_label( $proctoring_violation_config, 'FACE_NOT_DETECTED' ) ) ?>, lebih dari satu wajah <?= esc_html( $violation_threshold_label( $proctoring_violation_config, 'MULTIPLE_FACES' ) ) ?>, arah wajah menyamping <?= esc_html( $violation_threshold_label( $proctoring_violation_config, 'FACE_TURNED_AWAY' ) ) ?>, atau kamera terputus <?= esc_html( $violation_threshold_label( $proctoring_violation_config, 'CAMERA_STOPPED' ) ) ?>. Jika frame tersedia, snapshot diambil saat threshold terpenuhi; kamera terputus tidak memiliki snapshot. Video utuh tidak dikirim atau disimpan.</p>
+                        </article>
+                        <article class="daw-consent__fact">
+                            <h3>Audio</h3>
+                            <p>Mikrofon tidak diakses selama psikotes. Audio tidak direkam atau disimpan.</p>
                         </article>
                     </div>
-                    <p class="daw-consent__note">Sistem tidak melakukan pencocokan identitas wajah atau analisis OCR. Snapshot dikirim hanya saat peringatan dan disimpan secara privat untuk tinjauan HR.</p>
+                    <p class="daw-consent__note">Deteksi dapat keliru dan pemulihan menunggu perilaku normal yang konsisten. Peringatan ditampilkan saat threshold terpenuhi; event ditandai untuk tinjauan manusia dan tidak otomatis menyimpulkan kecurangan atau menggagalkan tes. Arah wajah hanya perkiraan lokal; sistem tidak mencocokkan identitas wajah, membaca KTP dengan OCR, atau mengirim video untuk analisis.</p>
                 </section>
 
                 <section class="daw-consent__section daw-consent__section--review" aria-labelledby="daw-consent-review-title">
                     <h2 id="daw-consent-review-title">Penggunaan dan perlindungan data</h2>
                     <ul class="daw-consent__list">
-                        <li>Peringatan dapat dicatat saat wajah tidak terlihat beberapa saat, lebih dari satu wajah terdeteksi, Anda berpindah tab, atau kamera terputus. Deteksi dapat keliru; setiap peringatan ditinjau oleh manusia dan tidak otomatis menggagalkan tes.</li>
+                        <li>Peringatan dapat dicatat saat wajah tidak terlihat, lebih dari satu wajah terdeteksi, wajah menghadap menyamping cukup lama, halaman ujian disembunyikan/dibuka kembali, atau kamera terputus. Browser tidak mengungkap tab atau situs mana yang dibuka. HR dapat mengonfirmasi atau mengesampingkan event setelah meninjau bukti dan konteks.</li>
                         <li>Jika kamera tidak tersedia, Anda dapat meminta verifikasi identitas manual oleh HR.</li>
-                        <li>Gambar hanya dapat diakses melalui akun WordPress Administrator, dan setiap akses dicatat. Gambar dihapus otomatis paling lambat satu tahun setelah tes selesai. Jika tes tidak selesai, masa simpan dihitung sejak persetujuan diberikan.</li>
+                        <li>Gambar dan laporan hanya dapat diakses HR berwenang, dan akses dicatat. Gambar serta log aktivitas dihapus otomatis paling lambat satu tahun setelah tes selesai. Jika tes tidak selesai, masa simpan dihitung sejak persetujuan diberikan.</li>
                     </ul>
                 </section>
 
@@ -74,7 +99,7 @@ $device_url = recruitment_get_public_url( 'psychotest-device', $consent_argument
                     <input type="hidden" name="test" value="<?= esc_attr( $test_key ) ?>">
                     <label class="daw-consent__checkbox">
                         <input type="checkbox" name="consent" value="1" required>
-                        <span>Saya telah membaca dan memahami informasi di atas, termasuk pemrosesan lokal wajah serta pengambilan dan penyimpanan foto identitas dan snapshot peringatan. Saya memahami bahwa audio tidak direkam dan verifikasi manual dapat diminta jika kamera tidak tersedia.</span>
+                        <span>Saya telah membaca dan memahami informasi di atas, termasuk pencatatan browser dan alamat IP, pemrosesan lokal arah/jumlah wajah, pencatatan saat halaman ujian disembunyikan, peringatan berbasis durasi, serta penyimpanan snapshot jika frame tersedia. Saya memahami bahwa audio tidak direkam, event memerlukan tinjauan manusia, dan verifikasi manual dapat diminta jika kamera tidak tersedia.</span>
                     </label>
                     <button class="daw-recruitment__button" type="submit">Setuju dan lanjutkan</button>
                 </form>

@@ -12,6 +12,7 @@ foreach ( get_posts(
     $vacancy_status = (string) get_post_meta( $vacancy_post->ID, '_daw_vacancy_status', true );
     $deadline = (string) get_post_meta( $vacancy_post->ID, '_daw_deadline', true );
     if ( ( '' !== $vacancy_status && 'published' !== $vacancy_status )
+        || ! recruitment_has_approved_vacancy_request( (int) $vacancy_post->ID )
         || ( '' !== $deadline && $deadline < current_time( 'Y-m-d' ) ) ) {
         continue;
     }
@@ -37,7 +38,7 @@ $screen_explorer_items = [
     ],
     'Psikotes' => [
         [ 'label' => 'Beranda Psikotes', 'screen' => 'psychotest' ],
-        [ 'label' => 'Persiapan Assessment', 'screen' => 'psychotest-preparation' ],
+        [ 'label' => 'Beranda Psikotes', 'screen' => 'psychotest' ],
         [ 'label' => 'Periksa Perangkat', 'screen' => 'psychotest-device' ],
         [ 'label' => 'Psikotes: Review & Kirim', 'screen' => 'psych-test', 'args' => [ 'state' => 'review' ] ],
         [ 'label' => 'Psikotes: Memproses Hasil', 'screen' => 'psych-test', 'args' => [ 'state' => 'processing' ] ],
@@ -50,7 +51,8 @@ $screen_explorer_items = [
         [ 'label' => 'Rekrutmen Aktif', 'screen' => 'applicants' ],
         [ 'label' => 'Lowongan', 'screen' => 'vacancies' ],
         [ 'label' => 'Lamaran', 'screen' => 'applications' ],
-        [ 'label' => 'Jadwal Wawancara', 'screen' => 'interview-schedule' ],
+        [ 'label' => 'Jadwal Wawancara HR', 'screen' => 'interview-schedule' ],
+        [ 'label' => 'Jadwal Wawancara User', 'screen' => 'interview-schedule-user' ],
         [ 'label' => 'Pengaturan Psikotes', 'screen' => 'psychotest-settings' ],
         [ 'label' => 'Bank Soal', 'screen' => 'question-bank' ],
         [ 'label' => 'Final Decision', 'screen' => 'final-decision' ],

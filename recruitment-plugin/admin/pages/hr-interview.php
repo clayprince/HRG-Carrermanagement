@@ -67,6 +67,7 @@ if ( $selected_candidate && '' !== $selected_department ) {
 	}
 }
 $interview_date = (string) ( $latest_note['interview_date'] ?? $selected_candidate['scheduled_interview_date'] ?? current_time( 'Y-m-d' ) );
+$interviewer_name = trim( (string) ( $latest_note['interviewer'] ?? $selected_candidate['scheduled_interviewer'] ?? $display_name ) );
 $scheduled_date_timestamp = ! empty( $selected_candidate['scheduled_interview_date'] )
 	? strtotime( (string) $selected_candidate['scheduled_interview_date'] )
 	: false;
@@ -91,7 +92,7 @@ $scheduled_interview_date = $scheduled_date_timestamp ? date_i18n( 'j F Y', $sch
 	</header>
 
 	<main class="daw-user-interview__main">
-		<?php if ( 'note_saved' === $notice ) : ?><div class="notice notice-success inline"><p>Catatan wawancara HR berhasil disimpan.</p></div><?php elseif ( 'saved' === $notice ) : ?><div class="notice notice-success inline"><p>Hasil tersimpan. Kandidat telah diteruskan ke Wawancara User dan tidak lagi muncul di daftar Wawancara HR.</p></div><?php elseif ( 'failed' === $notice ) : ?><div class="notice notice-success inline"><p>Hasil tersimpan. Kandidat tidak dilanjutkan dan tidak lagi muncul di daftar Wawancara HR.</p></div><?php elseif ( 'save_error' === $notice ) : ?><div class="notice notice-error inline" role="alert"><p>Keputusan belum tersimpan. Kandidat masih berada di Wawancara HR. Pastikan departemen tujuan dan akun User Department yang dipilih cocok, lalu coba lagi.</p></div><?php endif; ?>
+		<?php if ( 'note_saved' === $notice ) : ?><div class="notice notice-success inline"><p>Catatan wawancara HR berhasil disimpan.</p></div><?php elseif ( 'saved' === $notice ) : ?><div class="notice notice-success inline"><p>Hasil tersimpan. Kandidat telah diteruskan ke Wawancara User dan tidak lagi muncul di daftar Wawancara HR.</p></div><?php elseif ( 'failed' === $notice ) : ?><div class="notice notice-success inline"><p>Hasil tersimpan. Kandidat tidak dilanjutkan dan tidak lagi muncul di daftar Wawancara HR.</p></div><?php elseif ( 'save_error' === $notice ) : ?><div class="notice notice-error inline" role="alert"><p>Keputusan belum tersimpan. Kandidat masih berada di Wawancara HR. Pastikan departemen tujuan dan akun User Department yang dipilih cocok. Jika Oracle melaporkan skema belum tersedia, pastikan migrasi 016 lalu 017 sudah diterapkan pada schema yang sama.</p></div><?php endif; ?>
 		<?php if ( $load_error ) : ?><div class="notice notice-error inline" role="alert"><p>Data wawancara HR, akun tujuan, atau riwayat catatan tidak dapat dimuat dari Oracle. Periksa penerapan migrasi database yang diperlukan.</p></div><?php endif; ?>
 
 		<?php if ( $selected_candidate ) : ?>
@@ -111,6 +112,9 @@ $scheduled_interview_date = $scheduled_date_timestamp ? date_i18n( 'j F Y', $sch
 						<div><dt>Dealer</dt><dd><?= esc_html( (string) ( $selected_candidate['dealer'] ?? '—' ) ) ?></dd></div>
 						<div><dt>Tgl Wawancara</dt><dd><?= esc_html( $scheduled_interview_date ) ?></dd></div>
 						<div><dt>Waktu</dt><dd><?= esc_html( (string) ( $selected_candidate['scheduled_interview_time'] ?? '—' ) ) ?></dd></div>
+						<?php if ( ! empty( $selected_candidate['scheduled_interview_method'] ) ) : ?><div><dt>Metode</dt><dd><?= esc_html( 'ONLINE' === strtoupper( (string) $selected_candidate['scheduled_interview_method'] ) ? 'Online' : ( 'OFFLINE' === strtoupper( (string) $selected_candidate['scheduled_interview_method'] ) ? 'Tatap muka' : (string) $selected_candidate['scheduled_interview_method'] ) ) ?></dd></div><?php endif; ?>
+						<?php if ( ! empty( $selected_candidate['scheduled_interview_location'] ) ) : ?><div><dt>Lokasi/Platform</dt><dd><?= esc_html( (string) $selected_candidate['scheduled_interview_location'] ) ?></dd></div><?php endif; ?>
+						<?php if ( ! empty( $selected_candidate['scheduled_interview_link'] ) ) : ?><div><dt>Link Wawancara</dt><dd><a href="<?= esc_url( (string) $selected_candidate['scheduled_interview_link'] ) ?>" target="_blank" rel="noopener noreferrer"><?= esc_html( (string) $selected_candidate['scheduled_interview_link'] ) ?></a></dd></div><?php endif; ?>
 					</dl>
 					<a class="daw-hr-interview__profile-link" href="<?= esc_url( add_query_arg( [ 'page' => 'recruitment-applicants', 'application_id' => $application_id ], admin_url( 'admin.php' ) ) ) ?>">Lihat Profil Lengkap</a>
 				</section>
@@ -125,8 +129,8 @@ $scheduled_interview_date = $scheduled_date_timestamp ? date_i18n( 'j F Y', $sch
 							<input type="hidden" name="intent" value="save_note" data-hr-intent>
 
 							<div class="daw-hr-interview__form-grid">
-								<label>Interviewer
-									<input type="text" value="<?= esc_attr( $display_name ) ?>" readonly aria-label="Interviewer">
+								<label>Nama Pewawancara <b>*</b>
+									<input type="text" name="interviewer" value="<?= esc_attr( $interviewer_name ) ?>" maxlength="100" required>
 								</label>
 								<label>Tanggal Wawancara
 									<input type="date" name="interview_date" value="<?= esc_attr( $interview_date ) ?>" required>
@@ -193,6 +197,7 @@ $scheduled_interview_date = $scheduled_date_timestamp ? date_i18n( 'j F Y', $sch
 											<?php foreach ( $department_accounts as $account ) : ?>
 												<option value="<?= esc_attr( (string) $account['id'] ) ?>" data-department-id="<?= esc_attr( (string) ( $account['department_id'] ?? '' ) ) ?>" <?= selected( $selected_account_id, (string) $account['id'], false ) ?>><?= esc_html( (string) $account['full_name'] . ' — ' . (string) ( $account['department'] ?: 'Departemen belum diatur' ) ) ?></option>
 											<?php endforeach; ?>
+											<?php if ( empty( $department_accounts ) ) : ?><option value="" disabled>Tidak ada akun User Department aktif</option><?php endif; ?>
 										</select>
 									</label>
 								</div>
@@ -212,7 +217,7 @@ $scheduled_interview_date = $scheduled_date_timestamp ? date_i18n( 'j F Y', $sch
 				<div class="daw-user-interview__table-wrap">
 					<table class="daw-interview-screen__table daw-hr-interview__table">
 						<caption class="screen-reader-text">Kandidat menunggu keputusan wawancara HR</caption>
-						<thead><tr><th scope="col">Kandidat</th><th scope="col">Posisi</th><th scope="col">Dealer</th><th scope="col">Hasil Psikotes</th><th scope="col">Tgl Wawancara</th><th scope="col">Status</th><th scope="col">Aksi</th></tr></thead>
+						<thead><tr><th scope="col">Kandidat</th><th scope="col">Posisi / Departemen</th><th scope="col">Dealer</th><th scope="col">Nilai Psikotes</th><th scope="col">Jadwal Wawancara</th><th scope="col">Status</th><th scope="col">Aksi</th></tr></thead>
 						<tbody>
 							<?php if ( ! empty( $candidates ) ) : ?>
 								<?php foreach ( $candidates as $candidate ) :
@@ -223,7 +228,16 @@ $scheduled_interview_date = $scheduled_date_timestamp ? date_i18n( 'j F Y', $sch
 										<td><?= esc_html( (string) ( $candidate['position'] ?? 'Posisi belum ditentukan' ) ) ?><small><?= esc_html( (string) ( $candidate['department'] ?? '' ) ) ?></small></td>
 										<td><?= esc_html( (string) ( $candidate['dealer'] ?? '-' ) ) ?></td>
 										<td><strong class="daw-interview-screen__score"><?= esc_html( (string) ( $candidate['psychotest_score'] ?? '—' ) ) ?></strong></td>
-										<td><?= esc_html( (string) ( $candidate['scheduled_interview_date'] ?? '—' ) ) ?></td>
+										<td>
+											<?php if ( ! empty( $candidate['scheduled_interview_date'] ) ) : ?>
+												<strong><?= esc_html( (string) $candidate['scheduled_interview_date'] ) ?></strong>
+												<small><?= esc_html( (string) ( $candidate['scheduled_interview_time'] ?? '' ) ) ?><?= ! empty( $candidate['scheduled_interview_method'] ) ? ' · ' . esc_html( 'ONLINE' === strtoupper( (string) $candidate['scheduled_interview_method'] ) ? 'Online' : 'Tatap muka' ) : '' ?></small>
+												<?php if ( ! empty( $candidate['scheduled_interview_location'] ) ) : ?><small><?= esc_html( (string) $candidate['scheduled_interview_location'] ) ?></small><?php endif; ?>
+												<span class="daw-interview-screen__status is-booked">Jadwal dipesan</span>
+											<?php else : ?>
+												<span class="daw-interview-screen__status is-waiting">Belum memilih jadwal</span>
+											<?php endif; ?>
+										</td>
 										<td><span class="daw-interview-screen__status is-waiting">Menunggu Keputusan HR</span></td>
 										<td><a class="daw-interview-screen__action" href="<?= esc_url( add_query_arg( 'application_id', $candidate_application_id, $list_url ) ) ?>">Detail / Catatan</a></td>
 									</tr>
