@@ -19,6 +19,7 @@ class Recruitment_Router {
         'account-profile'    => 'public/pages/account-profile.php',
         'applicant-file'     => 'public/pages/account-profile.php',
         'application-process' => 'public/pages/application-process.php',
+        'application-result' => 'public/pages/application-result.php',
         'psych-test'         => 'public/pages/psychological-test.php',
         'interview-booking'  => 'public/pages/interview-booking.php',
         'psychotest'         => 'public/pages/psychotest-home.php',
@@ -42,6 +43,7 @@ class Recruitment_Router {
         'user-interview'     => 'admin/pages/user-interview.php',
         'user-department'    => 'admin/pages/user-department.php',
         'interview-schedule' => 'admin/pages/interview-schedule.php',
+        'interview-schedule-user' => 'admin/pages/interview-schedule.php',
         'user-management'    => 'admin/pages/user-management-oracle.php',
         'hr-profile'         => 'admin/pages/hr-profile.php',
         'psychotest-settings' => 'admin/pages/psychotest-settings.php',
@@ -61,6 +63,7 @@ class Recruitment_Router {
         'user-interview',
         'user-department',
         'interview-schedule',
+        'interview-schedule-user',
         'user-management',
         'hr-profile',
         'psychotest-settings',
@@ -78,6 +81,7 @@ class Recruitment_Router {
         'application-form',
         'application-confirmation',
         'application-process',
+        'application-result',
         'tracking-detail',
         'interview-booking',
         'psych-test',
@@ -97,7 +101,7 @@ class Recruitment_Router {
     public function render( string $page, array $data = [] ): void {
         $slug = array_key_exists( $page, self::ROUTES ) ? $page : 'careers';
 
-        $sandbox_preview = in_array( $slug, [ 'user-interview', 'interview-schedule', 'vacancies' ], true )
+        $sandbox_preview = in_array( $slug, [ 'user-interview', 'interview-schedule', 'interview-schedule-user', 'vacancies' ], true )
             && defined( 'RECRUITMENT_SANDBOX' )
             && RECRUITMENT_SANDBOX
             && '1' === sanitize_text_field( wp_unslash( $_GET['daw_ui_preview'] ?? '' ) );
@@ -105,6 +109,7 @@ class Recruitment_Router {
         $applicant_preview = recruitment_is_ui_preview();
 
         if ( in_array( $slug, self::APPLICANT_PROTECTED, true ) && ! $applicant_preview && ! recruitment_is_applicant_user() ) {
+            recruitment_abort_if_applicant_session_unavailable();
             $is_logged_in = function_exists( 'is_user_logged_in' ) && is_user_logged_in();
             $redirect_args = [
                 'account_error' => $is_logged_in ? 'applicant_account_required' : '',

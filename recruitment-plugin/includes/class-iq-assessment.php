@@ -178,9 +178,6 @@ class Recruitment_IQ_Assessment {
     }
 
     private function start_session( int $user_id, int $candidate_id ): void {
-        if ( ! recruitment_consume_psychotest_consent( 'iq' ) ) {
-            wp_die( esc_html__( 'Berikan persetujuan tes terlebih dahulu.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
-        }
         $global_settings = (array) get_option( 'recruitment_psychotest_settings', [] );
         $test_settings = (array) get_option( 'recruitment_psychotest_tests', [] );
         if ( isset( $global_settings['status'] ) && 'active' !== $global_settings['status'] ) {
@@ -233,6 +230,9 @@ class Recruitment_IQ_Assessment {
         $now = time();
         $tests[0]['started_at'] = $now;
         $tests[0]['deadline'] = $now + ( $tests[0]['duration'] * MINUTE_IN_SECONDS );
+        if ( ! recruitment_consume_psychotest_consent( 'iq' ) ) {
+            wp_die( esc_html__( 'Berikan persetujuan tes terlebih dahulu.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+        }
         recruitment_update_assessment_state(
             $user_id,
             self::USER_META_KEY,

@@ -1321,8 +1321,9 @@
           }
         }
 
-        function proceedToSubtest() {
+        function proceedToSubtest(redirectUrl = "") {
           const nextUrl =
+            redirectUrl ||
             confirmSubmitButton?.dataset?.nextUrl ||
             identityCapture.dataset.nextUrl ||
             document
@@ -1337,11 +1338,10 @@
         }
 
         async function uploadIdentityPhoto(image) {
-          status.textContent = "Menghubungkan ke soal tes...";
+          status.textContent = "Menyimpan foto identitas...";
           if (confirmSubmitButton) confirmSubmitButton.disabled = true;
           if (retakeButton) retakeButton.disabled = true;
 
-          // Kirim snapshot ke server di latar belakang tanpa menahan atau memblokir peserta
           try {
             actionInput.value = "capture";
             const body = new FormData(form);
@@ -1351,22 +1351,50 @@
               (typeof form.action === "string" && !form.action.includes("[object")
                 ? form.action
                 : "");
-            if (actionUrl) {
-              fetch(actionUrl, {
-                method: "POST",
-                body,
-                credentials: "same-origin",
-                headers: {
-                  Accept: "application/json",
-                  "X-Requested-With": "XMLHttpRequest",
-                },
-                keepalive: true,
-              }).catch(() => {});
+            if (!actionUrl) {
+              throw new Error("Alamat penyimpanan foto tidak tersedia. Muat ulang halaman lalu coba kembali.");
             }
-          } catch (e) {}
 
-          // Langsung next ke soal subtes tanpa menahan kandidat
-          setTimeout(proceedToSubtest, 100);
+            const response = await fetch(actionUrl, {
+              method: "POST",
+              body,
+              credentials: "same-origin",
+              headers: {
+                Accept: "application/json",
+                "X-Requested-With": "XMLHttpRequest",
+              },
+            });
+            let result;
+            try {
+              result = await response.json();
+            } catch {
+              throw new Error("Respons penyimpanan foto tidak valid. Silakan coba kembali.");
+            }
+            if (
+              !response.ok ||
+              !result?.success ||
+              typeof result?.data?.redirect !== "string"
+            ) {
+              throw new Error(
+                result?.data?.message ||
+                  "Foto identitas gagal disimpan. Periksa koneksi lalu coba kembali.",
+              );
+            }
+
+            proceedToSubtest(result.data.redirect);
+          } catch (uploadError) {
+            const message =
+              uploadError instanceof Error
+                ? uploadError.message
+                : "Foto identitas gagal disimpan. Periksa koneksi lalu coba kembali.";
+            status.textContent = message;
+            if (error) {
+              error.textContent = message;
+              error.hidden = false;
+            }
+            if (confirmSubmitButton) confirmSubmitButton.disabled = false;
+            if (retakeButton) retakeButton.disabled = false;
+          }
         }
 
         if (startButton) {
@@ -1424,7 +1452,13 @@
             if (capturedBlob) {
               uploadIdentityPhoto(capturedBlob);
             } else {
-              proceedToSubtest();
+              const message =
+                "Ambil foto identitas terlebih dahulu sebelum melanjutkan.";
+              status.textContent = message;
+              if (error) {
+                error.textContent = message;
+                error.hidden = false;
+              }
             }
           });
         }
@@ -1514,6 +1548,79 @@
     if (!video || !status || !ajaxUrl || !nonce) {
       return;
     }
+    let pointerStart = null;
+    const setWatchPosition = function setWatchPosition(left, top) {
+      const bounds = watch.getBoundingClientRect();
+      const maxLeft = Math.max(12, window.innerWidth - bounds.width - 12);
+      const maxTop = Math.max(12, window.innerHeight - bounds.height - 12);
+      watch.style.left = `${Math.max(12, Math.min(left, maxLeft))}px`;
+      watch.style.top = `${Math.max(12, Math.min(top, maxTop))}px`;
+      watch.style.right = "auto";
+      watch.style.bottom = "auto";
+    };
+    watch.addEventListener("pointerdown", function startWatchDrag(event) {
+      if (!event.isPrimary || ("mouse" === event.pointerType && 0 !== event.button)) {
+        return;
+      }
+      event.preventDefault();
+      const bounds = watch.getBoundingClientRect();
+      pointerStart = {
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        left: bounds.left,
+        top: bounds.top,
+      };
+      watch.style.left = `${bounds.left}px`;
+      watch.style.top = `${bounds.top}px`;
+      watch.style.right = "auto";
+      watch.style.bottom = "auto";
+      watch.classList.add("is-moving");
+      if (typeof watch.setPointerCapture === "function") {
+        watch.setPointerCapture(event.pointerId);
+      }
+    });
+    watch.addEventListener("pointermove", function moveWatch(event) {
+      if (!pointerStart || pointerStart.pointerId !== event.pointerId) {
+        return;
+      }
+      setWatchPosition(
+        pointerStart.left + event.clientX - pointerStart.x,
+        pointerStart.top + event.clientY - pointerStart.y,
+      );
+    });
+    const stopWatchDrag = function stopWatchDrag(event) {
+      if (!pointerStart || pointerStart.pointerId !== event.pointerId) {
+        return;
+      }
+      pointerStart = null;
+      watch.classList.remove("is-moving");
+    };
+    watch.addEventListener("pointerup", stopWatchDrag);
+    watch.addEventListener("pointercancel", stopWatchDrag);
+    watch.addEventListener("lostpointercapture", stopWatchDrag);
+    watch.addEventListener("keydown", function moveWatchWithKeyboard(event) {
+      const step = event.shiftKey ? 32 : 12;
+      const movement = {
+        ArrowDown: [0, step],
+        ArrowLeft: [-step, 0],
+        ArrowRight: [step, 0],
+        ArrowUp: [0, -step],
+      }[event.key];
+      if (!movement) {
+        return;
+      }
+      event.preventDefault();
+      const bounds = watch.getBoundingClientRect();
+      setWatchPosition(bounds.left + movement[0], bounds.top + movement[1]);
+    });
+    window.addEventListener("resize", function keepWatchInViewport() {
+      if (!watch.style.left || !watch.style.top) {
+        return;
+      }
+      const bounds = watch.getBoundingClientRect();
+      setWatchPosition(bounds.left, bounds.top);
+    });
     let stream = null;
     let stopFaceMonitor = null;
     const lastAlertAt = new Map();
@@ -1574,59 +1681,6 @@
         return false;
       }
     };
-
-    const microphoneButton = watch.querySelector(
-      "[data-proctoring-microphone-check]",
-    );
-    const microphoneStatus = watch.querySelector(
-      "[data-proctoring-microphone-status]",
-    );
-    if (microphoneButton && microphoneStatus) {
-      microphoneButton.addEventListener("click", async function checkMicrophone() {
-        if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
-          microphoneStatus.textContent =
-            "Mikrofon memerlukan HTTPS atau localhost. Tidak ada audio yang direkam.";
-          sendEvent("MICROPHONE_UNAVAILABLE", false);
-          return;
-        }
-
-        microphoneButton.disabled = true;
-        microphoneStatus.textContent = "Memeriksa izin dan ketersediaan mikrofon...";
-        let microphoneStream = null;
-        try {
-          microphoneStream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-          });
-          const microphoneAvailable = microphoneStream
-            .getAudioTracks()
-            .some((track) => "live" === track.readyState);
-          microphoneStream.getTracks().forEach((track) => track.stop());
-          microphoneStream = null;
-
-          if (!microphoneAvailable) {
-            throw new Error("No live microphone track was returned.");
-          }
-          microphoneStatus.textContent =
-            "Mikrofon tersedia. Hanya status yang dicatat; audio tidak direkam.";
-          if (false === (await sendEvent("MICROPHONE_AVAILABLE", false))) {
-            microphoneStatus.textContent =
-              "Mikrofon tersedia, tetapi statusnya belum berhasil dilaporkan. Coba lagi.";
-          }
-        } catch (microphoneError) {
-          microphoneStream?.getTracks().forEach((track) => track.stop());
-          microphoneStatus.textContent =
-            microphoneError?.name === "NotAllowedError"
-              ? "Izin mikrofon ditolak. Status ini dilaporkan ke HR; audio tidak direkam."
-              : "Mikrofon tidak tersedia. Status ini dilaporkan ke HR; audio tidak direkam.";
-          if (false === (await sendEvent("MICROPHONE_UNAVAILABLE", false))) {
-            microphoneStatus.textContent =
-              "Status mikrofon tidak dapat dilaporkan. Periksa koneksi internet lalu coba lagi.";
-          }
-        } finally {
-          microphoneButton.disabled = false;
-        }
-      });
-    }
 
     document.addEventListener("visibilitychange", function recordTabChange() {
       if (document.hidden) {

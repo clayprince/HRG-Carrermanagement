@@ -93,6 +93,9 @@ class Recruitment_Psychotest_Proctoring {
         }
 
         $context = $this->get_context();
+        if ( null === $context ) {
+            recruitment_abort_if_applicant_session_unavailable();
+        }
         $session = null === $context
             ? null
             : $this->database->get_proctoring_session( $context['candidate_id'], $context['session_id'] );
@@ -124,6 +127,9 @@ class Recruitment_Psychotest_Proctoring {
         }
         $context = $this->get_context();
         if ( null === $context ) {
+            if ( 'service_unavailable' === recruitment_get_applicant_session_error() ) {
+                $fail( __( 'Akun pelamar sedang tidak dapat diverifikasi. Sesi Anda tetap tersimpan; silakan coba kembali.', 'recruitment-plugin' ), 503 );
+            }
             $fail( __( 'Sesi pelamar tidak valid.', 'recruitment-plugin' ), 403 );
         }
 
@@ -194,6 +200,9 @@ class Recruitment_Psychotest_Proctoring {
         }
         $context = $this->get_context();
         if ( null === $context ) {
+            if ( 'service_unavailable' === recruitment_get_applicant_session_error() ) {
+                wp_send_json_error( [ 'message' => 'Akun pelamar sedang tidak dapat diverifikasi. Sesi Anda tetap tersimpan; silakan coba kembali.' ], 503 );
+            }
             wp_send_json_error( [ 'message' => 'Sesi pelamar tidak valid.' ], 403 );
         }
 

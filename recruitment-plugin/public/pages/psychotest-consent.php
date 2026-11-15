@@ -29,6 +29,7 @@ $device_url = recruitment_get_public_url( 'psychotest-device', $consent_argument
                 <div class="daw-recruitment__psychotest-step"><span>2</span><small>Perangkat</small></div>
                 <div class="daw-recruitment__psychotest-step"><span>3</span><small>Kamera</small></div>
                 <div class="daw-recruitment__psychotest-step is-active"><span>4</span><small>Persetujuan</small></div>
+                <div class="daw-recruitment__psychotest-step"><span>5</span><small>Foto &amp; KTP</small></div>
             </div>
             <section class="daw-recruitment__psychotest-card">
                 <header class="daw-consent__header">
@@ -53,8 +54,8 @@ $device_url = recruitment_get_public_url( 'psychotest-device', $consent_argument
                             <p>Browser memeriksa secara lokal jika wajah tidak terlihat beberapa saat atau lebih dari satu wajah terdeteksi. Video tidak dikirim untuk analisis. Maksimal lima snapshot peringatan dapat disimpan untuk seluruh sesi.</p>
                         </article>
                         <article class="daw-consent__fact">
-                            <h3>Pemeriksaan mikrofon</h3>
-                            <p>Anda dapat memeriksa izin dan ketersediaan mikrofon. Hanya status yang dicatat; audio tidak direkam atau disimpan.</p>
+                            <h3>Audio</h3>
+                            <p>Mikrofon tidak diakses selama psikotes. Audio tidak direkam atau disimpan.</p>
                         </article>
                     </div>
                     <p class="daw-consent__note">Sistem tidak melakukan pencocokan identitas wajah atau analisis OCR. Snapshot dikirim hanya saat peringatan dan disimpan secara privat untuk tinjauan HR.</p>

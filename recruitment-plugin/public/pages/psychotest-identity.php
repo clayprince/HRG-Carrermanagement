@@ -46,10 +46,14 @@ recruitment_grant_psychotest_consent( $test_key );
                 </div>
                 <div class="daw-recruitment__psychotest-step">
                     <span>3</span>
+                    <small>Kamera</small>
+                </div>
+                <div class="daw-recruitment__psychotest-step">
+                    <span>4</span>
                     <small>Persetujuan</small>
                 </div>
                 <div class="daw-recruitment__psychotest-step is-active">
-                    <span>4</span>
+                    <span>5</span>
                     <small>Foto &amp; KTP</small>
                 </div>
             </div>
@@ -60,13 +64,14 @@ recruitment_grant_psychotest_consent( $test_key );
                         <div>
                             <h1>Verifikasi Identitas: Foto Bersama KTP</h1>
                             <p>
-                                Untuk memastikan bahwa peserta yang mengisi ujian adalah orang yang benar sesuai dengan berkas lamaran, silakan berfoto selfie memegang KTP Anda. 
-                                Anda juga dapat langsung lanjut ke soal tes <strong><?= esc_html( $subtest_name ) ?></strong> kapan saja.
+                                Untuk memastikan bahwa peserta yang mengisi ujian adalah orang yang benar sesuai dengan berkas lamaran, silakan berfoto selfie memegang KTP Anda. Setelah foto berhasil disimpan, Anda akan langsung diarahkan ke soal tes <strong><?= esc_html( $subtest_name ) ?></strong>.
                             </p>
                         </div>
-                        <a href="<?= esc_url( $next_subtest_url ) ?>" class="daw-recruitment__button daw-identity-btn-skip-top">
-                            Lanjut ke Soal Tes &rarr;
-                        </a>
+                        <?php if ( $identity_processed ) : ?>
+                            <a href="<?= esc_url( $next_subtest_url ) ?>" class="daw-recruitment__button daw-identity-btn-skip-top">
+                                Lanjut ke Soal Tes &rarr;
+                            </a>
+                        <?php endif; ?>
                     </div>
                 </header>
 
@@ -171,7 +176,7 @@ recruitment_grant_psychotest_consent( $test_key );
 
                         <!-- Status Keterangan Interaktif -->
                         <div class="daw-identity-status-box" role="status" data-proctoring-identity-status>
-                            Kamera belum aktif. Klik tombol "Buka Kamera" di bawah atau langsung lanjut ke soal tes.
+                            Kamera belum aktif. Klik tombol "Buka Kamera" di bawah untuk mengambil foto identitas.
                         </div>
 
                         <!-- Panel Tombol Aksi -->
@@ -196,10 +201,11 @@ recruitment_grant_psychotest_consent( $test_key );
                                 </button>
                             </div>
 
-                            <!-- Opsi Langsung Next Tanpa Foto / Lewati -->
-                            <a href="<?= esc_url( $next_subtest_url ) ?>" class="daw-identity-btn-skip-direct" data-proctoring-identity-skip-btn>
-                                &rarr; Lewati &amp; Langsung ke Soal Tes <?= esc_html( $subtest_name ) ?>
-                            </a>
+                            <?php if ( $identity_processed ) : ?>
+                                <a href="<?= esc_url( $next_subtest_url ) ?>" class="daw-identity-btn-skip-direct" data-proctoring-identity-skip-btn>
+                                    &rarr; Lanjut ke Soal Tes <?= esc_html( $subtest_name ) ?>
+                                </a>
+                            <?php endif; ?>
                         </div>
 
                         <!-- Form Pengiriman Backend -->

@@ -33,12 +33,13 @@ foreach ( $department_users as $department_user ) {
 			continue;
 		}
 		$fields = is_array( $saved_request['fields'] ?? null ) ? $saved_request['fields'] : [];
+		$request_headcount = filter_var( $fields['headcount'] ?? null, FILTER_VALIDATE_INT );
 		$requests[ $code ] = [
 			'code' => (string) $code,
 			'department' => (string) ( $fields['department'] ?? get_user_meta( $department_user->ID, 'department', true ) ?: '—' ),
 			'position' => (string) ( $fields['position'] ?? 'Posisi belum diisi' ),
 			'hiring_user' => (string) ( $fields['hiring_user'] ?? $department_user->display_name ),
-			'count' => (int) ( $fields['headcount'] ?? 1 ),
+			'count' => is_int( $request_headcount ) && 1 <= $request_headcount ? (string) $request_headcount : 'Belum diatur',
 			'priority' => (string) ( $fields['priority'] ?? 'Sedang' ),
 			'date' => ! empty( $saved_request['created_at'] ) ? date_i18n( 'd M Y', strtotime( $saved_request['created_at'] ) ) : '—',
 			'status' => $request_status,
@@ -139,7 +140,7 @@ $hr_identity = recruitment_get_current_hr_identity();
 				'Level Jabatan' => $fields['job_level'] ?? '—',
 				'Kategori KJ' => $fields['employment_type'] ?? '—',
 				'Hiring User' => $selected_request['hiring_user'],
-				'Jumlah Kebutuhan' => $selected_request['count'] . ' orang',
+				'Jumlah Kebutuhan' => is_numeric( $selected_request['count'] ) ? $selected_request['count'] . ' orang' : $selected_request['count'],
 				'Status Karyawan' => $fields['employee_status'] ?? '—',
 				'Prioritas' => $selected_request['priority'],
 				'Target Pemenuhan' => $fields['target_date'] ?? '—',

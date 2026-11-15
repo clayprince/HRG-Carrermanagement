@@ -12,6 +12,7 @@ $notice = sanitize_key( wp_unslash( $_GET['notice'] ?? '' ) );
 $hr_account_notice = sanitize_key( wp_unslash( $_GET['hr_account_notice'] ?? '' ) );
 $messages = [
     'created' => [ 'Akun department berhasil dibuat.', 'success' ],
+    'created_mail_failed' => [ 'Akun department berhasil dibuat, tetapi email undangan gagal dikirim. Sampaikan username dan password melalui jalur yang aman.', 'error' ],
     'updated' => [ 'Akun department berhasil diperbarui.', 'success' ],
     'deleted' => [ 'Akun department berhasil dihapus.', 'success' ],
     'deleted_hr' => [ 'Akun HR berhasil dihapus.', 'success' ],
@@ -24,9 +25,10 @@ $messages = [
 ];
 $hr_account_messages = [
     'created' => [ 'Akun Admin HR berhasil dibuat di Oracle. Silakan login menggunakan email dan password yang baru dibuat.', 'success' ],
-    'duplicate' => [ 'Email Admin HR sudah terdaftar di Oracle.', 'error' ],
+    'duplicate' => [ 'Username atau email Admin HR sudah terdaftar di Oracle.', 'error' ],
     'unavailable' => [ 'Akun Admin HR belum dapat dibuat karena Oracle belum tersedia.', 'error' ],
-    'invalid' => [ 'Masukkan email yang valid dan password minimal 8 karakter dengan konfirmasi yang sama.', 'error' ],
+    'schema' => [ 'Struktur tabel Oracle belum sesuai dengan fitur akun Admin HR. Minta DBA memeriksa skema HRS_ROLE_AKSES sebelum mencoba lagi.', 'error' ],
+    'invalid' => [ 'Periksa username, nama lengkap, departemen, email, serta password minimal 8 karakter dan konfirmasinya.', 'error' ],
 ];
 $can_create_account = ! $department_error && ! $account_error && ! empty( $departments );
 $active_accounts = count(
@@ -172,7 +174,9 @@ $can_create_hr_account = current_user_can( 'manage_recruitment' );
                 <div data-account-form="department" hidden>
                     <label>Nama Lengkap<input type="text" name="display_name" maxlength="100" placeholder="contoh: Andi Wirawan" disabled required></label>
                     <input type="hidden" name="username" data-generated-username disabled>
-                    <label>Email<input type="email" name="email" maxlength="50" autocomplete="email" disabled></label>
+                    <label>Email<input type="email" name="email" maxlength="50" autocomplete="email" disabled required></label>
+                    <label>Password<input type="password" name="password" minlength="8" autocomplete="new-password" disabled required></label>
+                    <label>Konfirmasi password<input type="password" name="password_confirmation" minlength="8" autocomplete="new-password" disabled required></label>
                     <label>Departemen<select name="department_id" <?= $departments ? '' : 'disabled' ?> required>
                         <option value="">Pilih departemen</option>
                         <?php foreach ( $departments as $department ) : ?>
@@ -187,7 +191,7 @@ $can_create_hr_account = current_user_can( 'manage_recruitment' );
                         <label><input type="checkbox" name="permissions[]" value="interview_history" checked><span><strong>Riwayat Hasil Wawancara</strong><small>Melihat rekap penilaian yang telah dikirim.</small></span></label>
                         <label><input type="checkbox" name="permissions[]" value="recruitment_report"><span><strong>Laporan Recruitment</strong><small>Melihat laporan statistik recruitment departemen.</small></span></label>
                     </fieldset>
-                    <p class="daw-account-settings__invitation">Email undangan login akan dikirim ke alamat yang didaftarkan bersama password sementara. User harus segera mengganti password setelah login.</p>
+                    <p class="daw-account-settings__invitation">Password dibuat oleh Admin HR dan tidak dikirim melalui email. Bagikan password kepada user melalui jalur yang aman.</p>
                 </div>
             </div>
             <footer>
@@ -259,7 +263,16 @@ $can_create_hr_account = current_user_can( 'manage_recruitment' );
                 <input type="hidden" name="action" value="daw_create_hr_account">
                 <?php wp_nonce_field( 'daw_create_hr_account' ); ?>
                 <div class="daw-account-settings__form-grid">
+                    <label>Username<input type="text" name="username" maxlength="100" autocomplete="username" required></label>
+                    <label>Nama lengkap<input type="text" name="display_name" maxlength="100" autocomplete="name" required></label>
                     <label>Email Admin HR<input type="email" name="email" maxlength="254" autocomplete="email" required></label>
+                    <label>Departemen<select name="hr_department" required>
+                        <option value="">Pilih departemen</option>
+                        <option value="HR People Development &amp; Recruitment">HR People Development &amp; Recruitment</option>
+                        <option value="HR People Development &amp; General Affairss">HR People Development &amp; General Affairss</option>
+                        <option value="Personel &amp; IR">Personel &amp; IR</option>
+                        <option value="legal">legal</option>
+                    </select></label>
                     <label>Password<input type="password" name="password" minlength="8" autocomplete="new-password" required></label>
                     <label>Konfirmasi password<input type="password" name="password_confirmation" minlength="8" autocomplete="new-password" required></label>
                 </div>

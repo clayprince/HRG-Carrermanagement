@@ -42,14 +42,19 @@ it is not a live-schema verification.
   `PERAN` must be `ADMIN_HR` or `KEPALA_DEPARTEMEN`; email and username are
   stored in the same account row.
 - The first HR account can be created from the WordPress administrator-only
-  setup form under Recruitment > Pengelolaan Akun User. The entered password
-  is hashed before it is written to `HRS_ROLE_AKSES`; no default credential is
-  committed to the repository.
+  setup form under Recruitment > Pengelolaan Akun User. The form collects a
+  username, full name, email, department, and password; the password is hashed
+  before it is written to `HRS_ROLE_AKSES`. The account schema migrations must
+  be reviewed and applied by the Oracle owner before account creation; no
+  default credential is committed to the repository.
 - Department accounts use `DEPARTEMEN_ID` and `NAMA_DEPARTEMEN` in the same
   `HRS_ROLE_AKSES` row.
 - New account passwords use PHP `password_hash()` and are checked with
   `password_verify()`. WordPress users are restricted session/capability
   bridges, not copies of Oracle passwords.
+- Department account creation requires an Admin HR-set password and
+  confirmation. Invitation emails never contain the password; share it with
+  the account owner through a separate secure channel.
 - Applicant signup and edit-profile store extended education, work history,
   family, interests, and private document metadata in
   `HRS_PROFIL_KANDIDAT_DETAIL`. With explicit user approval, migration
@@ -71,6 +76,32 @@ it is not a live-schema verification.
   returned to screens.
 
 ## Schema alignment and migrations
+
+### Vacancy hiring capacity
+
+Vacancy headcount is stored in the existing
+`HRS_DETAIL_INFO_LOWONGAN.JUMLAH_KEBUTUHAN` column. HR vacancy forms and
+approved department requests carry a positive integer into the WordPress
+vacancy metadata; the value is copied to Oracle when its application record is
+created and synchronized when an existing linked vacancy is edited. An
+accepted final decision locks that vacancy, counts accepted applications only,
+and prevents acceptance beyond the configured headcount. Rejections do not
+consume capacity.
+
+Publishing and applying through the public portal require a positive headcount
+and an exact link from the WordPress vacancy ID and FPTK code to an approved
+department request. Oracle-only vacancy rows and unlinked WordPress vacancies
+are not public sources.
+
+When accepted candidates reach the headcount, Oracle
+`HRS_KOLOM_LANDING_PENDAFTARAN.STATUS_KOLOM` is set to `0` so the vacancy is
+unpublished, and a linked WordPress vacancy is marked filled and made private.
+The Oracle vacancy and application records are retained. The current Oracle
+status column has no distinct “filled” value (`0` is also used for draft or
+unpublished vacancies), so the explicit filled marker is kept in WordPress
+metadata. Existing Oracle vacancies with a null headcount are not treated as
+having one opening; an acceptance is blocked until a valid headcount is set.
+These behaviors use existing columns and do not require a migration.
 
 ### Running Oracle migration files
 
@@ -117,8 +148,32 @@ their SQL is compatible with the current Oracle database.
   `HRS_PROFILE_KANDIDAT_LOGIN` and require migration
   `009_candidate_account_auth.sql`.
 
+## Interview scheduling
+
+- Migration [`migrations/016_interview_scheduler.sql`](migrations/016_interview_scheduler.sql)
+  adds stage and department scoping to interview slots and links bookings to
+  `HRS_LAMARAN.LAMARAN_ID`. With user approval, it was applied to the local
+  Oracle XE `XEPDB1` database under the `APPS` schema on 2026-11-11. It remains
+  unapplied in other environments; review the target schema and obtain its
+  owner's approval before applying it there. The plugin does not run this
+  migration automatically.
+- HR slots are global and apply only to `INTERVIEW_HR`; User Department slots
+  are restricted to the account's assigned department and apply only to
+  `INTERVIEW_USER`. Candidate booking is available only at the matching current
+  application stage. Slot capacity is serialized by locking the slot row;
+  bookings cannot be changed or cancelled by candidates, and slots with
+  bookings cannot be edited or deleted by administrators.
+- Existing legacy slots and bookings are retained but are not automatically
+  linked to application stages. Do not backfill them without confirming the
+  intended candidate/application mapping with the Oracle owner.
+
 ## Psychometric assessment linking
 
+- The schema reference spells the primary key on
+  `HRS_PERTANYAAN_PSIKOTES` as `PEERTANYAAN_PSIKOTES_ID`; the response and
+  choice tables retain the foreign-key spelling
+  `PERTANYAAN_PSIKOTES_ID`. Keep those identifiers distinct in reads and
+  writes.
 - Assessment sessions are associated with the authenticated Oracle candidate
   profile ID. Progress is kept in a non-autoloaded WordPress option scoped to
   that profile and assessment; answers and completed result records are
@@ -126,7 +181,9 @@ their SQL is compatible with the current Oracle database.
 - Migration `012_psychotest_candidate_results.sql` adds the candidate and
   completed-result links used by assessment writes and result review. It must
   be reviewed and applied by the authorized Oracle owner; the plugin does not
-  run it automatically.
+  run it automatically. The result table's primary key is
+  `HASIL_TES_PSIKOLOGI`; response rows store that value in
+  `HASIL_TES_PSIKOLOGI_ID`.
 - Proctoring consent, identity-verification status, alert metadata, and the
   one-year retention deadline are stored in Oracle by
   `Recruitment_Database`. Migration
@@ -160,6 +217,9 @@ their SQL is compatible with the current Oracle database.
   or the full sum (up to three digits); each lane supports up to 900 answers
   using the on-screen keypad or keyboard. Oracle stores the generated sequence
   and full answers in a compact encoded payload with the correct-answer score.
+  The question-bank admin action can create a missing active Pauli definition
+  and its 20 generic lane records in one transaction; the arithmetic sequence
+  itself is generated per applicant session.
   Long answer payloads are split
   into bounded CLOB binds for PDO_OCI. The Pauli bank must contain at
   least 20 questions to provide the fixed one-hour session. The applicant
@@ -356,7 +416,7 @@ authorization. User interview results are linked to `LAMARAN_ID` so repeated
 applications by one candidate do not share interview data.
 
 These features require migration
-[`migrations/016_hr_interview_department_assignment.sql`](migrations/016_hr_interview_department_assignment.sql).
+[`migrations/017_hr_interview_department_assignment.sql`](migrations/017_hr_interview_department_assignment.sql).
 It creates the HR interview/assignment table and adds the nullable
 application link, foreign key, and unique index to
 `HRS_HASIL_WAWANCARA_USER`. It was applied and verified on the local Oracle
@@ -364,18 +424,55 @@ schema on 2026-11-10; this does not confirm application to any shared or
 production schema. Obtain the Oracle owner's approval and verify the target
 schema before applying it elsewhere. HR and User Department profile downloads
 use Dompdf to generate PDF files. Private applicant uploads remain behind
-authenticated, assignment-checked routes.
+authenticated, assignment-checked routes. HR may explicitly assign an
+application to any active User Department account, including an account from a
+different department; User Department access remains restricted to applications
+assigned to that exact account.
 
 Migration
-[`migrations/017_hr_interview_rating_date.sql`](migrations/017_hr_interview_rating_date.sql)
+[`migrations/018_hr_interview_rating_date.sql`](migrations/018_hr_interview_rating_date.sql)
 adds HR interview dates, ratings, department recommendations, and append-only
-interview note history. With the Oracle owner's approval, it was applied and
+interview note history. Run migration 016 successfully in the same Oracle
+schema before 017. ORA-20071 from migration 017 means one or more of its
+required tables, including `HRS_HASIL_WAWANCARA_HR`, is not visible in that
+schema. With the Oracle owner's approval, migration 017 was applied and
 verified on the local Oracle schema on 2026-11-11 after confirming migration
 016's prerequisites. This does not confirm application to any shared or
 production schema; verify and obtain approval before applying it elsewhere.
 The plugin does not apply the migration automatically. The duplicate local
 copy of migration 016 was reconciled by retaining the canonical
 `migrations/016_hr_interview_department_assignment.sql`.
+
+The HR and User interview schedule administration pages persist configured
+date/time slots separately in `HRS_INTERVIEW_SCHEDULE`. Migration
+[`migrations/018_interview_schedule_slots.sql`](migrations/018_interview_schedule_slots.sql)
+creates the storage table. The schedule screens require this migration and
+report Oracle errors rather than treating an unsaved preview as a successful
+schedule. Review and approve it against the target schema before execution;
+the plugin does not apply it automatically.
+
+Applicant reservations use `HRS_INTERVIEW_BOOKING`, linked to the application
+and its HR/User schedule slot. Apply
+[`migrations/019_interview_slot_bookings.sql`](migrations/019_interview_slot_bookings.sql)
+only after verifying migration 018 and the target `HRS_LAMARAN` columns.
+Booking is allowed only when the application is at the corresponding
+`INTERVIEW_HR` or `INTERVIEW_USER` stage. Capacity is locked and checked in
+the same Oracle transaction as the reservation. Schedule edits preserve booked
+slots, lock their date and time, and reject capacity reductions below existing
+bookings. The plugin does not
+apply migration 019 automatically.
+
+Each schedule slot also requires an interviewer name. Apply
+[`migrations/020_interview_schedule_interviewer.sql`](migrations/020_interview_schedule_interviewer.sql)
+after migrations 018 and 019. Existing schedules must be assigned an interviewer
+before they can be saved through the schedule editor; the plugin does not run
+migrations automatically.
+
+The schedule pages show each slot's bookings and result status. Unbooked slots
+can be edited or removed; booked slots keep their date and time and cannot be
+removed, while capacity cannot be reduced below its current bookings. A slot is
+archived from applicant availability once it is full and every booking has a
+saved interview result.
 
 Some legacy application and vacancy gateway methods still contain
 `DAW_*`-table operations; they need schema reconciliation before being treated

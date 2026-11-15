@@ -10,6 +10,7 @@ $type_labels = [ 'multiple_choice' => 'Pilihan Ganda', 'multi_select' => 'Piliha
 $database = new Recruitment_Database();
 $questions = $database->get_psychotest_question_bank();
 $notice = '';
+$pauli_initialized = false;
 $error = $database->has_error()
     ? 'Bank soal belum dapat dimuat dari Oracle. Silakan coba kembali.'
     : '';
@@ -42,7 +43,9 @@ if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) && isset( $_POST['questi
         : '';
     $result = [ 'success' => false, 'error' => 'Aksi bank soal tidak valid.' ];
 
-    if ( in_array( $action, [ 'preview_pdf_import', 'save_pdf_import' ], true ) ) {
+    if ( 'initialize_pauli_bank' === $action ) {
+        $result = $database->initialize_pauli_question_bank();
+    } elseif ( in_array( $action, [ 'preview_pdf_import', 'save_pdf_import' ], true ) ) {
         $pdf_preview_test = $test;
         $pdf_preview_subtest = isset( $posted['subtest'] ) && is_scalar( $posted['subtest'] )
             ? sanitize_key( (string) $posted['subtest'] )
@@ -188,7 +191,15 @@ if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) && isset( $_POST['questi
         ];
     }
 
-    if ( ! empty( $result['success'] ) && 'preview_pdf_import' !== $action ) {
+    if ( ! empty( $result['success'] ) && 'initialize_pauli_bank' === $action ) {
+        $pauli_initialized = true;
+        $notice = 'Bank Pauli berhasil disiapkan. Angka penjumlahan dibuat otomatis untuk setiap sesi.';
+        $questions = $database->get_psychotest_question_bank();
+        if ( $database->has_error() ) {
+            $notice = '';
+            $error = 'Bank Pauli berhasil disiapkan, tetapi daftar soal belum dapat dimuat ulang dari Oracle.';
+        }
+    } elseif ( ! empty( $result['success'] ) && 'preview_pdf_import' !== $action ) {
         $redirect_args = [ 'page' => 'recruitment-question-bank', 'saved' => '1' ];
         if ( 'save_pdf_import' === $action ) {
             $redirect_args['pdf_imported'] = '1';
@@ -211,12 +222,14 @@ if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) && isset( $_POST['questi
     }
 }
 
-if ( '1' === sanitize_text_field( wp_unslash( $_GET['saved'] ?? '' ) ) ) {
+if ( '1' === sanitize_text_field( wp_unslash( $_GET['pauli_initialized'] ?? '' ) ) ) {
+    $notice = 'Bank Pauli berhasil disiapkan. Angka penjumlahan dibuat otomatis untuk setiap sesi.';
+} elseif ( '1' === sanitize_text_field( wp_unslash( $_GET['saved'] ?? '' ) ) ) {
     $notice = '1' === sanitize_text_field( wp_unslash( $_GET['pdf_imported'] ?? '' ) )
         ? 'Soal hasil impor berhasil disimpan pada bank Oracle.'
         : 'Soal berhasil disimpan pada bank Oracle.';
 }
-$filter_test = sanitize_key( $_GET['test'] ?? '' );
+$filter_test = $pauli_initialized ? 'pauli' : sanitize_key( $_GET['test'] ?? '' );
 $filter_status = sanitize_key( $_GET['status'] ?? '' );
 $search = sanitize_text_field( wp_unslash( $_GET['s'] ?? '' ) );
 $filtered_questions = array_values( array_filter( $questions, static function ( $question ) use ( $filter_test, $filter_status, $search ) {
@@ -255,6 +268,14 @@ $logout_form = recruitment_logout_form( 'Keluar', home_url( '/' ) );
     <section class="daw-question-bank__panel">
         <div class="daw-question-bank__panel-heading"><div><h2>Bank Soal Psikotes</h2><p><?= esc_html( (string) count( $filtered_questions ) ) ?> soal ditampilkan<?php if ( isset( $test_labels[ $filter_test ] ) ) : ?> untuk <?= esc_html( $test_labels[ $filter_test ] ) ?><?php endif; ?></p><small>Soal baru ditambahkan setelah urutan terakhir. Sesi yang sedang berjalan tetap menggunakan soal yang sudah dibuka saat sesi dimulai.</small></div><div class="daw-question-bank__panel-actions">
             <form method="get" class="daw-question-bank__filters"><input type="hidden" name="page" value="recruitment-question-bank"><label class="screen-reader-text" for="question-test-filter">Filter tes</label><select id="question-test-filter" name="test"><option value="">Semua Tes</option><?php foreach ( $test_labels as $test_key => $test_label ) : ?><option value="<?= esc_attr( $test_key ) ?>" <?= selected( $filter_test, $test_key, false ) ?>><?= esc_html( $test_label ) ?></option><?php endforeach; ?></select><label class="screen-reader-text" for="question-status-filter">Filter status</label><select id="question-status-filter" name="status"><option value="">Semua Status</option><option value="active" <?= selected( $filter_status, 'active', false ) ?>>Aktif</option><option value="inactive" <?= selected( $filter_status, 'inactive', false ) ?>>Nonaktif</option></select><label class="screen-reader-text" for="question-search">Cari soal</label><input id="question-search" type="search" name="s" value="<?= esc_attr( $search ) ?>" placeholder="Cari soal..."><button type="submit" class="button">Filter</button></form>
+            <?php if ( $test_counts['pauli'] < 20 ) : ?>
+                <form method="post" class="daw-question-bank__initialize-pauli">
+                    <?php wp_nonce_field( 'recruitment_question_bank' ); ?>
+                    <input type="hidden" name="question_bank_action" value="initialize_pauli_bank">
+                    <button type="submit" class="button button-secondary">Siapkan 20 Lajur Pauli</button>
+                    <p class="description">Entri lajur bersifat teknis; angka soal dibuat acak saat sesi berjalan.</p>
+                </form>
+            <?php endif; ?>
             <button type="button" class="button button-primary" data-new-question>Tambah Soal</button>
         </div></div>
         <div class="daw-question-bank__pdf-import">
