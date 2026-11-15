@@ -299,6 +299,31 @@ foreach ( $all_candidates as $candidate ) {
     }
 }
 
+$offline_filter = isset( $_GET['offline_filter'] ) ? sanitize_key( (string) $_GET['offline_filter'] ) : '';
+$all_filtered_before_offline = $filtered_candidates;
+$offline_count_scored = 0;
+$offline_count_unscored = 0;
+
+foreach ( $all_filtered_before_offline as $cand ) {
+    $has_score = '' !== trim( (string) ( $cand['psychotest_score'] ?? '' ) ) && (float) $cand['psychotest_score'] > 0;
+    if ( $has_score ) {
+        $offline_count_scored++;
+    } elseif ( in_array( strtoupper( (string) ( $cand['raw_status'] ?? '' ) ), [ 'PSIKOTES' ], true ) || false !== stripos( (string) ( $cand['stage'] ?? '' ), 'psikotes' ) ) {
+        $offline_count_unscored++;
+    }
+}
+
+if ( 'scored' === $offline_filter ) {
+    $filtered_candidates = array_values( array_filter( $all_filtered_before_offline, static function( array $cand ): bool {
+        return '' !== trim( (string) ( $cand['psychotest_score'] ?? '' ) ) && (float) $cand['psychotest_score'] > 0;
+    } ) );
+} elseif ( 'unscored' === $offline_filter ) {
+    $filtered_candidates = array_values( array_filter( $all_filtered_before_offline, static function( array $cand ): bool {
+        $has_score = '' !== trim( (string) ( $cand['psychotest_score'] ?? '' ) ) && (float) $cand['psychotest_score'] > 0;
+        return ! $has_score && ( in_array( strtoupper( (string) ( $cand['raw_status'] ?? '' ) ), [ 'PSIKOTES' ], true ) || false !== stripos( (string) ( $cand['stage'] ?? '' ), 'psikotes' ) || ! empty( $cand['application_id'] ) );
+    } ) );
+}
+
 $years = [];
 foreach ( $all_candidates as $candidate ) {
     $years[ (string) $candidate['year'] ] = (string) $candidate['year'];
@@ -488,6 +513,7 @@ $filter_query = array_filter(
         'position' => $position_filter !== '' ? $position_filter : null,
         'dealer' => $dealer_filter !== '' ? $dealer_filter : null,
         'status' => $status_filter !== '' ? $status_filter : null,
+        'offline_filter' => $offline_filter !== '' ? $offline_filter : null,
     ],
     static fn ( $value ) => null !== $value && '' !== $value
 );
@@ -1000,7 +1026,7 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
                 <?php endif; ?>
             <?php endif;             ?>
             <?php if ( in_array( $current_stage_key, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) ) : ?>
-                <section class="daw-documents-panel daw-application-decision">
+                <section class="daw-documents-panel daw-application-decision" style="margin-bottom:16px;">
                     <h2><?= 'INTERVIEW_HR' === $current_stage_key ? 'Wawancara HR' : 'Wawancara User' ?></h2>
                     <p><?= 'INTERVIEW_HR' === $current_stage_key
                         ? 'Simpan hasil dan teruskan kandidat ke User Department melalui halaman Wawancara HR.'
@@ -1011,7 +1037,9 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
                         <a class="button button-primary" href="<?= esc_url( add_query_arg( [ 'page' => 'recruitment-user-interview', 'view' => 'results', 'application_id' => (int) $selected_candidate['application_id'] ], admin_url( 'admin.php' ) ) ) ?>">Lihat Hasil Wawancara User</a>
                     <?php endif; ?>
                 </section>
-            <?php else : ?>
+            <?php endif; ?>
+
+            <?php if ( ! in_array( $raw_status, [ 'DITERIMA', 'DITOLAK' ], true ) ) : ?>
             <section class="daw-documents-panel daw-application-decision">
                 <h2>Perbarui Status Lamaran</h2>
                 <div class="daw-application-decision__current" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
@@ -1578,10 +1606,16 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
         </section>
 
         <section class="daw-applicant-table-card">
-            <div class="daw-applicant-table-card__top">
+            <div class="daw-applicant-table-card__top" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
                 <div>
                     <span class="daw-applicant-table-card__label">Jumlah Data</span>
                     <strong><?= esc_html( number_format_i18n( count( $filtered_candidates ) ) ) ?> dari <?= esc_html( number_format_i18n( $summary_total ) ) ?></strong>
+                </div>
+                <div class="daw-offline-filter-pills" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                    <span style="font-size:12px;font-weight:600;color:#64748b;margin-right:2px;">Psikotes Offline:</span>
+                    <a href="<?= esc_url( add_query_arg( array_merge( $filter_query, [ 'offline_filter' => '' ] ), admin_url( 'admin.php' ) ) ) ?>" class="button <?= '' === $offline_filter ? 'button-primary' : '' ?>" style="border-radius:16px;font-size:12px;padding:1px 12px;min-height:28px;line-height:26px;">Semua (<?= esc_html( count( $all_filtered_before_offline ) ) ?>)</a>
+                    <a href="<?= esc_url( add_query_arg( array_merge( $filter_query, [ 'offline_filter' => 'scored' ] ), admin_url( 'admin.php' ) ) ) ?>" class="button <?= 'scored' === $offline_filter ? 'button-primary' : '' ?>" style="border-radius:16px;font-size:12px;padding:1px 12px;min-height:28px;line-height:26px;background:<?= 'scored' === $offline_filter ? '#059669' : '#ecfdf5' ?>;border-color:<?= 'scored' === $offline_filter ? '#047857' : '#a7f3d0' ?>;color:<?= 'scored' === $offline_filter ? '#fff' : '#065f46' ?>;font-weight:600;">✓ Sudah Diinput (<?= esc_html( $offline_count_scored ) ?>)</a>
+                    <a href="<?= esc_url( add_query_arg( array_merge( $filter_query, [ 'offline_filter' => 'unscored' ] ), admin_url( 'admin.php' ) ) ) ?>" class="button <?= 'unscored' === $offline_filter ? 'button-primary' : '' ?>" style="border-radius:16px;font-size:12px;padding:1px 12px;min-height:28px;line-height:26px;background:<?= 'unscored' === $offline_filter ? '#d97706' : '#fffbeb' ?>;border-color:<?= 'unscored' === $offline_filter ? '#b45309' : '#fde68a' ?>;color:<?= 'unscored' === $offline_filter ? '#fff' : '#92400e' ?>;font-weight:600;">⏳ Belum Diinput (<?= esc_html( $offline_count_unscored ) ?>)</a>
                 </div>
             </div>
 
@@ -1621,7 +1655,14 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
                                         </div>
                                     </td>
                                     <td><span class="daw-year-badge"><?= esc_html( $candidate['year'] ) ?></span></td>
-                                    <td><span class="daw-stage-badge daw-stage-badge--<?= esc_attr( strtolower( str_replace( ' ', '-', $candidate['stage'] ) ) ) ?>"><?= esc_html( $candidate['stage'] ) ?></span></td>
+                                    <td>
+                                        <span class="daw-stage-badge daw-stage-badge--<?= esc_attr( strtolower( str_replace( ' ', '-', $candidate['stage'] ) ) ) ?>"><?= esc_html( $candidate['stage'] ) ?></span>
+                                        <?php if ( '' !== trim( (string) ( $candidate['psychotest_score'] ?? '' ) ) && (float) $candidate['psychotest_score'] > 0 ) : ?>
+                                            <div style="margin-top:4px;"><span style="background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;display:inline-block;">✓ Nilai: <?= esc_html( $candidate['psychotest_score'] ) ?> (Offline)</span></div>
+                                        <?php elseif ( in_array( strtoupper( (string) ( $candidate['raw_status'] ?? '' ) ), [ 'PSIKOTES' ], true ) || false !== stripos( (string) ( $candidate['stage'] ?? '' ), 'psikotes' ) ) : ?>
+                                            <div style="margin-top:4px;"><span style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;display:inline-block;">⏳ Belum Input Nilai</span></div>
+                                        <?php endif; ?>
+                                    </td>
                                     <td><span class="daw-status-badge daw-status-badge--<?= esc_attr( $candidate['status_key'] ) ?>"><?= esc_html( $candidate['status_label'] ) ?></span></td>
                                     <td class="daw-note-cell"><?= esc_html( $candidate['notes'] ) ?></td>
                                     <td class="daw-social-cell">

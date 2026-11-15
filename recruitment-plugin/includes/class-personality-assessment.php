@@ -133,8 +133,7 @@ class Recruitment_Personality_Assessment {
         }
         $test = $catalog[ $test_key ] ?? null;
         if ( ! is_array( $test ) || (int) $test['ID'] !== (int) $test_state['id']
-            || empty( $test['questions'] )
-            || (int) $test['QUESTION_COUNT'] !== count( $test['questions'] ) ) {
+            || empty( $test['questions'] ) ) {
             return [ 'error' => 'Bank soal tes kepribadian belum tersedia atau belum lengkap. Silakan hubungi tim HR.' ];
         }
 
@@ -243,7 +242,8 @@ class Recruitment_Personality_Assessment {
         if ( 'complete' === ( $test_state['status'] ?? '' ) ) {
             return;
         }
-        if ( 'papi' === $test_key && 'complete' !== ( $state['tests']['disc']['status'] ?? '' ) ) {
+        $disc_enabled = recruitment_is_psychotest_test_enabled( 'disc' );
+        if ( 'papi' === $test_key && $disc_enabled && 'complete' !== ( $state['tests']['disc']['status'] ?? '' ) ) {
             wp_die( esc_html__( 'Selesaikan DISC terlebih dahulu sebelum memulai PAPI Kostick.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
         }
         $settings = (array) get_option( 'recruitment_psychotest_settings', [] );
@@ -260,9 +260,7 @@ class Recruitment_Personality_Assessment {
             $latest_test = $catalog[ $test_key ] ?? null;
             if ( ! is_array( $latest_test )
                 || (int) $latest_test['ID'] !== (int) ( $test_state['id'] ?? 0 )
-                || self::REMINDER_MINUTES[ $test_key ] !== (int) $latest_test['DURATION']
-                || self::MINIMUM_QUESTION_COUNTS[ $test_key ] > count( (array) ( $latest_test['questions'] ?? [] ) )
-                || (int) $latest_test['QUESTION_COUNT'] !== count( $latest_test['questions'] ) ) {
+                || empty( $latest_test['questions'] ) ) {
                 wp_die( esc_html__( 'Bank soal tes kepribadian belum tersedia atau berubah. Silakan hubungi tim HR.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
             }
             foreach ( $latest_test['questions'] as $question ) {
@@ -270,7 +268,9 @@ class Recruitment_Personality_Assessment {
                     wp_die( esc_html__( 'Bank soal kepribadian tidak memiliki jumlah pernyataan yang valid. Silakan hubungi tim HR.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
                 }
             }
-            $state['tests'][ $test_key ]['question_order'] = array_map( 'intval', array_column( $latest_test['questions'], 'id' ) );
+            $target_limit = max( 1, absint( $test_settings[ $test_key ]['question_count'] ?? count( $latest_test['questions'] ) ) );
+            $sliced_questions = array_slice( (array) $latest_test['questions'], 0, $target_limit );
+            $state['tests'][ $test_key ]['question_order'] = array_map( 'intval', array_column( $sliced_questions, 'id' ) );
             $state['tests'][ $test_key ]['answers'] = [];
             $state['tests'][ $test_key ]['response_ids'] = [];
             $state['tests'][ $test_key ]['result_id'] = 0;
@@ -300,9 +300,7 @@ class Recruitment_Personality_Assessment {
     private function has_valid_catalog( array $catalog ): bool {
         foreach ( [ 'disc', 'papi' ] as $key ) {
             if ( ! isset( $catalog[ $key ] )
-                || self::REMINDER_MINUTES[ $key ] !== (int) $catalog[ $key ]['DURATION']
-                || self::MINIMUM_QUESTION_COUNTS[ $key ] > count( (array) ( $catalog[ $key ]['questions'] ?? [] ) )
-                || (int) $catalog[ $key ]['QUESTION_COUNT'] !== count( $catalog[ $key ]['questions'] ) ) {
+                || empty( $catalog[ $key ]['questions'] ) ) {
                 return false;
             }
             foreach ( $catalog[ $key ]['questions'] as $question ) {

@@ -1,5 +1,5 @@
 <?php
-$test_labels = [ 'iq' => 'IQ', 'pauli' => 'Pauli', 'disc' => 'DISC', 'papi' => 'PAPI Kostick' ];
+$test_labels = [ 'iq' => 'IQ (TIKI)', 'pauli' => 'Pauli', 'disc' => 'DISC', 'papi' => 'PAPI Kostick (Papikostik)' ];
 $subtest_labels = [
     'iq_numbers' => 'IQ - 1 Berhitung Angka',
     'iq_assembly' => 'IQ - 2 Gabungan Bagian',
@@ -435,7 +435,7 @@ $logout_form = recruitment_logout_form( 'Keluar', home_url( '/' ) );
                 <?php wp_nonce_field( 'recruitment_question_bank' ); ?>
                 <input type="hidden" name="question_bank_action" value="preview_pdf_import">
                 <label for="pdf-import-test">Kategori (opsional)</label>
-                <select id="pdf-import-test" name="question[test]" data-pdf-import-test><option value="auto" <?= selected( $pdf_preview_test, 'auto', false ) ?>>Deteksi otomatis</option><option value="disc" <?= selected( $pdf_preview_test, 'disc', false ) ?>>DISC</option><option value="papi" <?= selected( $pdf_preview_test, 'papi', false ) ?>>PAPI Kostick</option><option value="iq" <?= selected( $pdf_preview_test, 'iq', false ) ?>>IQ</option></select>
+                <select id="pdf-import-test" name="question[test]" data-pdf-import-test><option value="auto" <?= selected( $pdf_preview_test, 'auto', false ) ?>>Deteksi otomatis</option><option value="iq" <?= selected( $pdf_preview_test, 'iq', false ) ?>>IQ (TIKI)</option><option value="disc" <?= selected( $pdf_preview_test, 'disc', false ) ?>>DISC</option><option value="papi" <?= selected( $pdf_preview_test, 'papi', false ) ?>>PAPI Kostick (Papikostik)</option></select>
                 <label for="pdf-import-file">File PDF</label>
                 <input id="pdf-import-file" type="file" name="source_pdf" accept="application/pdf,.pdf" required>
                 <button type="submit" class="button">Ekstrak untuk ditinjau</button>
@@ -451,9 +451,9 @@ $logout_form = recruitment_logout_form( 'Keluar', home_url( '/' ) );
                     <select name="question[test]">
                         <option value="" <?= selected( $pdf_preview_test, '', false ) ?>>Pilih kategori</option>
                         <option value="auto" <?= selected( $pdf_preview_test, 'auto', false ) ?>>Deteksi otomatis</option>
-                        <option value="iq" <?= selected( $pdf_preview_test, 'iq', false ) ?>>IQ</option>
+                        <option value="iq" <?= selected( $pdf_preview_test, 'iq', false ) ?>>IQ (TIKI)</option>
                         <option value="disc" <?= selected( $pdf_preview_test, 'disc', false ) ?>>DISC</option>
-                        <option value="papi" <?= selected( $pdf_preview_test, 'papi', false ) ?>>PAPI Kostick</option>
+                        <option value="papi" <?= selected( $pdf_preview_test, 'papi', false ) ?>>PAPI Kostick (Papikostik)</option>
                     </select>
                     <button type="submit" class="button" name="reparse_pdf_import" value="1">Perbarui pratinjau</button>
                 </label>

@@ -6432,15 +6432,12 @@ class Recruitment_Database {
         } elseif ( in_array( $normalized, [ 'ADMINISTRASI', 'SCREENING', 'SUBMITTED' ], true ) ) {
             $normalized = 'ADMINISTRASI';
         }
-        $allowed_statuses = [ 'PSIKOTES', 'INTERVIEW_HR', 'DITOLAK' ];
+        $allowed_statuses = [ 'PSIKOTES', 'INTERVIEW_HR', 'INTERVIEW_USER', 'FINAL', 'DITERIMA', 'DITOLAK' ];
         if ( ! in_array( $normalized, $allowed_statuses, true ) ) {
             return [ 'success' => false, 'error' => 'Status lamaran tidak dikenal.' ];
         }
 
         $stage = strtoupper( trim( $stage ) );
-        if ( 'DITERIMA' === $normalized || ( 'DITOLAK' === $normalized && 'FINAL' === $stage ) ) {
-            return [ 'success' => false, 'error' => 'Simpan keputusan akhir melalui menu Keputusan Akhir agar hasil HR, departemen, dan tracking tetap sinkron.' ];
-        }
 
         $stage_map = [
             'SUBMITTED'      => 'ADMINISTRASI',
@@ -6471,9 +6468,9 @@ class Recruitment_Database {
             if ( false === $current_status ) {
                 throw new InvalidArgumentException( 'Application not found.' );
             }
-            if ( ! in_array( $current_status, [ 'SUBMITTED', 'SCREENING', 'ADMINISTRASI', 'PSIKOTES' ], true ) ) {
+            if ( ! in_array( $current_status, [ 'SUBMITTED', 'SCREENING', 'ADMINISTRASI', 'PSIKOTES', 'INTERVIEW_HR', 'INTERVIEW_USER', 'FINAL' ], true ) ) {
                 $connection->rollBack();
-                return [ 'success' => false, 'error' => 'Tahap ini harus diproses melalui halaman Wawancara HR, User Department, atau Keputusan Akhir.' ];
+                return [ 'success' => false, 'error' => 'Lamaran sudah selesai atau tidak dalam status aktif.' ];
             }
             $current_stage = in_array( $current_status, [ 'SUBMITTED', 'SCREENING' ], true ) ? 'ADMINISTRASI' : $current_status;
             $expected_next_stage = [
@@ -6481,6 +6478,9 @@ class Recruitment_Database {
                 'SCREENING' => 'PSIKOTES',
                 'ADMINISTRASI' => 'PSIKOTES',
                 'PSIKOTES' => 'INTERVIEW_HR',
+                'INTERVIEW_HR' => 'INTERVIEW_USER',
+                'INTERVIEW_USER' => 'FINAL',
+                'FINAL' => 'DITERIMA',
             ][ $current_status ] ?? '';
             if ( 'DITOLAK' === $normalized ) {
                 if ( '' !== $stage && strtoupper( trim( $stage ) ) !== $current_stage ) {
@@ -6488,11 +6488,13 @@ class Recruitment_Database {
                     return [ 'success' => false, 'error' => 'Keputusan harus disimpan pada tahap seleksi yang sedang berjalan.' ];
                 }
                 $effective_stage = $current_stage;
-            } elseif ( $normalized !== $expected_next_stage || ( '' !== $stage && strtoupper( trim( $stage ) ) !== $expected_next_stage ) ) {
+            } elseif ( 'DITERIMA' === $normalized && in_array( $current_status, [ 'INTERVIEW_USER', 'FINAL' ], true ) ) {
+                $effective_stage = 'FINAL';
+            } elseif ( $normalized !== $expected_next_stage && ( '' === $stage || strtoupper( trim( $stage ) ) !== $expected_next_stage ) ) {
                 $connection->rollBack();
                 return [ 'success' => false, 'error' => 'Kandidat hanya dapat dilanjutkan ke tahap seleksi berikutnya.' ];
             } else {
-                $effective_stage = $expected_next_stage;
+                $effective_stage = '' !== $expected_next_stage ? $expected_next_stage : $normalized;
             }
             $update = $connection->prepare(
                 'UPDATE HRS_LAMARAN SET STATUS_TERKINI = :status_value, STATUS_AKHIR = CASE WHEN :is_final = 1 THEN :final_status ELSE STATUS_AKHIR END, UPDATED_AT = CURRENT_TIMESTAMP WHERE LAMARAN_ID = :application_id'
