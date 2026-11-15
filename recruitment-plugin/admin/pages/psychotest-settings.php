@@ -43,6 +43,8 @@ $notice = '';
 $admin_user = wp_get_current_user();
 $hr_identity = recruitment_get_current_hr_identity();
 $logout_form = recruitment_logout_form( 'Keluar', home_url( '/' ) );
+$proctoring_settings = new Recruitment_Psychotest_Proctoring();
+$violation_config = $proctoring_settings->get_violation_config();
 
 if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['psychotest_settings_action'] ) ) {
     check_admin_referer( 'recruitment_psychotest_settings' );
@@ -103,6 +105,16 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['psychotest_settings
             update_option( 'recruitment_psychotest_tests', $test_settings );
             $notice = 'Konfigurasi tes berhasil disimpan.';
         }
+    } elseif ( 'save_proctoring' === $action ) {
+        $posted = isset( $_POST['violation_config'] ) && is_array( $_POST['violation_config'] )
+            ? wp_unslash( $_POST['violation_config'] )
+            : [];
+        if ( $proctoring_settings->save_violation_config( $posted ) ) {
+            $violation_config = $proctoring_settings->get_violation_config();
+            $notice = 'Konfigurasi pemantauan pelanggaran berhasil disimpan.';
+        } else {
+            wp_die( esc_html__( 'Konfigurasi pemantauan tidak dapat disimpan. Periksa penyimpanan WordPress lalu coba kembali.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+        }
     }
 }
 
@@ -147,6 +159,89 @@ $test_order = [ 'iq', 'pauli', 'personality', 'disc', 'papi' ];
             <fieldset class="daw-psychotest-settings__documents daw-psychotest-settings__online-tests"><legend>Tes yang Diaktifkan untuk Psikotes Online</legend><?php foreach ( [ 'iq' => 'Tes IQ', 'pauli' => 'Tes PAULI', 'personality' => 'Tes Kepribadian (DISC & PAPI Kostick)' ] as $test_key => $test_label ) : ?><label><input type="checkbox" name="global_settings[online_tests][]" value="<?= esc_attr( $test_key ) ?>" <?= checked( in_array( $test_key, $global_settings['online_tests'], true ), true, false ) ?>> <?= esc_html( $test_label ) ?></label><?php endforeach; ?><small>Pilih juga tes yang sudah diaktifkan pada pengaturan masing-masing jenis tes.</small></fieldset>
             <label class="daw-psychotest-settings__field"><span>Informasi Tambahan</span><textarea rows="3" name="global_settings[instructions]" placeholder="Instruksi atau informasi tambahan untuk peserta..."><?= esc_textarea( $global_settings['instructions'] ) ?></textarea></label>
             <div class="daw-psychotest-settings__actions"><button type="submit" class="button button-primary">Simpan Konfigurasi Global</button></div>
+        </form>
+    </section>
+
+    <section class="daw-psychotest-settings__panel" aria-labelledby="psychotest-proctoring-title">
+        <div class="daw-psychotest-settings__panel-heading">
+            <div>
+                <h2 id="psychotest-proctoring-title">Threshold Pemantauan Psikotes</h2>
+                <p>Threshold adalah total durasi indikasi sebelum satu event dicatat. Grace adalah interval sebelum konfirmasi; perilaku normal harus konsisten selama masa pemulihan untuk mengakhiri deteksi. Event hanya menjadi temuan tinjauan, bukan keputusan kecurangan otomatis.</p>
+            </div>
+        </div>
+        <form method="post" class="daw-psychotest-settings__form">
+            <?php wp_nonce_field( 'recruitment_psychotest_settings' ); ?>
+            <input type="hidden" name="psychotest_settings_action" value="save_proctoring">
+            <div style="overflow-x:auto">
+                <table class="widefat striped">
+                    <thead>
+                        <tr>
+                            <th>Deteksi</th>
+                            <th>Aktif</th>
+                            <th>Konfirmasi (detik)</th>
+                            <th>Grace (detik)</th>
+                            <th>Confidence min. (%)</th>
+                            <th>Sensitivitas arah wajah</th>
+                            <th>Pemulihan (detik)</th>
+                            <th>Cooldown (detik)</th>
+                            <th>Ulang (jumlah / detik)</th>
+                            <th>Serius (jumlah / detik)</th>
+                            <th>Keparahan awal</th>
+                            <th>Pesan peringatan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
+                        $violation_labels = [
+                            'FACE_NOT_DETECTED' => 'Wajah tidak terlihat',
+                            'MULTIPLE_FACES' => 'Lebih dari satu wajah',
+                            'FACE_TURNED_AWAY' => 'Wajah menghadap menyamping',
+                            'CAMERA_STOPPED' => 'Kamera terputus',
+                        ];
+                        foreach ( $violation_labels as $event_type => $event_label ) :
+                            $rule = $violation_config[ $event_type ];
+                            ?>
+                            <tr>
+                                <th scope="row"><?= esc_html( $event_label ) ?></th>
+                                <td>
+                                    <input type="hidden" name="violation_config[<?= esc_attr( $event_type ) ?>][enabled]" value="0">
+                                    <input type="checkbox" name="violation_config[<?= esc_attr( $event_type ) ?>][enabled]" value="1" <?= checked( $rule['enabled'], true, false ) ?> aria-label="<?= esc_attr( 'Aktifkan ' . $event_label ) ?>">
+                                </td>
+                                <td><input type="number" min="1" max="60" step="0.1" name="violation_config[<?= esc_attr( $event_type ) ?>][threshold_seconds]" value="<?= esc_attr( number_format( $rule['threshold_ms'] / 1000, 1, '.', '' ) ) ?>" required></td>
+                                <td><input type="number" min="0" max="5" step="0.1" name="violation_config[<?= esc_attr( $event_type ) ?>][grace_seconds]" value="<?= esc_attr( number_format( $rule['grace_ms'] / 1000, 1, '.', '' ) ) ?>" required></td>
+                                <td><input type="number" min="10" max="100" step="1" name="violation_config[<?= esc_attr( $event_type ) ?>][confidence_percent]" value="<?= esc_attr( (string) round( $rule['confidence_threshold'] * 100 ) ) ?>" required></td>
+                                <td>
+                                    <?php if ( 'FACE_TURNED_AWAY' === $event_type ) : ?>
+                                        <input type="number" min="0.05" max="1" step="0.05" name="violation_config[<?= esc_attr( $event_type ) ?>][signal_threshold]" value="<?= esc_attr( number_format( (float) $rule['signal_threshold'], 2, '.', '' ) ) ?>" required>
+                                    <?php else : ?>
+                                        —
+                                    <?php endif; ?>
+                                </td>
+                                <td><input type="number" min="0.25" max="10" step="0.25" name="violation_config[<?= esc_attr( $event_type ) ?>][recovery_seconds]" value="<?= esc_attr( number_format( $rule['recovery_ms'] / 1000, 2, '.', '' ) ) ?>" required></td>
+                                <td><input type="number" min="0" max="300" step="1" name="violation_config[<?= esc_attr( $event_type ) ?>][cooldown_seconds]" value="<?= esc_attr( number_format( $rule['cooldown_ms'] / 1000, 0, '.', '' ) ) ?>" required></td>
+                                <td>
+                                    <input type="number" min="2" max="20" name="violation_config[<?= esc_attr( $event_type ) ?>][repeat_warning_count]" value="<?= esc_attr( (string) $rule['repeat_warning_count'] ) ?>" required>
+                                    <input type="number" min="10" max="1800" name="violation_config[<?= esc_attr( $event_type ) ?>][repeat_warning_window_seconds]" value="<?= esc_attr( (string) ( $rule['repeat_warning_window_ms'] / 1000 ) ) ?>" required>
+                                </td>
+                                <td>
+                                    <input type="number" min="3" max="30" name="violation_config[<?= esc_attr( $event_type ) ?>][repeat_serious_count]" value="<?= esc_attr( (string) $rule['repeat_serious_count'] ) ?>" required>
+                                    <input type="number" min="10" max="3600" name="violation_config[<?= esc_attr( $event_type ) ?>][repeat_serious_window_seconds]" value="<?= esc_attr( (string) ( $rule['repeat_serious_window_ms'] / 1000 ) ) ?>" required>
+                                </td>
+                                <td>
+                                    <select name="violation_config[<?= esc_attr( $event_type ) ?>][severity]">
+                                        <?php foreach ( [ 'warning' => 'Peringatan', 'repeated' => 'Berulang', 'serious' => 'Serius' ] as $severity => $severity_label ) : ?>
+                                            <option value="<?= esc_attr( $severity ) ?>" <?= selected( $rule['severity'], $severity, false ) ?>><?= esc_html( $severity_label ) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </td>
+                                <td><input type="text" class="regular-text" maxlength="240" name="violation_config[<?= esc_attr( $event_type ) ?>][warning_message]" value="<?= esc_attr( $rule['warning_message'] ) ?>" required></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <p class="description">Detektor saat ini hanya mendukung kategori di atas. Browser menghitung durasi dengan timestamp aktual; confidence detector memakai nilai aktif tertinggi untuk satu sesi kamera. Jumlah dan durasi pengulangan serta cooldown disimpan per jenis deteksi. Perubahan ini tidak mengaktifkan deteksi mata, ucapan, telepon, atau objek.</p>
+            <div class="daw-psychotest-settings__actions"><button type="submit" class="button button-primary">Simpan Threshold Pemantauan</button></div>
         </form>
     </section>
 

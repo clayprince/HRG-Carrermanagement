@@ -64,13 +64,24 @@ class Recruitment_Psychotest_Pdf_Importer {
      * @return array{success: bool, questions?: array<int, array<string, mixed>>, error?: string}
      */
     public function parse_questions( string $text, string $test, string $subtest = '' ): array {
+        if ( 'auto' === $test ) {
+            $test = $this->detect_test( $text );
+        }
         if ( 'iq' === $test ) {
-            return $this->parse_iq_questions( $text, $subtest );
+            $remove_heading = '' === $subtest;
+            if ( $remove_heading ) {
+                $subtest = $this->detect_iq_subtest( $text );
+            }
+            if ( '' === $subtest ) {
+                $subtest = 'iq_numbers';
+            }
+            return $this->parse_iq_questions( $text, $subtest, $remove_heading );
         }
         if ( ! in_array( $test, [ 'disc', 'papi' ], true ) ) {
-            return [ 'success' => false, 'error' => 'Impor PDF hanya tersedia untuk IQ, DISC, dan PAPI Kostick.' ];
+            return [ 'success' => false, 'error' => 'Kategori belum dapat dikenali. Pilih IQ, DISC, atau PAPI Kostick lalu coba ekstrak kembali.' ];
         }
 
+        $text = preg_replace( '/^\s*(?:DISC|PAPI(?:\s+Kostick)?|Kostick)\s*$/imu', '', $text ) ?? $text;
         $expected_items = 'disc' === $test ? 4 : 2;
         $blocks = preg_split( '/\n\s*\n/u', trim( $text ) ) ?: [];
         if ( 1 === count( $blocks ) ) {
@@ -127,10 +138,82 @@ class Recruitment_Psychotest_Pdf_Importer {
         return [ 'success' => true, 'questions' => $questions ];
     }
 
+    public function detect_test( string $text ): string {
+        if ( 1 === preg_match( '/\b(?:PAPI|Kostick)\b/iu', $text ) ) {
+            return 'papi';
+        }
+        if ( 1 === preg_match( '/\bDISC\b/iu', $text ) ) {
+            return 'disc';
+        }
+        if ( 1 === preg_match( '/\b(?:IQ|intelligence|kecerdasan|berhitung(?:\s+angka)?|hubungan\s+kata|gabungan\s+bagian|abstraksi)\b/iu', $text )
+            || 1 === preg_match( '/^\s*[A-F][.) :]\s*\S.*$/imu', $text ) ) {
+            return 'iq';
+        }
+
+        $blocks = preg_split( '/\n\s*\n/u', trim( $text ) ) ?: [];
+        $item_counts = [];
+        foreach ( $blocks as $block ) {
+            $items = array_values( array_filter( array_map( 'trim', preg_split( '/\R/u', $block ) ?: [] ) ) );
+            $items = array_values( array_filter(
+                $items,
+                static fn ( string $item ): bool => 1 !== preg_match( '/^(?:petunjuk|instruksi|contoh)\b/iu', $item )
+            ) );
+            if ( $items ) {
+                $item_counts[] = count( $items );
+            }
+        }
+        if ( $item_counts && 1 === count( array_unique( $item_counts ) ) ) {
+            if ( 4 === $item_counts[0] ) {
+                return 'disc';
+            }
+            if ( 2 === $item_counts[0] ) {
+                return 'papi';
+            }
+        }
+        return '';
+    }
+
+    private function detect_iq_subtest( string $text ): string {
+        $text = preg_replace( '/\r\n?/', "\n", $text ) ?? $text;
+        $lines = preg_split( '/\n/u', $text ) ?: [];
+        $header_lines = $lines;
+        foreach ( $lines as $line_index => $line ) {
+            if ( preg_match( '/^\s*\d{1,3}[.)]\s+\S/u', $line ) ) {
+                $header_lines = array_slice( $lines, 0, $line_index );
+                break;
+            }
+        }
+        if ( $header_lines === $lines ) {
+            $paragraphs = preg_split( '/\n\s*\n/u', trim( $text ) ) ?: [];
+            $header_lines = preg_split( '/\n/u', $paragraphs[0] ?? '' ) ?: [];
+            if ( 1 === count( $header_lines ) && 1 === count( $paragraphs ) && isset( $lines[0] ) ) {
+                $header_lines = [ $lines[0] ];
+            }
+        }
+        $header = implode( "\n", $header_lines );
+        $patterns = [
+            'iq_numbers' => [ '/\bberhitung(?:\s+angka)?\b/iu', '/\bangka\b/iu', '/\bnumbers?\b/iu' ],
+            'iq_assembly' => [ '/\bgabungan(?:\s+bagian)?\b/iu', '/\bassembly\b/iu' ],
+            'iq_words' => [ '/\bhubungan\s+kata\b/iu', '/\bwords?\b/iu' ],
+            'iq_abstraction' => [ '/\babstraksi\b/iu', '/\bnon[\s-]?verbal\b/iu', '/\babstraction\b/iu' ],
+        ];
+        $matches = [];
+        foreach ( $patterns as $subtest => $aliases ) {
+            foreach ( $aliases as $pattern ) {
+                if ( 1 === preg_match( $pattern, $header ) ) {
+                    $matches[] = $subtest;
+                    break;
+                }
+            }
+        }
+
+        return 1 === count( $matches ) ? $matches[0] : '';
+    }
+
     /**
      * @return array{success: bool, questions?: array<int, array<string, mixed>>, error?: string}
      */
-    private function parse_iq_questions( string $text, string $subtest ): array {
+    private function parse_iq_questions( string $text, string $subtest, bool $remove_heading = false ): array {
         if ( ! in_array( $subtest, [ 'iq_numbers', 'iq_assembly', 'iq_words', 'iq_abstraction' ], true ) ) {
             return [ 'success' => false, 'error' => 'Pilih salah satu dari empat subtes IQ sebelum memproses PDF.' ];
         }
@@ -138,6 +221,16 @@ class Recruitment_Psychotest_Pdf_Importer {
         $text = trim( preg_replace( '/\r\n?/', "\n", $text ) ?? $text );
         if ( '' === $text ) {
             return [ 'success' => false, 'error' => 'Tidak ada teks soal IQ untuk diproses.' ];
+        }
+
+        if ( $remove_heading ) {
+            $lines = preg_split( '/\n/u', $text ) ?: [];
+            foreach ( $lines as $line_index => $line ) {
+                if ( preg_match( '/^\s*\d{1,3}[.)]\s+\S/u', $line ) ) {
+                    $text = implode( "\n", array_slice( $lines, $line_index ) );
+                    break;
+                }
+            }
         }
 
         $blocks = preg_split( '/\n\s*\n/u', $text ) ?: [];
@@ -190,8 +283,8 @@ class Recruitment_Psychotest_Pdf_Importer {
             if ( '' === $prompt || 4000 < strlen( $prompt ) ) {
                 return [ 'success' => false, 'error' => 'Setiap soal IQ harus memiliki pertanyaan dengan panjang maksimal 4.000 karakter.' ];
             }
-            if ( 2 > count( $choices ) || 6 < count( $choices ) || '' === $answer_key ) {
-                return [ 'success' => false, 'error' => 'Setiap soal IQ harus memiliki 2–6 pilihan A–F dan kunci jawaban (contoh: Kunci: B).' ];
+            if ( 2 > count( $choices ) || 6 < count( $choices ) ) {
+                return [ 'success' => false, 'error' => 'Setiap soal IQ harus memiliki 2–6 pilihan jawaban.' ];
             }
             foreach ( $choices as $choice ) {
                 if ( '' === trim( $choice ) ) {
@@ -199,22 +292,25 @@ class Recruitment_Psychotest_Pdf_Importer {
                 }
             }
             $labels = array_keys( $choices );
-            foreach ( str_split( str_replace( ',', '|', $answer_key ) ) as $answer ) {
-                if ( '|' === $answer ) {
-                    continue;
+            $answer_indexes = [];
+            if ( '' !== $answer_key ) {
+                foreach ( str_split( str_replace( ',', '|', $answer_key ) ) as $answer ) {
+                    if ( '|' === $answer ) {
+                        continue;
+                    }
+                    if ( ! in_array( $answer, $labels, true ) ) {
+                        return [ 'success' => false, 'error' => 'Kunci jawaban IQ harus cocok dengan label pilihan yang tersedia.' ];
+                    }
                 }
-                if ( ! in_array( $answer, $labels, true ) ) {
-                    return [ 'success' => false, 'error' => 'Kunci jawaban IQ harus cocok dengan label pilihan yang tersedia.' ];
+                $answers = array_values( array_filter( preg_split( '/[,|]/', $answer_key ) ?: [] ) );
+                if ( ! $answers || 2 < count( $answers ) || count( $answers ) !== count( array_unique( $answers ) ) ) {
+                    return [ 'success' => false, 'error' => 'Kunci jawaban IQ tidak valid.' ];
                 }
+                $answer_indexes = array_map(
+                    static fn ( string $answer ): string => (string) ( array_search( $answer, $labels, true ) + 1 ),
+                    $answers
+                );
             }
-            $answers = array_values( array_filter( preg_split( '/[,|]/', $answer_key ) ?: [] ) );
-            if ( ! $answers || 2 < count( $answers ) || count( $answers ) !== count( array_unique( $answers ) ) ) {
-                return [ 'success' => false, 'error' => 'Kunci jawaban IQ tidak valid.' ];
-            }
-            $answer_indexes = array_map(
-                static fn ( string $answer ): string => (string) ( array_search( $answer, $labels, true ) + 1 ),
-                $answers
-            );
             $questions[] = [
                 'subtest' => $subtest,
                 'prompt' => $prompt,

@@ -438,9 +438,7 @@ $attendance_messages = [
                     <?php if ( 'online' === $psychotest_mode && $psychotest_online_window_open ) : ?>
                         <div class="daw-psychotest-info__actions">
                             <a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'psychotest', [ 'application_id' => $selected_application_id ] ) ) ?>">Beranda Psikotes</a>
-                            <?php if ( '' !== $psychotest_preparation_test ) : ?>
-                                <a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'psychotest-preparation', [ 'test' => $psychotest_preparation_test, 'application_id' => $selected_application_id ] ) ) ?>">Mulai Persiapan Tes Psikotes</a>
-                            <?php else : ?>
+                            <?php if ( '' === $psychotest_preparation_test ) : ?>
                                 <p class="daw-psychotest-info__notice">Semua tes yang aktif telah diselesaikan, atau belum ada tes online aktif yang dapat dimulai.</p>
                             <?php endif; ?>
                         </div>

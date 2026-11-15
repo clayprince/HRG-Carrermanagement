@@ -1,5 +1,17 @@
 <?php
-$back_url = recruitment_get_public_url( 'application-process' );
+$application_id = recruitment_get_psychotest_application_id();
+if ( $application_id < 1 ) {
+    wp_safe_redirect( recruitment_get_public_url( 'application-process' ) );
+    exit;
+}
+$stage_status = recruitment_applicant_psychotest_stage_status( (string) $application_id );
+if ( null === $stage_status ) {
+    wp_die( esc_html__( 'Status lamaran tidak dapat diverifikasi. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+}
+if ( ! $stage_status ) {
+    wp_die( esc_html__( 'Beranda psikotes hanya tersedia untuk lamaran yang sedang berada pada tahap psikotes.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+}
+$back_url = recruitment_get_public_url( 'application-process', [ 'application_id' => $application_id ] );
 $user_id = recruitment_get_assessment_user_id();
 $iq_state = recruitment_get_assessment_state( $user_id, 'recruitment_iq_assessment' );
 $pauli_state = recruitment_get_assessment_state( $user_id, 'recruitment_pauli_assessment' );
@@ -17,7 +29,11 @@ $personality_active_test = is_array( $personality_state ) ? sanitize_key( (strin
 $personality_next_test = 'papi' === $personality_active_test || $disc_complete ? 'papi' : 'disc';
 $personality_active = in_array( $personality_active_test, [ 'disc', 'papi' ], true )
     && 'active' === ( $personality_tests[ $personality_active_test ]['status'] ?? '' );
-$has_existing_proctoring_consent = ( new Recruitment_Psychotest_Proctoring() )->has_current_consent();
+$proctoring = new Recruitment_Psychotest_Proctoring();
+$preparation_complete = $proctoring->has_current_consent( $application_id );
+if ( $proctoring->get_current_session_error() ) {
+    wp_die( esc_html__( 'Status persiapan psikotes tidak dapat dibaca dari Oracle. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+}
 $psychotest_settings = recruitment_sync_psychotest_closing( (array) get_option( 'recruitment_psychotest_settings', [] ) );
 $iq_enabled = recruitment_is_psychotest_test_enabled( 'iq' );
 $pauli_enabled = recruitment_is_psychotest_test_enabled( 'pauli' );
@@ -145,13 +161,14 @@ $progress = 0 < $test_count ? (int) round( $completed_count / $test_count * 100 
                     $status = $complete ? 'Selesai' : ( $active ? 'Sedang dikerjakan' : ( $unlocked ? 'Tersedia' : 'Menunggu tes sebelumnya' ) );
                     $status_class = $complete ? 'complete' : ( $unlocked ? 'available' : 'locked' );
                     $test_arguments = 'psych-personality' === $test['screen'] ? [ 'test' => $test['test'] ] : [];
-                    if ( $active ) {
-                        $test_url = recruitment_get_public_url( $test['screen'], $test_arguments );
-                    } elseif ( $has_existing_proctoring_consent ) {
-                        $test_arguments['start'] = '1';
+                    $test_arguments['application_id'] = $application_id;
+                    if ( $preparation_complete ) {
+                        if ( ! $active ) {
+                            $test_arguments['start'] = '1';
+                        }
                         $test_url = recruitment_get_public_url( $test['screen'], $test_arguments );
                     } else {
-                        $test_url = recruitment_get_public_url( 'psychotest-preparation', [ 'test' => $test['test'] ] );
+                        $test_url = '';
                     }
                     ?>
                     <article class="daw-recruitment__psychotest-item <?= esc_attr( 'is-' . $status_class ) ?>">
@@ -164,12 +181,22 @@ $progress = 0 < $test_count ? (int) round( $completed_count / $test_count * 100 
                             <p class="daw-recruitment__psychotest-description"><?= esc_html( $test['description'] ) ?></p>
                             <small><?= esc_html( $test['duration'] ) ?></small>
                         </div>
-                        <?php if ( ! $complete && $unlocked ) : ?>
+                        <?php if ( ! $complete && $unlocked && '' !== $test_url ) : ?>
                             <a class="daw-recruitment__button daw-recruitment__button--small" href="<?= esc_url( $test_url ) ?>"><?= esc_html( $active ? 'Lanjutkan Tes' : 'Mulai Tes' ) ?></a>
                         <?php endif; ?>
                     </article>
                 <?php endforeach; ?>
             </section>
+
+            <?php if ( ! $preparation_complete && 0 < $test_count ) : ?>
+                <section class="daw-recruitment__psychotest-card daw-recruitment__psychotest-preparation-cta">
+                    <div>
+                        <strong>Persiapan awal diperlukan</strong>
+                        <p>Lengkapi pemeriksaan perangkat, kamera, persetujuan, dan verifikasi identitas sebelum memulai Tes IQ.</p>
+                    </div>
+                    <a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'psychotest-preparation', [ 'application_id' => $application_id ] ) ) ?>">Persiapan Assesment</a>
+                </section>
+            <?php endif; ?>
 
             <div class="daw-recruitment__psychotest-footer">
                 <div class="daw-recruitment__psychotest-divider" aria-hidden="true"></div>

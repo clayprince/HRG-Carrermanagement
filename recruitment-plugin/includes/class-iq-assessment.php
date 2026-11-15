@@ -32,13 +32,18 @@ class Recruitment_IQ_Assessment {
         }
 
         if ( '1' === sanitize_text_field( wp_unslash( $_GET['start'] ?? '' ) ) ) {
+            $application_id = recruitment_get_psychotest_application_id();
             if ( ! is_array( $state ) || empty( $state['status'] ) ) {
                 if ( ! recruitment_is_psychotest_test_enabled( 'iq' ) ) {
                     wp_die( esc_html__( 'Tes IQ sedang tidak tersedia untuk sesi online. Silakan periksa jadwal dengan tim HR.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
                 }
-                $this->start_session( $user_id, $candidate_id );
+                recruitment_require_psychotest_preparation( $application_id );
+                $this->start_session( $user_id, $candidate_id, $application_id );
+            } elseif ( absint( $state['application_id'] ?? 0 ) > 0 && absint( $state['application_id'] ) !== $application_id ) {
+                wp_die( esc_html__( 'Sesi Tes IQ ini terhubung ke lamaran lain.', 'recruitment-plugin' ), '', [ 'response' => 409 ] );
             }
-            wp_safe_redirect( recruitment_get_public_url( 'psych-iq' ) );
+            $arguments = $application_id > 0 ? [ 'application_id' => $application_id ] : [];
+            wp_safe_redirect( recruitment_get_public_url( 'psych-iq', $arguments ) );
             exit;
         }
 
@@ -114,7 +119,7 @@ class Recruitment_IQ_Assessment {
 
         $index = absint( $state['subtest_index'] ?? 0 );
         $test_state = $state['tests'][ $index ] ?? null;
-        $catalog = $this->database->get_iq_assessment();
+        $catalog = $this->database->get_iq_assessment( true );
         if ( $this->database->has_error() ) {
             return [ 'error' => 'Koneksi Oracle belum tersedia. Silakan coba kembali nanti.' ];
         }
@@ -177,7 +182,7 @@ class Recruitment_IQ_Assessment {
         return recruitment_get_assessment_user_id();
     }
 
-    private function start_session( int $user_id, int $candidate_id ): void {
+    private function start_session( int $user_id, int $candidate_id, int $application_id ): void {
         $global_settings = (array) get_option( 'recruitment_psychotest_settings', [] );
         $test_settings = (array) get_option( 'recruitment_psychotest_tests', [] );
         if ( isset( $global_settings['status'] ) && 'active' !== $global_settings['status'] ) {
@@ -230,7 +235,7 @@ class Recruitment_IQ_Assessment {
         $now = time();
         $tests[0]['started_at'] = $now;
         $tests[0]['deadline'] = $now + ( $tests[0]['duration'] * MINUTE_IN_SECONDS );
-        if ( ! recruitment_consume_psychotest_consent( 'iq' ) ) {
+        if ( ! recruitment_consume_psychotest_consent( 'iq', $application_id ) ) {
             wp_die( esc_html__( 'Berikan persetujuan tes terlebih dahulu.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
         }
         recruitment_update_assessment_state(
@@ -239,6 +244,7 @@ class Recruitment_IQ_Assessment {
             [
                 'version' => 1,
                 'candidate_id' => $candidate_id,
+                'application_id' => $application_id,
                 'status' => 'active',
                 'subtest_index' => 0,
                 'tests' => $tests,
@@ -335,6 +341,35 @@ class Recruitment_IQ_Assessment {
         if ( ! is_array( $test ) || (int) ( $state['candidate_id'] ?? 0 ) !== $candidate_id ) {
             wp_die( esc_html__( 'Sesi tes tidak dapat dilanjutkan.', 'recruitment-plugin' ), '', [ 'response' => 409 ] );
         }
+        $next_index = $index + 1;
+        $next_questions = [];
+        $next_choice_order = [];
+        if ( $next_index < count( $state['tests'] ) ) {
+            $catalog = $this->database->get_iq_assessment();
+            if ( $this->database->has_error() ) {
+                wp_die( esc_html__( 'Koneksi Oracle belum tersedia. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+            }
+            $next_test = $catalog[ $next_index ] ?? null;
+            if ( ! is_array( $next_test )
+                || (int) $next_test['ID'] !== (int) ( $state['tests'][ $next_index ]['id'] ?? 0 )
+                || ! isset( self::SUBTEST_DURATIONS[ $next_index ] )
+                || (int) $next_test['DURATION'] !== self::SUBTEST_DURATIONS[ $next_index ]
+                || empty( $next_test['questions'] )
+                || (int) $next_test['QUESTION_COUNT'] !== count( $next_test['questions'] ) ) {
+                wp_die( esc_html__( 'Bank soal subtes IQ berikutnya belum tersedia atau berubah. Silakan hubungi tim HR.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+            }
+            foreach ( $next_test['questions'] as $question ) {
+                $question_id = (int) $question['id'];
+                if ( $question_id < 1 || count( $question['choices'] ) < 2 ) {
+                    wp_die( esc_html__( 'Ada soal IQ yang belum memiliki pilihan jawaban lengkap.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+                }
+                $next_questions[] = $question_id;
+                $next_choice_order[ $question_id ] = array_map( 'intval', array_column( $question['choices'], 'id' ) );
+                shuffle( $next_choice_order[ $question_id ] );
+            }
+            shuffle( $next_questions );
+        }
+
         $result = $this->database->complete_iq_subtest(
             $candidate_id,
             (int) $test['id'],
@@ -347,13 +382,17 @@ class Recruitment_IQ_Assessment {
 
         $state['tests'][ $index ]['result_id'] = (int) $result['result_id'];
         $state['results'][] = (int) $result['result_id'];
-        $next_index = $index + 1;
         if ( $next_index >= count( $state['tests'] ) ) {
             $state['status'] = 'complete';
             $state['completed_at'] = time();
         } else {
             $state['subtest_index'] = $next_index;
             $now = time();
+            $state['tests'][ $next_index ]['question_order'] = $next_questions;
+            $state['tests'][ $next_index ]['choice_order'] = $next_choice_order;
+            $state['tests'][ $next_index ]['answers'] = [];
+            $state['tests'][ $next_index ]['response_ids'] = [];
+            $state['tests'][ $next_index ]['result_id'] = 0;
             $state['tests'][ $next_index ]['started_at'] = $now;
             $state['tests'][ $next_index ]['deadline'] = $now + ( (int) $state['tests'][ $next_index ]['duration'] * MINUTE_IN_SECONDS );
         }

@@ -36,14 +36,26 @@ class Recruitment_Personality_Assessment {
         }
         if ( '1' === sanitize_text_field( wp_unslash( $_GET['start'] ?? '' ) ) ) {
             $state = recruitment_get_assessment_state( $user_id, self::USER_META_KEY );
+            $application_id = recruitment_get_psychotest_application_id();
+            if ( $this->is_valid_state( $state, $candidate_id )
+                && absint( $state['application_id'] ?? 0 ) > 0
+                && absint( $state['application_id'] ) !== $application_id ) {
+                wp_die( esc_html__( 'Sesi tes kepribadian ini terhubung ke lamaran lain.', 'recruitment-plugin' ), '', [ 'response' => 409 ] );
+            }
             $test_already_started = is_array( $state )
                 && (int) ( $state['candidate_id'] ?? 0 ) === $candidate_id
                 && in_array( $state['tests'][ $test_key ]['status'] ?? '', [ 'active', 'complete' ], true );
+            if ( $test_already_started && absint( $state['application_id'] ?? 0 ) > 0 && absint( $state['application_id'] ) !== $application_id ) {
+                wp_die( esc_html__( 'Sesi tes kepribadian ini terhubung ke lamaran lain.', 'recruitment-plugin' ), '', [ 'response' => 409 ] );
+            }
             if ( ! $test_already_started && ! recruitment_is_psychotest_test_enabled( $test_key ) ) {
                 wp_die( esc_html__( 'Tes kepribadian sedang tidak tersedia untuk sesi online. Silakan periksa jadwal dengan tim HR.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
             }
-            $this->start_test( $user_id, $candidate_id, $test_key );
-            wp_safe_redirect( recruitment_get_public_url( 'psych-personality', [ 'test' => $test_key ] ) );
+            if ( ! $test_already_started ) {
+                recruitment_require_psychotest_preparation( $application_id );
+            }
+            $this->start_test( $user_id, $candidate_id, $test_key, $application_id );
+            wp_safe_redirect( recruitment_get_public_url( 'psych-personality', [ 'test' => $test_key, 'application_id' => $application_id ] ) );
             exit;
         }
     }
@@ -115,7 +127,7 @@ class Recruitment_Personality_Assessment {
             return [ 'ready' => false, 'test_key' => $test_key ];
         }
 
-        $catalog = $this->database->get_personality_assessments();
+        $catalog = $this->database->get_personality_assessments( false, true );
         if ( $this->database->has_error() ) {
             return [ 'error' => 'Koneksi Oracle belum tersedia. Silakan coba kembali nanti.' ];
         }
@@ -184,11 +196,11 @@ class Recruitment_Personality_Assessment {
             && is_array( $state['tests']['papi'] );
     }
 
-    private function start_test( int $user_id, int $candidate_id, string $test_key ): void {
+    private function start_test( int $user_id, int $candidate_id, string $test_key, int $application_id ): void {
         $state = recruitment_get_assessment_state( $user_id, self::USER_META_KEY );
         $test_already_started = $this->is_valid_state( $state, $candidate_id )
             && in_array( $state['tests'][ $test_key ]['status'] ?? '', [ 'active', 'complete' ], true );
-        if ( ! $test_already_started && ! recruitment_consume_psychotest_consent( $test_key ) ) {
+        if ( ! $test_already_started && ! recruitment_consume_psychotest_consent( $test_key, $application_id ) ) {
             wp_die( esc_html__( 'Berikan persetujuan tes terlebih dahulu.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
         }
         if ( ! $this->is_valid_state( $state, $candidate_id ) ) {
@@ -206,6 +218,7 @@ class Recruitment_Personality_Assessment {
             $state = [
                 'version' => 1,
                 'candidate_id' => $candidate_id,
+                'application_id' => $application_id,
                 'active_test' => '',
                 'tests' => [],
             ];
@@ -222,6 +235,8 @@ class Recruitment_Personality_Assessment {
                     'result_id' => 0,
                 ];
             }
+        } elseif ( empty( $state['application_id'] ) ) {
+            $state['application_id'] = $application_id;
         }
 
         $test_state = $state['tests'][ $test_key ];
@@ -236,6 +251,29 @@ class Recruitment_Personality_Assessment {
         if ( ( isset( $settings['status'] ) && 'active' !== $settings['status'] )
             || ( isset( $test_settings[ $test_key ]['active'] ) && empty( $test_settings[ $test_key ]['active'] ) ) ) {
             wp_die( esc_html__( 'Tes kepribadian sedang dinonaktifkan oleh tim HR.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+        }
+        if ( 'active' !== ( $test_state['status'] ?? '' ) ) {
+            $catalog = $this->database->get_personality_assessments();
+            if ( $this->database->has_error() ) {
+                wp_die( esc_html__( 'Koneksi Oracle belum tersedia. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+            }
+            $latest_test = $catalog[ $test_key ] ?? null;
+            if ( ! is_array( $latest_test )
+                || (int) $latest_test['ID'] !== (int) ( $test_state['id'] ?? 0 )
+                || self::REMINDER_MINUTES[ $test_key ] !== (int) $latest_test['DURATION']
+                || self::MINIMUM_QUESTION_COUNTS[ $test_key ] > count( (array) ( $latest_test['questions'] ?? [] ) )
+                || (int) $latest_test['QUESTION_COUNT'] !== count( $latest_test['questions'] ) ) {
+                wp_die( esc_html__( 'Bank soal tes kepribadian belum tersedia atau berubah. Silakan hubungi tim HR.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+            }
+            foreach ( $latest_test['questions'] as $question ) {
+                if ( self::ITEM_COUNTS[ $test_key ] !== count( (array) ( $question['items'] ?? [] ) ) ) {
+                    wp_die( esc_html__( 'Bank soal kepribadian tidak memiliki jumlah pernyataan yang valid. Silakan hubungi tim HR.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
+                }
+            }
+            $state['tests'][ $test_key ]['question_order'] = array_map( 'intval', array_column( $latest_test['questions'], 'id' ) );
+            $state['tests'][ $test_key ]['answers'] = [];
+            $state['tests'][ $test_key ]['response_ids'] = [];
+            $state['tests'][ $test_key ]['result_id'] = 0;
         }
         $state['active_test'] = $test_key;
         $state['tests'][ $test_key ]['status'] = 'active';

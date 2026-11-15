@@ -35,14 +35,37 @@ if ( $selected_candidate ) {
 
 $latest_note = $history[0] ?? [];
 $notice = sanitize_key( wp_unslash( $_GET['hr_interview'] ?? '' ) );
-$selected_department = trim( (string) ( $latest_note['department'] ?? '' ) );
+$selected_department = $selected_candidate
+	? trim( (string) ( $selected_candidate['department'] ?? '' ) )
+	: trim( (string) ( $latest_note['department'] ?? '' ) );
+$selected_department_id = trim( (string) ( $selected_candidate['department_id'] ?? '' ) );
 foreach ( $departments as $department ) {
-	if ( 0 === strcasecmp( trim( (string) ( $department['name'] ?? '' ) ), $selected_department ) ) {
-		$selected_department = (string) ( $department['name'] ?? $selected_department );
+	$department_id = (string) ( $department['id'] ?? '' );
+	$department_name = trim( (string) ( $department['name'] ?? '' ) );
+	if (
+		( '' !== $selected_department_id && $selected_department_id === $department_id )
+		|| ( '' === $selected_department_id && 0 === strcasecmp( $department_name, $selected_department ) )
+	) {
+		$selected_department = $department_name;
+		$selected_department_id = $department_id;
 		break;
 	}
 }
 $selected_account_id = (string) ( $latest_note['assigned_account_id'] ?? '' );
+if ( $selected_candidate && '' !== $selected_department ) {
+	$department_accounts = array_values(
+		array_filter(
+			$department_accounts,
+			static function ( array $account ) use ( $selected_department_id ): bool {
+				return '' !== $selected_department_id && $selected_department_id === (string) ( $account['department_id'] ?? '' );
+			}
+		)
+	);
+	$matching_account_ids = array_map( static fn ( array $account ): string => (string) $account['id'], $department_accounts );
+	if ( ! in_array( $selected_account_id, $matching_account_ids, true ) ) {
+		$selected_account_id = 1 === count( $department_accounts ) ? (string) $department_accounts[0]['id'] : '';
+	}
+}
 $interview_date = (string) ( $latest_note['interview_date'] ?? $selected_candidate['scheduled_interview_date'] ?? current_time( 'Y-m-d' ) );
 $interviewer_name = trim( (string) ( $latest_note['interviewer'] ?? $selected_candidate['scheduled_interviewer'] ?? $display_name ) );
 $scheduled_date_timestamp = ! empty( $selected_candidate['scheduled_interview_date'] )
@@ -50,7 +73,7 @@ $scheduled_date_timestamp = ! empty( $selected_candidate['scheduled_interview_da
 	: false;
 $scheduled_interview_date = $scheduled_date_timestamp ? date_i18n( 'j F Y', $scheduled_date_timestamp ) : '—';
 ?>
-<div class="daw-user-interview daw-interview-screen">
+<div class="daw-user-interview daw-interview-screen<?= $selected_candidate ? '' : ' daw-interview-screen--list' ?>">
 	<header class="daw-user-interview__header">
 		<nav class="daw-user-interview__breadcrumb" aria-label="Breadcrumb">
 			<span class="daw-user-interview__breadcrumb-root">DAW Admin</span>
@@ -69,7 +92,7 @@ $scheduled_interview_date = $scheduled_date_timestamp ? date_i18n( 'j F Y', $sch
 	</header>
 
 	<main class="daw-user-interview__main">
-		<?php if ( 'note_saved' === $notice ) : ?><div class="notice notice-success inline"><p>Catatan wawancara HR berhasil disimpan.</p></div><?php elseif ( 'saved' === $notice ) : ?><div class="notice notice-success inline"><p>Hasil tersimpan. Kandidat telah diteruskan ke Wawancara User dan tidak lagi muncul di daftar Wawancara HR.</p></div><?php elseif ( 'failed' === $notice ) : ?><div class="notice notice-success inline"><p>Hasil tersimpan. Kandidat tidak dilanjutkan dan tidak lagi muncul di daftar Wawancara HR.</p></div><?php elseif ( 'save_error' === $notice ) : ?><div class="notice notice-error inline" role="alert"><p>Penyimpanan gagal ke Oracle. Pastikan migrasi wawancara HR diterapkan berurutan pada schema yang sama: 016 lalu 017. Jika migrasi 017 menampilkan ORA-20071, tabel prasyarat dari migrasi 016 belum tersedia.</p></div><?php endif; ?>
+		<?php if ( 'note_saved' === $notice ) : ?><div class="notice notice-success inline"><p>Catatan wawancara HR berhasil disimpan.</p></div><?php elseif ( 'saved' === $notice ) : ?><div class="notice notice-success inline"><p>Hasil tersimpan. Kandidat telah diteruskan ke Wawancara User dan tidak lagi muncul di daftar Wawancara HR.</p></div><?php elseif ( 'failed' === $notice ) : ?><div class="notice notice-success inline"><p>Hasil tersimpan. Kandidat tidak dilanjutkan dan tidak lagi muncul di daftar Wawancara HR.</p></div><?php elseif ( 'save_error' === $notice ) : ?><div class="notice notice-error inline" role="alert"><p>Keputusan belum tersimpan. Kandidat masih berada di Wawancara HR. Pastikan departemen tujuan dan akun User Department yang dipilih cocok. Jika Oracle melaporkan skema belum tersedia, pastikan migrasi 016 lalu 017 sudah diterapkan pada schema yang sama.</p></div><?php endif; ?>
 		<?php if ( $load_error ) : ?><div class="notice notice-error inline" role="alert"><p>Data wawancara HR, akun tujuan, atau riwayat catatan tidak dapat dimuat dari Oracle. Periksa penerapan migrasi database yang diperlukan.</p></div><?php endif; ?>
 
 		<?php if ( $selected_candidate ) : ?>
@@ -84,6 +107,8 @@ $scheduled_interview_date = $scheduled_date_timestamp ? date_i18n( 'j F Y', $sch
 					</div>
 					<dl class="daw-hr-interview__candidate-facts">
 						<div><dt>Posisi</dt><dd><?= esc_html( (string) ( $selected_candidate['position'] ?? 'Posisi belum ditentukan' ) ) ?></dd></div>
+						<div><dt>Departemen</dt><dd><?= esc_html( '' !== $selected_department ? $selected_department : 'Belum diatur pada lowongan' ) ?></dd></div>
+						<div><dt>Cabang / Lokasi</dt><dd><?= esc_html( (string) ( $selected_candidate['location'] ?? 'Belum ditentukan' ) ) ?></dd></div>
 						<div><dt>Dealer</dt><dd><?= esc_html( (string) ( $selected_candidate['dealer'] ?? '—' ) ) ?></dd></div>
 						<div><dt>Tgl Wawancara</dt><dd><?= esc_html( $scheduled_interview_date ) ?></dd></div>
 						<div><dt>Waktu</dt><dd><?= esc_html( (string) ( $selected_candidate['scheduled_interview_time'] ?? '—' ) ) ?></dd></div>
@@ -97,7 +122,7 @@ $scheduled_interview_date = $scheduled_date_timestamp ? date_i18n( 'j F Y', $sch
 				<div class="daw-hr-interview__detail-content">
 					<section class="daw-hr-interview__card" aria-labelledby="hr-notes-title">
 						<h2 id="hr-notes-title">Catatan Wawancara HR</h2>
-						<form class="daw-hr-interview__form" method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" data-hr-interview-form>
+						<form class="daw-hr-interview__form" method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" data-hr-interview-form data-hr-department-id="<?= esc_attr( $selected_department_id ) ?>">
 							<input type="hidden" name="action" value="daw_save_hr_interview">
 							<input type="hidden" name="application_id" value="<?= esc_attr( (string) $application_id ) ?>">
 							<?php wp_nonce_field( 'daw_save_hr_interview_' . $application_id ); ?>
@@ -160,26 +185,23 @@ $scheduled_interview_date = $scheduled_date_timestamp ? date_i18n( 'j F Y', $sch
 
 							<fieldset class="daw-hr-interview__department">
 								<legend>REKOMENDASI DEPARTEMEN</legend>
-								<p>Tentukan departemen tujuan dan akun User Department aktif dari departemen yang sama agar kandidat diteruskan ke tim yang tepat.</p>
+								<p>Departemen tujuan mengikuti departemen pada lowongan. Pilih akun User Department aktif dalam departemen tersebut.</p>
 								<div class="daw-hr-interview__form-grid">
-									<label>Departemen Tujuan
-										<select name="department_name" data-hr-department>
-											<option value="">Pilih departemen...</option>
-											<?php foreach ( $departments as $department ) : ?>
-												<option value="<?= esc_attr( (string) $department['name'] ) ?>" data-department-id="<?= esc_attr( (string) $department['id'] ) ?>" <?= selected( $selected_department, (string) $department['name'], false ) ?>><?= esc_html( (string) $department['name'] ) ?></option>
-											<?php endforeach; ?>
-										</select>
+									<label>Departemen Lowongan
+										<input type="text" value="<?= esc_attr( '' !== $selected_department ? $selected_department : 'Belum diatur pada lowongan' ) ?>" readonly>
+										<input type="hidden" name="department_name" value="<?= esc_attr( $selected_department ) ?>">
 									</label>
 									<label>User Department
 										<select name="department_account_id" data-hr-account>
-											<option value="0">Pilih user...</option>
+											<option value="0">Pilih akun penerima...</option>
 											<?php foreach ( $department_accounts as $account ) : ?>
-												<option value="<?= esc_attr( (string) $account['id'] ) ?>" data-department-name="<?= esc_attr( (string) $account['department'] ) ?>" <?= selected( $selected_account_id, (string) $account['id'], false ) ?>><?= esc_html( (string) $account['username'] . ' (' . (string) $account['email'] . ') · ' . (string) $account['department'] ) ?></option>
+												<option value="<?= esc_attr( (string) $account['id'] ) ?>" data-department-id="<?= esc_attr( (string) ( $account['department_id'] ?? '' ) ) ?>" <?= selected( $selected_account_id, (string) $account['id'], false ) ?>><?= esc_html( (string) $account['full_name'] . ' — ' . (string) ( $account['department'] ?: 'Departemen belum diatur' ) ) ?></option>
 											<?php endforeach; ?>
 											<?php if ( empty( $department_accounts ) ) : ?><option value="" disabled>Tidak ada akun User Department aktif</option><?php endif; ?>
 										</select>
 									</label>
 								</div>
+								<p class="daw-hr-interview__routing-status" data-hr-routing-status role="status">Tujuan harus cocok dengan departemen lowongan dan akun penerima yang dipilih.</p>
 								<label>Catatan Rekomendasi
 									<textarea name="department_notes" rows="2" maxlength="1000" placeholder="Alasan rekomendasi ke departemen ini..."><?= esc_textarea( (string) ( $latest_note['department_notes'] ?? '' ) ) ?></textarea>
 								</label>
@@ -190,15 +212,8 @@ $scheduled_interview_date = $scheduled_date_timestamp ? date_i18n( 'j F Y', $sch
 				</div>
 			</div>
 		<?php else : ?>
-			<div class="daw-interview-screen__heading">
-				<div><h1>Wawancara HR</h1><p>Kelola catatan, penilaian, dan keputusan kandidat pada tahap wawancara HR.</p></div>
-			</div>
-			<section class="daw-interview-screen__stats" aria-label="Ringkasan wawancara HR">
-				<article class="is-waiting"><strong><?= esc_html( (string) count( $candidates ) ) ?></strong><span>Menunggu Wawancara</span></article>
-				<article class="is-scheduled"><strong><?= esc_html( (string) count( $department_accounts ) ) ?></strong><span>Akun User Department Aktif</span></article>
-			</section>
 			<section class="daw-user-interview__panel daw-interview-screen__panel" aria-labelledby="hr-interview-candidates-title">
-				<div class="daw-interview-screen__panel-heading"><h2 id="hr-interview-candidates-title">Kandidat Tahap Wawancara HR</h2></div>
+				<div class="daw-interview-screen__panel-heading"><h2 id="hr-interview-candidates-title">Kandidat — Wawancara HR</h2></div>
 				<div class="daw-user-interview__table-wrap">
 					<table class="daw-interview-screen__table daw-hr-interview__table">
 						<caption class="screen-reader-text">Kandidat menunggu keputusan wawancara HR</caption>
@@ -240,36 +255,42 @@ $scheduled_interview_date = $scheduled_date_timestamp ? date_i18n( 'j F Y', $sch
 <?php if ( $selected_candidate ) : ?>
 <script>
 document.querySelectorAll('[data-hr-interview-form]').forEach((form) => {
-	const departmentSelect = form.querySelector('[data-hr-department]');
 	const accountSelect = form.querySelector('[data-hr-account]');
 	const decisionInputs = form.querySelectorAll('input[name="decision"]');
 	const forwardButton = form.querySelector('[data-hr-forward]');
+	const routingStatus = form.querySelector('[data-hr-routing-status]');
 	const intentInput = form.querySelector('[data-hr-intent]');
 	const saveNoteButton = form.querySelector('[data-hr-save-note]');
-	if (!departmentSelect || !accountSelect || !forwardButton || !intentInput || !saveNoteButton) return;
+	if (!accountSelect || !forwardButton || !intentInput || !saveNoteButton) return;
 
 	const updateDecision = () => {
 		const decision = form.querySelector('input[name="decision"]:checked')?.value || '';
-		const recipientSelected = departmentSelect.value !== '' && accountSelect.value !== '0';
-		forwardButton.disabled = !decision || ('pass' === decision && !recipientSelected);
+		const selectedAccount = accountSelect.selectedOptions[0];
+		const selectedDepartmentId = form.dataset.hrDepartmentId || '';
+		const recipientSelected = Boolean(
+			selectedDepartmentId
+			&& accountSelect.value !== '0'
+			&& selectedAccount?.dataset.departmentId === selectedDepartmentId
+		);
+		forwardButton.disabled = 'fail' === decision ? false : !recipientSelected;
 		forwardButton.textContent = 'fail' === decision
 			? 'Simpan Keputusan Wawancara HR'
 			: 'Simpan Keputusan & Arahkan ke Departemen';
+		if (routingStatus) {
+			routingStatus.textContent = 'fail' === decision
+				? 'Keputusan tidak lolos tidak memerlukan tujuan User Department.'
+				: recipientSelected
+					? 'Siap diteruskan ke Wawancara User setelah tombol ditekan.'
+					: !selectedDepartmentId
+						? 'Lowongan belum memiliki departemen yang cocok dengan data Oracle; kandidat tidak dapat diteruskan.'
+						: selectedAccount && accountSelect.value !== '0' && selectedAccount.dataset.departmentId !== selectedDepartmentId
+							? 'Akun yang dipilih bukan bagian dari departemen lowongan.'
+							: accountSelect.options.length <= 1
+								? 'Belum ada akun User Department aktif untuk departemen lowongan ini.'
+								: 'Pilih akun User Department pada departemen lowongan untuk mengaktifkan tombol pengarah.';
+		}
 	};
 
-	const updateAccounts = () => {
-		const selectedDepartment = departmentSelect.value.trim().toLocaleLowerCase();
-		Array.from(accountSelect.options).forEach((option) => {
-			if ('0' === option.value) return;
-			const matchesDepartment = option.dataset.departmentName?.trim().toLocaleLowerCase() === selectedDepartment;
-			option.hidden = !matchesDepartment;
-			option.disabled = !matchesDepartment;
-			if (!matchesDepartment && option.selected) accountSelect.value = '0';
-		});
-		updateDecision();
-	};
-
-	departmentSelect.addEventListener('change', updateAccounts);
 	accountSelect.addEventListener('change', updateDecision);
 	decisionInputs.forEach((input) => input.addEventListener('change', updateDecision));
 	form.addEventListener('submit', (event) => {
@@ -279,15 +300,17 @@ document.querySelectorAll('[data-hr-interview-form]').forEach((form) => {
 			return;
 		}
 
-		const decision = form.querySelector('input[name="decision"]:checked')?.value || '';
-		if (!decision || ('pass' === decision && (departmentSelect.value === '' || accountSelect.value === '0'))) {
+		const decision = form.querySelector('input[name="decision"]:checked')?.value || 'pass';
+		const selectedDepartmentId = form.dataset.hrDepartmentId || '';
+		const selectedAccountDepartmentId = accountSelect.selectedOptions[0]?.dataset.departmentId || '';
+		if (!decision || ('pass' === decision && (accountSelect.value === '0' || selectedAccountDepartmentId !== selectedDepartmentId))) {
 			event.preventDefault();
 			updateDecision();
 			return;
 		}
 		intentInput.value = decision;
 	});
-	updateAccounts();
+	updateDecision();
 });
 </script>
 <?php endif; ?>

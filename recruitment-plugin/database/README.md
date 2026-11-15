@@ -193,21 +193,53 @@ their SQL is compatible with the current Oracle database.
   stored in the private `daw-applicant-private` directory, not in Oracle or a
   public media URL. Deployments using Nginx or another server must block direct
   web access to this directory.
-- The capture stage records one identity photo and allows no more than five
-  alert snapshots total per applicant session. Face absence and multiple-face
-  alerts are analyzed locally in the browser; video frames are not sent for
-  model processing. Snapshots are uploaded only for an alert and retained as
-  private evidence. Alerts require human review and do not automatically fail
-  an assessment. Gaze direction and phone/device detection are not
-  implemented. An optional microphone check logs only availability/permission
-  status; no audio is recorded. These event types use the existing
-  `EVENT_TYPE VARCHAR2(32)` field and do not require another Oracle migration.
-  The HR results page exposes evidence only to users with `manage_options`;
-  evidence access is logged. Completed sessions expire one year after
-  completion, while abandoned sessions expire one year after consent. Image
-  reads are denied after the deadline and daily file cleanup is scheduled.
-  Configure a host-level scheduler to run WordPress cron daily so
-  physical deletion is not delayed on a low-traffic site.
+- Migration
+  [`migrations/021_psychotest_proctoring_application_reports.sql`](migrations/021_psychotest_proctoring_application_reports.sql)
+  adds an application link to new proctoring sessions and stage/idempotency
+  metadata to events. Historical HMAC session IDs cannot be reversed to
+  backfill an application ID, so those rows remain unlinked. The migration
+  must be reviewed and applied by the authorized Oracle owner; it is not run
+  automatically. The report reader checks for the new columns and keeps score
+  PDF downloads available if this migration is pending; it omits proctoring
+  sessions that cannot be safely linked to an application.
+- Migration
+  [`migrations/022_psychotest_event_client_metadata.sql`](migrations/022_psychotest_event_client_metadata.sql)
+  adds nullable client IP and User-Agent fields to new proctoring events.
+  Existing events remain empty because their original client metadata is
+  unknown. The report reader can still generate PDFs before this migration is
+  applied, but unavailable metadata is shown as not recorded. The migration
+  must be reviewed and applied by the authorized Oracle owner before event
+  capture can store these fields.
+- Migration
+  [`migrations/023_psychotest_violation_lifecycle.sql`](migrations/023_psychotest_violation_lifecycle.sql)
+  adds client-reported detection duration/confidence, severity and repeat counts,
+  warning history, and HR review state to proctoring events. It depends on
+  migrations 021 and 022 and is not run automatically. The Oracle server
+  timestamp remains authoritative for repeat windows; client timing is evidence
+  metadata and is not independently proof of a policy violation. New event
+  writes require this migration, while report reads omit unavailable lifecycle
+  fields until it is applied.
+- HR-adjustable thresholds live in the WordPress option
+  `recruitment_proctoring_violation_config`, are validated against bounded
+  ranges, and are passed to the local browser detector. Oracle stores resulting
+  event history and review status, not mutable detector configuration.
+- Face absence, multiple faces, and sustained face-turn alerts are analyzed
+  locally in the browser; video frames are not sent for model processing.
+  Snapshots are uploaded only for distinct incident events and retained as
+  private evidence. Tab-hidden and tab-visible timestamps are logged, but the
+  browser cannot identify which other tab or site was opened. Alerts require
+  human review and do not automatically fail an assessment. No face identity
+  matching, gaze tracking, phone/device detection, or audio recording is
+  performed. Evidence access and report downloads are restricted to users with
+  `manage_recruitment` or `manage_options` and are logged. Completed sessions
+  expire one year after completion, while abandoned sessions expire one year
+  after consent. Image reads are denied after the deadline and daily file
+  cleanup is scheduled. Configure a host-level scheduler to run WordPress cron
+  daily so physical deletion is not delayed on a low-traffic site. From consent
+  version `proctoring-v2`, each newly recorded participant event also stores
+  the User-Agent and the IP address visible to the application server; the
+  latter may be a proxy or gateway address. No metadata is backfilled for
+  historical events.
 - HR can add and edit IQ, Pauli, DISC, and PAPI questions. IQ remains divided
   into four subtests with the existing fixed time limits; additional questions
   use those same limits. Pauli presents one vertical sum at a time for 60
@@ -230,8 +262,13 @@ their SQL is compatible with the current Oracle database.
   and response shapes follow the supplied company reference PDFs. Questions
   retain Oracle display order, and neither personality subtest has a hard time
   limit; the displayed elapsed-time reminders do not end a session.
-- Active assessment sessions keep their original question order when HR adds
-  questions; new questions are included in sessions started afterward.
+- Each assessment locks its active question order when that individual
+  assessment starts. Questions HR adds before a later IQ subtest, Pauli test,
+  DISC test, or PAPI test starts are included in that test; a test already in
+  progress keeps its original questions and answer order.
+- Pauli remains a fixed 20-column, one-hour test. When its active bank has more
+  than 20 question templates, a new session uses the 20 most recently ordered
+  active templates, so newly added Pauli questions enter the next session.
 - Psychometric routes require an authenticated applicant portal session.
 - The HR Hasil Psikotes page reads saved and completed IQ, Pauli, DISC, and PAPI
   records from Oracle, including response counts for sessions without a result
@@ -415,6 +452,47 @@ that same account assignment in Oracle; department-name matching alone is not
 authorization. User interview results are linked to `LAMARAN_ID` so repeated
 applications by one candidate do not share interview data.
 
+Selection advances in order: Administration to Psychotest, then Psychotest to
+HR Interview. HR's interview decision is saved through the HR interview screen;
+passing requires an active User Department account belonging to the vacancy's
+Oracle department. The HR result, account assignment, `INTERVIEW_USER` status,
+and tracking event are saved in one Oracle transaction. This makes the
+application appear on the assigned account's User Department interview page.
+Only an existing `INTERVIEW_USER` application with a stored passing HR result
+can have its department account reassigned from the applicant detail screen.
+Legacy `INTERVIEW_USER` rows without a passing HR result are excluded from the
+User Department queue and must be reviewed rather than reassigned.
+User Department results are linked to `LAMARAN_ID`, and HR final decisions
+require that application's own passing HR result and saved passing User
+interview result. The decision screen includes only applications with both
+passing results, and the save operation independently validates both stages.
+A failed User interview also marks that same application `DITOLAK` in the same
+transaction as its result and tracking history.
+
+`HRS_REKAPAN_KEPUTUSAN_HR` currently stores decisions by candidate and
+department, not by application. If a candidate has multiple applications to
+the same department, final-decision records cannot be distinguished reliably
+until an application-level link is added. The current save operation therefore
+refuses to write a decision when the candidate has multiple applications to
+that department.
+
+The verified Oracle schema also links `HRS_JADWAL_KANDIDAT` and psychometric
+result records to a candidate, but not to a specific application. For
+candidates with multiple applications, a schedule or psychometric result
+cannot be attributed reliably to one application. Do not treat the latest
+candidate-level record as application-specific.
+
+Migration
+[`migrations/019_application_scoped_records.sql`](migrations/019_application_scoped_records.sql)
+is prepared but has not been run. It adds nullable `LAMARAN_ID` foreign keys
+for schedules, psychometric results, and final-decision records. It backfills a
+legacy final-decision row only when the candidate has exactly one application
+for that department. Legacy schedules and psychometric results remain unlinked
+because their application cannot be reliably inferred. The application code
+must be updated to consume these links after the Oracle owner reviews and
+approves the migration; do not run it before that code change and target-schema
+verification.
+
 These features require migration
 [`migrations/017_hr_interview_department_assignment.sql`](migrations/017_hr_interview_department_assignment.sql).
 It creates the HR interview/assignment table and adds the nullable
@@ -442,6 +520,20 @@ production schema; verify and obtain approval before applying it elsewhere.
 The plugin does not apply the migration automatically. The duplicate local
 copy of migration 016 was reconciled by retaining the canonical
 `migrations/016_hr_interview_department_assignment.sql`.
+
+Migration
+[`migrations/018_psychotest_question_metadata.sql`](migrations/018_psychotest_question_metadata.sql)
+adds a per-question explanation and active flag to the psychotest bank.
+Existing questions default to active. The question bank displays inactive
+questions, while new applicant sessions load active questions only. Sessions
+already in progress retain their assigned questions. Explanations are only used
+in the admin question bank and are not included in applicant assessment views.
+With the user's approval, it was applied and verified on the local Oracle XE
+`XEPDB1` schema on 2026-11-11. The explanation CLOB, `IS_ACTIVE NUMBER(1,0)
+DEFAULT 1 NOT NULL`, and enabled/validated check constraint are present. This
+does not confirm application to any shared or production schema; verify the
+target schema and obtain the Oracle owner's approval before applying it
+elsewhere.
 
 The HR and User interview schedule administration pages persist configured
 date/time slots separately in `HRS_INTERVIEW_SCHEDULE`. Migration
@@ -473,6 +565,13 @@ can be edited or removed; booked slots keep their date and time and cannot be
 removed, while capacity cannot be reduced below its current bookings. A slot is
 archived from applicant availability once it is full and every booking has a
 saved interview result.
+
+Migration filenames in this repository do not have globally unique numeric
+prefixes. In particular, multiple independent migrations use prefixes 018 and
+019. Do not infer execution order or migration status from the numeric prefix;
+review the exact filename, prerequisites, and target-schema state with the
+Oracle owner before applying any migration. The plugin does not apply
+migrations automatically.
 
 Some legacy application and vacancy gateway methods still contain
 `DAW_*`-table operations; they need schema reconciliation before being treated

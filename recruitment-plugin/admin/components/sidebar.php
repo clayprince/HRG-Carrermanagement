@@ -3,22 +3,24 @@ $current_page = sanitize_key( $_GET['page'] ?? '' );
 $screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
 $current_post_type = sanitize_key( $_GET['post_type'] ?? ( $screen->post_type ?? '' ) );
 $current_stage = sanitize_key( $_GET['stage'] ?? '' );
+$active_candidate_detail = 'recruitment-applicants' === $current_page
+    && 'active' === ( isset( $_GET['from'] ) && is_scalar( $_GET['from'] ) ? sanitize_key( (string) $_GET['from'] ) : '' );
 $settings_section = sanitize_key( $_GET['section'] ?? 'email' );
 $dashboard_url = recruitment_get_admin_url( 'dashboard' );
 $settings_url = recruitment_get_admin_url( 'settings' );
 $hr_identity = recruitment_get_current_hr_identity();
 $vacancy_view = 'create' === sanitize_key( $_GET['view'] ?? '' ) ? 'create' : ( 'recruitment-applications' === $current_page ? 'requests' : 'list' );
-$active_candidate_count = ( new Recruitment_Database() )->get_active_applicant_count();
+$active_candidate_count = ( new Recruitment_Database() )->get_active_application_count();
 $stage_url = static function ( string $stage ) use ( $dashboard_url ): string {
     return add_query_arg( 'stage', $stage, $dashboard_url );
 };
 $stage_links = [
-    [ 'label' => 'Semua Kandidat Aktif', 'page' => 'recruitment-applicants', 'url' => recruitment_get_admin_url( 'applicants' ) ],
+    [ 'label' => 'Semua Kandidat Aktif', 'stage' => 'all' ],
     [ 'label' => 'Seleksi Administrasi', 'stage' => 'administration' ],
     [ 'label' => 'Psikotes', 'stage' => 'psychological_test' ],
     [ 'label' => 'Wawancara HR', 'page' => 'recruitment-hr-interview', 'url' => admin_url( 'admin.php?page=recruitment-hr-interview' ) ],
     [ 'label' => 'Wawancara User', 'page' => 'recruitment-user-interview', 'url' => admin_url( 'admin.php?page=recruitment-user-interview' ) ],
-    [ 'label' => 'Keputusan Akhir', 'page' => 'recruitment-final-decision', 'url' => admin_url( 'admin.php?page=recruitment-final-decision' ) ],
+    [ 'label' => 'Final Decision', 'page' => 'recruitment-final-decision', 'url' => admin_url( 'admin.php?page=recruitment-final-decision' ) ],
 ];
 $root_links = [
     [ 'label' => 'Database Pelamar', 'icon' => 'dashicons-database', 'page' => 'recruitment-applicants', 'url' => recruitment_get_admin_url( 'applicants' ) ],
@@ -55,7 +57,8 @@ $root_links = [
             <div class="recruitment-dashboard__nav-group-items" id="recruitment-stage-links" data-nav-group-panel>
                 <?php foreach ( $stage_links as $item ) :
                     $is_active = isset( $item['stage'] )
-                        ? 'recruitment-dashboard' === $current_page && $current_stage === $item['stage']
+                        ? ( 'recruitment-dashboard' === $current_page && $current_stage === $item['stage'] )
+                            || ( $active_candidate_detail && 'all' === $item['stage'] )
                         : $current_page === $item['page'];
                     $url = $item['url'] ?? $stage_url( $item['stage'] );
                     ?>
@@ -68,6 +71,9 @@ $root_links = [
             $is_active = ( isset( $item['page'] ) && $current_page === $item['page'] )
                 || ( isset( $item['post_type'] ) && $current_post_type === $item['post_type'] )
                 || ( 'Lowongan' === $item['label'] && 'recruitment-applications' === $current_page );
+            if ( $active_candidate_detail && 'Database Pelamar' === $item['label'] ) {
+                $is_active = false;
+            }
             ?>
             <?php if ( ! empty( $item['children'] ) ) : ?>
                 <div class="recruitment-dashboard__nav-group">

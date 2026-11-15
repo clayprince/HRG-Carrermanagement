@@ -3,9 +3,17 @@ $user = function_exists( 'wp_get_current_user' ) ? wp_get_current_user() : null;
 $display_name = $user && ! empty( $user->display_name ) ? $user->display_name : 'Admin HR';
 $user_email = $user && ! empty( $user->user_email ) ? $user->user_email : 'hr@daw.co.id';
 $logout_form = recruitment_logout_form( 'Keluar', home_url( '/' ), 'daw-user-interview__logout' );
-$show_notes = 'notes' === sanitize_key( $_GET['view'] ?? '' );
+$view = sanitize_key( $_GET['view'] ?? '' );
+$show_notes = 'notes' === $view;
+$show_queue = ! $show_notes && 'results' !== $view;
+$show_results = ! $show_notes && ! $show_queue;
 $list_url = recruitment_get_admin_url( 'user-interview' );
+$queue_url = add_query_arg( 'view', 'queue', $list_url );
+$results_url = add_query_arg( 'view', 'results', $list_url );
 $notes_url = add_query_arg( 'view', 'notes', $list_url );
+$result_search = sanitize_text_field( wp_unslash( $_GET['search'] ?? '' ) );
+$result_department = sanitize_text_field( wp_unslash( $_GET['department'] ?? '' ) );
+$result_rating = sanitize_text_field( wp_unslash( $_GET['rating'] ?? '' ) );
 
 $database = new Recruitment_Database();
 $applications = $database->get_applications();
@@ -19,6 +27,7 @@ $stats = [
     'passed'      => 0,
     'failed'      => 0,
 ];
+$unverified_interview_count = 0;
 
 foreach ( $applications as $app ) {
     $raw_status = strtoupper( (string) ( $app['status'] ?? 'SUBMITTED' ) );
@@ -26,9 +35,14 @@ foreach ( $applications as $app ) {
     $has_result = '' !== $selection_status;
     $is_passed = in_array( $selection_status, [ 'Lolos Wawancara User', 'Lolos' ], true );
     $is_failed = in_array( $selection_status, [ 'Tidak Lolos Wawancara User', 'Tidak Lolos' ], true );
-    $is_waiting = 'INTERVIEW_USER' === $raw_status && ! $has_result;
+    $hr_passed = 'LOLOS' === strtoupper( trim( (string) ( $app['hr_result'] ?? '' ) ) );
+    $has_department_assignment = (int) ( $app['department_account_id'] ?? 0 ) > 0;
+    $is_waiting = 'INTERVIEW_USER' === $raw_status && ! $has_result && $hr_passed && $has_department_assignment;
 
-    if ( ! in_array( $raw_status, [ 'INTERVIEW_USER', 'DITERIMA', 'DITOLAK' ], true ) && ! $has_result ) {
+    if ( ! $has_result && ! $is_waiting ) {
+        if ( 'INTERVIEW_USER' === $raw_status ) {
+            $unverified_interview_count++;
+        }
         continue;
     }
 
@@ -46,6 +60,10 @@ foreach ( $applications as $app ) {
     $created_at = (string) ( $app['created_at'] ?? '' );
     $year = $created_at ? date( 'Y', strtotime( $created_at ) ) : date( 'Y' );
     $cand_id = (int) ( $app['applicant_id'] ?? 0 );
+    $final_decision = strtoupper( trim( (string) ( $app['hr_final_decision'] ?? '' ) ) );
+    if ( '' === $final_decision ) {
+        $final_decision = strtoupper( trim( (string) ( $app['final_status'] ?? '' ) ) );
+    }
 
     $candidates[] = [
         'id'             => $cand_id,
@@ -54,6 +72,7 @@ foreach ( $applications as $app ) {
         'code'           => 'DAW-' . $year . '-' . str_pad( (string) $cand_id, 4, '0', STR_PAD_LEFT ),
         'position'       => (string) ( $app['title'] ?: 'Posisi belum ditentukan' ),
         'dealer'         => (string) ( $app['dealer'] ?: '-' ),
+        'department'     => (string) ( $app['department'] ?: '-' ),
         'region'         => (string) ( $app['location'] ?: $app['province'] ?: '-' ),
         'hr_result'      => trim( (string) ( $app['hr_result'] ?? '' ) ) ?: 'Belum tersedia',
         'interview_date' => trim( (string) ( $app['user_scheduled_interview_date'] ?? '' ) ) ?: ( trim( (string) ( $app['user_interview_date'] ?? '' ) ) ?: '—' ),
@@ -70,14 +89,62 @@ foreach ( $applications as $app ) {
         'recommendation' => trim( (string) ( $app['user_recommendation'] ?? '' ) ),
         'interviewer'    => trim( (string) ( $app['user_interviewer'] ?? '' ) ) ?: trim( (string) ( $app['user_scheduled_interviewer'] ?? '' ) ),
         'notes'          => trim( (string) ( $app['user_interview_notes'] ?? '' ) ),
+        'has_result'     => $has_result,
         'final_decision' => [
             'DITERIMA' => 'Diterima',
             'ACCEPTED' => 'Diterima',
-            'DITOLAK' => 'Tidak Diterima',
-            'REJECTED' => 'Tidak Diterima',
-        ][ strtoupper( trim( (string) ( $app['hr_final_decision'] ?? '' ) ) ) ] ?? 'Menunggu Keputusan',
+            'LOLOS' => 'Diterima',
+            'DITOLAK' => 'Ditolak',
+            'REJECTED' => 'Ditolak',
+            'TIDAK DITERIMA' => 'Ditolak',
+            'TIDAK_LOLOS' => 'Ditolak',
+        ][ $final_decision ] ?? 'Pending',
     ];
 }
+
+$result_candidates = array_values(
+    array_filter(
+        $candidates,
+        static fn ( array $candidate ): bool => ! empty( $candidate['has_result'] )
+    )
+);
+$filtered_result_candidates = array_values(
+    array_filter(
+        $result_candidates,
+        static function ( array $candidate ) use ( $result_search, $result_department, $result_rating ): bool {
+            $searchable = strtolower( implode( ' ', [ $candidate['name'], $candidate['code'], $candidate['position'], $candidate['dealer'], $candidate['department'] ?? '' ] ) );
+            return ( '' === $result_search || false !== strpos( $searchable, strtolower( $result_search ) ) )
+                && ( '' === $result_department || $candidate['department'] === $result_department )
+                && ( '' === $result_rating || $candidate['recommendation'] === $result_rating );
+        }
+    )
+);
+$result_departments = array_values( array_unique( array_filter( array_column( $result_candidates, 'department' ) ) ) );
+$result_ratings = array_values( array_unique( array_filter( array_column( $result_candidates, 'recommendation' ) ) ) );
+sort( $result_departments );
+sort( $result_ratings );
+$result_filter_url = static function ( array $args = [] ) use ( $list_url, $result_search, $result_department, $result_rating ): string {
+    $current_filters = array_filter(
+        [
+            'search' => $result_search,
+            'department' => $result_department,
+            'rating' => $result_rating,
+        ],
+        static fn ( string $value ): bool => '' !== $value
+    );
+    return add_query_arg( array_merge( [ 'view' => 'results' ], $current_filters, $args ), $list_url );
+};
+$result_stats = [
+    'total' => count( $result_candidates ),
+    'good' => count(
+        array_filter(
+            $result_candidates,
+            static fn ( array $candidate ): bool => in_array( $candidate['recommendation'], [ 'Sangat Baik', 'Baik' ], true )
+        )
+    ),
+    'accepted' => count( array_filter( $result_candidates, static fn ( array $candidate ): bool => 'Diterima' === $candidate['final_decision'] ) ),
+    'pending' => count( array_filter( $result_candidates, static fn ( array $candidate ): bool => 'Pending' === $candidate['final_decision'] ) ),
+];
 
 $selected_candidate_id = absint( $_GET['candidate_id'] ?? 0 );
 $selected_application_id = absint( $_GET['application_id'] ?? 0 );
@@ -95,10 +162,10 @@ if ( ! $selected_cand && 0 === $selected_application_id && 0 === $selected_candi
     $selected_cand = $candidates[0];
 }
 ?>
-<div class="daw-user-interview<?= $show_notes ? ' daw-user-interview--notes' : '' ?>">
-    <?php if ( $show_notes ) : ?>
+<div class="daw-user-interview<?= $show_notes || $show_results ? ' daw-user-interview--notes daw-user-interview--results' : '' ?>">
+    <?php if ( $show_notes || $show_results ) : ?>
         <aside class="daw-user-interview__sidebar">
-            <a class="daw-user-interview__brand" href="<?= esc_url( $list_url ) ?>"><span>DAW</span><strong>Admin</strong></a>
+            <a class="daw-user-interview__brand" href="<?= esc_url( $queue_url ) ?>"><span>DAW</span><strong>Admin</strong></a>
             <nav aria-label="Navigasi admin">
                 <span class="daw-user-interview__nav-item">Dashboard</span>
                 <span class="daw-user-interview__nav-heading">Recruitment</span>
@@ -106,8 +173,9 @@ if ( ! $selected_cand && 0 === $selected_application_id && 0 === $selected_candi
                 <span class="daw-user-interview__nav-item">Seleksi Administrasi</span>
                 <span class="daw-user-interview__nav-item">Psikotes</span>
                 <span class="daw-user-interview__nav-item">Wawancara HR</span>
-                <a class="daw-user-interview__nav-item is-active" href="<?= esc_url( $list_url ) ?>">Wawancara User</a>
-                <span class="daw-user-interview__nav-item">Final Decision</span>
+                <a class="daw-user-interview__nav-item" href="<?= esc_url( $queue_url ) ?>">Wawancara User</a>
+                <a class="daw-user-interview__nav-item daw-user-interview__nav-subitem <?= $show_results ? 'is-active' : '' ?>" href="<?= esc_url( $results_url ) ?>">Detail Hasil Wawancara User</a>
+                <a class="daw-user-interview__nav-item" href="<?= esc_url( recruitment_get_admin_url( 'final-decision' ) ) ?>">Final Decision</a>
                 <span class="daw-user-interview__nav-item">Database Pelamar</span>
                 <details class="daw-user-interview__nav-group" open>
                     <summary class="daw-user-interview__nav-item">Lowongan</summary>
@@ -125,7 +193,7 @@ if ( ! $selected_cand && 0 === $selected_application_id && 0 === $selected_candi
         <nav class="daw-user-interview__breadcrumb" aria-label="Breadcrumb">
             <span class="daw-user-interview__breadcrumb-root">DAW Admin</span>
             <span aria-hidden="true">/</span>
-            <strong><?= $show_notes ? 'Hasil Wawancara User' : 'Wawancara User' ?></strong>
+            <strong><?= $show_notes ? 'Hasil Wawancara User' : ( $show_results ? 'Detail Hasil Wawancara User' : 'Wawancara User' ) ?></strong>
         </nav>
         <div class="daw-user-interview__account">
             <span class="daw-user-interview__avatar" aria-hidden="true">HR</span>
@@ -182,11 +250,65 @@ if ( ! $selected_cand && 0 === $selected_application_id && 0 === $selected_candi
             <?php else : ?>
                 <div class="daw-empty-state" style="padding:40px; text-align:center; background:#fff; border-radius:8px;">Belum ada kandidat yang tersedia untuk wawancara user.</div>
             <?php endif; ?>
+        <?php elseif ( $show_results ) : ?>
+            <?php if ( $database_error ) : ?><div class="notice notice-error"><p>Data hasil wawancara User belum dapat dimuat dari Oracle. Silakan coba kembali.</p></div><?php endif; ?>
+            <div class="daw-user-results__heading">
+                <div><h1>Detail Hasil Wawancara User</h1><p>Rekap hasil wawancara user yang telah disampaikan oleh Kepala Departemen. Data ini hanya untuk review HR — bukan tempat HR melakukan wawancara user.</p></div>
+            </div>
+            <section class="daw-user-results__stats" aria-label="Ringkasan hasil wawancara User">
+                <article><span>Total Diwawancarai</span><strong><?= esc_html( (string) $result_stats['total'] ) ?></strong></article>
+                <article><span>Sangat Baik / Baik</span><strong class="is-green"><?= esc_html( (string) $result_stats['good'] ) ?></strong></article>
+                <article><span>Diterima</span><strong class="is-green"><?= esc_html( (string) $result_stats['accepted'] ) ?></strong></article>
+                <article><span>Menunggu Keputusan</span><strong class="is-amber"><?= esc_html( (string) $result_stats['pending'] ) ?></strong></article>
+            </section>
+            <div class="daw-user-results__filter-bar">
+                <nav class="daw-user-results__filters daw-user-results__filters--departments" aria-label="Filter departemen">
+                    <a class="<?= '' === $result_department ? 'is-active' : '' ?>" href="<?= esc_url( $result_filter_url( [ 'department' => '' ] ) ) ?>">Semua</a>
+                    <?php foreach ( $result_departments as $department_name ) : ?>
+                        <a class="<?= $result_department === $department_name ? 'is-active' : '' ?>" href="<?= esc_url( $result_filter_url( [ 'department' => $department_name ] ) ) ?>"><?= esc_html( $department_name ) ?></a>
+                    <?php endforeach; ?>
+                </nav>
+                <nav class="daw-user-results__filters daw-user-results__filters--ratings" aria-label="Filter hasil wawancara">
+                    <a class="<?= '' === $result_rating ? 'is-active' : '' ?>" href="<?= esc_url( $result_filter_url( [ 'rating' => '' ] ) ) ?>">Semua</a>
+                    <?php foreach ( $result_ratings as $rating_name ) : ?>
+                        <a class="<?= $result_rating === $rating_name ? 'is-active' : '' ?>" href="<?= esc_url( $result_filter_url( [ 'rating' => $rating_name ] ) ) ?>"><?= esc_html( $rating_name ) ?></a>
+                    <?php endforeach; ?>
+                </nav>
+            </div>
+            <section class="daw-user-results__list" aria-label="Daftar hasil wawancara User">
+                <?php if ( empty( $filtered_result_candidates ) ) : ?>
+                    <div class="daw-user-results__empty">Belum ada hasil wawancara yang sesuai dengan filter.</div>
+                <?php else : ?>
+                    <?php foreach ( $filtered_result_candidates as $candidate ) :
+                        $final_status_class = 'Diterima' === $candidate['final_decision'] ? 'is-accepted' : ( 'Ditolak' === $candidate['final_decision'] ? 'is-rejected' : 'is-pending' );
+                        $rating_class = 'Sangat Baik' === $candidate['recommendation'] ? 'is-excellent' : ( 'Baik' === $candidate['recommendation'] ? 'is-good' : ( 'Dipertimbangkan' === $candidate['recommendation'] ? 'is-consider' : 'is-not-recommended' ) );
+                        ?>
+                        <details class="daw-user-results__item" <?= (int) ( $_GET['application_id'] ?? 0 ) === $candidate['application_id'] ? 'open' : '' ?>>
+                            <summary>
+                                <span class="daw-user-results__avatar" aria-hidden="true"><?= esc_html( strtoupper( substr( $candidate['name'], 0, 2 ) ) ) ?></span>
+                                <span class="daw-user-results__identity"><strong><?= esc_html( $candidate['name'] ) ?></strong><small><?= esc_html( $candidate['code'] . ' · ' . $candidate['position'] . ' · ' . $candidate['department'] . ' · ' . $candidate['dealer'] ) ?></small></span>
+                                <span class="daw-user-results__badges"><span class="daw-user-results__badge <?= esc_attr( $rating_class ) ?>"><?= esc_html( $candidate['recommendation'] ?: 'Belum dinilai' ) ?></span><span class="daw-user-results__badge <?= esc_attr( $final_status_class ) ?>">Final: <?= esc_html( $candidate['final_decision'] ) ?></span></span>
+                                <span class="daw-user-results__interviewer"><?= esc_html( $candidate['interviewer'] ?: 'Interviewer belum tercatat' ) ?><small><?= esc_html( $candidate['interview_date'] ) ?></small></span>
+                                <span class="dashicons dashicons-arrow-down-alt2" aria-hidden="true"></span>
+                            </summary>
+                            <div class="daw-user-results__details">
+                                <dl><div><dt>Departemen</dt><dd><?= esc_html( $candidate['department'] ) ?></dd></div><div><dt>Interviewer</dt><dd><?= esc_html( $candidate['interviewer'] ?: '—' ) ?></dd></div><div><dt>Tanggal Wawancara</dt><dd><?= esc_html( $candidate['interview_date'] ) ?></dd></div><div><dt>Hasil User</dt><dd><?= esc_html( $candidate['recommendation'] ?: 'Belum tersedia' ) ?><?= '' !== $candidate['score'] ? ' · ' . esc_html( $candidate['score'] . '/100' ) : '' ?></dd></div></dl>
+                                <div class="daw-user-results__notes"><strong>Catatan Wawancara User</strong><p><?= '' !== $candidate['notes'] ? nl2br( esc_html( $candidate['notes'] ) ) : 'Tidak ada catatan wawancara.' ?></p></div>
+                                <?php if ( 'Pending' === $candidate['final_decision'] ) : ?><a class="daw-user-results__final-link" href="<?= esc_url( add_query_arg( [ 'page' => 'recruitment-final-decision', 'section' => 'decision', 'application_id' => $candidate['application_id'] ], admin_url( 'admin.php' ) ) ) ?>">Lanjut ke Final Decision</a><?php endif; ?>
+                            </div>
+                        </details>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </section>
         <?php else : ?>
             <?php if ( $database_error ) : ?><div class="notice notice-error"><p>Data wawancara User belum dapat dimuat dari Oracle. Silakan coba kembali.</p></div><?php endif; ?>
             <div class="daw-interview-screen__heading">
                 <div><h1>Wawancara User</h1><p>Kelola wawancara user (hiring manager) untuk kandidat yang lolos wawancara HR.</p></div>
+                <a class="daw-user-results__queue-link" href="<?= esc_url( $results_url ) ?>">Detail Hasil Wawancara User</a>
             </div>
+            <?php if ( $unverified_interview_count > 0 ) : ?>
+                <div class="notice notice-warning"><p><?= esc_html( number_format_i18n( $unverified_interview_count ) ) ?> lamaran berstatus Wawancara User tidak ditampilkan karena hasil HR belum lolos atau akun User Department belum ditetapkan. Tinjau lamaran tersebut sebelum melanjutkan; status Oracle tidak diubah otomatis.</p></div>
+            <?php endif; ?>
             <section class="daw-interview-screen__stats" aria-label="Ringkasan wawancara user">
                 <article class="is-waiting"><strong><?= esc_html( (string) $stats['waiting'] ) ?></strong><span>Menunggu Wawancara</span></article>
                 <article class="is-scheduled"><strong><?= esc_html( (string) $stats['interviewed'] ) ?></strong><span>Sudah Diwawancarai</span></article>

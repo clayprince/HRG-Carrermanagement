@@ -38,7 +38,7 @@ $screen_explorer_items = [
     ],
     'Psikotes' => [
         [ 'label' => 'Beranda Psikotes', 'screen' => 'psychotest' ],
-        [ 'label' => 'Persiapan Assessment', 'screen' => 'psychotest-preparation' ],
+        [ 'label' => 'Beranda Psikotes', 'screen' => 'psychotest' ],
         [ 'label' => 'Periksa Perangkat', 'screen' => 'psychotest-device' ],
         [ 'label' => 'Psikotes: Review & Kirim', 'screen' => 'psych-test', 'args' => [ 'state' => 'review' ] ],
         [ 'label' => 'Psikotes: Memproses Hasil', 'screen' => 'psych-test', 'args' => [ 'state' => 'processing' ] ],

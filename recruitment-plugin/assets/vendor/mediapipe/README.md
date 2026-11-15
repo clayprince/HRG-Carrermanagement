@@ -8,5 +8,7 @@
 - Keep the runtime and its `.tflite`, `.binarypb`, and `*_wasm_bin.*` assets
   together when updating or packaging the plugin.
 
-The detector reports face presence/count only. It does not identify a person,
-perform face matching, or record video.
+The detector reports face locations/count and six facial keypoints (including
+eye and nose points). The plugin uses their relative positions only for a
+coarse, local face-orientation alert; this is not gaze tracking or identity
+matching. It does not identify a person or record video.

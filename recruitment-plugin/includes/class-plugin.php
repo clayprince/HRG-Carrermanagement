@@ -152,8 +152,11 @@ class Recruitment_Plugin {
         $requested_application_id = isset( $_GET['application_id'] ) && is_scalar( $_GET['application_id'] )
             ? absint( wp_unslash( (string) $_GET['application_id'] ) )
             : 0;
+        if ( $requested_application_id < 1 ) {
+            wp_die( esc_html__( 'Pilih lamaran psikotes yang aktif sebelum menyetujui persiapan tes.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+        }
         $stage_status = recruitment_applicant_psychotest_stage_status(
-            $requested_application_id > 0 ? (string) $requested_application_id : null
+            (string) $requested_application_id
         );
         if ( null === $stage_status ) {
             wp_die( esc_html__( 'Status lamaran tidak dapat diverifikasi. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
@@ -174,7 +177,7 @@ class Recruitment_Plugin {
             'disc' => 'psych-personality',
             'papi' => 'psych-personality',
         ];
-        if ( ! isset( $test_routes[ $test_key ] ) || empty( $_POST['consent'] ) ) {
+        if ( 'iq' !== $test_key || empty( $_POST['consent'] ) ) {
             wp_die( esc_html__( 'Persetujuan dan jenis tes harus dipilih sebelum tes dimulai.', 'recruitment-plugin' ), '', [ 'response' => 400 ] );
         }
         if ( ! recruitment_is_psychotest_test_enabled( $test_key ) ) {
@@ -184,11 +187,11 @@ class Recruitment_Plugin {
         if ( null === $this->proctoring || ! $this->proctoring->is_secure_transport() ) {
             wp_die( esc_html__( 'Persetujuan kamera dan pengiriman bukti hanya diizinkan melalui HTTPS atau localhost.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
         }
-        if ( null === $this->proctoring || ! $this->proctoring->save_consent() ) {
+        if ( null === $this->proctoring || ! $this->proctoring->save_consent( $requested_application_id ) ) {
             wp_die( esc_html__( 'Persetujuan pengawasan tidak dapat disimpan di Oracle. Muat ulang halaman dan coba kembali.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
         }
 
-        wp_safe_redirect( recruitment_get_public_url( 'psychotest-identity', [ 'test' => $test_key ] ) );
+        wp_safe_redirect( recruitment_get_public_url( 'psychotest-identity', [ 'test' => $test_key, 'application_id' => $requested_application_id ] ) );
         exit;
     }
 
@@ -406,9 +409,18 @@ class Recruitment_Plugin {
             }
             $requested_page = sanitize_key( wp_unslash( $_GET['page'] ?? '' ) );
             $department_page = 'daw-user-department' === $requested_page;
+            global $pagenow;
+            $department_download_action = 'admin-post.php' === $pagenow
+                && in_array(
+                    sanitize_key( wp_unslash( $_GET['action'] ?? '' ) ),
+                    [ 'daw_download_department_profile', 'daw_download_department_document' ],
+                    true
+                );
             $requested_action = isset( $_POST['action'] ) && is_scalar( $_POST['action'] )
                 ? sanitize_key( wp_unslash( (string) $_POST['action'] ) )
-                : '';
+                : ( isset( $_POST['daw_ud_action'] ) && is_scalar( $_POST['daw_ud_action'] )
+                    ? sanitize_key( wp_unslash( (string) $_POST['daw_ud_action'] ) )
+                    : '' );
             $department_post_action = 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? '' ) )
                 && in_array(
                     $requested_action,
@@ -417,10 +429,11 @@ class Recruitment_Plugin {
                         'daw_delete_interview_slot',
                         'daw_change_department_password',
                         'daw_logout',
+                        'save_user_interview',
                     ],
                     true
                 );
-            if ( ( 'user_department' === $account_type && ! $department_page && ! $department_post_action ) || ( 'hr' === $account_type && $department_page ) ) {
+            if ( ( 'user_department' === $account_type && ! $department_page && ! $department_download_action && ! $department_post_action ) || ( 'hr' === $account_type && $department_page ) ) {
                 wp_logout();
                 $redirect = 'user_department' === $account_type
                     ? recruitment_get_department_login_url( [ 'login_error' => 'no_access' ] )
