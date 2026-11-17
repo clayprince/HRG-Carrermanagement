@@ -223,6 +223,9 @@ $schedule_url = static function ( DateTimeImmutable $month ) use ( $schedule_pag
 													<?php endforeach; ?>
 												</ul>
 											<?php endif; ?>
+											<?php if ( ! empty( $slot['is_complete'] ) ) : ?>
+												<button class="daw-schedule__button daw-schedule__button--secondary" type="button" data-delete-schedule="<?= esc_attr( (string) $slot['id'] ) ?>">Hapus jadwal selesai</button>
+											<?php endif; ?>
 										</div>
 									<?php endforeach; ?>
 									<button class="daw-schedule__button daw-schedule__button--secondary" type="button" data-edit-schedule="<?= esc_attr( wp_json_encode( $edit_slots ) ) ?>" data-edit-date="<?= esc_attr( $date ) ?>">Edit jadwal tanggal ini</button>

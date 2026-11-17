@@ -2427,6 +2427,15 @@ class Recruitment_Database {
             $booking_count = $connection->prepare(
                 'SELECT COUNT(*) FROM HRS_INTERVIEW_BOOKING WHERE schedule_id = :schedule_id AND booking_status = \'BOOKED\''
             );
+            $result_table = 'HR' === $interview_type ? 'HRS_HASIL_WAWANCARA_HR' : 'HRS_HASIL_WAWANCARA_USER';
+            $pending_count = $connection->prepare(
+                'SELECT COUNT(*) FROM HRS_INTERVIEW_BOOKING b
+                 WHERE b.schedule_id = :schedule_id AND b.booking_status = \'BOOKED\'
+                   AND NOT EXISTS (
+                       SELECT 1 FROM ' . $result_table . ' r WHERE r.lamaran_id = b.lamaran_id
+                   )'
+            );
+            $delete_bookings = $connection->prepare( 'DELETE FROM HRS_INTERVIEW_BOOKING WHERE schedule_id = :schedule_id' );
             $delete = $connection->prepare( 'DELETE FROM HRS_INTERVIEW_SCHEDULE WHERE schedule_id = :schedule_id' );
             $update = $connection->prepare(
                 'UPDATE HRS_INTERVIEW_SCHEDULE
@@ -2464,9 +2473,17 @@ class Recruitment_Database {
                         continue;
                     }
                     $booking_count->execute( [ 'schedule_id' => $current_id ] );
-                    if ( 0 < (int) $booking_count->fetchColumn() ) {
+                    $booked_count = (int) $booking_count->fetchColumn();
+                    $pending_count->execute( [ 'schedule_id' => $current_id ] );
+                    $is_complete = 0 < $booked_count
+                        && $booked_count >= (int) $current_slot['CAPACITY']
+                        && 0 === (int) $pending_count->fetchColumn();
+                    if ( 0 < $booked_count && ! $is_complete ) {
                         $connection->rollBack();
                         return [ 'success' => false, 'error' => 'booked_slot_cannot_remove' ];
+                    }
+                    if ( $is_complete ) {
+                        $delete_bookings->execute( [ 'schedule_id' => $current_id ] );
                     }
                     $delete->execute( [ 'schedule_id' => $current_id ] );
                 }
@@ -2503,8 +2520,13 @@ class Recruitment_Database {
                     $current_slot = $current_by_id[ $schedule_id ];
                     $booking_count->execute( [ 'schedule_id' => $schedule_id ] );
                     $booked_count = (int) $booking_count->fetchColumn();
+                    $pending_count->execute( [ 'schedule_id' => $schedule_id ] );
+                    $is_complete = 0 < $booked_count
+                        && $booked_count >= (int) $current_slot['CAPACITY']
+                        && 0 === (int) $pending_count->fetchColumn();
                     if (
                         0 < $booked_count
+                        && ! $is_complete
                         && ( $slot['start'] !== trim( (string) $current_slot['START_TIME'] ) || $slot['end'] !== trim( (string) $current_slot['END_TIME'] ) )
                     ) {
                         $connection->rollBack();
@@ -2524,6 +2546,79 @@ class Recruitment_Database {
                 $connection->rollBack();
             }
             $this->log_error( 'Interview schedule save failed', $exception );
+            return [ 'success' => false, 'error' => 'service_unavailable' ];
+        }
+    }
+
+    /**
+     * @return array{success: bool, error?: string}
+     */
+    public function delete_completed_interview_schedule( string $schedule_id, string $type ): array {
+        if ( ! ctype_digit( $schedule_id ) || '0' === $schedule_id || ! in_array( $type, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) ) {
+            return [ 'success' => false, 'error' => 'invalid_schedule_data' ];
+        }
+
+        $interview_type = 'INTERVIEW_HR' === $type ? 'HR' : 'USER';
+        $result_table = 'HR' === $interview_type ? 'HRS_HASIL_WAWANCARA_HR' : 'HRS_HASIL_WAWANCARA_USER';
+        $connection = null;
+        try {
+            $connection = $this->get_connection();
+            $connection->beginTransaction();
+            $lock_schedules = $connection->prepare(
+                'SELECT s.schedule_id, s.capacity
+                 FROM HRS_INTERVIEW_SCHEDULE s
+                 WHERE s.schedule_id = :schedule_id
+                   AND s.interview_type = :interview_type
+                 FOR UPDATE OF s.schedule_id'
+            );
+            $lock_schedules->execute( [ 'schedule_id' => (int) $schedule_id, 'interview_type' => $interview_type ] );
+            $schedules = $lock_schedules->fetchAll( PDO::FETCH_ASSOC );
+            if ( empty( $schedules ) ) {
+                $connection->rollBack();
+                return [ 'success' => false, 'error' => 'schedule_not_found' ];
+            }
+
+            $booking_count = $connection->prepare(
+                'SELECT COUNT(*) FROM HRS_INTERVIEW_BOOKING
+                 WHERE schedule_id = :schedule_id AND booking_status = \'BOOKED\''
+            );
+            $pending_count = $connection->prepare(
+                'SELECT COUNT(*) FROM HRS_INTERVIEW_BOOKING b
+                 WHERE b.schedule_id = :schedule_id AND b.booking_status = \'BOOKED\'
+                   AND NOT EXISTS (
+                       SELECT 1 FROM ' . $result_table . ' r WHERE r.lamaran_id = b.lamaran_id
+                   )'
+            );
+            $delete_bookings = $connection->prepare( 'DELETE FROM HRS_INTERVIEW_BOOKING WHERE schedule_id = :schedule_id' );
+            $delete_schedule = $connection->prepare(
+                'DELETE FROM HRS_INTERVIEW_SCHEDULE
+                 WHERE schedule_id = :schedule_id AND interview_type = :interview_type'
+            );
+            foreach ( $schedules as $schedule_row ) {
+                $schedule_id = (int) $schedule_row['SCHEDULE_ID'];
+                $booking_count->execute( [ 'schedule_id' => $schedule_id ] );
+                $booked_count = (int) $booking_count->fetchColumn();
+                $pending_count->execute( [ 'schedule_id' => $schedule_id ] );
+                $is_complete = 0 < $booked_count
+                    && $booked_count >= (int) $schedule_row['CAPACITY']
+                    && 0 === (int) $pending_count->fetchColumn();
+                if ( ! $is_complete ) {
+                    $connection->rollBack();
+                    return [ 'success' => false, 'error' => 'schedule_not_complete' ];
+                }
+                $delete_bookings->execute( [ 'schedule_id' => $schedule_id ] );
+                $delete_schedule->execute(
+                    [ 'schedule_id' => $schedule_id, 'interview_type' => $interview_type ]
+                );
+            }
+
+            $connection->commit();
+            return [ 'success' => true ];
+        } catch ( PDOException | RuntimeException $exception ) {
+            if ( $connection instanceof PDO && $connection->inTransaction() ) {
+                $connection->rollBack();
+            }
+            $this->log_error( 'Completed interview schedule deletion failed', $exception );
             return [ 'success' => false, 'error' => 'service_unavailable' ];
         }
     }

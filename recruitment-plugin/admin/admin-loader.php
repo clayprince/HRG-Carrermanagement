@@ -21,6 +21,7 @@ class Recruitment_Admin {
 		add_action( 'admin_post_daw_update_application_status', [ $this, 'handle_application_status' ] );
 		add_action( 'admin_post_daw_save_hr_interview', [ $this, 'handle_hr_interview_save' ] );
 		add_action( 'wp_ajax_daw_save_interview_schedule', [ $this, 'handle_interview_schedule_save_ajax' ] );
+		add_action( 'wp_ajax_daw_delete_interview_schedule', [ $this, 'handle_interview_schedule_delete_ajax' ] );
 		add_action( 'admin_post_daw_send_application_status_email', [ $this, 'handle_application_status_email' ] );
 		add_action( 'admin_post_daw_update_psychotest_attendance_time', [ $this, 'handle_psychotest_attendance_time_update' ] );
 		add_action( 'admin_post_daw_update_applicant_email', [ $this, 'handle_applicant_email_update' ] );
@@ -1639,13 +1640,37 @@ class Recruitment_Admin {
 			'invalid_schedule_data' => 'Periksa kembali tanggal, kapasitas, dan detail setiap slot.',
 			'overlapping_slots' => 'Waktu antar-slot tidak boleh saling tumpang tindih.',
 			'schedule_already_exists' => 'Tanggal tersebut sudah memiliki jadwal. Gunakan tombol Edit jadwal pada daftar jadwal tersimpan.',
-			'booked_slot_cannot_remove' => 'Slot yang sudah dipesan tidak dapat dihapus.',
+			'booked_slot_cannot_remove' => 'Slot yang belum selesai atau belum mencapai target tidak dapat dihapus.',
 			'booked_slot_time_locked' => 'Waktu slot yang sudah dipesan tidak dapat diubah.',
 			'capacity_below_bookings' => 'Kapasitas slot tidak boleh lebih kecil dari jumlah peserta yang sudah memesan.',
 			'schedule_interviewer_schema_unavailable' => 'Jalankan migrasi 020 untuk menambahkan nama pewawancara sebelum menyimpan jadwal.',
 			'service_unavailable' => 'Jadwal gagal disimpan ke Oracle. Pastikan migrasi 018, 019, dan 020 telah diterapkan dan koneksi tersedia.',
 		][ $error ] ?? 'Jadwal gagal disimpan. Silakan coba kembali.';
 		wp_send_json_error( [ 'message' => $message ], in_array( $error, [ 'service_unavailable', 'schedule_interviewer_schema_unavailable' ], true ) ? 503 : 400 );
+	}
+
+	public function handle_interview_schedule_delete_ajax(): void {
+		check_ajax_referer( 'daw_save_interview_schedule', 'nonce' );
+		$context = $this->get_interview_schedule_context();
+		$schedule_id = isset( $_POST['schedule_id'] ) && is_scalar( $_POST['schedule_id'] )
+			? sanitize_text_field( wp_unslash( (string) $_POST['schedule_id'] ) )
+			: '';
+		$result = ( new Recruitment_Database() )->delete_completed_interview_schedule( $schedule_id, $context['type'] );
+		if ( ! empty( $result['success'] ) ) {
+			wp_send_json_success( [ 'message' => 'Jadwal selesai beserta booking terkait berhasil dihapus.' ] );
+		}
+
+		$error = (string) ( $result['error'] ?? '' );
+		$message = [
+			'invalid_schedule_data' => 'Slot jadwal tidak valid.',
+			'schedule_not_found' => 'Jadwal tidak ditemukan atau sudah dihapus.',
+			'schedule_not_complete' => 'Jadwal hanya dapat dihapus setelah target tercapai dan semua hasil wawancara tercatat.',
+			'service_unavailable' => 'Jadwal gagal dihapus dari Oracle. Silakan coba kembali.',
+		][ $error ] ?? 'Jadwal gagal dihapus. Silakan coba kembali.';
+		wp_send_json_error(
+			[ 'message' => $message ],
+			'service_unavailable' === $error ? 503 : 400
+		);
 	}
 
 	public function render_user_management(): void {
