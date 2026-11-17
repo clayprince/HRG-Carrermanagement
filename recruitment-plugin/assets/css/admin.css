@@ -1190,6 +1190,21 @@
   margin-bottom: 14px;
   padding: 8px;
 }
+.recruitment-dashboard__filter-label {
+  align-items: center;
+  color: #707780;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 700;
+  gap: 5px;
+  padding: 0 3px;
+  text-transform: uppercase;
+}
+.recruitment-dashboard__filter-label .dashicons {
+  font-size: 13px;
+  height: 13px;
+  width: 13px;
+}
 .recruitment-dashboard__filters select,
 .recruitment-dashboard__search input {
   background-color: #fff;
@@ -1289,6 +1304,51 @@
   flex: 0 0 auto;
   flex-direction: column;
   gap: 5px;
+}
+.recruitment-candidate__actions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.recruitment-candidate__actions .recruitment-candidate__stage,
+.recruitment-candidate__actions .recruitment-candidate__state {
+  font-size: 9px;
+}
+.recruitment-candidate__decision-form {
+  display: contents;
+}
+.recruitment-candidate__accept,
+.recruitment-candidate__reject {
+  border-radius: 6px !important;
+  font-size: 10px !important;
+  font-weight: 650 !important;
+  line-height: 1.2 !important;
+  min-height: 28px !important;
+  padding: 5px 9px !important;
+  white-space: nowrap;
+}
+.recruitment-candidate__actions .recruitment-candidate__accept {
+  background: #16a34a !important;
+  border-color: #16a34a !important;
+  color: #fff !important;
+}
+.recruitment-candidate__actions .recruitment-candidate__reject {
+  background: #fff !important;
+  border-color: #ef4444 !important;
+  color: #dc2626 !important;
+}
+.recruitment-candidate__detail {
+  color: #606972;
+  font-size: 10px;
+  padding: 4px 2px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.recruitment-candidate__detail:hover {
+  color: #c8102e;
 }
 .recruitment-candidate__stage,
 .recruitment-candidate__state {
@@ -1792,6 +1852,62 @@
   justify-content: space-between;
   margin-bottom: 14px;
 }
+.recruitment-dashboard__candidate-heading h2 {
+  color: #30363c;
+  font-size: 15px;
+  margin: 0 0 3px;
+}
+.recruitment-dashboard__candidate-heading p {
+  color: #747c85;
+  font-size: 10px;
+  margin: 0;
+}
+.recruitment-dashboard__candidate-panel--active-list {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  padding: 0;
+}
+.recruitment-dashboard__candidate-panel--active-list
+  .recruitment-dashboard__candidate-heading {
+  background: #fff;
+  border: 1px solid #e0e2e5;
+  border-radius: 7px;
+  margin-bottom: 16px;
+  padding: 14px max(16px, calc((100% - 755px) / 2));
+}
+.recruitment-dashboard__candidate-panel--active-list
+  > .recruitment-dashboard__section-label,
+.recruitment-dashboard__candidate-panel--active-list
+  > .recruitment-dashboard__stage-filters,
+.recruitment-dashboard__candidate-panel--active-list
+  > .recruitment-dashboard__filters,
+.recruitment-dashboard__candidate-panel--active-list
+  > .recruitment-dashboard__result-count,
+.recruitment-dashboard__candidate-panel--active-list
+  > .recruitment-dashboard__candidate-list {
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 755px;
+}
+.recruitment-dashboard__candidate-panel--active-list
+  > .recruitment-dashboard__section-label {
+  margin-bottom: 6px;
+}
+.recruitment-dashboard__candidate-panel--active-list
+  .recruitment-dashboard__filters {
+  grid-template-columns:
+    auto minmax(180px, 1fr) minmax(115px, 150px) minmax(115px, 150px) auto;
+}
+.recruitment-dashboard__candidate-panel--active-list .recruitment-candidate {
+  align-items: flex-start;
+  min-height: 66px;
+}
+.recruitment-dashboard__candidate-panel--active-list
+  .recruitment-candidate__identity {
+  padding-top: 2px;
+}
 .recruitment-dashboard__candidate-panel .recruitment-dashboard__pipeline {
   margin: 0;
   max-width: none;
@@ -2187,6 +2303,24 @@ body.daw-recruitment-sidebar-collapsed .daw-sidebar-user-link,
   }
   .recruitment-dashboard__content {
     padding: 12px 10px 20px;
+  }
+  .recruitment-dashboard__candidate-panel--active-list
+    .recruitment-dashboard__filters {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .recruitment-dashboard__candidate-panel--active-list
+    .recruitment-dashboard__filter-label {
+    grid-column: 1 / -1;
+  }
+  .recruitment-dashboard__candidate-panel--active-list
+    .recruitment-candidate {
+    flex-wrap: wrap;
+  }
+  .recruitment-dashboard__candidate-panel--active-list
+    .recruitment-candidate__actions {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+    margin-left: 40px;
   }
 }
 
@@ -3925,10 +4059,10 @@ body:has(.daw-admin-login) main {
   align-items: end;
   display: grid;
   gap: 8px;
-  grid-template-columns: repeat(7, minmax(90px, 1fr)) auto auto;
+  grid-template-columns: repeat(7, minmax(90px, 1fr)) auto;
 }
 .daw-fd-filter--email .daw-fd-filter__fields {
-  grid-template-columns: repeat(5, minmax(100px, 1fr)) auto auto;
+  grid-template-columns: repeat(5, minmax(100px, 1fr)) auto;
 }
 .daw-fd-filter__fields label,
 .daw-fd-analytics-filter__fields label {
@@ -5469,18 +5603,23 @@ button.daw-ud-topbar__logout:hover {
   flex: 0 0 auto;
   gap: 4px;
 }
-.daw-ud-detail-heading nav > span:not(.daw-ud-status) {
+.daw-ud-detail-heading nav > a {
   background: #fff;
   border: 1px solid #d4d7dd;
   border-radius: 5px;
   color: #626a75;
   font-size: 7px;
   padding: 4px 7px;
+  text-decoration: none;
 }
-.daw-ud-detail-heading nav > span.is-current {
+.daw-ud-detail-heading nav > a.is-current {
   background: #252a32;
   border-color: #252a32;
   color: #fff;
+}
+.daw-ud-detail-heading nav > a:not(.is-current):hover {
+  border-color: #858c96;
+  color: #252a32;
 }
 .daw-ud-detail-layout {
   align-items: start;
@@ -6907,6 +7046,73 @@ body:has(.daw-user-interview) {
 .daw-interview-screen__action:hover {
   background: #a80d27;
   color: #fff;
+}
+.daw-interview-screen--list .daw-user-interview__main {
+  padding-top: 2px;
+}
+.daw-interview-screen--list .daw-interview-screen__panel-heading {
+  border-bottom: 1px solid #e6e6e9;
+  min-height: 34px;
+  padding: 8px 13px;
+}
+.daw-interview-screen--list .daw-interview-screen__panel-heading h2 {
+  font-size: 10px;
+}
+.daw-interview-screen--list .daw-hr-interview__table {
+  min-width: 760px;
+  table-layout: fixed;
+}
+.daw-interview-screen--list .daw-hr-interview__table th:nth-child(1) {
+  width: 15%;
+}
+.daw-interview-screen--list .daw-hr-interview__table th:nth-child(2) {
+  width: 16%;
+}
+.daw-interview-screen--list .daw-hr-interview__table th:nth-child(3) {
+  width: 15%;
+}
+.daw-interview-screen--list .daw-hr-interview__table th:nth-child(4) {
+  width: 12%;
+}
+.daw-interview-screen--list .daw-hr-interview__table th:nth-child(5) {
+  width: 13%;
+}
+.daw-interview-screen--list .daw-hr-interview__table th:nth-child(6) {
+  width: 12%;
+}
+.daw-interview-screen--list .daw-hr-interview__table th:nth-child(7) {
+  width: 17%;
+}
+.daw-interview-screen--list .daw-hr-interview__table td {
+  padding: 8px 10px;
+}
+.daw-interview-screen--list .daw-user-interview__candidate {
+  color: #303036;
+  font-size: 9px;
+  font-weight: 650;
+}
+.daw-interview-screen--list .daw-hr-interview__table td > small {
+  color: #7a7a81;
+  display: block;
+  font-size: 8px;
+  margin-top: 2px;
+}
+.daw-interview-screen--list .daw-interview-screen__status {
+  font-size: 8px;
+}
+.daw-interview-screen--list .daw-interview-screen__action,
+.daw-interview-screen--list .daw-interview-screen__action:hover {
+  background: transparent;
+  color: #c8102e;
+  font-size: 8px;
+  font-weight: 650;
+  min-height: 0;
+  padding: 0;
+  text-decoration: none;
+}
+.daw-interview-screen--list .daw-interview-screen__action:hover {
+  color: #a80d27;
+  text-decoration: underline;
 }
 @media (max-width: 640px) {
   .daw-interview-screen__stats {
@@ -8738,7 +8944,7 @@ body:has(.daw-user-interview) {
   box-shadow: 0 18px 60px rgba(24, 30, 39, 0.22);
   color: var(--account-ink);
   max-height: min(90vh, 720px);
-  max-width: 720px;
+  max-width: 560px;
   padding: 0;
   width: calc(100% - 32px);
 }
@@ -10607,6 +10813,342 @@ body:has(.daw-hr-interview__detail-grid) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+.daw-user-interview--results .daw-user-interview__main {
+  max-width: 760px;
+}
+.daw-user-results__heading {
+  align-items: flex-end;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin: 2px 0 12px;
+}
+.daw-user-results__heading h1 {
+  color: #303036;
+  font-size: 15px;
+  line-height: 1.25;
+  margin: 0 0 4px;
+}
+.daw-user-results__heading p {
+  color: #73737a;
+  font-size: 9px;
+  line-height: 1.45;
+  margin: 0;
+  max-width: 520px;
+}
+.daw-user-results__queue-link,
+.daw-user-results__final-link {
+  align-items: center;
+  background: #c8102e;
+  border-radius: 4px;
+  color: #fff;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 8px;
+  font-weight: 650;
+  justify-content: center;
+  min-height: 25px;
+  padding: 0 9px;
+  text-decoration: none;
+}
+.daw-user-results__queue-link:hover,
+.daw-user-results__final-link:hover {
+  background: #a80d27;
+  color: #fff;
+}
+.daw-user-results__stats {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0 0 10px;
+}
+.daw-user-results__stats article {
+  background: #fff;
+  border: 1px solid #dedee2;
+  border-radius: 6px;
+  min-height: 42px;
+  padding: 7px 9px;
+}
+.daw-user-results__stats span,
+.daw-user-results__stats strong {
+  display: block;
+}
+.daw-user-results__stats span {
+  color: #73737a;
+  font-size: 7px;
+  line-height: 1.25;
+}
+.daw-user-results__stats strong {
+  color: #29292e;
+  font-size: 14px;
+  line-height: 1.1;
+  margin-top: 3px;
+}
+.daw-user-results__stats strong.is-green {
+  color: #16834b;
+}
+.daw-user-results__stats strong.is-amber {
+  color: #b76500;
+}
+.daw-user-results__search {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #dedee2;
+  border-radius: 6px;
+  display: flex;
+  gap: 6px;
+  margin: 0 0 7px;
+  padding: 6px;
+}
+.daw-user-results__search input[type="search"] {
+  border: 1px solid #dedee2;
+  border-radius: 4px;
+  box-shadow: none;
+  flex: 1 1 auto;
+  font-size: 9px;
+  height: 24px;
+  min-width: 0;
+  padding: 0 8px;
+}
+.daw-user-results__search button {
+  background: #fff;
+  border: 1px solid #dedee2;
+  border-radius: 4px;
+  color: #56565d;
+  cursor: pointer;
+  font: inherit;
+  font-size: 8px;
+  min-height: 24px;
+  padding: 0 9px;
+}
+.daw-user-results__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 0 5px;
+}
+.daw-user-results__filter-bar {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 0 8px;
+}
+.daw-user-results__filter-bar .daw-user-results__filters {
+  margin: 0;
+}
+.daw-user-results__filters a {
+  background: #fff;
+  border: 1px solid #dedee2;
+  border-radius: 4px;
+  color: #56565d;
+  font-size: 8px;
+  line-height: 1.2;
+  padding: 4px 7px;
+  text-decoration: none;
+}
+.daw-user-results__filters a.is-active,
+.daw-user-results__filters a:hover {
+  background: #c8102e;
+  border-color: #c8102e;
+  color: #fff;
+}
+.daw-user-results__filters--departments a.is-active,
+.daw-user-results__filters--departments a:hover {
+  background: #303036;
+  border-color: #303036;
+  color: #fff;
+}
+.daw-user-results__filters--ratings {
+  margin-bottom: 0;
+}
+.daw-user-results__list {
+  display: grid;
+  gap: 5px;
+}
+.daw-user-results__item {
+  background: #fff;
+  border: 1px solid #dedee2;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.daw-user-results__item summary {
+  align-items: center;
+  cursor: pointer;
+  display: grid;
+  gap: 7px;
+  grid-template-columns: 24px minmax(100px, 1fr) auto minmax(65px, 95px) 12px;
+  list-style: none;
+  min-height: 42px;
+  padding: 6px 8px;
+}
+.daw-user-results__item summary::-webkit-details-marker {
+  display: none;
+}
+.daw-user-results__avatar {
+  align-items: center;
+  background: #ececef;
+  border-radius: 50%;
+  color: #5f6068;
+  display: inline-flex;
+  font-size: 7px;
+  font-weight: 700;
+  height: 23px;
+  justify-content: center;
+  width: 23px;
+}
+.daw-user-results__identity,
+.daw-user-results__identity strong,
+.daw-user-results__identity small,
+.daw-user-results__interviewer,
+.daw-user-results__interviewer small {
+  display: block;
+  min-width: 0;
+}
+.daw-user-results__identity strong {
+  color: #303036;
+  font-size: 8px;
+  line-height: 1.3;
+}
+.daw-user-results__identity small {
+  color: #73737a;
+  font-size: 7px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.daw-user-results__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+.daw-user-results__badge {
+  border-radius: 8px;
+  font-size: 7px;
+  font-weight: 650;
+  line-height: 1.2;
+  padding: 3px 5px;
+  white-space: nowrap;
+}
+.daw-user-results__badge.is-excellent,
+.daw-user-results__badge.is-accepted {
+  background: #d9fbe8;
+  color: #16834b;
+}
+.daw-user-results__badge.is-good {
+  background: #deebff;
+  color: #2868c7;
+}
+.daw-user-results__badge.is-consider,
+.daw-user-results__badge.is-pending {
+  background: #fff1c2;
+  color: #b76500;
+}
+.daw-user-results__badge.is-not-recommended,
+.daw-user-results__badge.is-rejected {
+  background: #ffe1e1;
+  color: #ca3030;
+}
+.daw-user-results__interviewer {
+  color: #55555c;
+  font-size: 7px;
+  text-align: right;
+}
+.daw-user-results__interviewer small {
+  color: #85858c;
+  margin-top: 2px;
+}
+.daw-user-results__item summary > .dashicons {
+  color: #73737a;
+  font-size: 12px;
+  height: 12px;
+  width: 12px;
+}
+.daw-user-results__item[open] summary {
+  border-bottom: 1px solid #e6e6e9;
+}
+.daw-user-results__details {
+  background: #fdfdfe;
+  padding: 8px;
+}
+.daw-user-results__details dl {
+  display: grid;
+  gap: 5px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0 0 7px;
+}
+.daw-user-results__details dl div {
+  background: #fff;
+  border: 1px solid #eeeef0;
+  border-radius: 4px;
+  padding: 5px;
+}
+.daw-user-results__details dt {
+  color: #77777e;
+  font-size: 7px;
+}
+.daw-user-results__details dd {
+  color: #303036;
+  font-size: 7px;
+  font-weight: 600;
+  margin: 2px 0 0;
+}
+.daw-user-results__notes {
+  background: #fff;
+  border: 1px solid #eeeef0;
+  border-radius: 4px;
+  margin-bottom: 7px;
+  padding: 6px;
+}
+.daw-user-results__notes strong {
+  color: #77777e;
+  font-size: 7px;
+}
+.daw-user-results__notes p {
+  color: #46464d;
+  font-size: 8px;
+  font-style: italic;
+  margin: 3px 0 0;
+}
+.daw-user-results__empty {
+  background: #fff;
+  border: 1px solid #dedee2;
+  border-radius: 6px;
+  color: #73737a;
+  font-size: 9px;
+  padding: 22px 12px;
+  text-align: center;
+}
+@media (max-width: 780px) {
+  .daw-user-results__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .daw-user-results__filter-bar {
+    flex-direction: column;
+  }
+  .daw-user-results__item summary {
+    grid-template-columns: 24px minmax(0, 1fr) 12px;
+  }
+  .daw-user-results__badges,
+  .daw-user-results__interviewer {
+    grid-column: 2;
+    text-align: left;
+  }
+  .daw-user-results__item summary > .dashicons {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .daw-user-results__details dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 540px) {
+  .daw-user-results__heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
 .daw-requests-page {
   color: #252a32;
   margin: 0;
@@ -11787,14 +12329,233 @@ body.daw-recruitment-admin.post-type-daw_vacancy .wp-list-table .no-items td {
   border-top: 0;
   padding-top: 0;
 }
-.daw-question-bank__pdf-preview textarea {
+.daw-question-bank__pdf-preview-heading {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.daw-question-bank__pdf-preview-heading p {
+  color: #69727a;
+  font-size: 9px;
+  margin: 0;
+}
+.daw-question-bank__pdf-draft {
+  background: #fff1c2;
+  border-radius: 999px;
+  color: #b76500;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 4px 9px;
+  white-space: nowrap;
+}
+.daw-question-bank__pdf-selection-bar {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #e0e3e7;
+  border-radius: 7px;
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 11px;
+}
+.daw-question-bank__pdf-selection-bar label {
+  align-items: center;
+  color: #303840;
+  display: inline-flex;
+  font-weight: 600;
+  gap: 6px;
+}
+.daw-question-bank__pdf-selection-bar input,
+.daw-question-bank__pdf-question input {
+  margin: 0;
+}
+.daw-question-bank__pdf-selection-bar > span {
+  color: #69727a;
+  font-size: 9px;
+}
+.daw-question-bank__pdf-question-list {
+  display: grid;
+  gap: 7px;
+}
+.daw-question-bank__pdf-question {
+  background: #fff;
+  border: 1px solid #e0e3e7;
+  border-radius: 7px;
+  display: grid;
+  gap: 7px;
+  padding: 10px 12px;
+}
+.daw-question-bank__pdf-question > header,
+.daw-question-bank__pdf-question > header label {
+  align-items: center;
+  display: flex;
+  gap: 7px;
+}
+.daw-question-bank__pdf-question > header label {
+  color: #303840;
+}
+.daw-question-bank__pdf-question > header small {
+  color: #69727a;
+  font-size: 8px;
+}
+.daw-question-bank__pdf-prompt {
+  color: #303840;
+  font-size: 10px;
+  font-weight: 600;
+  margin: 0;
+}
+.daw-question-bank__pdf-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.daw-question-bank__pdf-choices span {
+  background: #f2f3f5;
+  border-radius: 4px;
+  color: #59616b;
+  font-size: 9px;
+  padding: 4px 6px;
+}
+.daw-question-bank__pdf-choices span.is-correct {
+  background: #d9fbe8;
+  color: #16834b;
+  font-weight: 700;
+}
+.daw-question-bank__pdf-answer {
+  color: #16834b;
+  font-size: 8px;
+  font-weight: 700;
+}
+.daw-question-bank__pdf-answer-field {
+  color: #525a62;
+  display: grid;
+  font-size: 9px;
+  font-weight: 600;
+  gap: 5px;
+  max-width: 260px;
+}
+.daw-question-bank__pdf-answer-field input {
   font-size: 10px;
   margin: 0;
   max-width: none;
   width: 100%;
 }
+.daw-question-bank__pdf-category {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.daw-question-bank__pdf-category select {
+  font-size: 9px;
+  margin: 0;
+  max-width: 180px;
+}
+.daw-question-bank__pdf-preview > button[disabled] {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
 .daw-question-bank__pdf-validation--error {
   color: #b32d2e;
+}
+.daw-personality-results {
+  color: #252a30;
+  margin: 14px 20px 28px 2px;
+  max-width: none;
+}
+.daw-psychotest-results__stats {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0 0 14px;
+}
+.daw-psychotest-results__stats article {
+  background: #fff;
+  border: 1px solid #d9dce0;
+  border-radius: 7px;
+  display: grid;
+  gap: 5px;
+  padding: 12px 14px;
+}
+.daw-psychotest-results__stats span {
+  color: #737b83;
+  font-size: 11px;
+}
+.daw-psychotest-results__stats strong {
+  color: #303840;
+  font-size: 20px;
+  line-height: 1.1;
+}
+.daw-psychotest-results__table-wrap {
+  background: #fff;
+  border: 1px solid #d9dce0;
+  border-radius: 7px;
+  overflow-x: auto;
+}
+.daw-psychotest-results__table {
+  border: 0;
+  border-collapse: collapse;
+  min-width: 1050px;
+}
+.daw-psychotest-results__table thead th {
+  background: #f3f4f6;
+  color: #68717a;
+  font-size: 10px;
+  padding: 11px 12px;
+  text-transform: uppercase;
+}
+.daw-psychotest-results__table tbody td {
+  color: #424a52;
+  font-size: 11px;
+  padding: 12px;
+  vertical-align: top;
+}
+.daw-psychotest-results__status {
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 8px;
+}
+.daw-psychotest-results__status.is-complete {
+  background: #e4f5eb;
+  color: #197342;
+}
+.daw-psychotest-results__status.is-progress {
+  background: #fff4dc;
+  color: #8a6400;
+}
+.daw-question-bank--import-preview .daw-question-bank__header {
+  margin-bottom: 18px;
+}
+.daw-question-bank--import-preview .daw-question-bank__panel {
+  padding: 14px;
+}
+.daw-question-bank__preview-back {
+  margin: 0 0 12px;
+}
+.daw-question-bank__pdf-preview {
+  gap: 12px;
+  padding: 0;
+}
+.daw-question-bank--import-preview .daw-question-bank__pdf-preview-heading h3 {
+  font-size: 15px;
+}
+.daw-question-bank--import-preview .daw-question-bank__pdf-preview-heading p,
+.daw-question-bank--import-preview .daw-question-bank__pdf-validation,
+.daw-question-bank--import-preview .daw-question-bank__pdf-selection-bar label,
+.daw-question-bank--import-preview .daw-question-bank__pdf-selection-bar > span,
+.daw-question-bank--import-preview .daw-question-bank__pdf-question > header strong,
+.daw-question-bank--import-preview .daw-question-bank__pdf-prompt,
+.daw-question-bank--import-preview .daw-question-bank__pdf-choices span {
+  font-size: 12px;
+}
+.daw-question-bank--import-preview .daw-question-bank__pdf-question {
+  gap: 10px;
+  padding: 14px;
+}
+.daw-question-bank--import-preview .daw-question-bank__pdf-answer-field {
+  font-size: 11px;
 }
 .daw-question-bank__table-wrap {
   overflow-x: auto;
@@ -11825,6 +12586,13 @@ body.daw-recruitment-admin.post-type-daw_vacancy .wp-list-table .no-items td {
   color: #353d45;
   font-size: 9px;
   font-weight: 550;
+}
+.daw-question-bank__explanation {
+  color: #727b84;
+  display: block;
+  font-size: 8px;
+  margin-top: 5px;
+  white-space: pre-line;
 }
 .daw-question-bank__table tbody tr:hover td {
   background: #fafbfc;
@@ -11883,20 +12651,22 @@ body.daw-recruitment-admin.post-type-daw_vacancy .wp-list-table .no-items td {
   text-align: center;
 }
 .daw-question-bank__dialog {
-  border: 1px solid #d6dade;
-  border-radius: 7px;
+  border: 0;
+  border-radius: 14px;
   color: #303840;
-  max-width: 560px;
+  max-height: calc(100vh - 32px);
+  max-width: 680px;
+  overflow-y: auto;
   padding: 0;
-  width: calc(100% - 28px);
+  width: calc(100% - 32px);
 }
 .daw-question-bank__dialog::backdrop {
-  background: rgba(18, 21, 24, 0.42);
+  background: rgba(18, 21, 24, 0.54);
 }
 .daw-question-bank__dialog form {
   display: grid;
-  gap: 12px;
-  padding: 16px;
+  gap: 14px;
+  padding: 28px 30px;
 }
 .daw-question-bank__dialog-heading {
   align-items: center;
@@ -11904,20 +12674,23 @@ body.daw-recruitment-admin.post-type-daw_vacancy .wp-list-table .no-items td {
   justify-content: space-between;
 }
 .daw-question-bank__dialog-heading h2 {
-  font-size: 14px;
+  color: #25282c;
+  font-size: 20px;
+  font-weight: 700;
   margin: 0;
 }
 .daw-question-bank__dialog-heading button {
-  font-size: 18px;
+  color: #5c626a;
+  font-size: 24px;
   text-decoration: none;
 }
 .daw-question-bank__dialog form > label,
 .daw-question-bank__dialog-grid label {
-  color: #525a62;
+  color: #45494e;
   display: grid;
-  font-size: 9px;
-  font-weight: 600;
-  gap: 5px;
+  font-size: 14px;
+  font-weight: 650;
+  gap: 7px;
 }
 .daw-question-bank__dialog label[hidden] {
   display: none;
@@ -11925,28 +12698,129 @@ body.daw-recruitment-admin.post-type-daw_vacancy .wp-list-table .no-items td {
 .daw-question-bank__dialog input:not([type="hidden"]),
 .daw-question-bank__dialog select,
 .daw-question-bank__dialog textarea {
-  font-size: 10px;
+  border-color: #d6d9df;
+  border-radius: 6px;
+  color: #30343a;
+  font-size: 14px;
   margin: 0;
   max-width: none;
+  padding: 10px 13px;
   width: 100%;
 }
 .daw-question-bank__dialog textarea {
-  min-height: 65px;
+  min-height: 106px;
+  resize: vertical;
+}
+.daw-question-bank__dialog [data-question-explanation] {
+  min-height: 80px;
+}
+.daw-question-bank__dialog .daw-question-bank__active {
+  align-items: center;
+  display: flex;
+  font-size: 14px;
+  gap: 9px;
+}
+.daw-question-bank__dialog .daw-question-bank__active input {
+  appearance: none;
+  background: #fff;
+  border: 1px solid #c8102e;
+  border-radius: 4px;
+  height: 16px;
+  margin: 0;
+  position: relative;
+  width: 16px;
+}
+.daw-question-bank__dialog .daw-question-bank__active input:checked {
+  background: #c8102e;
+}
+.daw-question-bank__dialog .daw-question-bank__active input:checked::after {
+  color: #fff;
+  content: "✓";
+  font-size: 12px;
+  font-weight: 700;
+  left: 2px;
+  line-height: 14px;
+  position: absolute;
+  top: 0;
 }
 .daw-question-bank__dialog label small {
   color: #7b838b;
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 400;
 }
 .daw-question-bank__dialog-grid {
   display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.daw-question-bank__choice-fields {
+  border: 0;
+  display: grid;
   gap: 9px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+.daw-question-bank__choice-fields[hidden] {
+  display: none;
+}
+.daw-question-bank__choice-fields legend {
+  color: #45494e;
+  font-size: 14px;
+  font-weight: 650;
+  margin-bottom: 7px;
+}
+.daw-question-bank__choice-row {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 32px minmax(0, 1fr);
+}
+.daw-question-bank__choice-row[hidden] {
+  display: none;
+}
+.daw-question-bank__choice-row > span {
+  align-items: center;
+  background: #f4f4f6;
+  border: 1px solid #dadde2;
+  border-radius: 50%;
+  color: #747982;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 650;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+.daw-question-bank__dialog .daw-question-bank__choice-row input {
+  min-height: 48px;
+}
+.daw-question-bank__dialog [data-question-answer] {
+  max-width: 130px;
+}
+.daw-question-bank__add-choice {
+  justify-self: start;
+  padding: 0;
+  text-decoration: none;
+}
+.daw-question-bank__choice-fields [data-add-choice][hidden] {
+  display: none;
 }
 .daw-question-bank__dialog-actions {
   display: flex;
-  gap: 7px;
-  justify-content: flex-end;
+  gap: 12px;
+  justify-content: stretch;
+}
+.daw-question-bank__dialog-actions .button {
+  border-radius: 6px;
+  flex: 1;
+  font-size: 14px;
+  font-weight: 650;
+  min-height: 54px;
+}
+.daw-question-bank__dialog-actions .button-primary {
+  background: #c8102e;
+  border-color: #c8102e;
 }
 
 @media (max-width: 900px) {
@@ -11977,8 +12851,21 @@ body.daw-recruitment-admin.post-type-daw_vacancy .wp-list-table .no-items td {
   .daw-question-bank__pdf-upload {
     justify-content: flex-start;
   }
+  .daw-question-bank__dialog form {
+    gap: 12px;
+    padding: 20px 18px;
+  }
+  .daw-question-bank__dialog-grid {
+    gap: 9px;
+  }
 }
 @media (max-width: 600px) {
+  .daw-personality-results {
+    margin: 10px 10px 22px 2px;
+  }
+  .daw-psychotest-results__stats {
+    grid-template-columns: 1fr;
+  }
   .daw-psychotest-settings,
   .daw-question-bank {
     margin: 10px 10px 22px 2px;
@@ -12361,6 +13248,411 @@ body.daw-recruitment-admin.post-type-daw_vacancy .wp-list-table .no-items td {
   outline: none;
 }
 
+.recruitment-admin-selection__stats {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0 0 12px;
+}
+.recruitment-admin-selection__stats article {
+  background: #fff;
+  border: 1px solid #e0e2e5;
+  border-radius: 7px;
+  display: grid;
+  gap: 3px;
+  min-height: 55px;
+  padding: 10px 12px;
+}
+.recruitment-admin-selection__stats strong {
+  color: #d97706;
+  font-size: 17px;
+  line-height: 1;
+}
+.recruitment-admin-selection__stats article:nth-child(2) strong,
+.recruitment-admin-selection__stats article:nth-child(4) strong {
+  color: #16a34a;
+}
+.recruitment-admin-selection__stats article:nth-child(3) strong {
+  color: #737b84;
+}
+.recruitment-admin-selection__stats span {
+  color: #424a52;
+  font-size: 10px;
+  font-weight: 600;
+}
+.recruitment-dashboard__candidate-panel--administration {
+  padding: 0;
+}
+.recruitment-dashboard__candidate-panel--administration
+  .recruitment-dashboard__candidate-heading {
+  margin-bottom: 10px;
+}
+.recruitment-admin-selection__recommendation {
+  align-items: flex-start;
+  background: #fff;
+  border: 1px solid #e0e2e5;
+  border-radius: 7px;
+  display: flex;
+  gap: 9px;
+  margin: 0 0 8px;
+  padding: 10px 12px;
+}
+.recruitment-admin-selection__recommendation > .dashicons {
+  align-items: center;
+  background: #e8f0ff;
+  border-radius: 5px;
+  color: #3569c8;
+  display: inline-flex;
+  flex: 0 0 22px;
+  font-size: 13px;
+  height: 22px;
+  justify-content: center;
+  width: 22px;
+}
+.recruitment-admin-selection__recommendation h3 {
+  color: #303840;
+  font-size: 11px;
+  margin: 0 0 3px;
+}
+.recruitment-admin-selection__recommendation p {
+  color: #69727a;
+  font-size: 9px;
+  line-height: 1.45;
+  margin: 0;
+}
+.recruitment-admin-selection__filters {
+  align-items: center;
+  border-bottom: 1px solid #e5e7e9;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0 0 10px;
+  padding: 0 8px 8px;
+}
+.recruitment-admin-selection__filters > span {
+  color: #69727a;
+  font-size: 9px;
+  margin-right: 3px;
+}
+.recruitment-admin-selection__filters button {
+  background: #f3f4f6;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #535b64;
+  cursor: pointer;
+  font-size: 9px;
+  line-height: 1.2;
+  padding: 5px 8px;
+}
+.recruitment-admin-selection__filters button.is-active {
+  background: #272a2f;
+  color: #fff;
+}
+.recruitment-admin-selection__list-heading {
+  color: #303840;
+  font-size: 11px;
+  font-weight: 650;
+  margin: 0 0 8px;
+}
+.recruitment-admin-selection__candidate-list {
+  display: grid;
+  gap: 7px;
+}
+.recruitment-admin-selection__candidate {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #e0e2e5;
+  border-radius: 7px;
+  display: flex;
+  gap: 10px;
+  padding: 11px 12px;
+}
+.recruitment-admin-selection__candidate .recruitment-candidate__identity {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.recruitment-admin-selection__candidate .recruitment-candidate__identity h3 {
+  color: #303840;
+  font-size: 11px;
+  margin: 0 0 2px;
+}
+.recruitment-admin-selection__candidate .recruitment-candidate__identity p {
+  color: #69727a;
+  font-size: 9px;
+  margin: 0;
+}
+.recruitment-admin-selection__candidate .recruitment-candidate__position {
+  color: #535b64 !important;
+  margin-top: 3px !important;
+}
+.recruitment-admin-selection__review-badge {
+  background: #fff4d7;
+  border-radius: 4px;
+  color: #956300;
+  display: inline-block;
+  font-size: 8px;
+  font-weight: 650;
+  margin-top: 4px;
+  padding: 3px 6px;
+}
+.recruitment-admin-selection__actions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+.recruitment-admin-selection__actions .button {
+  font-size: 9px;
+  line-height: 1.2;
+  min-height: 26px;
+  padding: 4px 8px;
+}
+.recruitment-admin-selection__actions .recruitment-candidate__accept {
+  background: #16a34a !important;
+  border-color: #16a34a !important;
+  color: #fff !important;
+}
+.recruitment-admin-selection__actions .recruitment-candidate__reject {
+  background: #fff1f1 !important;
+  border-color: #fecaca !important;
+  color: #dc2626 !important;
+}
+.recruitment-admin-selection [hidden] {
+  display: none !important;
+}
+@media (max-width: 782px) {
+  .recruitment-admin-selection__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .recruitment-admin-selection__candidate {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .recruitment-admin-selection__actions {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    margin-left: 40px;
+  }
+}
+.recruitment-psychotest-stage__stats {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 0 0 12px;
+}
+.recruitment-psychotest-stage__stats article {
+  background: #fff;
+  border: 1px solid #e0e2e5;
+  border-radius: 7px;
+  display: grid;
+  gap: 3px;
+  min-height: 62px;
+  padding: 10px 12px;
+}
+.recruitment-psychotest-stage__stats article > span {
+  color: #69727a;
+  font-size: 9px;
+}
+.recruitment-psychotest-stage__stats strong {
+  color: #303840;
+  font-size: 16px;
+  line-height: 1;
+}
+.recruitment-psychotest-stage__stats article:nth-child(2) strong,
+.recruitment-psychotest-stage__stats article:nth-child(4) strong {
+  color: #16a34a;
+}
+.recruitment-psychotest-stage__stats article:nth-child(3) strong {
+  color: #d97706;
+}
+.recruitment-psychotest-stage__stats small {
+  color: #858b92;
+  font-size: 8px;
+}
+.recruitment-psychotest-stage__filters {
+  background: #fff;
+  border: 1px solid #e0e2e5;
+  border-radius: 7px;
+  display: inline-flex;
+  gap: 3px;
+  margin: 0 0 12px;
+  padding: 3px;
+}
+.recruitment-psychotest-stage__filters button {
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  color: #69727a;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 7px 12px;
+}
+.recruitment-psychotest-stage__filters button.is-active {
+  background: #c8102e;
+  color: #fff;
+}
+.recruitment-psychotest-stage__panel {
+  background: #fff;
+  border: 1px solid #e0e2e5;
+  border-radius: 7px;
+  margin: 0 0 10px;
+  overflow: hidden;
+}
+.recruitment-psychotest-stage__panel[hidden] {
+  display: none !important;
+}
+.recruitment-psychotest-stage__panel-heading {
+  align-items: center;
+  border-bottom: 1px solid #e5e7e9;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding: 9px 11px;
+}
+.recruitment-psychotest-stage__panel-heading > div {
+  align-items: flex-start;
+  display: flex;
+  gap: 7px;
+  min-width: 0;
+}
+.recruitment-psychotest-stage__panel-heading h2 {
+  color: #303840;
+  font-size: 10px;
+  margin: 0 0 2px;
+}
+.recruitment-psychotest-stage__panel-heading p {
+  color: #7a8189;
+  font-size: 8px;
+  margin: 0;
+}
+.recruitment-psychotest-stage__mode {
+  border-radius: 3px;
+  flex: 0 0 auto;
+  font-size: 8px;
+  font-weight: 700;
+  padding: 3px 6px;
+}
+.recruitment-psychotest-stage__mode--online {
+  background: #e8f0ff;
+  color: #3569c8;
+}
+.recruitment-psychotest-stage__mode--offline {
+  background: #fff3d4;
+  color: #a76b00;
+}
+.recruitment-psychotest-stage__panel-heading > .button {
+  font-size: 8px;
+  min-height: 24px;
+  padding: 3px 7px;
+}
+.recruitment-psychotest-stage__pending-count {
+  color: #c8102e;
+  flex: 0 0 auto;
+  font-size: 8px;
+  font-weight: 600;
+}
+.recruitment-psychotest-stage__table-wrap {
+  overflow-x: auto;
+}
+.recruitment-psychotest-stage__table {
+  border-collapse: collapse;
+  min-width: 920px;
+  width: 100%;
+}
+.recruitment-psychotest-stage__table--offline {
+  min-width: 800px;
+}
+.recruitment-psychotest-stage__actions {
+  display: flex;
+  gap: 3px;
+  white-space: nowrap;
+}
+.recruitment-psychotest-stage__actions .button {
+  font-size: 8px;
+  line-height: 1.15;
+  min-height: 22px;
+  padding: 3px 5px;
+}
+.recruitment-psychotest-stage__actions .recruitment-psychotest-stage__action-accept:disabled {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+  opacity: 0.75;
+}
+.recruitment-psychotest-stage__actions .recruitment-psychotest-stage__action-reject:disabled {
+  background: #fff1f1;
+  border-color: #fecaca;
+  color: #dc2626;
+  opacity: 1;
+}
+.recruitment-psychotest-stage__table thead th {
+  background: #f3f4f6;
+  border-bottom: 1px solid #e5e7e9;
+  color: #69727a;
+  font-size: 8px;
+  font-weight: 650;
+  padding: 8px 9px;
+  text-align: left;
+  text-transform: uppercase;
+}
+.recruitment-psychotest-stage__table tbody td {
+  border-bottom: 1px solid #eceef0;
+  color: #424a52;
+  font-size: 9px;
+  padding: 8px 9px;
+  vertical-align: middle;
+}
+.recruitment-psychotest-stage__table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.recruitment-psychotest-stage__table tbody td:first-child {
+  min-width: 150px;
+}
+.recruitment-psychotest-stage__table tbody td > strong,
+.recruitment-psychotest-stage__table tbody td > small {
+  display: block;
+}
+.recruitment-psychotest-stage__table tbody td > strong {
+  color: #303840;
+}
+.recruitment-psychotest-stage__table tbody td > small {
+  color: #7a8189;
+  font-size: 8px;
+  margin-top: 2px;
+}
+.recruitment-psychotest-stage__status {
+  border-radius: 4px;
+  display: inline-block;
+  font-size: 8px;
+  font-weight: 650;
+  padding: 3px 6px;
+  white-space: nowrap;
+}
+.recruitment-psychotest-stage__status.is-complete {
+  background: #e4f5eb;
+  color: #197342;
+}
+.recruitment-psychotest-stage__status.is-progress {
+  background: #fff4dc;
+  color: #956300;
+}
+.recruitment-psychotest-stage__empty {
+  color: #7a8189;
+  font-size: 9px;
+  margin: 0;
+  padding: 12px;
+}
+@media (max-width: 782px) {
+  .recruitment-psychotest-stage__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .recruitment-psychotest-stage__panel-heading {
+    align-items: flex-start;
+  }
+}
+
 .daw-hr-profile__field input.is-readonly,
 .daw-hr-profile__field input[readonly] {
   background: #f9fafb;
@@ -12597,5 +13889,188 @@ body.daw-recruitment-admin.post-type-daw_vacancy .wp-list-table .no-items td {
   }
   .daw-hr-profile__code-input {
     max-width: 100% !important;
+  }
+}
+.daw-applicants-page--active-detail .daw-applicants__header {
+  align-items: flex-start;
+  display: block;
+  margin-bottom: 14px;
+}
+.daw-applicants-page--active-detail .daw-applicants__breadcrumb {
+  font-size: 11px;
+  margin-bottom: 12px;
+  text-transform: none;
+}
+.daw-applicants-page--active-detail .daw-applicants__back {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: #70747d;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 0;
+}
+.daw-active-candidate-overview {
+  background: #fff;
+  border: 1px solid #e1e3e7;
+  border-radius: 11px;
+  margin-bottom: 13px;
+  overflow: hidden;
+}
+.daw-applicants-page--active-detail .daw-applicant-profile-card {
+  align-items: flex-start;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  gap: 12px;
+  margin: 0 16px;
+  padding: 15px 0 11px;
+}
+.daw-applicants-page--active-detail .daw-applicant-profile-card__avatar {
+  background: #fdebed;
+  color: #c8102e;
+  flex: 0 0 38px;
+  font-size: 13px;
+  height: 38px;
+  min-width: 38px;
+  width: 38px;
+}
+.daw-applicants-page--active-detail .daw-applicant-profile-card__identity h1 {
+  color: #272a30;
+  font-size: 15px;
+  line-height: 1.3;
+}
+.daw-applicants-page--active-detail .daw-applicant-profile-card__code {
+  font-size: 10px;
+  margin: 3px 0 5px;
+}
+.daw-applicants-page--active-detail .daw-applicant-profile-card__meta {
+  gap: 5px;
+}
+.daw-applicants-page--active-detail .daw-applicant-profile-card__meta span {
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  font-size: 9px;
+  padding: 3px 7px;
+}
+.daw-applicants-page--active-detail .daw-applicant-profile-card__stage {
+  margin-left: auto;
+}
+.daw-applicants-page--active-detail .daw-stage-badge {
+  font-size: 9px;
+  padding: 5px 9px;
+}
+.daw-applicants-page--active-detail .daw-stage-badge:not(.daw-stage-badge--final) {
+  background: #e8f0ff;
+  color: #3269db;
+}
+.daw-applicants-page--active-detail .daw-stage-badge--final {
+  background: #fdebed;
+  color: #c8102e;
+}
+.daw-applicants-page--active-detail .daw-detail-contact-row {
+  border-top: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+  gap: 12px;
+  margin: 0 16px;
+  padding: 10px 0;
+}
+.daw-applicants-page--active-detail .daw-detail-contact-row__item {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  min-width: 0;
+  padding: 0;
+}
+.daw-applicants-page--active-detail .daw-detail-contact-row__item span {
+  font-size: 9px;
+  margin-bottom: 3px;
+  text-transform: none;
+}
+.daw-applicants-page--active-detail .daw-detail-contact-row__item strong {
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+.daw-applicants-page--active-detail .daw-detail-contact-row__item a {
+  color: inherit;
+  text-decoration: none;
+}
+.daw-active-candidate-downloads {
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  padding: 10px 16px 14px;
+}
+.daw-active-candidate-downloads h2 {
+  color: #777b83;
+  font-size: 9px;
+  font-weight: 600;
+  margin: 0 0 7px;
+  text-transform: none;
+}
+.daw-active-candidate-downloads .daw-documents-panel__actions {
+  gap: 6px;
+}
+.daw-active-candidate-downloads .daw-document-btn {
+  border-radius: 4px;
+  font-size: 9px;
+  min-height: 27px;
+  padding: 4px 9px;
+}
+.daw-active-candidate-downloads .daw-document-btn--disabled {
+  cursor: not-allowed;
+}
+.daw-applicants-page--active-detail .daw-applicant-detail-tabs {
+  border-radius: 11px;
+}
+.daw-applicants-page--active-detail .daw-applicant-detail-tabs__nav {
+  background: #fff;
+  gap: 0;
+  padding: 0 12px;
+}
+.daw-applicants-page--active-detail .daw-applicant-detail-tabs__tab {
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: #737780;
+  font-size: 10px;
+  min-height: 35px;
+  padding: 7px 10px;
+}
+.daw-applicants-page--active-detail .daw-applicant-detail-tabs__tab.is-active {
+  background: #fff;
+  border-bottom-color: #c8102e;
+  color: #c8102e;
+}
+.daw-applicants-page--active-detail .daw-applicant-detail-tabs__content {
+  padding: 15px 16px;
+}
+.daw-applicants-page--active-detail .daw-detail-grid {
+  gap: 12px 22px;
+}
+.daw-applicants-page--active-detail .daw-detail-field {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+.daw-applicants-page--active-detail .daw-detail-field span {
+  font-size: 9px;
+  margin-bottom: 2px;
+  text-transform: none;
+}
+.daw-applicants-page--active-detail .daw-detail-field strong {
+  font-size: 10px;
+}
+@media (max-width: 782px) {
+  .daw-applicants-page--active-detail .daw-applicant-profile-card {
+    display: flex;
+    margin: 0 12px;
+  }
+  .daw-applicants-page--active-detail .daw-applicant-profile-card__stage {
+    margin-top: 0;
+  }
+  .daw-applicants-page--active-detail .daw-detail-contact-row {
+    grid-template-columns: 1fr;
+    margin: 0 12px;
   }
 }

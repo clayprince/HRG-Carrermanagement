@@ -151,7 +151,7 @@ class Recruitment_Pauli_Assessment {
 
         $segment = absint( $state['current_segment'] ?? 0 );
         $column = $state['columns'][ $segment ] ?? null;
-        $catalog = $this->database->get_pauli_assessment();
+        $catalog = $this->database->get_pauli_assessment( true );
         if ( $this->database->has_error() ) {
             return [ 'error' => 'Koneksi Oracle belum tersedia. Silakan coba kembali nanti.' ];
         }
@@ -259,7 +259,9 @@ class Recruitment_Pauli_Assessment {
         }
 
         $columns = [];
-        foreach ( array_slice( $test['questions'], 0, self::SEGMENT_COUNT ) as $question ) {
+        $pauli_questions = $test['questions'];
+        $pauli_questions = array_slice( $pauli_questions, -self::SEGMENT_COUNT );
+        foreach ( $pauli_questions as $question ) {
             $segment = count( $columns );
             [ $minimum, $maximum ] = self::number_range_for_segment( $segment );
             $numbers = [];

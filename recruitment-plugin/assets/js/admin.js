@@ -114,9 +114,30 @@ document.documentElement.classList.add("js");
     "[data-administrative-next-stage]",
   );
   const nextStage = form.querySelector('[name="next_stage"]');
+  const departmentAssignment = form.querySelector(
+    "[data-user-department-assignment]",
+  );
+  const departmentAccount = departmentAssignment
+    ? departmentAssignment.querySelector('[name="department_account_id"]')
+    : null;
   if (!decision || !nextStageContainer || !nextStage) {
     return;
   }
+
+  const updateDepartmentAssignment = function updateDepartmentAssignment() {
+    if (!departmentAssignment || !departmentAccount) {
+      return;
+    }
+
+    const shouldAssign =
+      "passed" === decision.value && "INTERVIEW_USER" === nextStage.value;
+    departmentAssignment.hidden = !shouldAssign;
+    departmentAccount.disabled = !shouldAssign;
+    departmentAccount.required = shouldAssign;
+    if (!shouldAssign) {
+      departmentAccount.value = "";
+    }
+  };
 
   const updateDecisionLayout = function updateDecisionLayout() {
     const passed = "passed" === decision.value;
@@ -128,9 +149,11 @@ document.documentElement.classList.add("js");
     if (!passed) {
       nextStage.value = "";
     }
+    updateDepartmentAssignment();
   };
 
   decision.addEventListener("change", updateDecisionLayout);
+  nextStage.addEventListener("change", updateDepartmentAssignment);
   updateDecisionLayout();
 })();
 
@@ -187,9 +210,83 @@ document.documentElement.classList.add("js");
   });
 })();
 
+(function recruitmentPsychotestStageFilters() {
+  const psychotestStage = document.querySelector("[data-psychotest-stage]");
+  if (!psychotestStage) {
+    return;
+  }
+
+  const filterButtons = Array.from(
+    psychotestStage.querySelectorAll("[data-psychotest-mode-filter]"),
+  );
+  const panels = Array.from(
+    psychotestStage.querySelectorAll("[data-psychotest-mode-panel]"),
+  );
+
+  filterButtons.forEach(function bindPsychotestModeFilter(button) {
+    button.addEventListener("click", function selectPsychotestMode() {
+      const selectedMode = button.dataset.psychotestModeFilter;
+      filterButtons.forEach(function updateModeButton(item) {
+        const isActive = item === button;
+        item.classList.toggle("is-active", isActive);
+        item.setAttribute("aria-pressed", String(isActive));
+      });
+      panels.forEach(function filterModePanel(panel) {
+        panel.hidden =
+          "all" !== selectedMode &&
+          selectedMode !== panel.dataset.psychotestModePanel;
+      });
+    });
+  });
+})();
+
 (function recruitmentDashboardFilters() {
   const dashboard = document.querySelector("[data-recruitment-dashboard]");
   if (!dashboard) {
+    return;
+  }
+
+  const administrationSelection = dashboard.querySelector(
+    "[data-admin-selection]",
+  );
+  if (administrationSelection) {
+    const filterButtons = Array.from(
+      administrationSelection.querySelectorAll(
+        "[data-admin-recommendation-filter]",
+      ),
+    );
+    const candidates = Array.from(
+      administrationSelection.querySelectorAll(
+        "[data-admin-selection-candidate]",
+      ),
+    );
+    const emptyMessage = administrationSelection.querySelector(
+      "[data-admin-selection-empty]",
+    );
+    let activeFilter = "all";
+
+    filterButtons.forEach(function bindRecommendationFilter(button) {
+      button.addEventListener("click", function selectRecommendationFilter() {
+        activeFilter = button.dataset.adminRecommendationFilter;
+        filterButtons.forEach(function updateRecommendationFilter(item) {
+          const isActive = item === button;
+          item.classList.toggle("is-active", isActive);
+          item.setAttribute("aria-pressed", String(isActive));
+        });
+
+        let visibleCount = 0;
+        candidates.forEach(function filterAdminCandidate(candidate) {
+          const isVisible =
+            "all" === activeFilter ||
+            activeFilter === candidate.dataset.recommendation;
+          candidate.hidden = !isVisible;
+          if (isVisible) {
+            visibleCount++;
+          }
+        });
+        emptyMessage.hidden = visibleCount > 0;
+      });
+    });
     return;
   }
 
@@ -202,6 +299,16 @@ document.documentElement.classList.add("js");
   const resetButton = dashboard.querySelector("[data-candidate-reset]");
   const emptyMessage = dashboard.querySelector("[data-candidate-empty]");
   const visibleCount = dashboard.querySelector("[data-candidate-count]");
+  if (
+    !searchInput ||
+    !dealerSelect ||
+    !vacancySelect ||
+    !resetButton ||
+    !emptyMessage ||
+    !visibleCount
+  ) {
+    return;
+  }
   let activeStage = "all";
 
   const applyFilters = function applyFilters() {
@@ -213,7 +320,8 @@ document.documentElement.classList.add("js");
 
     cards.forEach(function filterCandidate(card) {
       const matchesStage =
-        "all" === activeStage || activeStage === card.dataset.stage;
+        "true" === card.dataset.active &&
+        ("all" === activeStage || activeStage === card.dataset.stage);
       const matchesSearch = !search || card.dataset.search.includes(search);
       const matchesDealer =
         !dealerSelect.value || dealerSelect.value === card.dataset.dealer;
@@ -254,6 +362,15 @@ document.documentElement.classList.add("js");
   );
   if (requestedStageButton) {
     requestedStageButton.click();
+  } else {
+    const allCandidatesButton = stageButtons.find(
+      function findAllCandidates(button) {
+        return "all" === button.dataset.stageFilter;
+      },
+    );
+    if (allCandidatesButton) {
+      allCandidatesButton.click();
+    }
   }
 
   searchInput.addEventListener("input", applyFilters);
@@ -1040,27 +1157,49 @@ document.documentElement.classList.add("js");
     return;
   }
 
-  const pdfTest = bank.querySelector("[data-pdf-import-test]");
-  const pdfSubtest = bank.querySelector("[data-pdf-import-subtest]");
-  const pdfSubtestField = bank.querySelector("[data-pdf-import-subtest-field]");
-  if (pdfTest && pdfSubtest && pdfSubtestField) {
-    const updatePdfSubtest = function updatePdfSubtest() {
-      const isIq = "iq" === pdfTest.value;
-      pdfSubtestField.hidden = !isIq;
-      pdfSubtest.required = isIq;
-    };
-    pdfTest.addEventListener("change", updatePdfSubtest);
-    updatePdfSubtest();
+  const pdfPreview = bank.querySelector("[data-pdf-preview]");
+  if (pdfPreview) {
+    const selectAll = pdfPreview.querySelector("[data-pdf-select-all]");
+    const questionCheckboxes = Array.from(
+      pdfPreview.querySelectorAll("[data-pdf-question-checkbox]"),
+    );
+    const selectedCount = pdfPreview.querySelector("[data-pdf-selected-count]");
+    const applyCount = pdfPreview.querySelector("[data-pdf-apply-count]");
+    const applyButton = pdfPreview.querySelector("[data-pdf-apply]");
+    if (selectAll && selectedCount && applyCount && applyButton) {
+      const updateSelection = function updateSelection() {
+        const selected = questionCheckboxes.filter(function isSelected(checkbox) {
+          return checkbox.checked;
+        }).length;
+        selectedCount.textContent = String(selected);
+        applyCount.textContent = String(selected);
+        applyButton.disabled = 0 === selected;
+        selectAll.checked = 0 < selected && selected === questionCheckboxes.length;
+        selectAll.indeterminate = 0 < selected && selected < questionCheckboxes.length;
+      };
+
+      selectAll.addEventListener("change", function toggleAllQuestions() {
+        questionCheckboxes.forEach(function setSelected(checkbox) {
+          checkbox.checked = selectAll.checked;
+        });
+        updateSelection();
+      });
+      questionCheckboxes.forEach(function bindQuestionCheckbox(checkbox) {
+        checkbox.addEventListener("change", updateSelection);
+      });
+      updateSelection();
+    }
   }
 
   const dialog = bank.querySelector("[data-question-dialog]");
   const form = bank.querySelector("[data-question-form]");
   const prompt = form.querySelector("[data-question-prompt]");
+  const explanation = form.querySelector("[data-question-explanation]");
+  const active = form.querySelector("[data-question-active]");
   const choices = form.querySelector("[data-question-choices]");
   const choicesLabel = form.querySelector("[data-question-choices-label]");
   const answerLabel = form.querySelector("[data-question-answer-label]");
   const test = form.querySelector("[data-question-test]");
-  const subtest = form.querySelector("[data-question-subtest]");
   const type = form.querySelector("[data-question-type]");
   const promptHelp = form.querySelector("[data-question-prompt-help]");
   const questionAction = form.querySelector("[data-question-action]");
@@ -1069,21 +1208,61 @@ document.documentElement.classList.add("js");
     "[data-question-subtest-value]",
   );
   const questionTypeValue = form.querySelector("[data-question-type-value]");
+  const choiceInputs = Array.from(form.querySelectorAll("[data-choice-input]"));
+  const choiceRows = Array.from(form.querySelectorAll("[data-choice-row]"));
+  const addChoiceButton = form.querySelector("[data-add-choice]");
+  const answer = form.querySelector("[data-question-answer]");
+  const syncChoiceFields = function syncChoiceFields() {
+    const previousAnswers = Array.from(answer.selectedOptions).map(
+      function selectedValue(option) {
+        return option.value;
+      },
+    );
+    const choiceValues = choiceInputs.map(function getChoiceValue(input) {
+      return input.value.trim();
+    });
+    choices.value = choiceValues.join("\n");
+    const activeChoices = choiceValues.filter(Boolean);
+    answer.replaceChildren();
+    if (!answer.multiple) {
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "Pilih kunci...";
+      answer.append(placeholder);
+    }
+    activeChoices.forEach(function addAnswerOption(choice, index) {
+      const option = document.createElement("option");
+      option.value = String(index + 1);
+      option.textContent = `${String.fromCharCode(65 + index)} — ${choice}`;
+      option.selected = previousAnswers.includes(option.value);
+      answer.append(option);
+    });
+    answer.disabled = 0 === activeChoices.length;
+  };
   const updateQuestionFields = function updateQuestionFields() {
     const isIq = "iq" === test.value;
     const isPauli = "pauli" === test.value;
     const isPersonality = ["disc", "papi"].includes(test.value);
-    form.querySelector("[data-question-subtest-label]").hidden = !isIq;
-    form.querySelector("[data-question-type-label]").hidden = !isIq;
+    const isNewQuestion = "" === form.querySelector("[data-question-id]").value;
+    form.querySelector("[data-question-type-label]").hidden = false;
     choicesLabel.hidden = !isIq;
-    answerLabel.hidden = !isIq;
-    subtest.disabled = !isIq || Boolean(form.querySelector("[data-question-id]").value);
-    type.disabled = !isIq || Boolean(form.querySelector("[data-question-id]").value);
+    answerLabel.hidden = !isIq || !["multiple_choice", "multi_select"].includes(type.value);
+    type.disabled = !isIq || !isNewQuestion;
     questionTestValue.value = test.value;
-    questionSubtestValue.value = subtest.value;
+    if ( isIq && isNewQuestion ) {
+      questionSubtestValue.value = "iq_numbers";
+    }
+    if (!isIq) {
+      type.value = isPauli ? "numeric" : "paired";
+    }
     questionTypeValue.value = type.value;
+    prompt.placeholder = isPersonality
+      ? "Tulis satu pernyataan per baris..."
+      : "Tulis pertanyaan atau pernyataan...";
     if (isIq) {
-      promptHelp.textContent = "Masukkan satu pertanyaan IQ.";
+      promptHelp.textContent = isNewQuestion
+        ? "Soal IQ baru otomatis masuk ke IQ - 1 Berhitung Angka."
+        : "Masukkan satu pertanyaan IQ.";
     } else if (isPauli) {
       promptHelp.textContent =
         "Setiap entri bank menjadi satu lajur Pauli; lajur berjalan tiga menit dan memuat hingga 900 jawaban.";
@@ -1093,6 +1272,22 @@ document.documentElement.classList.add("js");
     } else {
       promptHelp.textContent = "";
     }
+    promptHelp.hidden = isIq && isNewQuestion;
+    choiceRows.forEach(function updateChoiceRow(row, index) {
+      row.hidden = index > 3 && !choiceInputs[index].value.trim();
+      choiceInputs[index].required = isIq && index < 2;
+    });
+    Array.from(type.options).forEach(function updateTypeOption(option) {
+      option.hidden =
+        isIq && ["numeric", "paired"].includes(option.value);
+    });
+    addChoiceButton.hidden =
+      !isIq || choiceRows.every(function allRowsVisible(row) {
+        return !row.hidden;
+      });
+    answer.multiple = "multi_select" === type.value;
+    answer.required = isIq;
+    syncChoiceFields();
   };
   const setQuestionTypeForTest = function setQuestionTypeForTest() {
     if ("iq" === test.value) {
@@ -1108,10 +1303,10 @@ document.documentElement.classList.add("js");
     const isIq = "iq" === test.value;
     const questionType = type.value;
     choicesLabel.hidden = !isIq || "numeric" === questionType;
-    answerLabel.hidden =
-      !isIq ||
-      !["multiple_choice", "multi_select", "numeric"].includes(questionType);
+    answerLabel.hidden = !isIq || !["multiple_choice", "multi_select"].includes(questionType);
     questionTypeValue.value = type.value;
+    answer.multiple = "multi_select" === questionType;
+    syncChoiceFields();
   };
   const openDialog = function openDialog(question) {
     form.reset();
@@ -1122,7 +1317,11 @@ document.documentElement.classList.add("js");
     test.value = question
       ? question.dataset.test
       : bank.dataset.filterTest || "iq";
-    subtest.value = question ? question.dataset.subtest || "" : "iq_numbers";
+    questionSubtestValue.value = question
+      ? question.dataset.subtest || ""
+      : "iq" === test.value
+        ? "iq_numbers"
+        : "";
     type.value = question
       ? question.dataset.type
       : "iq" === test.value
@@ -1136,16 +1335,35 @@ document.documentElement.classList.add("js");
       : "pauli" === test.value
         ? "Kolom Pauli baru"
         : "";
+    explanation.value = question ? question.dataset.explanation || "" : "";
+    active.checked = question ? "1" === question.dataset.active : true;
     choices.value = question ? question.dataset.choices || "" : "";
-    form.querySelector("[data-question-answer]").value = question
-      ? question.dataset.answer || ""
-      : "";
+    const choiceValues = choices.value.split(/\r\n|\r|\n/);
+    choiceInputs.forEach(function setChoiceInput(input, index) {
+      input.value = choiceValues[index] || "";
+      choiceRows[index].hidden = index > 3 && !input.value.trim();
+    });
+    syncChoiceFields();
+    if (question) {
+      const answerTexts = (question.dataset.answer || "")
+        .split("|")
+        .map(function findChoiceIndex(value) {
+          const index = choiceValues.findIndex(function matchChoice(choice) {
+            return choice.trim() === value.trim();
+          });
+          return 0 <= index ? String(index + 1) : "";
+        })
+        .filter(Boolean);
+      Array.from(answer.options).forEach(function restoreAnswer(option) {
+        option.selected = answerTexts.includes(option.value);
+      });
+    }
     form.querySelector("[data-question-submit]").textContent = question
       ? "Simpan Perubahan"
-      : "Tambah Soal";
+      : "Simpan Soal";
     bank.querySelector("#question-dialog-title").textContent = question
       ? "Edit Soal"
-      : "Tambah Soal";
+      : "Tambah Soal Manual";
     updateQuestionFields();
     updateTypeFields();
     dialog.showModal();
@@ -1167,10 +1385,23 @@ document.documentElement.classList.add("js");
   form
     .querySelector("[data-question-type]")
     .addEventListener("change", updateTypeFields);
-  test.addEventListener("change", setQuestionTypeForTest);
-  subtest.addEventListener("change", function syncQuestionSubtest() {
-    questionSubtestValue.value = subtest.value;
+  choiceInputs.forEach(function bindChoiceInput(input) {
+    input.addEventListener("input", updateQuestionFields);
   });
+  addChoiceButton.addEventListener("click", function revealNextChoice() {
+    const nextRow = choiceRows.find(function isHidden(row) {
+      return row.hidden;
+    });
+    if (nextRow) {
+      nextRow.hidden = false;
+      nextRow.querySelector("input").focus();
+    }
+    addChoiceButton.hidden = !choiceRows.some(function hasHidden(row) {
+      return row.hidden;
+    });
+  });
+  answer.addEventListener("change", syncChoiceFields);
+  test.addEventListener("change", setQuestionTypeForTest);
   dialog
     .querySelectorAll("[data-close-question-dialog]")
     .forEach(function bindClose(button) {

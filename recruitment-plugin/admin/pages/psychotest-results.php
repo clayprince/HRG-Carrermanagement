@@ -20,6 +20,13 @@ foreach ( $proctoring_report['sessions'] as $session ) {
 foreach ( $proctoring_report['events'] as $event ) {
     $events_by_session[ (string) $event['session_id'] ][] = $event;
 }
+$completed_count = count(
+    array_filter(
+        $results,
+        static fn ( array $result ): bool => 'complete' === ( $result['status'] ?? '' )
+    )
+);
+$in_progress_count = count( $results ) - $completed_count;
 ?>
 <div class="wrap daw-personality-results">
     <header class="daw-psychotest-settings__header">
@@ -45,7 +52,13 @@ foreach ( $proctoring_report['events'] as $event ) {
         <?php if ( $proctoring_error ) : ?>
             <div class="notice notice-error"><p>Metadata bukti keamanan belum dapat dibaca. Pastikan migrasi proctoring telah ditinjau dan diterapkan oleh pemilik Oracle.</p></div>
         <?php endif; ?>
-        <table class="widefat striped">
+        <section class="daw-psychotest-results__stats" aria-label="Ringkasan hasil psikotes">
+            <article><span>Total Hasil</span><strong><?= esc_html( number_format_i18n( count( $results ) ) ) ?></strong></article>
+            <article><span>Tes Selesai</span><strong><?= esc_html( number_format_i18n( $completed_count ) ) ?></strong></article>
+            <article><span>Belum Selesai</span><strong><?= esc_html( number_format_i18n( $in_progress_count ) ) ?></strong></article>
+        </section>
+        <div class="daw-psychotest-results__table-wrap">
+        <table class="widefat striped daw-psychotest-results__table">
             <thead>
                 <tr>
                     <th>Kandidat</th>
@@ -71,7 +84,7 @@ foreach ( $proctoring_report['events'] as $event ) {
                             <small>ID <?= esc_html( (string) ( $result['candidate_id'] ?? '' ) ) ?><?= ! empty( $result['candidate_email'] ) ? ' · ' . esc_html( (string) $result['candidate_email'] ) : '' ?></small>
                         </td>
                         <td><?= esc_html( $title ) ?></td>
-                        <td><?= esc_html( $status ) ?></td>
+                        <td><span class="daw-psychotest-results__status <?= 'complete' === ( $result['status'] ?? '' ) ? 'is-complete' : 'is-progress' ?>"><?= esc_html( $status ) ?></span></td>
                         <td><?= esc_html( (string) ( $result['response_count'] ?? 0 ) ) ?> / <?= esc_html( (string) ( $result['question_count'] ?? 0 ) ) ?></td>
                         <td><?= $is_scored_assessment ? esc_html( (string) ( $result['score'] ?? 0 ) ) : 'Tidak dihitung' ?></td>
                         <td><?= esc_html( (string) ( $result['started_at'] ?? '' ) ) ?></td>
@@ -295,5 +308,6 @@ foreach ( $proctoring_report['events'] as $event ) {
                 <?php endif; ?>
             </tbody>
         </table>
+        </div>
     <?php endif; ?>
 </div>

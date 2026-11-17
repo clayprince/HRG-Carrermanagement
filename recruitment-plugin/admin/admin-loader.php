@@ -19,6 +19,7 @@ class Recruitment_Admin {
 		add_action( 'admin_post_daw_save_vacancy', [ $this, 'handle_vacancy_save' ] );
 		add_action( 'admin_post_daw_set_vacancy_status', [ $this, 'handle_vacancy_status' ] );
 		add_action( 'admin_post_daw_update_application_status', [ $this, 'handle_application_status' ] );
+		add_action( 'admin_post_daw_assign_user_department', [ $this, 'handle_user_department_assignment' ] );
 		add_action( 'admin_post_daw_save_hr_interview', [ $this, 'handle_hr_interview_save' ] );
 		add_action( 'wp_ajax_daw_save_interview_schedule', [ $this, 'handle_interview_schedule_save_ajax' ] );
 		add_action( 'wp_ajax_daw_delete_interview_schedule', [ $this, 'handle_interview_schedule_delete_ajax' ] );
@@ -808,28 +809,25 @@ class Recruitment_Admin {
 			$stage = ! empty( $current_stage ) ? $current_stage : 'ADMINISTRASI';
 			$note = trim( 'Hasil seleksi: tidak lolos. ' . $note );
 		} elseif ( in_array( $decision, [ 'passed', 'accepted', 'lolos', 'diterima' ], true ) ) {
-			if ( in_array( $next_stage, [ 'PSIKOTES', 'INTERVIEW_HR', 'INTERVIEW_USER', 'FINAL' ], true ) ) {
-				$status = $next_stage;
-				$stage = $next_stage;
-				$note = trim( 'Lolos ke tahap ' . $next_stage . '. ' . $note );
-			} else {
-				$stage_transitions = [
-					'ADMINISTRASI'   => 'PSIKOTES',
-					'SCREENING'      => 'PSIKOTES',
-					'SUBMITTED'      => 'PSIKOTES',
-					'PSIKOTES'       => 'INTERVIEW_HR',
-					'INTERVIEW_HR'   => 'INTERVIEW_USER',
-				];
-				$target = $stage_transitions[ $current_stage ] ?? 'PSIKOTES';
-				$status = $target;
-				$stage = $target;
-				$note = trim( 'Lolos ke tahap ' . $stage . '. ' . $note );
+			$stage_transitions = [
+				'ADMINISTRASI' => 'PSIKOTES',
+				'SCREENING' => 'PSIKOTES',
+				'SUBMITTED' => 'PSIKOTES',
+				'PSIKOTES' => 'INTERVIEW_HR',
+			];
+			$target = $stage_transitions[ $current_stage ] ?? '';
+			if ( '' === $target || ( '' !== $next_stage && $next_stage !== $target ) ) {
+				wp_die( esc_html__( 'Kandidat harus menyelesaikan setiap tahap secara berurutan. Wawancara HR dan User Department diproses pada halaman tahap masing-masing.', 'recruitment-plugin' ) );
 			}
+			$status = $target;
+			$stage = $target;
+			$note = trim( 'Lolos ke tahap ' . $target . '. ' . $note );
 		} else {
 			wp_die( esc_html__( 'Pilih hasil keputusan seleksi yang valid.', 'recruitment-plugin' ) );
 		}
 
-		$result = ( new Recruitment_Database() )->update_application_status( (string) $application_id, $status, $stage, $note );
+		$database = new Recruitment_Database();
+		$result = $database->update_application_status( (string) $application_id, $status, $stage, $note );
 		if ( empty( $result['success'] ) ) {
 			wp_die( esc_html( $result['error'] ?? 'Status lamaran gagal disimpan.' ) );
 		}
@@ -848,6 +846,40 @@ class Recruitment_Admin {
 					'application_id' => $application_id,
 					'status_updated' => '1',
 					'email_preview'  => '1',
+				],
+				admin_url( 'admin.php' )
+			)
+		);
+		exit;
+	}
+
+	public function handle_user_department_assignment(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk menugaskan kandidat ke User Department.', 'recruitment-plugin' ) );
+		}
+
+		$application_id = absint( $_POST['application_id'] ?? 0 );
+		check_admin_referer( 'daw_assign_user_department_' . $application_id );
+		$department_account_id = absint( $_POST['department_account_id'] ?? 0 );
+		$user = wp_get_current_user();
+		$interviewer = sanitize_text_field( (string) ( $user->display_name ?: $user->user_login ) );
+		$assignment = ( new Recruitment_Database() )->assign_application_to_user_department(
+			(string) $application_id,
+			$department_account_id,
+			$interviewer,
+			''
+		);
+		if ( empty( $assignment['success'] ) ) {
+			wp_die( esc_html( $assignment['error'] ?? 'Penugasan Wawancara User gagal disimpan.' ) );
+		}
+
+		wp_safe_redirect(
+			add_query_arg(
+				[
+					'page' => 'recruitment-applicants',
+					'candidate_id' => absint( $_POST['candidate_id'] ?? 0 ),
+					'application_id' => $application_id,
+					'assignment_updated' => '1',
 				],
 				admin_url( 'admin.php' )
 			)
@@ -1452,9 +1484,34 @@ class Recruitment_Admin {
 		$application = is_array( $report['application'] ?? null ) ? $report['application'] : [];
 		$profile = is_array( $report['profile'] ?? null ) ? $report['profile'] : [];
 		$details = is_array( $profile['profile_details'] ?? null ) ? $profile['profile_details'] : [];
+		$profile_documents = is_array( $details['documents'] ?? null ) ? $details['documents'] : [];
 		$escape = static function ( $value ): string {
 			return htmlspecialchars( is_scalar( $value ) ? (string) $value : '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
 		};
+		$photo_html = '';
+		$profile_photo = $profile_documents['profile_photo'] ?? null;
+		if ( is_array( $profile_photo ) ) {
+			$photo_path = ( new Recruitment_Applicant_Profile() )->document_path( $profile_photo );
+			$photo_mime = (string) ( $profile_photo['mime_type'] ?? '' );
+			if ( null === $photo_path || ! is_file( $photo_path ) || ! is_readable( $photo_path )
+				|| ! in_array( $photo_mime, [ 'image/jpeg', 'image/png' ], true ) ) {
+				wp_die( esc_html__( 'Foto profil pelamar tidak dapat dibaca untuk dimasukkan ke PDF.', 'recruitment-plugin' ), '', [ 'response' => 500 ] );
+			}
+
+			$file_info = finfo_open( FILEINFO_MIME_TYPE );
+			if ( false === $file_info ) {
+				wp_die( esc_html__( 'Foto profil pelamar tidak dapat diverifikasi.', 'recruitment-plugin' ), '', [ 'response' => 500 ] );
+			}
+			$actual_mime = finfo_file( $file_info, $photo_path );
+			finfo_close( $file_info );
+			$photo_contents = file_get_contents( $photo_path );
+			if ( $actual_mime !== $photo_mime || false === $photo_contents || '' === $photo_contents ) {
+				wp_die( esc_html__( 'Foto profil pelamar tidak valid atau gagal dibaca.', 'recruitment-plugin' ), '', [ 'response' => 500 ] );
+			}
+
+			$photo_data = base64_encode( $photo_contents );
+			$photo_html = '<div class="profile-photo"><img src="data:' . $photo_mime . ';base64,' . $photo_data . '" alt="' . $escape( $profile['name'] ?? 'Foto Profil' ) . '"></div>';
+		}
 		$rows = static function ( array $values ) use ( $escape ): string {
 			$html = '';
 			foreach ( $values as $label => $value ) {
@@ -1473,27 +1530,51 @@ class Recruitment_Admin {
 			'Kota' => $profile['city'] ?? '',
 			'Provinsi' => $profile['province'] ?? '',
 		];
+		$education_answers = [];
+		foreach ( (array) ( $report['answers'] ?? [] ) as $answer ) {
+			$field_key = (string) ( $answer['field_key'] ?? '' );
+			if ( preg_match( '/\Apendidikan_formal_(\d+)_(tingkat|nama_sekolah|program_studi|ipk|tahun_lulus)\z/i', $field_key, $matches ) ) {
+				$value = trim( (string) ( $answer['answer_value'] ?? '' ) );
+				if ( '' !== $value ) {
+					$education_answers[ (int) $matches[1] ][ strtolower( $matches[2] ) ] = $value;
+				}
+			}
+		}
+		ksort( $education_answers );
+		$first_education = reset( $education_answers );
+		$first_education = is_array( $first_education ) ? $first_education : [];
+		$education_value = static function ( string $detail_key, string $answer_key, string $fallback = '' ) use ( $details, $first_education ): string {
+			foreach ( [ $details[ $detail_key ] ?? '', $first_education[ $answer_key ] ?? '', $fallback ] as $value ) {
+				if ( is_scalar( $value ) && '' !== trim( (string) $value ) ) {
+					return trim( (string) $value );
+				}
+			}
+			return '';
+		};
 		$education = [
-			'Jenjang' => $details['education_level'] ?? $profile['education'] ?? '',
-			'Institusi' => $details['institution'] ?? '',
-			'Jurusan' => $details['major'] ?? '',
-			'IPK / Nilai' => $details['gpa'] ?? '',
-			'Tahun Lulus' => $details['graduation_year'] ?? '',
+			'Jenjang' => $education_value( 'education_level', 'tingkat', (string) ( $profile['education'] ?? '' ) ),
+			'Institusi' => $education_value( 'institution', 'nama_sekolah' ),
+			'Jurusan' => $education_value( 'major', 'program_studi' ),
+			'IPK / Nilai' => $education_value( 'gpa', 'ipk' ),
+			'Tahun Lulus' => $education_value( 'graduation_year', 'tahun_lulus' ),
 		];
 
 		$html = '<!doctype html><html lang="id"><meta charset="utf-8"><style>
-			body{font:11px/1.5 DejaVu Sans,sans-serif;color:#172033}
+			body{font:11px/1.5 "DejaVu Sans";color:#172033}
 			h1{font-size:20px;margin:0 0 4px}h2{font-size:14px;color:#17416b;margin:22px 0 8px}
 			p.meta{color:#56657a;margin:0 0 16px}
+			.profile-photo{margin:0 0 16px}.profile-photo img{width:110px;height:140px;object-fit:cover;border:1px solid #d5dde7}
 			table{border-collapse:collapse;width:100%;margin:8px 0 18px;page-break-inside:auto}
 			tr{page-break-inside:avoid}th,td{border:1px solid #d5dde7;padding:7px;text-align:left;vertical-align:top}
 			th{width:28%;background:#f2f5f9}
 			</style><body><h1>Profil Pelamar</h1><p class="meta">Lamaran #' . $escape( $application['application_id'] ?? '' ) . ' · ' . $escape( $application['position'] ?? '' ) . ' · ' . $escape( $application['department'] ?? '' ) . '</p>';
+		$html .= $photo_html;
 		$html .= '<h2>Identitas / Data Diri</h2><table>' . $rows( $identity ) . '</table>';
 		$html .= '<h2>Data Lamaran</h2><table>' . $rows(
 			[
 				'Tanggal Lamaran' => $application['application_date'] ?? '',
 				'Posisi' => $application['position'] ?? '',
+				'Cabang / Lokasi' => $application['vacancy_location'] ?? '',
 				'Dealer' => $application['dealer'] ?? '',
 				'Departemen' => $application['department'] ?? '',
 				'Status' => $application['application_status'] ?? '',
@@ -1528,12 +1609,12 @@ class Recruitment_Admin {
 
 		$answer_rows = '';
 		$document_rows = '';
-		$profile_documents = is_array( $details['documents'] ?? null ) ? $details['documents'] : [];
 		foreach ( $profile_documents as $document_key => $document ) {
 			if ( ! is_array( $document ) || '' === (string) ( $document['name'] ?? '' ) || ( $department_scope && 'resume' !== $document_key ) ) {
 				continue;
 			}
-			$document_rows .= '<tr><th>' . $escape( $document_key ) . '</th><td>' . $escape( $document['name'] ) . '</td></tr>';
+			$document_label = [ 'resume' => 'CV / Resume', 'portfolio' => 'Portofolio', 'profile_photo' => 'Foto Profil' ][ $document_key ] ?? $document_key;
+			$document_rows .= '<tr><th>' . $escape( $document_label ) . '</th><td>' . $escape( $document['name'] ) . '</td></tr>';
 		}
 		foreach ( (array) ( $report['answers'] ?? [] ) as $answer ) {
 			if ( is_array( $answer ) ) {
