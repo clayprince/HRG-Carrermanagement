@@ -78,7 +78,15 @@ foreach ( $questions as $question_index => $question ) {
                                         $input_type = 'multi_select' === ( $question['type'] ?? '' ) ? 'checkbox' : 'radio';
                                         ?>
                                         <fieldset class="daw-iq-assessment__question daw-exam-question" data-iq-question="<?= esc_attr( (string) $question_id ) ?>" data-question-index="<?= esc_attr( (string) $question_index ) ?>" data-max-select="<?= esc_attr( 'checkbox' === $input_type ? '2' : '1' ) ?>" <?= $question_index !== $initial_question_index ? 'hidden' : '' ?>>
-                                            <legend><span class="daw-exam-question__number">PERTANYAAN <?= esc_html( (string) ( $question_index + 1 ) ) ?> DARI <?= esc_html( (string) $question_count ) ?></span><strong><?= esc_html( $question['prompt'] ) ?></strong></legend>
+                                            <legend>
+                                                <span class="daw-exam-question__number">PERTANYAAN <?= esc_html( (string) ( $question_index + 1 ) ) ?> DARI <?= esc_html( (string) $question_count ) ?></span>
+                                                <strong><?= esc_html( $question['prompt'] ) ?></strong>
+                                            </legend>
+                                            <?php if ( ! empty( $question['image_url'] ) ) : ?>
+                                                <div class="daw-exam-question__image" style="margin:12px 0;text-align:center;">
+                                                    <img src="<?= esc_url( $question['image_url'] ) ?>" alt="Gambar Soal" style="max-height:260px;max-width:100%;object-fit:contain;border-radius:8px;border:1px solid #cbd5e1;">
+                                                </div>
+                                            <?php endif; ?>
                                             <input type="hidden" name="answer_present[<?= esc_attr( (string) $question_id ) ?>]" value="1">
                                             <?php foreach ( $question['choices'] as $choice_index => $choice ) :
                                                 $choice_id = (int) $choice['id'];
@@ -92,7 +100,12 @@ foreach ( $questions as $question_index => $question ) {
                                                         <?= checked( in_array( $choice_id, $selected_answers, true ), true, false ) ?>
                                                     >
                                                     <span class="daw-iq-assessment__choice-key" aria-hidden="true"><?= esc_html( chr( 65 + (int) $choice_index ) ) ?></span>
-                                                    <span class="daw-iq-assessment__choice-text"><?= esc_html( $choice['text'] ) ?></span>
+                                                    <span class="daw-iq-assessment__choice-text">
+                                                        <?php if ( ! empty( $choice['image_url'] ) ) : ?>
+                                                            <img src="<?= esc_url( $choice['image_url'] ) ?>" alt="Gambar Opsi" style="display:block;max-height:100px;border-radius:4px;margin-bottom:6px;object-fit:contain;">
+                                                        <?php endif; ?>
+                                                        <?= esc_html( $choice['text'] ) ?>
+                                                    </span>
                                                 </label>
                                             <?php endforeach; ?>
                                         </fieldset>

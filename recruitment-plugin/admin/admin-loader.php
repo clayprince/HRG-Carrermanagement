@@ -24,6 +24,7 @@ class Recruitment_Admin {
 		add_action( 'wp_ajax_daw_save_interview_schedule', [ $this, 'handle_interview_schedule_save_ajax' ] );
 		add_action( 'admin_post_daw_send_application_status_email', [ $this, 'handle_application_status_email' ] );
 		add_action( 'admin_post_daw_update_psychotest_attendance_time', [ $this, 'handle_psychotest_attendance_time_update' ] );
+		add_action( 'admin_post_daw_save_offline_psychotest', [ $this, 'handle_save_offline_psychotest' ] );
 		add_action( 'admin_post_daw_update_applicant_email', [ $this, 'handle_applicant_email_update' ] );
 		add_action( 'admin_post_daw_save_email_settings', [ $this, 'handle_save_email_settings' ] );
 		add_action( 'admin_post_daw_save_email_template', [ $this, 'handle_save_email_template' ] );
@@ -31,6 +32,8 @@ class Recruitment_Admin {
 		add_action( 'admin_post_daw_send_test_email', [ $this, 'handle_send_test_email' ] );
 		add_action( 'admin_post_daw_send_composed_email', [ $this, 'handle_send_composed_email' ] );
 		add_action( 'admin_post_daw_download_applicant_profile', [ $this, 'handle_applicant_profile_download' ] );
+		add_action( 'admin_post_daw_download_offline_psychotest_analysis', [ $this, 'handle_download_offline_psychotest_analysis' ] );
+		add_action( 'admin_post_daw_download_assessment_report', [ $this, 'handle_download_assessment_report' ] );
 		add_action( 'admin_post_daw_download_department_profile', [ $this, 'handle_department_profile_download' ] );
 		add_action( 'admin_post_daw_download_department_document', [ $this, 'handle_department_document_download' ] );
 		add_action( 'admin_post_daw_save_interview_schedule', [ $this, 'handle_interview_schedule_save' ] );
@@ -809,15 +812,15 @@ class Recruitment_Admin {
 			$note = trim( 'Hasil seleksi: tidak lolos. ' . $note );
 		} elseif ( in_array( $decision, [ 'passed', 'accepted', 'lolos', 'diterima' ], true ) ) {
 			$stage_transitions = [
-				'ADMINISTRASI' => 'PSIKOTES',
-				'SCREENING' => 'PSIKOTES',
-				'SUBMITTED' => 'PSIKOTES',
-				'PSIKOTES' => 'INTERVIEW_HR',
+				'ADMINISTRASI'   => 'PSIKOTES',
+				'SCREENING'      => 'PSIKOTES',
+				'SUBMITTED'      => 'PSIKOTES',
+				'PSIKOTES'       => 'INTERVIEW_HR',
+				'INTERVIEW_HR'   => 'INTERVIEW_USER',
+				'INTERVIEW_USER' => 'FINAL',
+				'FINAL'          => 'DITERIMA',
 			];
-			$target = $stage_transitions[ $current_stage ] ?? '';
-			if ( '' === $target || ( '' !== $next_stage && $next_stage !== $target ) ) {
-				wp_die( esc_html__( 'Kandidat harus menyelesaikan setiap tahap secara berurutan. Wawancara HR dan User Department diproses pada halaman tahap masing-masing.', 'recruitment-plugin' ) );
-			}
+			$target = $stage_transitions[ $current_stage ] ?? ( '' !== $next_stage ? $next_stage : 'PSIKOTES' );
 			$status = $target;
 			$stage = $target;
 			$note = trim( 'Lolos ke tahap ' . $target . '. ' . $note );
@@ -1038,6 +1041,63 @@ class Recruitment_Admin {
 				admin_url( 'admin.php' )
 			)
 		);
+		exit;
+	}
+
+	public function handle_save_offline_psychotest(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk menyimpan nilai psikotes.', 'recruitment-plugin' ) );
+		}
+
+		$candidate_id = absint( $_POST['candidate_id'] ?? 0 );
+		$application_id = absint( $_POST['application_id'] ?? 0 );
+		check_admin_referer( 'daw_save_offline_psychotest_' . $candidate_id );
+
+		$total_score = isset( $_POST['total_score'] ) ? (float) sanitize_text_field( wp_unslash( (string) $_POST['total_score'] ) ) : 0.0;
+		$score_iq = sanitize_text_field( wp_unslash( (string) ( $_POST['score_iq'] ?? '' ) ) );
+		$score_pauli = sanitize_text_field( wp_unslash( (string) ( $_POST['score_pauli'] ?? '' ) ) );
+		$score_disc = sanitize_text_field( wp_unslash( (string) ( $_POST['score_disc'] ?? '' ) ) );
+		$score_papi = sanitize_text_field( wp_unslash( (string) ( $_POST['score_papi'] ?? '' ) ) );
+		$recommendation = sanitize_text_field( wp_unslash( (string) ( $_POST['recommendation'] ?? '' ) ) );
+		$test_date = sanitize_text_field( wp_unslash( (string) ( $_POST['test_date'] ?? '' ) ) );
+		$notes = sanitize_textarea_field( wp_unslash( (string) ( $_POST['notes'] ?? '' ) ) );
+
+		$current_user = wp_get_current_user();
+		$evaluator = ! empty( $current_user->display_name ) ? $current_user->display_name : 'HR Recruitment';
+
+		$subtests = [
+			'iq'    => $score_iq,
+			'pauli' => $score_pauli,
+			'disc'  => $score_disc,
+			'papi'  => $score_papi,
+		];
+
+		$database = new Recruitment_Database();
+		$result = $database->save_offline_psychotest_score(
+			$candidate_id,
+			$total_score,
+			$subtests,
+			$recommendation,
+			$notes,
+			$test_date,
+			$evaluator
+		);
+
+		$redirect_args = [
+			'page' => 'recruitment-applicants',
+			'candidate_id' => $candidate_id,
+		];
+		if ( $application_id > 0 ) {
+			$redirect_args['application_id'] = $application_id;
+		}
+
+		if ( ! empty( $result['success'] ) ) {
+			$redirect_args['offline_psychotest_saved'] = '1';
+		} else {
+			$redirect_args['offline_psychotest_error'] = urlencode( (string) ( $result['error'] ?? 'Gagal menyimpan nilai' ) );
+		}
+
+		wp_safe_redirect( add_query_arg( $redirect_args, admin_url( 'admin.php' ) ) );
 		exit;
 	}
 
@@ -1406,6 +1466,226 @@ class Recruitment_Admin {
 		$this->stream_applicant_profile_pdf( $report, 'profil-pelamar-' . $application_id . '.pdf' );
 	}
 
+	public function handle_download_offline_psychotest_analysis(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) && ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengunduh laporan psikotes offline.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+		}
+
+		$candidate_id = absint( $_POST['candidate_id'] ?? $_GET['candidate_id'] ?? 0 );
+		$application_id = absint( $_POST['application_id'] ?? $_GET['application_id'] ?? 0 );
+		check_admin_referer( 'daw_download_offline_psychotest_analysis_' . $candidate_id );
+
+		$database = new Recruitment_Database();
+		$report = $application_id > 0 ? $database->get_admin_application_profile( (string) $application_id ) : null;
+		$profile = $database->get_admin_applicant( (string) $candidate_id );
+
+		if ( ! is_array( $profile ) || empty( $profile['name'] ) ) {
+			wp_die( esc_html__( 'Data kandidat tidak ditemukan.', 'recruitment-plugin' ), '', [ 'response' => 404 ] );
+		}
+
+		$offline_score = $profile['profile_details']['offline_psychotest'] ?? null;
+		if ( empty( $offline_score ) ) {
+			$offline_score = $database->get_offline_psychotest_score( $candidate_id );
+		}
+
+		if ( empty( $offline_score ) || empty( $offline_score['score_total'] ) ) {
+			wp_die( esc_html__( 'Nilai psikotes offline belum lengkap untuk di-generate.', 'recruitment-plugin' ), '', [ 'response' => 400 ] );
+		}
+
+		$this->stream_offline_psychotest_analysis_pdf( $profile, $report, $offline_score );
+	}
+
+	private function stream_offline_psychotest_analysis_pdf( array $profile, ?array $report, array $score ): void {
+		if ( ! class_exists( \Dompdf\Dompdf::class ) ) {
+			wp_die( esc_html__( 'Pustaka PDF (Dompdf) tidak tersedia.', 'recruitment-plugin' ), '', [ 'response' => 500 ] );
+		}
+
+		$escape = static function ( $val ): string {
+			return htmlspecialchars( is_scalar( $val ) ? (string) $val : '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' );
+		};
+
+		$candidate_name = (string) ( $profile['name'] ?? 'Kandidat' );
+		$application = is_array( $report['application'] ?? null ) ? $report['application'] : [];
+		$job_title = (string) ( $application['position'] ?? $application['job_title'] ?? 'Posisi Rekrutmen' );
+		$department = (string) ( $application['department'] ?? 'PT Daya Adicipta Wisesa' );
+		$code = (string) ( $application['code'] ?? ( 'DAW-' . date( 'Y' ) . '-' . str_pad( (string) ( $profile['profile_id'] ?? 1 ), 3, '0', STR_PAD_LEFT ) ) );
+		$test_date = (string) ( $score['test_date'] ?: date( 'd-m-Y' ) );
+		$evaluator = (string) ( $score['evaluator'] ?: 'HR Recruitment DAW' );
+		$rec = (string) ( $score['recommendation'] ?: 'Dipertimbangkan' );
+		$rec_bg = 'Disarankan' === $rec ? '#059669' : ( 'Tidak Disarankan' === $rec ? '#dc2626' : '#d97706' );
+		$notes = (string) ( $score['notes'] ?: 'Kandidat telah menyelesaikan seluruh rangkaian tes psikotes offline sesuai dengan standar evaluasi rekrutmen PT Daya Adicipta Wisesa.' );
+
+		$html = '<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<style>
+	@page { margin: 28px 32px 32px; size: A4 portrait; }
+	body { font-family: Helvetica, Arial, sans-serif; font-size: 11px; color: #1e293b; line-height: 1.5; margin: 0; padding: 0; }
+	.header-table { width: 100%; border-bottom: 2px solid #c8102e; padding-bottom: 12px; margin-bottom: 18px; }
+	.company-title { font-size: 17px; font-weight: bold; color: #c8102e; letter-spacing: 0.5px; }
+	.company-subtitle { font-size: 10px; color: #64748b; margin-top: 2px; }
+	.doc-title { font-size: 14px; font-weight: bold; color: #0f172a; text-align: right; text-transform: uppercase; }
+	.doc-sub { font-size: 10px; color: #64748b; text-align: right; }
+	.section-title { font-size: 12px; font-weight: bold; color: #0f172a; border-left: 4px solid #c8102e; padding-left: 8px; margin: 16px 0 10px; text-transform: uppercase; }
+	.info-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 11px; }
+	.info-table td { padding: 5px 8px; border: 1px solid #e2e8f0; }
+	.info-table td.label { width: 25%; background: #f8fafc; font-weight: bold; color: #475569; }
+	.score-card { background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 14px; margin-bottom: 16px; }
+	.score-grid { width: 100%; border-collapse: collapse; }
+	.score-grid td { text-align: center; padding: 8px 4px; }
+	.score-label { font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: bold; display: block; margin-bottom: 4px; }
+	.score-val { font-size: 20px; font-weight: bold; color: #0f172a; }
+	.score-total { color: #c8102e; font-size: 24px; font-weight: bold; }
+	.rec-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; color: #fff; font-weight: bold; font-size: 11px; }
+	.notes-box { background: #fdfdfd; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px 14px; font-size: 11px; color: #334155; line-height: 1.6; margin-bottom: 20px; }
+	.signature-table { width: 100%; margin-top: 30px; }
+	.footer { margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 8px; font-size: 9px; color: #94a3b8; text-align: center; }
+</style>
+</head>
+<body>
+	<table class="header-table">
+		<tr>
+			<td style="vertical-align: middle;">
+				<div class="company-title">PT DAYA ADICIPTA WISESA</div>
+				<div class="company-subtitle">Divisi Human Resources &bull; Talent Acquisition &amp; Recruitment Management</div>
+			</td>
+			<td style="vertical-align: middle;">
+				<div class="doc-title">Hasil Analisa Psikotes</div>
+				<div class="doc-sub">Pelaksanaan Tes Offline / Evaluasi Tatap Muka</div>
+			</td>
+		</tr>
+	</table>
+
+	<div class="section-title">I. Identitas Kandidat</div>
+	<table class="info-table">
+		<tr>
+			<td class="label">Nama Lengkap</td>
+			<td><strong>\' . $escape( $candidate_name ) . \'</strong></td>
+			<td class="label">Kode Kandidat</td>
+			<td>\' . $escape( $code ) . \'</td>
+		</tr>
+		<tr>
+			<td class="label">Posisi yang Dilamar</td>
+			<td>\' . $escape( $job_title ) . \'</td>
+			<td class="label">Departemen</td>
+			<td>\' . $escape( $department ) . \'</td>
+		</tr>
+		<tr>
+			<td class="label">Tanggal Pelaksanaan</td>
+			<td>\' . $escape( $test_date ) . \'</td>
+			<td class="label">Evaluator HR</td>
+			<td>\' . $escape( $evaluator ) . \'</td>
+		</tr>
+	</table>
+
+	<div class="section-title">II. Ringkasan Skor &amp; Rekomendasi HR</div>
+	<div class="score-card">
+		<table class="score-grid">
+			<tr>
+				<td style="width: 25%; border-right: 1px solid #cbd5e1;">
+					<span class="score-label">Skor Total Psikotes</span>
+					<span class="score-total">\' . $escape( (string) $score[\'score_total\'] ) . \'</span>
+				</td>
+				<td style="width: 20%; border-right: 1px solid #cbd5e1;">
+					<span class="score-label">Nilai IQ (TIKI)</span>
+					<span class="score-val">\' . $escape( (string) ( $score[\'score_iq\'] ?: \'—\' ) ) . \'</span>
+				</td>
+				<td style="width: 20%; border-right: 1px solid #cbd5e1;">
+					<span class="score-label">Nilai Pauli</span>
+					<span class="score-val">\' . $escape( (string) ( $score[\'score_pauli\'] ?: \'—\' ) ) . \'</span>
+				</td>
+				<td style="width: 15%; border-right: 1px solid #cbd5e1;">
+					<span class="score-label">Tipe DISC</span>
+					<span class="score-val" style="font-size: 14px;">\' . $escape( (string) ( $score[\'score_disc\'] ?: \'—\' ) ) . \'</span>
+				</td>
+				<td style="width: 20%;">
+					<span class="score-label">Rekomendasi</span>
+					<div class="rec-badge" style="background: \' . $rec_bg . \';">\' . $escape( $rec ) . \'</div>
+				</td>
+			</tr>
+		</table>
+	</div>
+
+	<div class="section-title">III. Detail Evaluasi Subtes Psikotes</div>
+	<table class="info-table">
+		<tr>
+			<td class="label" style="width: 30%;">Tes IQ / TIKI</td>
+			<td>Kemampuan intelektual umum, penalaran analitis, logika berhitung, dan pemahaman abstraksi spasial. Hasil: <strong>\' . $escape( (string) ( $score[\'score_iq\'] ?: \'Tercapai\' ) ) . \'</strong>.</td>
+		</tr>
+		<tr>
+			<td class="label">Tes Ketelitian Pauli</td>
+			<td>Ketahanan kerja di bawah tekanan, kestabilan grafik konsentrasi, ketelitian, dan kecepatan kalkulasi ritmik. Hasil: <strong>\' . $escape( (string) ( $score[\'score_pauli\'] ?: \'Memenuhi standar\' ) ) . \'</strong>.</td>
+		</tr>
+		<tr>
+			<td class="label">Profil Perilaku DISC</td>
+			<td>Pola komunikasi dan respon kerja dalam lingkungan organisasi: <strong>\' . $escape( (string) ( $score[\'score_disc\'] ?: \'Tidak ada\' ) ) . \'</strong>.</td>
+		</tr>
+		<tr>
+			<td class="label">PAPI Kostick (Karakter Kerja)</td>
+			<td>\' . $escape( (string) ( $score[\'score_papi\'] ?: \'Preferensi peran dan dinamika kepemimpinan kerja selaras dengan kriteria posisi yang dilamar.\' ) ) . \'</td>
+		</tr>
+	</table>
+
+	<div class="section-title">IV. Catatan &amp; Evaluasi Kualitatif HR</div>
+	<div class="notes-box">\' . nl2br( $escape( $notes ) ) . \'</div>
+
+	<table class="signature-table">
+		<tr>
+			<td style="width: 50%;"></td>
+			<td style="width: 50%; text-align: center;">
+				<div>Manado, \' . $escape( $test_date ) . \'</div>
+				<div style="margin-top: 4px; font-weight: bold;">Tim Rekrutmen PT Daya Adicipta Wisesa</div>
+				<div style="height: 60px;"></div>
+				<div style="font-weight: bold; text-decoration: underline;">\' . $escape( $evaluator ) . \'</div>
+				<div style="color: #64748b; font-size: 10px;">HR Recruitment Specialist</div>
+			</td>
+		</tr>
+	</table>
+
+	<div class="footer">
+		Dokumen ini dibuat otomatis melalui Sistem Career DAW &bull; PT Daya Adicipta Wisesa &bull; Bersifat Rahasia (Confidential)
+	</div>
+</body>
+</html>';
+
+		$options = new \Dompdf\Options();
+		$options->set( 'isHtml5ParserEnabled', true );
+		$options->set( 'isRemoteEnabled', false );
+		$dompdf = new \Dompdf\Dompdf( $options );
+		$dompdf->loadHtml( $html, 'UTF-8' );
+		$dompdf->setPaper( 'A4', 'portrait' );
+		$dompdf->render();
+
+		$safe_name = sanitize_file_name( 'analisa-psikotes-offline-' . $candidate_name . '-' . $code . '.pdf' );
+		$dompdf->stream( $safe_name, [ 'Attachment' => true ] );
+		exit;
+	}
+
+	public function handle_download_assessment_report(): void {
+		if ( ! current_user_can( 'manage_recruitment' ) && ! current_user_can( 'manage_options' ) && ! current_user_can( 'manage_user_department' ) ) {
+			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengunduh laporan asesmen.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
+		}
+
+		$candidate_id = absint( $_POST['candidate_id'] ?? $_GET['candidate_id'] ?? 0 );
+		$application_id = absint( $_POST['application_id'] ?? $_GET['application_id'] ?? 0 );
+		check_admin_referer( 'daw_download_assessment_report_' . $candidate_id );
+
+		$database = new Recruitment_Database();
+		$report = $application_id > 0 ? $database->get_admin_application_profile( (string) $application_id ) : null;
+		$profile = $database->get_admin_applicant( (string) $candidate_id );
+
+		if ( ! is_array( $profile ) || empty( $profile['name'] ) ) {
+			wp_die( esc_html__( 'Data kandidat tidak ditemukan.', 'recruitment-plugin' ), '', [ 'response' => 404 ] );
+		}
+
+		$breakdown = $database->get_candidate_psychotest_score_breakdown( $candidate_id );
+
+		require_once __DIR__ . '/../services/class-assessment-report-generator.php';
+		$generator = new Recruitment_Assessment_Report_Generator();
+		$generator->stream_pdf( $profile, $report, $breakdown );
+	}
+
 	public function handle_department_profile_download(): void {
 		if ( ! current_user_can( 'manage_user_department' ) ) {
 			wp_die( esc_html__( 'Anda tidak memiliki izin untuk mengunduh profil pelamar.', 'recruitment-plugin' ) );
@@ -1593,18 +1873,38 @@ class Recruitment_Admin {
 			}
 		}
 		$html .= '</tbody></table>';
-		$html .= '<h2>Hasil Tahapan</h2><table>' . $rows(
-			[
-				'Nilai Psikotes' => $application['psychotest_score'] ?? '',
-				'Hasil Wawancara HR' => $application['hr_interview_result'] ?? '',
-				'Rekomendasi HR' => $application['hr_recommendation'] ?? '',
-				'Catatan HR' => $application['hr_interview_notes'] ?? '',
-				'Hasil Wawancara User' => $application['user_interview_result'] ?? '',
-				'Nilai Wawancara User' => $application['user_interview_score'] ?? '',
-				'Rekomendasi User' => $application['user_recommendation'] ?? '',
-				'Catatan User' => $application['user_interview_notes'] ?? '',
-			]
-		) . '</table>';
+		$stage_results = [
+			'Nilai Psikotes' => $application['psychotest_score'] ?? '',
+			'Hasil Wawancara HR' => $application['hr_interview_result'] ?? '',
+			'Rekomendasi HR' => $application['hr_recommendation'] ?? '',
+			'Catatan HR' => $application['hr_interview_notes'] ?? '',
+			'Hasil Wawancara User' => $application['user_interview_result'] ?? '',
+			'Nilai Wawancara User' => $application['user_interview_score'] ?? '',
+			'Rekomendasi User' => $application['user_recommendation'] ?? '',
+			'Catatan User' => $application['user_interview_notes'] ?? '',
+		];
+		$offline_psiko = is_array( $details['offline_psychotest'] ?? null ) ? $details['offline_psychotest'] : [];
+		if ( ! empty( $offline_psiko ) ) {
+			if ( ! empty( $offline_psiko['score_iq'] ) ) {
+				$stage_results['Nilai IQ (Offline)'] = $offline_psiko['score_iq'];
+			}
+			if ( ! empty( $offline_psiko['score_pauli'] ) ) {
+				$stage_results['Nilai Pauli (Offline)'] = $offline_psiko['score_pauli'];
+			}
+			if ( ! empty( $offline_psiko['score_disc'] ) ) {
+				$stage_results['Tipe DISC (Offline)'] = $offline_psiko['score_disc'];
+			}
+			if ( ! empty( $offline_psiko['score_papi'] ) ) {
+				$stage_results['PAPI Kostick (Offline)'] = $offline_psiko['score_papi'];
+			}
+			if ( ! empty( $offline_psiko['recommendation'] ) ) {
+				$stage_results['Rekomendasi Psikotes'] = $offline_psiko['recommendation'];
+			}
+			if ( ! empty( $offline_psiko['notes'] ) ) {
+				$stage_results['Catatan Psikotes'] = $offline_psiko['notes'];
+			}
+		}
+		$html .= '<h2>Hasil Tahapan</h2><table>' . $rows( $stage_results ) . '</table>';
 
 		$answer_rows = '';
 		$document_rows = '';

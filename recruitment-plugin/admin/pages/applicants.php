@@ -225,6 +225,7 @@ foreach ( $applications as $application ) {
         'raw_status' => strtoupper( $effective_status ),
         'status_key' => $status_bucket,
         'status_label' => $status_label,
+        'psychotest_score' => (string) ( $application['psychotest_score'] ?? '' ),
         'created_at' => $created_at,
         'search' => $search_text,
         'notes' => '',
@@ -298,6 +299,31 @@ foreach ( $all_candidates as $candidate ) {
     if ( $matches_search && $matches_year && $matches_position && $matches_dealer && $matches_status ) {
         $filtered_candidates[] = $candidate;
     }
+}
+
+$offline_filter = isset( $_GET['offline_filter'] ) ? sanitize_key( (string) $_GET['offline_filter'] ) : '';
+$all_filtered_before_offline = $filtered_candidates;
+$offline_count_scored = 0;
+$offline_count_unscored = 0;
+
+foreach ( $all_filtered_before_offline as $cand ) {
+    $has_score = '' !== trim( (string) ( $cand['psychotest_score'] ?? '' ) ) && (float) $cand['psychotest_score'] > 0;
+    if ( $has_score ) {
+        $offline_count_scored++;
+    } elseif ( in_array( strtoupper( (string) ( $cand['raw_status'] ?? '' ) ), [ 'PSIKOTES' ], true ) || false !== stripos( (string) ( $cand['stage'] ?? '' ), 'psikotes' ) ) {
+        $offline_count_unscored++;
+    }
+}
+
+if ( 'scored' === $offline_filter ) {
+    $filtered_candidates = array_values( array_filter( $all_filtered_before_offline, static function( array $cand ): bool {
+        return '' !== trim( (string) ( $cand['psychotest_score'] ?? '' ) ) && (float) $cand['psychotest_score'] > 0;
+    } ) );
+} elseif ( 'unscored' === $offline_filter ) {
+    $filtered_candidates = array_values( array_filter( $all_filtered_before_offline, static function( array $cand ): bool {
+        $has_score = '' !== trim( (string) ( $cand['psychotest_score'] ?? '' ) ) && (float) $cand['psychotest_score'] > 0;
+        return ! $has_score && ( in_array( strtoupper( (string) ( $cand['raw_status'] ?? '' ) ), [ 'PSIKOTES' ], true ) || false !== stripos( (string) ( $cand['stage'] ?? '' ), 'psikotes' ) || ! empty( $cand['application_id'] ) );
+    } ) );
 }
 
 $years = [];
@@ -403,6 +429,24 @@ if ( is_array( $selected_profile ) ) {
     $selected_candidate['email'] = (string) ( $selected_profile['email'] ?? $selected_candidate['email'] );
     $selected_candidate['phone'] = (string) ( $selected_profile['phone'] ?? $selected_candidate['phone'] );
 }
+$selected_offline_psychotest = null;
+$selected_psychotest_breakdown = null;
+if ( $selected_candidate ) {
+    $cand_kandidat_id = (int) ( $selected_profile['profile_id'] ?? $selected_candidate['id'] );
+    $selected_offline_psychotest = $selected_profile['profile_details']['offline_psychotest'] ?? null;
+    if ( empty( $selected_offline_psychotest ) && $cand_kandidat_id > 0 ) {
+        $selected_offline_psychotest = $database->get_offline_psychotest_score( $cand_kandidat_id );
+    }
+    if ( ! empty( $selected_offline_psychotest['score_total'] ) ) {
+        $selected_candidate['psychotest_score'] = (string) $selected_offline_psychotest['score_total'];
+    }
+    if ( $cand_kandidat_id > 0 ) {
+        $selected_psychotest_breakdown = $database->get_candidate_psychotest_score_breakdown( $cand_kandidat_id );
+        if ( ! empty( $selected_psychotest_breakdown['has_data'] ) && empty( $selected_candidate['psychotest_score'] ) ) {
+            $selected_candidate['psychotest_score'] = (string) $selected_psychotest_breakdown['total_score'];
+        }
+    }
+}
 $selected_documents = is_array( $selected_profile['profile_details']['documents'] ?? null ) ? $selected_profile['profile_details']['documents'] : [];
 $profile_photo_url = ! empty( $selected_documents['profile_photo'] )
     ? recruitment_get_public_url( 'applicant-file', [ 'candidate_id' => $selected_candidate['id'], 'document' => 'profile_photo' ] )
@@ -478,6 +522,7 @@ $filter_query = array_filter(
         'position' => $position_filter !== '' ? $position_filter : null,
         'dealer' => $dealer_filter !== '' ? $dealer_filter : null,
         'status' => $status_filter !== '' ? $status_filter : null,
+        'offline_filter' => $offline_filter !== '' ? $offline_filter : null,
     ],
     static fn ( $value ) => null !== $value && '' !== $value
 );
@@ -487,6 +532,7 @@ $back_url = $is_active_candidate_detail
 
 $detail_tabs = [
     [ 'id' => 'data-diri', 'label' => 'Data Diri' ],
+    [ 'id' => 'psikotes', 'label' => 'Hasil Psikotes' ],
     [ 'id' => 'pendidikan', 'label' => 'Pendidikan' ],
     [ 'id' => 'pengalaman', 'label' => 'Pengalaman' ],
     [ 'id' => 'dokumen', 'label' => 'Dokumen' ],
@@ -650,6 +696,9 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
             </div>
             <div class="daw-applicant-profile-card__stage">
                 <span class="daw-stage-badge daw-stage-badge--<?= esc_attr( strtolower( str_replace( [ ' ', '/' ], '-', $selected_candidate['stage'] ) ) ) ?>"><?= esc_html( $selected_candidate['stage'] ) ?></span>
+                <?php if ( ! empty( $selected_candidate['psychotest_score'] ) ) : ?>
+                    <span class="daw-stage-badge" style="background:#059669;color:#fff;margin-left:8px;" title="Nilai Psikotes">&#128221; Psikotes: <?= esc_html( $selected_candidate['psychotest_score'] ) ?></span>
+                <?php endif; ?>
             </div>
         </section>
 
@@ -688,7 +737,9 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
             </section>
         </div><?php endif; ?>
 
-        <?php if ( ! empty( $selected_candidate['application_id'] ) && ! $is_active_candidate_detail ) : ?>
+        <?php if ( ! empty( $selected_candidate['application_id'] ) ) : ?>
+            <?php if ( '1' === (string) ( $_GET['offline_psychotest_saved'] ?? '' ) ) : ?><div class="notice notice-success inline" style="padding:10px 14px;border-left:4px solid #10b981;background:#ecfdf5;margin:12px 0;border-radius:6px;"><p style="margin:0;font-size:13px;color:#065f46;font-weight:600;">✓ Nilai psikotes offline berhasil disimpan dan otomatis diperbarui di profil, laporan hasil psikotes, serta akun User Department.</p></div><?php endif; ?>
+            <?php if ( ! empty( $_GET['offline_psychotest_error'] ) ) : ?><div class="notice notice-error inline" style="padding:10px 14px;border-left:4px solid #ef4444;background:#fef2f2;margin:12px 0;border-radius:6px;"><p style="margin:0;font-size:13px;color:#991b1b;font-weight:600;">⚠ Nilai psikotes offline gagal disimpan: <?= esc_html( urldecode( (string) $_GET['offline_psychotest_error'] ) ) ?></p></div><?php endif; ?>
             <?php if ( '1' === (string) ( $_GET['status_updated'] ?? '' ) ) : ?><div class="notice notice-success inline"><p>Status lamaran berhasil diperbarui. Tracker kandidat akan membaca status terbaru dari Oracle.</p></div><?php endif; ?>
             <?php if ( '1' === (string) ( $_GET['assignment_updated'] ?? '' ) ) : ?><div class="notice notice-success inline"><p>Kandidat berhasil ditugaskan ke akun User Department. Kandidat kini tersedia pada daftar Wawancara User departemen tersebut.</p></div><?php endif; ?>
             <?php
@@ -792,6 +843,161 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
             ];
 
             $cfg = $stage_configs[ $current_stage_key ] ?? $stage_configs['ADMINISTRASI'];
+            $has_offline_psychotest = ! empty( $selected_offline_psychotest['score_total'] ) || ! empty( $selected_offline_psychotest['is_offline'] );
+            $offline_scores_complete = $has_offline_psychotest
+                && ! empty( $selected_offline_psychotest['score_total'] )
+                && '' !== (string) ( $selected_offline_psychotest['score_iq'] ?? '' )
+                && '' !== (string) ( $selected_offline_psychotest['score_pauli'] ?? '' )
+                && '' !== (string) ( $selected_offline_psychotest['score_disc'] ?? '' )
+                && '' !== (string) ( $selected_offline_psychotest['recommendation'] ?? '' );
+            ?>
+            <section class="daw-documents-panel daw-offline-psychotest-section" style="margin-bottom:20px;border-top:3px solid #c8102e;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <h2 style="margin:0;font-size:16px;color:#111827;">Input &amp; Nilai Psikotes (Offline)</h2>
+                        <?php if ( $has_offline_psychotest ) : ?>
+                            <span style="background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;">✓ Nilai Tersimpan</span>
+                        <?php else : ?>
+                            <span style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;">Belum Diinput</span>
+                        <?php endif; ?>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <?php if ( $offline_scores_complete ) : ?>
+                            <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" style="display:inline-block;margin:0;">
+                                <input type="hidden" name="action" value="daw_download_offline_psychotest_analysis">
+                                <input type="hidden" name="candidate_id" value="<?= esc_attr( (int) $selected_candidate['id'] ) ?>">
+                                <input type="hidden" name="application_id" value="<?= esc_attr( (int) $selected_candidate['application_id'] ) ?>">
+                                <?php wp_nonce_field( 'daw_download_offline_psychotest_analysis_' . (int) $selected_candidate['id'] ); ?>
+                                <button type="submit" class="button" style="background:#0284c7;border-color:#0369a1;color:#fff;font-weight:600;">
+                                    <span class="dashicons dashicons-pdf" style="font-size:15px;line-height:1.4;vertical-align:text-bottom;margin-right:2px;"></span> Unduh Hasil Analisa Psikotes (PDF)
+                                </button>
+                            </form>
+                        <?php elseif ( $has_offline_psychotest ) : ?>
+                            <span class="button" disabled style="opacity:0.6;cursor:not-allowed;" title="Lengkapi Skor Total, IQ, Pauli, DISC, dan Rekomendasi untuk mengunduh dokumen analisa">
+                                Unduh Analisa (Lengkapi Nilai Dahulu)
+                            </span>
+                        <?php endif; ?>
+                        <?php if ( $has_offline_psychotest ) : ?>
+                            <button type="button" class="button" onclick="const f = document.getElementById('daw-offline-psychotest-form-box'); f.hidden = !f.hidden; this.textContent = f.hidden ? 'Edit / Perbarui Nilai' : 'Tutup Form Edit';">
+                                Edit / Perbarui Nilai
+                            </button>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <?php if ( $has_offline_psychotest ) : ?>
+                    <div class="daw-offline-score-display" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:16px;">
+                        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:12px;margin-bottom:14px;">
+                            <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #e2e8f0;text-align:center;">
+                                <span style="display:block;font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Skor Total / Akhir</span>
+                                <strong style="font-size:24px;color:#c8102e;"><?= esc_html( (string) $selected_offline_psychotest['score_total'] ) ?></strong>
+                            </div>
+                            <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #e2e8f0;text-align:center;">
+                                <span style="display:block;font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Tes IQ</span>
+                                <strong style="font-size:18px;color:#1e293b;"><?= esc_html( (string) ( $selected_offline_psychotest['score_iq'] ?: '—' ) ) ?></strong>
+                            </div>
+                            <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #e2e8f0;text-align:center;">
+                                <span style="display:block;font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Tes Pauli</span>
+                                <strong style="font-size:18px;color:#1e293b;"><?= esc_html( (string) ( $selected_offline_psychotest['score_pauli'] ?: '—' ) ) ?></strong>
+                            </div>
+                            <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #e2e8f0;text-align:center;">
+                                <span style="display:block;font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Tipe DISC</span>
+                                <strong style="font-size:18px;color:#1e293b;"><?= esc_html( (string) ( $selected_offline_psychotest['score_disc'] ?: '—' ) ) ?></strong>
+                            </div>
+                            <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #e2e8f0;text-align:center;">
+                                <span style="display:block;font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Rekomendasi</span>
+                                <?php
+                                $rec = (string) ( $selected_offline_psychotest['recommendation'] ?? '' );
+                                $rec_color = 'Disarankan' === $rec ? '#059669' : ( 'Tidak Disarankan' === $rec ? '#dc2626' : '#d97706' );
+                                ?>
+                                <strong style="font-size:14px;color:<?= esc_attr( $rec_color ) ?>;"><?= esc_html( $rec ?: '—' ) ?></strong>
+                            </div>
+                        </div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12px;color:#334155;border-top:1px dashed #cbd5e1;padding-top:10px;">
+                            <div>
+                                <strong>PAPI Kostick:</strong> <?= esc_html( (string) ( $selected_offline_psychotest['score_papi'] ?: 'Belum diisi' ) ) ?><br>
+                                <strong>Tanggal Pelaksanaan:</strong> <?= esc_html( (string) ( $selected_offline_psychotest['test_date'] ?: '—' ) ) ?>
+                            </div>
+                            <div>
+                                <strong>Evaluator HR:</strong> <?= esc_html( (string) ( $selected_offline_psychotest['evaluator'] ?: 'HR Recruitment' ) ) ?><br>
+                                <strong>Catatan Evaluasi:</strong> <?= esc_html( (string) ( $selected_offline_psychotest['notes'] ?: 'Tidak ada catatan khusus.' ) ) ?>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
+                <div id="daw-offline-psychotest-form-box" <?= $has_offline_psychotest ? 'hidden' : '' ?> style="background:#fafafa;border:1px solid #e5e7eb;border-radius:8px;padding:18px;">
+                    <p style="margin:0 0 14px;font-size:13px;color:#4b5563;">
+                        Masukkan nilai hasil pelaksanaan psikotes offline pelamar. Nilai ini akan otomatis terhubung ke database Oracle, hasil tahapan profil pelamar, laporan hasil psikotes HR, serta akun User Department.
+                    </p>
+                    <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>">
+                        <input type="hidden" name="action" value="daw_save_offline_psychotest">
+                        <input type="hidden" name="candidate_id" value="<?= esc_attr( (int) $selected_candidate['id'] ) ?>">
+                        <input type="hidden" name="application_id" value="<?= esc_attr( (int) $selected_candidate['application_id'] ) ?>">
+                        <?php wp_nonce_field( 'daw_save_offline_psychotest_' . (int) $selected_candidate['id'] ); ?>
+
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+                            <div>
+                                <label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:4px;">
+                                    Skor Total / Nilai Akhir Psikotes <span style="color:#dc2626;">*</span>
+                                </label>
+                                <input type="number" step="any" name="total_score" value="<?= esc_attr( (string) ( $selected_offline_psychotest['score_total'] ?? $selected_candidate['psychotest_score'] ?? '' ) ) ?>" placeholder="Contoh: 85 atau 115" required style="width:100%;height:38px;padding:6px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;font-weight:600;">
+                                <small style="color:#6b7280;font-size:11px;">Skor utama yang dibaca oleh sistem dan User Department.</small>
+                            </div>
+                            <div>
+                                <label style="display:block;font-size:12px;font-weight:700;color:#374151;margin-bottom:4px;">
+                                    Tanggal Pelaksanaan Tes Offline
+                                </label>
+                                <input type="date" name="test_date" value="<?= esc_attr( (string) ( $selected_offline_psychotest['test_date'] ?? current_time( 'Y-m-d' ) ) ) ?>" style="width:100%;height:38px;padding:6px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                            </div>
+                        </div>
+
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:14px;">
+                            <div>
+                                <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">Nilai IQ</label>
+                                <input type="text" name="score_iq" value="<?= esc_attr( (string) ( $selected_offline_psychotest['score_iq'] ?? '' ) ) ?>" placeholder="Contoh: 110" style="width:100%;height:36px;padding:4px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                            </div>
+                            <div>
+                                <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">Nilai Pauli</label>
+                                <input type="text" name="score_pauli" value="<?= esc_attr( (string) ( $selected_offline_psychotest['score_pauli'] ?? '' ) ) ?>" placeholder="Contoh: 80 / Baik" style="width:100%;height:36px;padding:4px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                            </div>
+                            <div>
+                                <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">Tipe DISC</label>
+                                <select name="score_disc" style="width:100%;height:36px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                                    <option value="">-- Pilih Tipe --</option>
+                                    <?php foreach ( [ 'Dominance (D)', 'Influence (I)', 'Steadiness (S)', 'Compliance (C)', 'D-I', 'D-C', 'I-S', 'S-C' ] as $disc_opt ) : ?>
+                                        <option value="<?= esc_attr( $disc_opt ) ?>" <?= ( ( $selected_offline_psychotest['score_disc'] ?? '' ) === $disc_opt ) ? 'selected' : '' ?>><?= esc_html( $disc_opt ) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">Rekomendasi HR</label>
+                                <select name="recommendation" style="width:100%;height:36px;padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                                    <option value="">-- Pilih --</option>
+                                    <?php foreach ( [ 'Disarankan', 'Dipertimbangkan', 'Tidak Disarankan' ] as $rec_opt ) : ?>
+                                        <option value="<?= esc_attr( $rec_opt ) ?>" <?= ( ( $selected_offline_psychotest['recommendation'] ?? '' ) === $rec_opt ) ? 'selected' : '' ?>><?= esc_html( $rec_opt ) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom:14px;">
+                            <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">Hasil PAPI Kostick (Kepribadian Kerja)</label>
+                            <input type="text" name="score_papi" value="<?= esc_attr( (string) ( $selected_offline_psychotest['score_papi'] ?? '' ) ) ?>" placeholder="Contoh: Peran kepemimpinan tinggi, patuh aturan, orientasi kerja tim" style="width:100%;height:36px;padding:4px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                        </div>
+
+                        <div style="margin-bottom:14px;">
+                            <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:4px;">Catatan &amp; Evaluasi Psikotes Offline</label>
+                            <textarea name="notes" rows="2" placeholder="Catatan khusus dari hasil observasi atau evaluasi psikotes..." style="width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;"><?= esc_textarea( (string) ( $selected_offline_psychotest['notes'] ?? '' ) ) ?></textarea>
+                        </div>
+
+                        <button type="submit" class="button button-primary" style="background:#059669;border-color:#047857;padding:6px 18px;font-weight:600;">
+                            ✓ <?= $has_offline_psychotest ? 'Perbarui Nilai Psikotes' : 'Simpan Nilai Psikotes (Offline)' ?>
+                        </button>
+                    </form>
+                </div>
+            </section>
+            <?php
             if ( empty( $selected_department_accounts ) ) {
                 unset( $cfg['next_stages']['INTERVIEW_USER'] );
                 if ( ! isset( $cfg['next_stages'][ $cfg['default_nxt'] ] ) ) {
@@ -834,7 +1040,7 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
                 <?php endif; ?>
             <?php endif;             ?>
             <?php if ( in_array( $current_stage_key, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) ) : ?>
-                <section class="daw-documents-panel daw-application-decision">
+                <section class="daw-documents-panel daw-application-decision" style="margin-bottom:16px;">
                     <h2><?= 'INTERVIEW_HR' === $current_stage_key ? 'Wawancara HR' : 'Wawancara User' ?></h2>
                     <p><?= 'INTERVIEW_HR' === $current_stage_key
                         ? 'Simpan hasil dan teruskan kandidat ke User Department melalui halaman Wawancara HR.'
@@ -845,7 +1051,9 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
                         <a class="button button-primary" href="<?= esc_url( add_query_arg( [ 'page' => 'recruitment-user-interview', 'view' => 'results', 'application_id' => (int) $selected_candidate['application_id'] ], admin_url( 'admin.php' ) ) ) ?>">Lihat Hasil Wawancara User</a>
                     <?php endif; ?>
                 </section>
-            <?php else : ?>
+            <?php endif; ?>
+
+            <?php if ( ! in_array( $raw_status, [ 'DITERIMA', 'DITOLAK' ], true ) ) : ?>
             <section class="daw-documents-panel daw-application-decision">
                 <h2>Perbarui Status Lamaran</h2>
                 <div class="daw-application-decision__current" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
@@ -1044,6 +1252,14 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
                         <button type="submit" class="button button-primary daw-document-btn">Download Profil Pelamar</button>
                     </form>
                 <?php endif; ?>
+                <?php if ( $selected_profile && ! empty( $cand_kandidat_id ) ) :
+                    $assessment_download_url = wp_nonce_url(
+                        admin_url( 'admin-post.php?action=daw_download_assessment_report&candidate_id=' . $cand_kandidat_id . '&application_id=' . absint( $selected_candidate['application_id'] ?? 0 ) ),
+                        'daw_download_assessment_report_' . $cand_kandidat_id
+                    );
+                    ?>
+                    <a class="button button-primary daw-document-btn" href="<?= esc_url( $assessment_download_url ) ?>" style="background:#059669;border-color:#047857;">📄 Unduh Laporan Asesmen Lengkap (19 Halaman PDF)</a>
+                <?php endif; ?>
                 <?php foreach ( [ 'resume' => 'Download CV Pelamar', 'portfolio' => 'Download Portofolio Pelamar' ] as $document_key => $document_label ) : ?>
                     <?php if ( ! empty( $selected_documents[ $document_key ] ) ) : ?>
                         <a class="button daw-document-btn daw-document-btn--light" href="<?= esc_url( recruitment_get_public_url( 'applicant-file', [ 'candidate_id' => $selected_candidate['id'], 'document' => $document_key ] ) ) ?>"><?= esc_html( $document_label ) ?></a>
@@ -1098,6 +1314,128 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
                             </div>
                         <?php endforeach; ?>
                     </div>
+                </div>
+
+                <div class="daw-applicant-detail-panel" data-applicant-panel="psikotes" role="tabpanel" hidden>
+                    <?php
+                    $has_online_data = ! empty( $selected_psychotest_breakdown['has_data'] );
+                    $assessment_pdf_url = ! empty( $cand_kandidat_id )
+                        ? wp_nonce_url(
+                            admin_url( 'admin-post.php?action=daw_download_assessment_report&candidate_id=' . $cand_kandidat_id . '&application_id=' . absint( $selected_candidate['application_id'] ?? 0 ) ),
+                            'daw_download_assessment_report_' . $cand_kandidat_id
+                        )
+                        : '';
+                    ?>
+                    <?php if ( $has_online_data || $has_offline_psychotest || ! empty( $selected_candidate['psychotest_score'] ) ) : ?>
+                        <?php if ( $has_online_data ) : ?>
+                            <div class="daw-profile__table-wrap" style="margin-bottom:24px;border:1px solid #10b981;border-radius:8px;padding:16px;background:#f0fdf4;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+                                    <div>
+                                        <h3 style="font-size:16px; margin:0 0 4px; font-weight:700;color:#065f46;">📊 Hasil Evaluasi Psikotes Online</h3>
+                                        <p style="margin:0;font-size:13px;color:#047857;">Perhitungan otomatis sistem: skor, akurasi jawaban benar/salah, estimasi IQ, dan profil kepribadian.</p>
+                                    </div>
+                                    <?php if ( '' !== $assessment_pdf_url ) : ?>
+                                        <a href="<?= esc_url( $assessment_pdf_url ) ?>" class="button button-primary" style="background:#059669;border-color:#047857;padding:6px 14px;font-weight:600;font-size:12px;">
+                                            📄 Unduh Laporan Asesmen (19 Halaman PDF)
+                                        </a>
+                                    <?php endif; ?>
+                                </div>
+                                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:12px;margin-bottom:12px;">
+                                    <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #d1fae5;text-align:center;">
+                                        <span style="display:block;font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Skor Total</span>
+                                        <strong style="font-size:24px;color:#059669;"><?= esc_html( (string) $selected_psychotest_breakdown['total_score'] ) ?></strong>
+                                    </div>
+                                    <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #d1fae5;text-align:center;">
+                                        <span style="display:block;font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Jawaban Benar</span>
+                                        <strong style="font-size:24px;color:#10b981;"><?= esc_html( (string) $selected_psychotest_breakdown['total_correct'] ) ?></strong>
+                                    </div>
+                                    <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #d1fae5;text-align:center;">
+                                        <span style="display:block;font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Jawaban Salah</span>
+                                        <strong style="font-size:24px;color:#ef4444;"><?= esc_html( (string) $selected_psychotest_breakdown['total_wrong'] ) ?></strong>
+                                    </div>
+                                    <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #d1fae5;text-align:center;">
+                                        <span style="display:block;font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Tingkat Akurasi</span>
+                                        <strong style="font-size:24px;color:#0284c7;"><?= esc_html( (string) $selected_psychotest_breakdown['accuracy'] ) ?>%</strong>
+                                    </div>
+                                    <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #d1fae5;text-align:center;">
+                                        <span style="display:block;font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Estimasi IQ (TIKI)</span>
+                                        <strong style="font-size:24px;color:#7c3aed;"><?= esc_html( (string) $selected_psychotest_breakdown['score_iq'] ) ?></strong>
+                                    </div>
+                                    <div style="background:#fff;padding:12px;border-radius:6px;border:1px solid #d1fae5;text-align:center;">
+                                        <span style="display:block;font-size:11px;color:#64748b;text-transform:uppercase;font-weight:700;">Rekomendasi</span>
+                                        <span style="display:inline-block;margin-top:6px;font-weight:700;font-size:13px;color:<?= 'Disarankan' === $selected_psychotest_breakdown['recommendation'] ? '#059669' : '#dc2626' ?>;">
+                                            <?= esc_html( $selected_psychotest_breakdown['recommendation'] ) ?>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div style="background:#fff;padding:10px 14px;border-radius:6px;border:1px solid #d1fae5;font-size:13px;">
+                                    <strong>Profil DISC:</strong> <?= esc_html( $selected_psychotest_breakdown['disc_type'] ) ?>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+
+                        <?php if ( $has_offline_psychotest ) : ?>
+                            <div class="daw-profile__table-wrap" style="margin-bottom:24px;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
+                                    <h3 style="font-size:16px; margin:0; font-weight:600;">Hasil Tes Psikologi / Psikotes (Input Manual HR)</h3>
+                                    <?php if ( $offline_scores_complete ) : ?>
+                                        <form method="post" action="<?= esc_url( admin_url( 'admin-post.php' ) ) ?>" style="margin:0;">
+                                            <input type="hidden" name="action" value="daw_download_offline_psychotest_analysis">
+                                            <input type="hidden" name="candidate_id" value="<?= esc_attr( $cand_kandidat_id ) ?>">
+                                            <input type="hidden" name="application_id" value="<?= esc_attr( (int) $selected_candidate['application_id'] ) ?>">
+                                            <?php wp_nonce_field( 'daw_download_offline_psychotest_analysis_' . $cand_kandidat_id ); ?>
+                                            <button type="submit" class="button" style="background:#4b5563;color:#fff;border-color:#374151;">
+                                                📄 Unduh Dokumen Analisa Offline (PDF)
+                                            </button>
+                                        </form>
+                                    <?php endif; ?>
+                                </div>
+                                <table class="daw-profile__work-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Skor Total</th>
+                                            <th>Tes IQ</th>
+                                            <th>Tes Pauli</th>
+                                            <th>Tipe DISC</th>
+                                            <th>Rekomendasi</th>
+                                            <th>Tanggal Tes</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td><strong style="font-size:16px;color:#c8102e;"><?= esc_html( (string) ( $selected_offline_psychotest['score_total'] ?? $selected_candidate['psychotest_score'] ?? '—' ) ) ?></strong></td>
+                                            <td><?= esc_html( (string) ( ( $selected_offline_psychotest['score_iq'] ?? '' ) ?: '—' ) ) ?></td>
+                                            <td><?= esc_html( (string) ( ( $selected_offline_psychotest['score_pauli'] ?? '' ) ?: '—' ) ) ?></td>
+                                            <td><?= esc_html( (string) ( ( $selected_offline_psychotest['score_disc'] ?? '' ) ?: '—' ) ) ?></td>
+                                            <td>
+                                                <?php if ( ! empty( $selected_offline_psychotest['recommendation'] ) ) : ?>
+                                                    <span style="font-weight:700;color:<?= 'Disarankan' === $selected_offline_psychotest['recommendation'] ? '#059669' : '#dc2626' ?>;"><?= esc_html( $selected_offline_psychotest['recommendation'] ) ?></span>
+                                                <?php else : ?>
+                                                    —
+                                                <?php endif; ?>
+                                            </td>
+                                            <td><?= esc_html( (string) ( ( $selected_offline_psychotest['test_date'] ?? '' ) ?: '—' ) ) ?></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                                <?php if ( ! empty( $selected_offline_psychotest['score_papi'] ) || ! empty( $selected_offline_psychotest['notes'] ) ) : ?>
+                                    <div style="margin-top:14px;padding:12px 14px;background:#f8fafc;border-radius:6px;border:1px solid #e2e8f0;font-size:13px;line-height:1.6;">
+                                        <?php if ( ! empty( $selected_offline_psychotest['score_papi'] ) ) : ?>
+                                            <p style="margin:0 0 6px;"><strong>Hasil PAPI Kostick:</strong> <?= esc_html( $selected_offline_psychotest['score_papi'] ) ?></p>
+                                        <?php endif; ?>
+                                        <?php if ( ! empty( $selected_offline_psychotest['notes'] ) ) : ?>
+                                            <p style="margin:0;"><strong>Catatan Evaluasi HR:</strong> <?= nl2br( esc_html( $selected_offline_psychotest['notes'] ) ) ?></p>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        <?php endif; ?>
+                    <?php else : ?>
+                        <div class="daw-empty-state">
+                            <p style="margin:0 0 10px;">Data nilai psikotes belum tersedia untuk kandidat ini.</p>
+                            <p style="margin:0;font-size:13px;color:#6b7280;">Jika kandidat mengikuti psikotes secara offline, silakan input nilainya pada formulir <strong>Input &amp; Nilai Psikotes (Offline)</strong> di atas.</p>
+                        </div>
+                    <?php endif; ?>
                 </div>
 
                 <div class="daw-applicant-detail-panel" data-applicant-panel="pendidikan" role="tabpanel" hidden>
@@ -1361,10 +1699,16 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
         </section>
 
         <section class="daw-applicant-table-card">
-            <div class="daw-applicant-table-card__top">
+            <div class="daw-applicant-table-card__top" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
                 <div>
                     <span class="daw-applicant-table-card__label">Jumlah Data</span>
                     <strong><?= esc_html( number_format_i18n( count( $filtered_candidates ) ) ) ?> dari <?= esc_html( number_format_i18n( $summary_total ) ) ?></strong>
+                </div>
+                <div class="daw-offline-filter-pills" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                    <span style="font-size:12px;font-weight:600;color:#64748b;margin-right:2px;">Psikotes Offline:</span>
+                    <a href="<?= esc_url( add_query_arg( array_merge( $filter_query, [ 'offline_filter' => '' ] ), admin_url( 'admin.php' ) ) ) ?>" class="button <?= '' === $offline_filter ? 'button-primary' : '' ?>" style="border-radius:16px;font-size:12px;padding:1px 12px;min-height:28px;line-height:26px;">Semua (<?= esc_html( count( $all_filtered_before_offline ) ) ?>)</a>
+                    <a href="<?= esc_url( add_query_arg( array_merge( $filter_query, [ 'offline_filter' => 'scored' ] ), admin_url( 'admin.php' ) ) ) ?>" class="button <?= 'scored' === $offline_filter ? 'button-primary' : '' ?>" style="border-radius:16px;font-size:12px;padding:1px 12px;min-height:28px;line-height:26px;background:<?= 'scored' === $offline_filter ? '#059669' : '#ecfdf5' ?>;border-color:<?= 'scored' === $offline_filter ? '#047857' : '#a7f3d0' ?>;color:<?= 'scored' === $offline_filter ? '#fff' : '#065f46' ?>;font-weight:600;">✓ Sudah Diinput (<?= esc_html( $offline_count_scored ) ?>)</a>
+                    <a href="<?= esc_url( add_query_arg( array_merge( $filter_query, [ 'offline_filter' => 'unscored' ] ), admin_url( 'admin.php' ) ) ) ?>" class="button <?= 'unscored' === $offline_filter ? 'button-primary' : '' ?>" style="border-radius:16px;font-size:12px;padding:1px 12px;min-height:28px;line-height:26px;background:<?= 'unscored' === $offline_filter ? '#d97706' : '#fffbeb' ?>;border-color:<?= 'unscored' === $offline_filter ? '#b45309' : '#fde68a' ?>;color:<?= 'unscored' === $offline_filter ? '#fff' : '#92400e' ?>;font-weight:600;">⏳ Belum Diinput (<?= esc_html( $offline_count_unscored ) ?>)</a>
                 </div>
             </div>
 
@@ -1404,7 +1748,14 @@ $view_mode = $selected_candidate ? 'detail' : 'list';
                                         </div>
                                     </td>
                                     <td><span class="daw-year-badge"><?= esc_html( $candidate['year'] ) ?></span></td>
-                                    <td><span class="daw-stage-badge daw-stage-badge--<?= esc_attr( strtolower( str_replace( ' ', '-', $candidate['stage'] ) ) ) ?>"><?= esc_html( $candidate['stage'] ) ?></span></td>
+                                    <td>
+                                        <span class="daw-stage-badge daw-stage-badge--<?= esc_attr( strtolower( str_replace( ' ', '-', $candidate['stage'] ) ) ) ?>"><?= esc_html( $candidate['stage'] ) ?></span>
+                                        <?php if ( '' !== trim( (string) ( $candidate['psychotest_score'] ?? '' ) ) && (float) $candidate['psychotest_score'] > 0 ) : ?>
+                                            <div style="margin-top:4px;"><span style="background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;display:inline-block;">✓ Nilai: <?= esc_html( $candidate['psychotest_score'] ) ?> (Offline)</span></div>
+                                        <?php elseif ( in_array( strtoupper( (string) ( $candidate['raw_status'] ?? '' ) ), [ 'PSIKOTES' ], true ) || false !== stripos( (string) ( $candidate['stage'] ?? '' ), 'psikotes' ) ) : ?>
+                                            <div style="margin-top:4px;"><span style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px;display:inline-block;">⏳ Belum Input Nilai</span></div>
+                                        <?php endif; ?>
+                                    </td>
                                     <td><span class="daw-status-badge daw-status-badge--<?= esc_attr( $candidate['status_key'] ) ?>"><?= esc_html( $candidate['status_label'] ) ?></span></td>
                                     <td class="daw-note-cell"><?= esc_html( $candidate['notes'] ) ?></td>
                                     <td class="daw-social-cell">

@@ -75,22 +75,72 @@ $in_progress_count = count( $results ) - $completed_count;
                 <?php foreach ( $results as $result ) :
                     $title = (string) ( $result['test_title'] ?? '' );
                     $test_label = strtoupper( $title );
-                    $is_scored_assessment = false !== strpos( $test_label, 'IQ' ) || false !== strpos( $test_label, 'PAULI' );
-                    $status = 'complete' === ( $result['status'] ?? '' ) ? 'Selesai' : 'Jawaban tersimpan — belum diselesaikan';
+                    $is_scored_assessment = false !== strpos( $test_label, 'IQ' ) || false !== strpos( $test_label, 'PAULI' ) || ( (float) ( $result['score'] ?? 0 ) > 0 );
+                    $is_offline_result = ( 0 === (int) ( $result['response_count'] ?? 0 ) && ! empty( $result['completed_at'] ) ) || false !== strpos( $test_label, 'OFFLINE' );
+                    $status = $is_offline_result
+                        ? 'Selesai (Offline)'
+                        : ( 'complete' === ( $result['status'] ?? '' ) ? 'Selesai' : 'Jawaban tersimpan — belum diselesaikan' );
+                    $candidate_id = absint( $result['candidate_id'] ?? 0 );
+                    $candidate_breakdown = $candidate_id > 0 ? $database->get_candidate_psychotest_score_breakdown( $candidate_id ) : null;
                     ?>
                     <tr>
                         <td>
                             <strong><?= esc_html( (string) ( $result['candidate_name'] ?? 'Kandidat' ) ) ?></strong><br>
                             <small>ID <?= esc_html( (string) ( $result['candidate_id'] ?? '' ) ) ?><?= ! empty( $result['candidate_email'] ) ? ' · ' . esc_html( (string) $result['candidate_email'] ) : '' ?></small>
+                            <?php if ( $candidate_id > 0 ) :
+                                $cand_assessment_url = wp_nonce_url(
+                                    admin_url( 'admin-post.php?action=daw_download_assessment_report&candidate_id=' . $candidate_id ),
+                                    'daw_download_assessment_report_' . $candidate_id
+                                );
+                            ?>
+                                <div style="margin-top:6px;">
+                                    <a class="button button-small" href="<?= esc_url( $cand_assessment_url ) ?>" style="background:#059669;color:#fff;border-color:#047857;font-size:11px;padding:2px 8px;" title="Unduh 19 Halaman PDF Assessment Report">
+                                        📄 Laporan Asesmen (PDF)
+                                    </a>
+                                </div>
+                            <?php endif; ?>
                         </td>
-                        <td><?= esc_html( $title ) ?></td>
-                        <td><span class="daw-psychotest-results__status <?= 'complete' === ( $result['status'] ?? '' ) ? 'is-complete' : 'is-progress' ?>"><?= esc_html( $status ) ?></span></td>
-                        <td><?= esc_html( (string) ( $result['response_count'] ?? 0 ) ) ?> / <?= esc_html( (string) ( $result['question_count'] ?? 0 ) ) ?></td>
-                        <td><?= $is_scored_assessment ? esc_html( (string) ( $result['score'] ?? 0 ) ) : 'Tidak dihitung' ?></td>
+                        <td>
+                            <?= esc_html( $title ) ?>
+                            <?php if ( $is_offline_result ) : ?>
+                                <br><span style="display:inline-block;margin-top:3px;font-size:10px;padding:2px 6px;background:#e0e7ff;color:#3730a3;border-radius:4px;font-weight:600;">Input Offline</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ( $is_offline_result ) : ?>
+                                <span style="display:inline-block;padding:2px 8px;background:#ecfdf5;color:#065f46;border-radius:4px;font-size:12px;font-weight:600;">✓ Selesai (Offline)</span>
+                            <?php else : ?>
+                                <span class="daw-psychotest-results__status <?= 'complete' === ( $result['status'] ?? '' ) ? 'is-complete' : 'is-progress' ?>"><?= esc_html( $status ) ?></span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ( $is_offline_result ) : ?>
+                                <span style="color:#64748b;font-size:12px;">Input Manual HR</span>
+                            <?php else : ?>
+                                <?= esc_html( (string) ( $result['response_count'] ?? 0 ) ) ?> / <?= esc_html( (string) ( $result['question_count'] ?? 0 ) ) ?>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <?php if ( $is_offline_result || $is_scored_assessment || ( $candidate_breakdown && ! empty( $candidate_breakdown['has_data'] ) ) ) : ?>
+                                <strong style="color:#059669;font-size:14px;"><?= esc_html( (string) ( ( $candidate_breakdown && ! empty( $candidate_breakdown['has_data'] ) ? $candidate_breakdown['total_score'] : ( $result['score'] ?? 0 ) ) ) ) ?></strong>
+                                <?php if ( $candidate_breakdown && ! empty( $candidate_breakdown['has_data'] ) && ( $candidate_breakdown['total_correct'] > 0 || $candidate_breakdown['total_wrong'] > 0 ) ) : ?>
+                                    <div style="font-size:11px;color:#64748b;margin-top:2px;">
+                                        <span style="color:#10b981;font-weight:600;">✓ <?= (int) $candidate_breakdown['total_correct'] ?></span> · <span style="color:#ef4444;font-weight:600;">✕ <?= (int) $candidate_breakdown['total_wrong'] ?></span>
+                                    </div>
+                                    <div style="font-size:11px;margin-top:2px;">
+                                        <span style="font-weight:700;color:<?= 'Disarankan' === $candidate_breakdown['recommendation'] ? '#059669' : '#dc2626' ?>;"><?= esc_html( $candidate_breakdown['recommendation'] ) ?></span>
+                                    </div>
+                                <?php endif; ?>
+                            <?php else : ?>
+                                <span style="color:#64748b;">Tidak dihitung</span>
+                            <?php endif; ?>
+                        </td>
                         <td><?= esc_html( (string) ( $result['started_at'] ?? '' ) ) ?></td>
                         <td><?= esc_html( (string) ( $result['completed_at'] ?? '—' ) ) ?></td>
                         <td>
-                            <?php if ( ! $can_view_proctoring ) : ?>
+                            <?php if ( $is_offline_result ) : ?>
+                                <span style="color:#64748b;font-size:12px;">Diselenggarakan offline di kantor DAW.</span>
+                            <?php elseif ( ! $can_view_proctoring ) : ?>
                                 Akses gambar dibatasi untuk HR berwenang.
                             <?php elseif ( $proctoring_error ) : ?>
                                 Data tidak tersedia.
