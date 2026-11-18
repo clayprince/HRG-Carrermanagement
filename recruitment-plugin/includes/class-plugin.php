@@ -426,7 +426,6 @@ class Recruitment_Plugin {
                     $requested_action,
                     [
                         'daw_save_interview_schedule',
-                        'daw_delete_interview_schedule',
                         'daw_delete_interview_slot',
                         'daw_change_department_password',
                         'daw_logout',

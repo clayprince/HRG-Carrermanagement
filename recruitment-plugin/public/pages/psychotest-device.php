@@ -1,5 +1,14 @@
 <?php
-$test_key = 'iq';
+$requested_test = isset( $_GET['test'] ) && is_scalar( $_GET['test'] ) ? sanitize_key( (string) $_GET['test'] ) : '';
+$test_key = $requested_test;
+if ( '' === $test_key || ! recruitment_is_psychotest_test_enabled( $test_key ) ) {
+    foreach ( [ 'iq', 'pauli', 'disc', 'papi' ] as $candidate_test ) {
+        if ( recruitment_is_psychotest_test_enabled( $candidate_test ) ) {
+            $test_key = $candidate_test;
+            break;
+        }
+    }
+}
 $requested_application_id = isset( $_GET['application_id'] ) && is_scalar( $_GET['application_id'] )
     ? absint( wp_unslash( (string) $_GET['application_id'] ) )
     : 0;

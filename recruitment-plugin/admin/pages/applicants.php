@@ -43,6 +43,7 @@ $all_statuses = [
     'tidak_diterima' => 'Tidak Diterima',
     'dipertimbangkan_kembali' => 'Dipertimbangkan Kembali',
     'belum_melamar' => 'Belum Melamar',
+    'data_lamaran_tidak_tersedia' => 'Status Lamaran Tidak Terverifikasi',
 ];
 
 $normalize_stage = static function ( $raw_status ): string {
@@ -234,7 +235,7 @@ foreach ( $applications as $application ) {
     ];
 }
 
-$applicants_without_applications = $applications_error ? [] : $applicant_map;
+$applicants_without_applications = $applicant_map;
 foreach ( $applicants_without_applications as $applicant_id => $candidate ) {
     if ( isset( $applicants_with_applications[ (string) $applicant_id ] ) ) {
         continue;
@@ -245,6 +246,7 @@ foreach ( $applicants_without_applications as $applicant_id => $candidate ) {
     $year = false !== $timestamp ? (string) date_i18n( 'Y', $timestamp ) : (string) date_i18n( 'Y' );
     $code = 'DAW-' . $year . '-' . str_pad( (string) $applicant_id, 3, '0', STR_PAD_LEFT );
     $applicant_name = (string) ( $candidate['name'] ?? 'Pelamar #' . $applicant_id );
+    $application_status_unknown = $applications_error;
     $latest_candidates[ 'profile-' . $applicant_id ] = [
         'id' => (int) $applicant_id,
         'application_id' => 0,
@@ -252,7 +254,7 @@ foreach ( $applicants_without_applications as $applicant_id => $candidate ) {
         'code' => $code,
         'email' => (string) ( $candidate['email'] ?? '' ),
         'phone' => (string) ( $candidate['phone'] ?? '' ),
-        'position' => 'Belum ada lamaran',
+        'position' => $application_status_unknown ? 'Data lamaran tidak tersedia' : 'Belum ada lamaran',
         'department' => '',
         'department_id' => '',
         'hr_interview_result' => '',
@@ -264,10 +266,10 @@ foreach ( $applicants_without_applications as $applicant_id => $candidate ) {
         'dealer' => '-',
         'region' => '',
         'year' => $year,
-        'stage' => 'Belum Melamar',
-        'raw_status' => 'BELUM_MELAMAR',
-        'status_key' => 'belum_melamar',
-        'status_label' => $all_statuses['belum_melamar'],
+        'stage' => $application_status_unknown ? 'Status Lamaran Tidak Diketahui' : 'Belum Melamar',
+        'raw_status' => $application_status_unknown ? 'STATUS_LAMARAN_TIDAK_DIVERIFIKASI' : 'BELUM_MELAMAR',
+        'status_key' => $application_status_unknown ? 'data_lamaran_tidak_tersedia' : 'belum_melamar',
+        'status_label' => $application_status_unknown ? $all_statuses['data_lamaran_tidak_tersedia'] : $all_statuses['belum_melamar'],
         'created_at' => $created_at,
         'search' => strtolower( trim( $applicant_name . ' ' . $code . ' ' . (string) ( $candidate['email'] ?? '' ) ) ),
         'notes' => '',
@@ -611,12 +613,17 @@ if ( 'diterima' === ( $selected_candidate['status_key'] ?? '' ) ) {
     $timeline_steps[3]['status'] = 'Belum Dimulai';
     $timeline_steps[4]['status'] = 'Belum Dimulai';
     $timeline_steps[5]['status'] = 'Belum Dimulai';
+} elseif ( 'data_lamaran_tidak_tersedia' === ( $selected_candidate['status_key'] ?? '' ) ) {
+    foreach ( $timeline_steps as &$step ) {
+        $step['status'] = 'Data Tidak Tersedia';
+    }
+    unset( $step );
 }
 
 $view_mode = $selected_candidate ? 'detail' : 'list';
 ?>
 <div class="wrap recruitment-admin daw-applicants-page <?= $is_active_candidate_detail ? 'daw-applicants-page--active-detail' : '' ?>" data-applicants-screen>
-    <?php if ( $applications_error ) : ?><div class="notice notice-error inline" role="alert"><p>Data lamaran belum dapat dimuat dari Oracle. Status kandidat tidak ditandai sebagai “Belum Melamar” sampai data berhasil dibaca.</p></div><?php endif; ?>
+    <?php if ( $applications_error ) : ?><div class="notice notice-error inline" role="alert"><p>Data lamaran belum dapat dimuat dari Oracle. Profil kandidat tetap ditampilkan, tetapi status lamaran dan riwayat seleksi belum dapat diverifikasi. Aksi HR per lamaran dinonaktifkan sampai data lamaran tersedia.</p></div><?php endif; ?>
     <?php if ( $department_accounts_error ) : ?><div class="notice notice-error inline" role="alert"><p>Akun User Department tidak dapat dimuat dari Oracle. Penugasan kandidat tidak tersedia saat ini.</p></div><?php endif; ?>
     <?php if ( $application_interview_link_missing ) : ?><div class="notice notice-warning inline" role="status"><p>Data lamaran dan profil tetap dimuat. Hasil wawancara User Department per lamaran belum tersedia karena kolom Oracle LAMARAN_ID belum ada; hasil lama tidak dikaitkan otomatis.</p></div><?php endif; ?>
     <?php if ( 'detail' === $view_mode && $selected_candidate ) : ?>

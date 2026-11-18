@@ -577,47 +577,6 @@ document.documentElement.classList.add("js");
       return;
     }
 
-    if (target.matches("[data-delete-schedule]")) {
-      if (!window.confirm("Hapus slot jadwal ini beserta booking peserta? Tindakan ini tidak dapat dibatalkan.")) {
-        return;
-      }
-      const deleteButton = target;
-      deleteButton.disabled = true;
-      showFeedback("Menghapus jadwal selesai…", false);
-      const request = new URLSearchParams({
-        action: "daw_delete_interview_schedule",
-        nonce: schedule.dataset.scheduleNonce,
-        schedule_type: `INTERVIEW_${schedule.dataset.scheduleType}`,
-        schedule_id: target.dataset.deleteSchedule,
-      });
-      fetch(schedule.dataset.ajaxUrl, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8" },
-        body: request.toString(),
-      })
-        .then(function parseResponse(response) {
-          return response.json().then(function checkResult(data) {
-            if (!response.ok || !data.success) {
-              const message = data.data && data.data.message
-                ? data.data.message
-                : "Jadwal gagal dihapus. Periksa koneksi dan coba kembali.";
-              throw new Error(message);
-            }
-          });
-        })
-        .then(function reloadSavedSchedules() {
-          window.location.reload();
-        })
-        .catch(function reportDeleteFailure(error) {
-          showFeedback(error instanceof Error
-            ? error.message
-            : "Jadwal gagal dihapus. Periksa koneksi dan coba kembali.", true);
-          deleteButton.disabled = false;
-        });
-      return;
-    }
-
     if (target.matches("[data-close-config]")) {
       config.hidden = true;
       feedback.hidden = true;

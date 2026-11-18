@@ -152,7 +152,7 @@ $notes_url = add_query_arg( 'view', 'notes', $list_url );
                                 </td>
                                 <td>Sales Executive</td><td>AHASS Ternate</td><td>Maluku Utara</td>
                                 <td><span class="daw-interview-screen__result is-passed">Lolos</span><small class="daw-interview-screen__result-note">Sangat Baik</small></td>
-                                <td>—</td><td><span class="daw-interview-screen__status is-waiting">Menunggu</span></td>
+                                <td>—</td><td><span class="daw-interview-screen__status is-waiting">Menunggu</span></td><td>
                                 <td><a class="daw-interview-screen__action" href="<?= esc_url( $notes_url ) ?>">Catat Wawancara</a></td>
                             </tr>
                         </tbody>

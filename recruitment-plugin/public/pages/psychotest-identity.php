@@ -13,7 +13,8 @@ if ( ! $stage_status ) {
     wp_die( esc_html__( 'Verifikasi identitas hanya tersedia untuk lamaran yang sedang berada pada tahap psikotes.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
 }
 
-$test_key = 'iq';
+$requested_test = isset( $_GET['test'] ) && is_scalar( $_GET['test'] ) ? sanitize_key( (string) $_GET['test'] ) : '';
+$test_key = $requested_test ?: 'iq';
 $proctoring = new Recruitment_Psychotest_Proctoring();
 $session = $proctoring->get_current_session( $requested_application_id );
 if ( $proctoring->get_current_session_error() ) {
@@ -26,7 +27,7 @@ if ( Recruitment_Psychotest_Proctoring::CONSENT_VERSION !== (string) ( $session[
     wp_safe_redirect(
         recruitment_get_public_url(
             'psychotest-consent',
-            [ 'test' => 'iq', 'application_id' => $requested_application_id ]
+            [ 'test' => $test_key, 'application_id' => $requested_application_id ]
         )
     );
     exit;
@@ -34,11 +35,19 @@ if ( Recruitment_Psychotest_Proctoring::CONSENT_VERSION !== (string) ( $session[
 
 $identity_status = (string) ( $session['identity_status'] ?? '' );
 $identity_processed = in_array( $identity_status, [ 'CAPTURED', 'MANUAL_REVIEW', 'MANUAL_VERIFIED' ], true );
-$back_url = recruitment_get_public_url( 'psychotest-preparation', [ 'application_id' => $requested_application_id ] );
-$next_subtest_url = recruitment_get_public_url(
-    'psych-iq',
-    [ 'start' => '1', 'application_id' => $requested_application_id ]
-);
+$back_url = recruitment_get_public_url( 'psychotest-preparation', [ 'application_id' => $requested_application_id, 'test' => $test_key ] );
+$screen_map = [
+    'iq' => 'psych-iq',
+    'pauli' => 'psych-pauli',
+    'disc' => 'psych-personality',
+    'papi' => 'psych-personality',
+];
+$target_screen = $screen_map[ $test_key ] ?? 'psych-iq';
+$target_args = [ 'start' => '1', 'application_id' => $requested_application_id ];
+if ( in_array( $test_key, [ 'disc', 'papi' ], true ) ) {
+    $target_args['test'] = $test_key;
+}
+$next_subtest_url = recruitment_get_public_url( $target_screen, $target_args );
 if ( ! recruitment_grant_psychotest_consent( $test_key, $requested_application_id ) ) {
     wp_die( esc_html__( 'Sesi persetujuan tidak dapat disiapkan. Muat ulang halaman dan coba kembali.', 'recruitment-plugin' ), '', [ 'response' => 500 ] );
 }
@@ -63,7 +72,7 @@ if ( ! recruitment_grant_psychotest_consent( $test_key, $requested_application_i
                     <h1>Identitas sudah tersimpan</h1>
                     <p>Anda dapat melanjutkan tanpa mengambil foto baru.</p>
                     <a href="<?= esc_url( $next_subtest_url ) ?>" class="daw-recruitment__button daw-identity-btn-skip-direct">
-                        Lanjut ke Tes IQ
+                        Lanjut ke Tes <?= esc_html( strtoupper( $test_key ) ) ?>
                     </a>
                 </section>
             <?php else : ?>

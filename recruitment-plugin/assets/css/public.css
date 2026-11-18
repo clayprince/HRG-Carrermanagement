@@ -5379,7 +5379,7 @@ body:has(.daw-account-auth) .daw-account-auth__main {
   background: #f5f5f7;
 }
 .daw-recruitment__psychotest-main {
-  padding: 36px 16px 56px;
+  padding: 36px 16px 64px;
 }
 .daw-recruitment__psychotest-shell {
   margin: 0 auto;
@@ -5636,6 +5636,7 @@ body:has(.daw-account-auth) .daw-account-auth__main {
 .daw-recruitment__psychotest-list {
   display: grid;
   gap: 12px;
+  margin-bottom: 24px;
 }
 .daw-recruitment__psychotest-item {
   align-items: center;
@@ -5713,7 +5714,8 @@ body:has(.daw-account-auth) .daw-account-auth__main {
   padding-right: 14px;
 }
 .daw-recruitment__psychotest-footer {
-  margin-top: 22px;
+  margin-top: 12px;
+  margin-bottom: 48px;
   text-align: center;
 }
 .daw-recruitment__psychotest-divider {
@@ -8148,22 +8150,55 @@ body:has(.daw-recruitment) main.daw-account__main--profile {
 
 .daw-recruitment__psychotest-preparation-cta {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 20px;
+  justify-content: center;
+  text-align: center;
+  padding: 32px 24px;
+  margin-top: 12px;
+  margin-bottom: 28px;
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 14px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
 }
 
-.daw-recruitment__psychotest-preparation-cta p {
-  margin: 6px 0 0;
-  color: #64748b;
+.daw-recruitment__psychotest-preparation-content {
+  max-width: 580px;
+  margin: 0 auto 20px;
+  text-align: center;
 }
 
-@media (max-width: 640px) {
-  .daw-recruitment__psychotest-preparation-cta {
-    align-items: stretch;
-    flex-direction: column;
-  }
+.daw-recruitment__psychotest-preparation-title {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1b1b1d;
+  line-height: 1.4;
+  margin: 0 0 8px;
 }
-  color: #64748b;
-  font-size: 12.5px;
+
+.daw-recruitment__psychotest-preparation-desc {
+  font-size: 13.5px;
+  color: var(--daw-gray, #64748b);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.daw-recruitment__psychotest-preparation-action {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.daw-recruitment__psychotest-preparation-action .daw-recruitment__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 220px;
+  padding: 12px 28px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  text-decoration: none;
 }

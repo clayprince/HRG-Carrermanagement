@@ -110,6 +110,7 @@ $tests = array_values(
 $completed_count = count( array_filter( $tests, static fn ( array $test ): bool => $test['complete'] ) );
 $test_count = count( $tests );
 $progress = 0 < $test_count ? (int) round( $completed_count / $test_count * 100 ) : 0;
+$first_available_test = (string) ( $tests[0]['test'] ?? 'iq' );
 ?>
 <div class="daw-recruitment daw-recruitment--psychotest-home">
     <?php require recruitment_get_plugin_path( 'public/components/header.php' ); ?>
@@ -190,11 +191,13 @@ $progress = 0 < $test_count ? (int) round( $completed_count / $test_count * 100 
 
             <?php if ( ! $preparation_complete && 0 < $test_count ) : ?>
                 <section class="daw-recruitment__psychotest-card daw-recruitment__psychotest-preparation-cta">
-                    <div>
-                        <strong>Persiapan awal diperlukan</strong>
-                        <p>Lengkapi pemeriksaan perangkat, kamera, persetujuan, dan verifikasi identitas sebelum memulai Tes IQ.</p>
+                    <div class="daw-recruitment__psychotest-preparation-content">
+                        <strong class="daw-recruitment__psychotest-preparation-title">Persiapan Awal Diperlukan</strong>
+                        <p class="daw-recruitment__psychotest-preparation-desc">Lengkapi pemeriksaan perangkat, kamera, persetujuan, dan verifikasi identitas sebelum memulai tes psikologi online.</p>
                     </div>
-                    <a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'psychotest-preparation', [ 'application_id' => $application_id ] ) ) ?>">Persiapan Assesment</a>
+                    <div class="daw-recruitment__psychotest-preparation-action">
+                        <a class="daw-recruitment__button" href="<?= esc_url( recruitment_get_public_url( 'psychotest-preparation', [ 'application_id' => $application_id, 'test' => $first_available_test ] ) ) ?>">Persiapan Assesment</a>
+                    </div>
                 </section>
             <?php endif; ?>
 

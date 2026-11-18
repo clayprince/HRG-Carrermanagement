@@ -21,8 +21,17 @@ if ( $proctoring->get_current_session_error() ) {
     wp_die( esc_html__( 'Status persiapan tidak dapat dibaca dari Oracle. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
 }
 $back_url = recruitment_get_public_url( 'psychotest', [ 'application_id' => $requested_application_id ] );
-$test_key = 'iq';
-if ( ! recruitment_is_psychotest_test_enabled( $test_key ) ) {
+$requested_test = isset( $_GET['test'] ) && is_scalar( $_GET['test'] ) ? sanitize_key( (string) $_GET['test'] ) : '';
+$test_key = $requested_test;
+if ( '' === $test_key || ! recruitment_is_psychotest_test_enabled( $test_key ) ) {
+    foreach ( [ 'iq', 'pauli', 'disc', 'papi' ] as $candidate_test ) {
+        if ( recruitment_is_psychotest_test_enabled( $candidate_test ) ) {
+            $test_key = $candidate_test;
+            break;
+        }
+    }
+}
+if ( '' === $test_key || ! recruitment_is_psychotest_test_enabled( $test_key ) ) {
     wp_die( esc_html__( 'Tes ini belum dibuka, sudah ditutup, atau tidak diaktifkan oleh HR.', 'recruitment-plugin' ), '', [ 'response' => 403 ] );
 }
 $global_settings = (array) get_option( 'recruitment_psychotest_settings', [] );

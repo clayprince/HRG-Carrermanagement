@@ -22,6 +22,10 @@ class Recruitment_Database {
     private ?bool $interview_schedule_interviewer_column_exists = null;
     private ?bool $psychotest_candidate_score_columns_exist = null;
     private ?array $proctoring_report_columns = null;
+    private ?string $detail_vacancy_department_id_column = null;
+    private ?string $detail_vacancy_department_name_column = null;
+    private ?string $landing_department_id_column = null;
+    private ?string $landing_department_name_column = null;
 
     /**
      * @param array<string, string> $config Optional configuration overrides.
@@ -2427,15 +2431,6 @@ class Recruitment_Database {
             $booking_count = $connection->prepare(
                 'SELECT COUNT(*) FROM HRS_INTERVIEW_BOOKING WHERE schedule_id = :schedule_id AND booking_status = \'BOOKED\''
             );
-            $result_table = 'HR' === $interview_type ? 'HRS_HASIL_WAWANCARA_HR' : 'HRS_HASIL_WAWANCARA_USER';
-            $pending_count = $connection->prepare(
-                'SELECT COUNT(*) FROM HRS_INTERVIEW_BOOKING b
-                 WHERE b.schedule_id = :schedule_id AND b.booking_status = \'BOOKED\'
-                   AND NOT EXISTS (
-                       SELECT 1 FROM ' . $result_table . ' r WHERE r.lamaran_id = b.lamaran_id
-                   )'
-            );
-            $delete_bookings = $connection->prepare( 'DELETE FROM HRS_INTERVIEW_BOOKING WHERE schedule_id = :schedule_id' );
             $delete = $connection->prepare( 'DELETE FROM HRS_INTERVIEW_SCHEDULE WHERE schedule_id = :schedule_id' );
             $update = $connection->prepare(
                 'UPDATE HRS_INTERVIEW_SCHEDULE
@@ -2473,17 +2468,9 @@ class Recruitment_Database {
                         continue;
                     }
                     $booking_count->execute( [ 'schedule_id' => $current_id ] );
-                    $booked_count = (int) $booking_count->fetchColumn();
-                    $pending_count->execute( [ 'schedule_id' => $current_id ] );
-                    $is_complete = 0 < $booked_count
-                        && $booked_count >= (int) $current_slot['CAPACITY']
-                        && 0 === (int) $pending_count->fetchColumn();
-                    if ( 0 < $booked_count && ! $is_complete ) {
+                    if ( 0 < (int) $booking_count->fetchColumn() ) {
                         $connection->rollBack();
                         return [ 'success' => false, 'error' => 'booked_slot_cannot_remove' ];
-                    }
-                    if ( $is_complete ) {
-                        $delete_bookings->execute( [ 'schedule_id' => $current_id ] );
                     }
                     $delete->execute( [ 'schedule_id' => $current_id ] );
                 }
@@ -2520,13 +2507,8 @@ class Recruitment_Database {
                     $current_slot = $current_by_id[ $schedule_id ];
                     $booking_count->execute( [ 'schedule_id' => $schedule_id ] );
                     $booked_count = (int) $booking_count->fetchColumn();
-                    $pending_count->execute( [ 'schedule_id' => $schedule_id ] );
-                    $is_complete = 0 < $booked_count
-                        && $booked_count >= (int) $current_slot['CAPACITY']
-                        && 0 === (int) $pending_count->fetchColumn();
                     if (
                         0 < $booked_count
-                        && ! $is_complete
                         && ( $slot['start'] !== trim( (string) $current_slot['START_TIME'] ) || $slot['end'] !== trim( (string) $current_slot['END_TIME'] ) )
                     ) {
                         $connection->rollBack();
@@ -2546,79 +2528,6 @@ class Recruitment_Database {
                 $connection->rollBack();
             }
             $this->log_error( 'Interview schedule save failed', $exception );
-            return [ 'success' => false, 'error' => 'service_unavailable' ];
-        }
-    }
-
-    /**
-     * @return array{success: bool, error?: string}
-     */
-    public function delete_completed_interview_schedule( string $schedule_id, string $type ): array {
-        if ( ! ctype_digit( $schedule_id ) || '0' === $schedule_id || ! in_array( $type, [ 'INTERVIEW_HR', 'INTERVIEW_USER' ], true ) ) {
-            return [ 'success' => false, 'error' => 'invalid_schedule_data' ];
-        }
-
-        $interview_type = 'INTERVIEW_HR' === $type ? 'HR' : 'USER';
-        $result_table = 'HR' === $interview_type ? 'HRS_HASIL_WAWANCARA_HR' : 'HRS_HASIL_WAWANCARA_USER';
-        $connection = null;
-        try {
-            $connection = $this->get_connection();
-            $connection->beginTransaction();
-            $lock_schedules = $connection->prepare(
-                'SELECT s.schedule_id, s.capacity
-                 FROM HRS_INTERVIEW_SCHEDULE s
-                 WHERE s.schedule_id = :schedule_id
-                   AND s.interview_type = :interview_type
-                 FOR UPDATE OF s.schedule_id'
-            );
-            $lock_schedules->execute( [ 'schedule_id' => (int) $schedule_id, 'interview_type' => $interview_type ] );
-            $schedules = $lock_schedules->fetchAll( PDO::FETCH_ASSOC );
-            if ( empty( $schedules ) ) {
-                $connection->rollBack();
-                return [ 'success' => false, 'error' => 'schedule_not_found' ];
-            }
-
-            $booking_count = $connection->prepare(
-                'SELECT COUNT(*) FROM HRS_INTERVIEW_BOOKING
-                 WHERE schedule_id = :schedule_id AND booking_status = \'BOOKED\''
-            );
-            $pending_count = $connection->prepare(
-                'SELECT COUNT(*) FROM HRS_INTERVIEW_BOOKING b
-                 WHERE b.schedule_id = :schedule_id AND b.booking_status = \'BOOKED\'
-                   AND NOT EXISTS (
-                       SELECT 1 FROM ' . $result_table . ' r WHERE r.lamaran_id = b.lamaran_id
-                   )'
-            );
-            $delete_bookings = $connection->prepare( 'DELETE FROM HRS_INTERVIEW_BOOKING WHERE schedule_id = :schedule_id' );
-            $delete_schedule = $connection->prepare(
-                'DELETE FROM HRS_INTERVIEW_SCHEDULE
-                 WHERE schedule_id = :schedule_id AND interview_type = :interview_type'
-            );
-            foreach ( $schedules as $schedule_row ) {
-                $schedule_id = (int) $schedule_row['SCHEDULE_ID'];
-                $booking_count->execute( [ 'schedule_id' => $schedule_id ] );
-                $booked_count = (int) $booking_count->fetchColumn();
-                $pending_count->execute( [ 'schedule_id' => $schedule_id ] );
-                $is_complete = 0 < $booked_count
-                    && $booked_count >= (int) $schedule_row['CAPACITY']
-                    && 0 === (int) $pending_count->fetchColumn();
-                if ( ! $is_complete ) {
-                    $connection->rollBack();
-                    return [ 'success' => false, 'error' => 'schedule_not_complete' ];
-                }
-                $delete_bookings->execute( [ 'schedule_id' => $schedule_id ] );
-                $delete_schedule->execute(
-                    [ 'schedule_id' => $schedule_id, 'interview_type' => $interview_type ]
-                );
-            }
-
-            $connection->commit();
-            return [ 'success' => true ];
-        } catch ( PDOException | RuntimeException $exception ) {
-            if ( $connection instanceof PDO && $connection->inTransaction() ) {
-                $connection->rollBack();
-            }
-            $this->log_error( 'Completed interview schedule deletion failed', $exception );
             return [ 'success' => false, 'error' => 'service_unavailable' ];
         }
     }
@@ -2872,6 +2781,7 @@ class Recruitment_Database {
      */
     public function get_hr_interview_candidates(): array {
         $this->last_error = null;
+        $dept_id_expr = $this->get_vacancy_department_id_expression();
         $booking_table_available = $this->has_interview_booking_table();
         $schedule_interviewer_available = $booking_table_available && $this->has_interview_schedule_interviewer_column();
         $psychotest_score_expression = $this->has_psychotest_candidate_score_columns()
@@ -2895,14 +2805,16 @@ class Recruitment_Database {
         $scheduled_interviewer_expression = $schedule_interviewer_available
             ? '(SELECT s.interviewer_name FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'HR\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY)'
             : 'CAST(NULL AS VARCHAR2(100))';
+        $dept_id_expr = $this->get_vacancy_department_id_expression();
+        $dept_name_expr = $this->get_vacancy_department_name_expression();
         return $this->fetch_all(
             'SELECT l.lamaran_id AS "application_id",
                     l.profile_kandidat_id AS "applicant_id",
                     l.status_terkini AS "status",
                     TO_CHAR(NVL(l.created_at, l.tanggal_melamar), \'YYYY-MM-DD HH24:MI:SS\') AS "created_at",
                     d.judul_pekerjaan AS "position",
-                    NVL(vacancy_department.nama_departemen, NVL(d.nama_departement, k.nama_departemen)) AS "department",
-                    NVL(d.departemen_id, k.departemen_id) AS "department_id",
+                    NVL(vacancy_department.nama_departemen, ' . $dept_name_expr . ') AS "department",
+                    ' . $dept_id_expr . ' AS "department_id",
                     d.lokasi_penempatan AS "location",
                     k.nama_dealer AS "dealer",
                     p.kandidat_id AS "candidate_id",
@@ -2918,7 +2830,7 @@ class Recruitment_Database {
              FROM HRS_LAMARAN l
              JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
              LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id
-             LEFT JOIN HRS_DEPARTEMEN vacancy_department ON vacancy_department.departemen_id = NVL(d.departemen_id, k.departemen_id)
+             LEFT JOIN HRS_DEPARTEMEN vacancy_department ON vacancy_department.departemen_id = ' . $dept_id_expr . '
              JOIN HRS_PROFILE_KANDIDAT_LOGIN pkl ON pkl.profile_kandidat_login = l.profile_kandidat_id
              JOIN HRS_PROFIL_KANDIDAT p ON p.kandidat_id = pkl.kandidat_id
              WHERE UPPER(TRIM(l.status_terkini)) = \'INTERVIEW_HR\'
@@ -3247,12 +3159,14 @@ class Recruitment_Database {
                 throw new InvalidArgumentException( 'Penugasan User Department hanya dapat diperbarui setelah hasil Wawancara HR yang lolos tersimpan.' );
             }
 
+            $dept_id_expr = $this->get_vacancy_department_id_expression();
+            $dept_name_expr = $this->get_vacancy_department_name_expression();
             $department_query = $connection->prepare(
-                'SELECT NVL(vacancy_department.nama_departemen, NVL(d.nama_departemen, k.nama_departemen)) AS "department_name"
+                'SELECT NVL(vacancy_department.nama_departemen, ' . $dept_name_expr . ') AS "department_name"
                  FROM HRS_LAMARAN l
                  JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
                  LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id
-                 LEFT JOIN HRS_DEPARTEMEN vacancy_department ON vacancy_department.departemen_id = NVL(d.departemen_id, k.departemen_id)
+                 LEFT JOIN HRS_DEPARTEMEN vacancy_department ON vacancy_department.departemen_id = ' . $dept_id_expr . '
                  WHERE l.lamaran_id = :application_id'
             );
             $department_query->execute( [ 'application_id' => $application_id ] );
@@ -3344,13 +3258,15 @@ class Recruitment_Database {
      * Ensure the selected recipient is an active User Department account in the chosen department.
      */
     private function validate_hr_interview_recipient( PDO $connection, string $application_id, string $department_name, int $department_account_id ): void {
+        $dept_id_expr = $this->get_vacancy_department_id_expression();
+        $dept_name_expr = $this->get_vacancy_department_name_expression();
         $vacancy = $connection->prepare(
-            'SELECT NVL(d.departemen_id, k.departemen_id) AS "DEPARTMENT_ID",
-                    NVL(vacancy_department.nama_departemen, NVL(d.nama_departemen, k.nama_departemen)) AS "DEPARTMENT_NAME"
+            'SELECT ' . $dept_id_expr . ' AS "DEPARTMENT_ID",
+                    NVL(vacancy_department.nama_departemen, ' . $dept_name_expr . ') AS "DEPARTMENT_NAME"
              FROM HRS_LAMARAN l
              JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
              LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id
-             LEFT JOIN HRS_DEPARTEMEN vacancy_department ON vacancy_department.departemen_id = NVL(d.departemen_id, k.departemen_id)
+             LEFT JOIN HRS_DEPARTEMEN vacancy_department ON vacancy_department.departemen_id = ' . $dept_id_expr . '
              WHERE l.lamaran_id = :application_id'
         );
         $vacancy->execute( [ 'application_id' => $application_id ] );
@@ -3424,6 +3340,7 @@ class Recruitment_Database {
 
     public function get_applications(): array {
         $this->last_error = null;
+        $dept_id_expr = $this->get_vacancy_department_id_expression();
         $booking_table_available = $this->has_interview_booking_table();
         $scheduled_interviewer_expression = $booking_table_available && $this->has_interview_schedule_interviewer_column()
             ? '(SELECT s.interviewer_name FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'USER\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY)'
@@ -3456,6 +3373,8 @@ class Recruitment_Database {
                CAST(NULL AS VARCHAR2(10)) AS "user_interview_date",
                CAST(NULL AS VARCHAR2(255)) AS "user_interviewer",
                CAST(NULL AS VARCHAR2(250)) AS "user_interview_notes",';
+        $dept_id_expr = $this->get_vacancy_department_id_expression();
+        $dept_name_expr = $this->get_vacancy_department_name_expression();
         return $this->fetch_all(
             'SELECT l.lamaran_id AS "id",
                    l.detail_lowongan_id AS "vacancy_id",
@@ -3467,8 +3386,8 @@ class Recruitment_Database {
                    NVL(d.lokasi_penempatan, k.nama_dealer) AS "location",
                    k.nama_dealer AS "dealer",
                    d.kategori_kj AS "category",
-                   NVL(d.nama_departement, k.nama_departemen) AS "department",
-                   NVL(d.departemen_id, k.departemen_id) AS "department_id",
+                   ' . $dept_name_expr . ' AS "department",
+                   ' . $dept_id_expr . ' AS "department_id",
                    hr.status_hasil AS "hr_interview_result",
                    hr.role_akses_id AS "department_account_id",
                    assigned_account.nama_lengkap AS "department_account_name",
@@ -3524,6 +3443,7 @@ class Recruitment_Database {
         }
 
         $this->last_error = null;
+        $dept_id_expr = $this->get_vacancy_department_id_expression();
         $booking_table_available = $this->has_interview_booking_table();
         $scheduled_date_expression = $booking_table_available
             ? 'NVL((SELECT TO_CHAR(s.schedule_date, \'YYYY-MM-DD\') FROM HRS_INTERVIEW_BOOKING b JOIN HRS_INTERVIEW_SCHEDULE s ON s.schedule_id = b.schedule_id WHERE b.lamaran_id = l.lamaran_id AND b.interview_type = \'USER\' AND b.booking_status = \'BOOKED\' FETCH FIRST 1 ROW ONLY), TO_CHAR(j.tanggal_wawancara, \'YYYY-MM-DD\'))'
@@ -3615,7 +3535,7 @@ class Recruitment_Database {
               AND hr.role_akses_id = :account_id
               AND assigned_account.peran = \'KEPALA_DEPARTEMEN\'
               AND UPPER(TRIM(assigned_account.status_akun)) = \'ACTIVE\'
-              AND assigned_account.departemen_id = NVL(d.departemen_id, k.departemen_id)
+              AND assigned_account.departemen_id = ' . $dept_id_expr . '
             ORDER BY NVL(l.created_at, l.tanggal_melamar) DESC, l.lamaran_id DESC',
             [
                 'account_id' => $account_id,
@@ -3684,6 +3604,9 @@ class Recruitment_Database {
         }
 
         $this->last_error = null;
+        $dept_id_expr = $this->get_vacancy_department_id_expression();
+        $dept_name_expr = $this->get_vacancy_department_name_expression();
+        $detail_dept_name_col = $this->get_detail_vacancy_department_name_column();
         $psychotest_score_expression = $this->has_psychotest_candidate_score_columns()
             ? '(SELECT h.nilai
                FROM HRS_HASIL_TES_PSIKOLOGI h
@@ -3697,7 +3620,7 @@ class Recruitment_Database {
                     l.status_terkini AS "application_status",
                     l.status_akhir AS "final_status",
                     d.judul_pekerjaan AS "position",
-                    NVL(vacancy_department.nama_departemen, NVL(d.nama_departement, k.nama_departemen)) AS "department",
+                    NVL(vacancy_department.nama_departemen, ' . $dept_name_expr . ') AS "department",
                     d.lokasi_penempatan AS "vacancy_location",
                     k.nama_dealer AS "dealer",
                     p.kandidat_id AS "candidate_id",
@@ -3715,7 +3638,7 @@ class Recruitment_Database {
                     hr.rekomendasi AS "hr_recommendation",
                     hr.nama_pewawancara AS "hr_interviewer",
                     hr.catatan_wawancara AS "hr_interview_notes",
-                    NVL(NULLIF(TRIM(hr.nama_departemen_tujuan), \'\'), d.nama_departement) AS "assigned_department",
+                    NVL(NULLIF(TRIM(hr.nama_departemen_tujuan), \'\'), ' . $detail_dept_name_col . ') AS "assigned_department",
                     current_account.username AS "department_account_username",
                     current_account.email AS "department_account_email",
                     w.status_seleksi AS "user_interview_result",
@@ -3735,15 +3658,15 @@ class Recruitment_Database {
              JOIN HRS_HASIL_WAWANCARA_HR hr ON hr.lamaran_id = l.lamaran_id
              JOIN HRS_ROLE_AKSES current_account ON current_account.role_akses_id = :account_id
              LEFT JOIN HRS_DEPARTEMEN current_department ON current_department.departemen_id = current_account.departemen_id
-             LEFT JOIN HRS_DEPARTEMEN vacancy_department ON vacancy_department.departemen_id = NVL(d.departemen_id, k.departemen_id)
+             LEFT JOIN HRS_DEPARTEMEN vacancy_department ON vacancy_department.departemen_id = ' . $dept_id_expr . '
              LEFT JOIN HRS_HASIL_WAWANCARA_USER w ON w.lamaran_id = l.lamaran_id
              WHERE l.lamaran_id = :application_id
                AND hr.status_hasil = \'LOLOS\'
                AND hr.role_akses_id = :account_id
                AND current_account.peran = \'KEPALA_DEPARTEMEN\'
                AND UPPER(TRIM(current_account.status_akun)) = \'ACTIVE\'
-               AND current_account.departemen_id = NVL(d.departemen_id, k.departemen_id)
-               AND UPPER(TRIM(NVL(NULLIF(TRIM(hr.nama_departemen_tujuan), \'\'), d.nama_departement))) = UPPER(TRIM(NVL(current_department.nama_departemen, current_account.nama_departemen)))
+               AND current_account.departemen_id = ' . $dept_id_expr . '
+               AND UPPER(TRIM(NVL(NULLIF(TRIM(hr.nama_departemen_tujuan), \'\'), ' . $detail_dept_name_col . '))) = UPPER(TRIM(NVL(current_department.nama_departemen, current_account.nama_departemen)))
              FETCH FIRST 1 ROW ONLY',
             [
                 'application_id' => $application_id,
@@ -3858,9 +3781,11 @@ class Recruitment_Database {
                        WHERE schedule.kandidat_id = p.kandidat_id
                          AND schedule.tanggal_wawancara IS NOT NULL
                    )';
+            $dept_id_expr = $this->get_vacancy_department_id_expression();
+            $detail_dept_name_col = $this->get_detail_vacancy_department_name_column();
             $assignment = $connection->prepare(
                 'SELECT p.kandidat_id AS "CANDIDATE_ID",
-                        NVL(NULLIF(TRIM(hr.nama_departemen_tujuan), \'\'), d.nama_departement) AS "ASSIGNED_DEPARTMENT"
+                        NVL(NULLIF(TRIM(hr.nama_departemen_tujuan), \'\'), ' . $detail_dept_name_col . ') AS "ASSIGNED_DEPARTMENT"
                  FROM HRS_LAMARAN l
                  JOIN HRS_DETAIL_INFO_LOWONGAN d ON d.detail_lowongan_id = l.detail_lowongan_id
                  LEFT JOIN HRS_KOLOM_LANDING_PENDAFTARAN k ON k.kolom_pendaftaran_id = d.kolom_pendaftaran_id
@@ -3875,8 +3800,8 @@ class Recruitment_Database {
                    AND hr.role_akses_id = :account_id
                    AND current_account.peran = \'KEPALA_DEPARTEMEN\'
                    AND UPPER(TRIM(current_account.status_akun)) = \'ACTIVE\'
-                   AND current_account.departemen_id = NVL(d.departemen_id, k.departemen_id)
-                   AND UPPER(TRIM(NVL(NULLIF(TRIM(hr.nama_departemen_tujuan), \'\'), d.nama_departement))) = UPPER(TRIM(NVL(current_department.nama_departemen, current_account.nama_departemen)))
+                   AND current_account.departemen_id = ' . $dept_id_expr . '
+                   AND UPPER(TRIM(NVL(NULLIF(TRIM(hr.nama_departemen_tujuan), \'\'), ' . $detail_dept_name_col . '))) = UPPER(TRIM(NVL(current_department.nama_departemen, current_account.nama_departemen)))
                    ' . $schedule_assignment_clause . '
                  FOR UPDATE OF l.status_terkini'
             );
@@ -7547,6 +7472,106 @@ class Recruitment_Database {
         }
 
         return $this->psychotest_candidate_score_columns_exist;
+    }
+
+    private function get_detail_vacancy_department_id_column(): string {
+        if ( null === $this->detail_vacancy_department_id_column ) {
+            try {
+                $statement = $this->get_connection()->prepare(
+                    'SELECT COLUMN_NAME FROM USER_TAB_COLUMNS WHERE TABLE_NAME = :table_name AND COLUMN_NAME IN (\'DEPARTEMENT_ID\', \'DEPARTEMEN_ID\')'
+                );
+                $statement->execute( [ 'table_name' => 'HRS_DETAIL_INFO_LOWONGAN' ] );
+                $cols = $statement->fetchAll( PDO::FETCH_COLUMN );
+                if ( in_array( 'DEPARTEMENT_ID', $cols, true ) ) {
+                    $this->detail_vacancy_department_id_column = 'd.departement_id';
+                } elseif ( in_array( 'DEPARTEMEN_ID', $cols, true ) ) {
+                    $this->detail_vacancy_department_id_column = 'd.departemen_id';
+                } else {
+                    $this->detail_vacancy_department_id_column = 'CAST(NULL AS NUMBER)';
+                }
+            } catch ( Throwable $exception ) {
+                $this->detail_vacancy_department_id_column = 'd.departement_id';
+            }
+        }
+
+        return $this->detail_vacancy_department_id_column;
+    }
+
+    private function get_detail_vacancy_department_name_column(): string {
+        if ( null === $this->detail_vacancy_department_name_column ) {
+            try {
+                $statement = $this->get_connection()->prepare(
+                    'SELECT COLUMN_NAME FROM USER_TAB_COLUMNS WHERE TABLE_NAME = :table_name AND COLUMN_NAME IN (\'NAMA_DEPARTEMENT\', \'NAMA_DEPARTEMEN\')'
+                );
+                $statement->execute( [ 'table_name' => 'HRS_DETAIL_INFO_LOWONGAN' ] );
+                $cols = $statement->fetchAll( PDO::FETCH_COLUMN );
+                if ( in_array( 'NAMA_DEPARTEMENT', $cols, true ) ) {
+                    $this->detail_vacancy_department_name_column = 'd.nama_departement';
+                } elseif ( in_array( 'NAMA_DEPARTEMEN', $cols, true ) ) {
+                    $this->detail_vacancy_department_name_column = 'd.nama_departemen';
+                } else {
+                    $this->detail_vacancy_department_name_column = 'CAST(NULL AS VARCHAR2(255))';
+                }
+            } catch ( Throwable $exception ) {
+                $this->detail_vacancy_department_name_column = 'd.nama_departement';
+            }
+        }
+
+        return $this->detail_vacancy_department_name_column;
+    }
+
+    private function get_landing_department_id_column(): string {
+        if ( null === $this->landing_department_id_column ) {
+            try {
+                $statement = $this->get_connection()->prepare(
+                    'SELECT COLUMN_NAME FROM USER_TAB_COLUMNS WHERE TABLE_NAME = :table_name AND COLUMN_NAME IN (\'DEPARTEMEN_ID\', \'DEPARTEMENT_ID\')'
+                );
+                $statement->execute( [ 'table_name' => 'HRS_KOLOM_LANDING_PENDAFTARAN' ] );
+                $cols = $statement->fetchAll( PDO::FETCH_COLUMN );
+                if ( in_array( 'DEPARTEMEN_ID', $cols, true ) ) {
+                    $this->landing_department_id_column = 'k.departemen_id';
+                } elseif ( in_array( 'DEPARTEMENT_ID', $cols, true ) ) {
+                    $this->landing_department_id_column = 'k.departement_id';
+                } else {
+                    $this->landing_department_id_column = 'CAST(NULL AS NUMBER)';
+                }
+            } catch ( Throwable $exception ) {
+                $this->landing_department_id_column = 'k.departemen_id';
+            }
+        }
+
+        return $this->landing_department_id_column;
+    }
+
+    private function get_landing_department_name_column(): string {
+        if ( null === $this->landing_department_name_column ) {
+            try {
+                $statement = $this->get_connection()->prepare(
+                    'SELECT COLUMN_NAME FROM USER_TAB_COLUMNS WHERE TABLE_NAME = :table_name AND COLUMN_NAME IN (\'NAMA_DEPARTEMEN\', \'NAMA_DEPARTEMENT\')'
+                );
+                $statement->execute( [ 'table_name' => 'HRS_KOLOM_LANDING_PENDAFTARAN' ] );
+                $cols = $statement->fetchAll( PDO::FETCH_COLUMN );
+                if ( in_array( 'NAMA_DEPARTEMEN', $cols, true ) ) {
+                    $this->landing_department_name_column = 'k.nama_departemen';
+                } elseif ( in_array( 'NAMA_DEPARTEMENT', $cols, true ) ) {
+                    $this->landing_department_name_column = 'k.nama_departement';
+                } else {
+                    $this->landing_department_name_column = 'CAST(NULL AS VARCHAR2(255))';
+                }
+            } catch ( Throwable $exception ) {
+                $this->landing_department_name_column = 'k.nama_departemen';
+            }
+        }
+
+        return $this->landing_department_name_column;
+    }
+
+    private function get_vacancy_department_id_expression(): string {
+        return 'NVL(' . $this->get_detail_vacancy_department_id_column() . ', ' . $this->get_landing_department_id_column() . ')';
+    }
+
+    private function get_vacancy_department_name_expression(): string {
+        return 'NVL(' . $this->get_detail_vacancy_department_name_column() . ', ' . $this->get_landing_department_name_column() . ')';
     }
 
     private function is_valid_oracle_date( string $date ): bool {

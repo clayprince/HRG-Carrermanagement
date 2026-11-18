@@ -9,7 +9,7 @@ $test_labels = [
 $requested_application_id = isset( $_GET['application_id'] ) && is_scalar( $_GET['application_id'] )
     ? absint( wp_unslash( (string) $_GET['application_id'] ) )
     : 0;
-if ( 'iq' !== $test_key || $requested_application_id < 1 ) {
+if ( ! array_key_exists( $test_key, $test_labels ) || $requested_application_id < 1 ) {
     wp_safe_redirect( recruitment_get_public_url( 'psychotest' ) );
     exit;
 }
