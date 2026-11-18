@@ -1057,10 +1057,11 @@ function recruitment_close_psychotest_if_due(): void {
 
 function recruitment_is_psychotest_test_enabled( string $test_key ): bool {
     $test_groups = [
-        'iq' => 'iq',
-        'pauli' => 'pauli',
-        'disc' => 'personality',
-        'papi' => 'personality',
+        'iq'          => 'iq',
+        'pauli'       => 'pauli',
+        'personality' => 'personality',
+        'disc'        => 'disc',
+        'papi'        => 'papi',
     ];
     if ( ! isset( $test_groups[ $test_key ] ) ) {
         return false;
@@ -1080,15 +1081,13 @@ function recruitment_is_psychotest_test_enabled( string $test_key ): bool {
 
     $selected_tests = is_array( $settings['online_tests'] ?? null )
         ? array_map( static fn ( $test ): string => sanitize_key( (string) $test ), array_filter( $settings['online_tests'], 'is_scalar' ) )
-        : [ 'iq', 'pauli', 'personality' ];
+        : [ 'iq', 'pauli', 'personality', 'disc', 'papi' ];
+
     $group = $test_groups[ $test_key ];
-    if ( ! in_array( $group, $selected_tests, true ) ) {
-        return false;
-    }
-    if ( 'personality' === $group && ( ! in_array( 'iq', $selected_tests, true ) || ! in_array( 'pauli', $selected_tests, true ) ) ) {
-        return false;
-    }
-    if ( 'pauli' === $group && ! in_array( 'iq', $selected_tests, true ) ) {
+    $is_in_global = in_array( $group, $selected_tests, true )
+        || ( in_array( $test_key, [ 'disc', 'papi' ], true ) && in_array( 'personality', $selected_tests, true ) );
+
+    if ( ! $is_in_global ) {
         return false;
     }
 

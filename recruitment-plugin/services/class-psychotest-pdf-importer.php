@@ -139,13 +139,13 @@ class Recruitment_Psychotest_Pdf_Importer {
     }
 
     public function detect_test( string $text ): string {
-        if ( 1 === preg_match( '/\b(?:PAPI|Kostick)\b/iu', $text ) ) {
+        if ( 1 === preg_match( '/\b(?:PAPI|Kostick|PAPIKOSTIK|PAPI-KOSTICK|PAPI\s*KOSTICK)\b/iu', $text ) ) {
             return 'papi';
         }
         if ( 1 === preg_match( '/\bDISC\b/iu', $text ) ) {
             return 'disc';
         }
-        if ( 1 === preg_match( '/\b(?:IQ|intelligence|kecerdasan|berhitung(?:\s+angka)?|hubungan\s+kata|gabungan\s+bagian|abstraksi)\b/iu', $text )
+        if ( 1 === preg_match( '/\b(?:IQ|TIKI|IQ-TIKI|IQ\s*TIKI|intelligence|kecerdasan|berhitung(?:\s+angka)?|hubungan\s+kata|gabungan\s+bagian|abstraksi)\b/iu', $text )
             || 1 === preg_match( '/^\s*[A-F][.) :]\s*\S.*$/imu', $text ) ) {
             return 'iq';
         }

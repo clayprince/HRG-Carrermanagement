@@ -199,29 +199,34 @@ class Recruitment_IQ_Assessment {
             wp_die( esc_html__( 'Bank soal IQ belum tersedia atau belum lengkap. Silakan hubungi tim HR.', 'recruitment-plugin' ) );
         }
 
+        $iq_cfg = (array) get_option( 'recruitment_psychotest_tests', [] );
+        $configured_iq_qcount = max( 1, absint( $iq_cfg['iq']['question_count'] ?? 10 ) );
+        $per_subtest_limit = max( 1, (int) ceil( $configured_iq_qcount / max( 1, count( $catalog ) ) ) );
+
         $tests = [];
         foreach ( $catalog as $index => $test ) {
-            if ( ! isset( self::SUBTEST_DURATIONS[ $index ] )
-                || (int) $test['DURATION'] !== self::SUBTEST_DURATIONS[ $index ]
-                || empty( $test['questions'] )
-                || (int) $test['QUESTION_COUNT'] !== count( $test['questions'] ) ) {
-                wp_die( esc_html__( 'Setiap subtes IQ harus memiliki soal dan durasi yang valid. Silakan hubungi tim HR.', 'recruitment-plugin' ) );
+            if ( empty( $test['questions'] ) ) {
+                wp_die( esc_html__( 'Setiap subtes IQ harus memiliki bank soal yang valid. Silakan hubungi tim HR.', 'recruitment-plugin' ) );
             }
+            $available_questions = array_slice( (array) $test['questions'], 0, $per_subtest_limit );
             $question_ids = [];
             $choice_order = [];
-            foreach ( $test['questions'] as $question ) {
+            foreach ( $available_questions as $question ) {
                 $question_id = (int) $question['id'];
                 if ( count( $question['choices'] ) < 2 ) {
-                    wp_die( esc_html__( 'Ada soal IQ yang belum memiliki pilihan jawaban lengkap.', 'recruitment-plugin' ) );
+                    continue;
                 }
                 $question_ids[] = $question_id;
                 $choice_order[ $question_id ] = array_map( 'intval', array_column( $question['choices'], 'id' ) );
                 shuffle( $choice_order[ $question_id ] );
             }
+            if ( empty( $question_ids ) ) {
+                wp_die( esc_html__( 'Ada soal IQ yang belum memiliki pilihan jawaban lengkap.', 'recruitment-plugin' ) );
+            }
             shuffle( $question_ids );
             $tests[] = [
                 'id' => (int) $test['ID'],
-                'duration' => (int) $test['DURATION'],
+                'duration' => (int) ( $test['DURATION'] ?: 5 ),
                 'started_at' => 0,
                 'deadline' => 0,
                 'question_order' => $question_ids,
@@ -352,10 +357,7 @@ class Recruitment_IQ_Assessment {
             $next_test = $catalog[ $next_index ] ?? null;
             if ( ! is_array( $next_test )
                 || (int) $next_test['ID'] !== (int) ( $state['tests'][ $next_index ]['id'] ?? 0 )
-                || ! isset( self::SUBTEST_DURATIONS[ $next_index ] )
-                || (int) $next_test['DURATION'] !== self::SUBTEST_DURATIONS[ $next_index ]
-                || empty( $next_test['questions'] )
-                || (int) $next_test['QUESTION_COUNT'] !== count( $next_test['questions'] ) ) {
+                || empty( $next_test['questions'] ) ) {
                 wp_die( esc_html__( 'Bank soal subtes IQ berikutnya belum tersedia atau berubah. Silakan hubungi tim HR.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
             }
             foreach ( $next_test['questions'] as $question ) {
@@ -385,6 +387,10 @@ class Recruitment_IQ_Assessment {
         if ( $next_index >= count( $state['tests'] ) ) {
             $state['status'] = 'complete';
             $state['completed_at'] = time();
+
+            // Automatically score test and synchronize across candidate profile, HR list, and User Department
+            $breakdown = $this->database->get_candidate_psychotest_score_breakdown( $candidate_id );
+            $this->database->save_online_psychotest_summary( $candidate_id, $breakdown );
         } else {
             $state['subtest_index'] = $next_index;
             $now = time();

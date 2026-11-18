@@ -35,78 +35,98 @@ if ( $proctoring->get_current_session_error() ) {
     wp_die( esc_html__( 'Status persiapan psikotes tidak dapat dibaca dari Oracle. Silakan coba kembali nanti.', 'recruitment-plugin' ), '', [ 'response' => 503 ] );
 }
 $psychotest_settings = recruitment_sync_psychotest_closing( (array) get_option( 'recruitment_psychotest_settings', [] ) );
+$all_test_settings = (array) get_option( 'recruitment_psychotest_tests', [] );
+$pauli_cfg = function_exists( 'recruitment_get_pauli_config' )
+    ? recruitment_get_pauli_config()
+    : [ 'duration_minutes' => 60, 'columns' => 10, 'numbers_per_column' => 50, 'interval_seconds' => 60 ];
+
 $iq_enabled = recruitment_is_psychotest_test_enabled( 'iq' );
 $pauli_enabled = recruitment_is_psychotest_test_enabled( 'pauli' );
-$personality_enabled = recruitment_is_psychotest_test_enabled( 'disc' ) && recruitment_is_psychotest_test_enabled( 'papi' );
-$assessment_database = new Recruitment_Database();
-$pauli_assessments = $assessment_database->get_pauli_assessment();
-$pauli_question_count = count( (array) ( $pauli_assessments[0]['questions'] ?? [] ) );
-$pauli_duration = $assessment_database->has_error() || $pauli_question_count < 20
-    ? 0
-    : 60;
-$pauli_duration_label = $pauli_duration > 0
-    ? $pauli_duration . ' menit'
-    : 'Belum tersedia';
-$personality_assessments = $assessment_database->get_personality_assessments();
-$disc_assessment = $personality_assessments['disc'] ?? [];
-$papi_assessment = $personality_assessments['papi'] ?? [];
-$disc_questions = (array) ( $disc_assessment['questions'] ?? [] );
-$papi_questions = (array) ( $papi_assessment['questions'] ?? [] );
-$personality_ready = ! $assessment_database->has_error()
-    && 24 <= count( $disc_questions )
-    && 90 <= count( $papi_questions )
-    && count( $disc_questions ) === count( array_filter( $disc_questions, static fn ( array $question ): bool => 4 === count( (array) ( $question['items'] ?? [] ) ) ) )
-    && count( $papi_questions ) === count( array_filter( $papi_questions, static fn ( array $question ): bool => 2 === count( (array) ( $question['items'] ?? [] ) ) ) );
-$tests = [
-    [
-        'number' => '01',
+$disc_enabled = recruitment_is_psychotest_test_enabled( 'disc' );
+$papi_enabled = recruitment_is_psychotest_test_enabled( 'papi' );
+
+$iq_settings = $all_test_settings['iq'] ?? [];
+$disc_settings = $all_test_settings['disc'] ?? [];
+$papi_settings = $all_test_settings['papi'] ?? [];
+
+$tests_blueprint = [];
+
+if ( $iq_enabled ) {
+    $iq_dur = (int) ( $iq_settings['duration'] ?? 20 );
+    $iq_qc = (int) ( $iq_settings['question_count'] ?? 10 );
+    $tests_blueprint[] = [
+        'key' => 'iq',
         'title' => 'IQ',
         'description' => 'Tes Kemampuan Intelektual',
-        'duration' => '4 subtes dengan batas waktu masing-masing',
+        'duration' => $iq_dur . ' menit · ' . $iq_qc . ' soal',
         'complete' => $iq_complete,
         'active' => is_array( $iq_state ) && 'active' === ( $iq_state['status'] ?? '' ),
-        'unlocked' => true,
         'screen' => 'psych-iq',
+        'test_param' => null,
         'test' => 'iq',
-    ],
-    [
-        'number' => '02',
+    ];
+}
+
+if ( $pauli_enabled ) {
+    $pauli_dur = (int) ( $pauli_cfg['duration_minutes'] ?? 60 );
+    $pauli_cols = (int) ( $pauli_cfg['columns'] ?? 10 );
+    $tests_blueprint[] = [
+        'key' => 'pauli',
         'title' => 'PAULI',
-        'description' => 'Tes Ketelitian dan Konsentrasi Kerja',
-        'duration' => $pauli_duration > 0 ? '60 menit · ganti lajur tiap 3 menit' : $pauli_duration_label,
+        'description' => 'Tes Ketelitian dan Kecepatan Kerja',
+        'duration' => $pauli_dur . ' menit · ' . $pauli_cols . ' kolom',
         'complete' => $pauli_complete,
         'active' => is_array( $pauli_state ) && 'active' === ( $pauli_state['status'] ?? '' ),
-        'unlocked' => $iq_complete && $pauli_duration > 0,
         'screen' => 'psych-pauli',
+        'test_param' => null,
         'test' => 'pauli',
-    ],
-    [
-        'number' => '03',
-        'title' => 'KEPRIBADIAN',
-        'description' => 'DISC, lalu PAPI Kostick',
-        'duration' => $personality_ready
-            ? sprintf( 'DISC %d nomor · PAPI Kostick %d pasang · tanpa batas waktu', count( $disc_questions ), count( $papi_questions ) )
-            : 'Bank soal DISC/PAPI belum memenuhi format PDF',
-        'complete' => $personality_complete,
-        'active' => $personality_active,
-        'unlocked' => $personality_active || ( $pauli_complete && $personality_ready ),
+    ];
+}
+
+if ( $disc_enabled ) {
+    $disc_dur = (int) ( $disc_settings['duration'] ?? 10 );
+    $disc_qc = (int) ( $disc_settings['question_count'] ?? 5 );
+    $tests_blueprint[] = [
+        'key' => 'disc',
+        'title' => 'DISC',
+        'description' => 'Asesmen Profil Perilaku Kerja',
+        'duration' => $disc_dur . ' menit · ' . $disc_qc . ' skenario',
+        'complete' => $disc_complete,
+        'active' => 'disc' === $personality_active_test && 'active' === ( $personality_tests['disc']['status'] ?? '' ),
         'screen' => 'psych-personality',
-        'test' => $personality_active ? $personality_active_test : $personality_next_test,
-    ],
-];
-$tests = array_values(
-    array_filter(
-        $tests,
-        static function ( array $test ) use ( $iq_enabled, $pauli_enabled, $personality_enabled ): bool {
-            return match ( $test['test'] ) {
-                'iq' => $iq_enabled,
-                'pauli' => $pauli_enabled,
-                'disc', 'papi' => $personality_enabled,
-                default => false,
-            };
-        }
-    )
-);
+        'test_param' => 'disc',
+        'test' => 'disc',
+    ];
+}
+
+if ( $papi_enabled ) {
+    $papi_dur = (int) ( $papi_settings['duration'] ?? 10 );
+    $papi_qc = (int) ( $papi_settings['question_count'] ?? 8 );
+    $tests_blueprint[] = [
+        'key' => 'papi',
+        'title' => 'PAPI KOSTICK',
+        'description' => 'Asesmen Preferensi & Peran Kerja',
+        'duration' => $papi_dur . ' menit · ' . $papi_qc . ' pasangan',
+        'complete' => $papi_complete,
+        'active' => 'papi' === $personality_active_test && 'active' === ( $personality_tests['papi']['status'] ?? '' ),
+        'screen' => 'psych-personality',
+        'test_param' => 'papi',
+        'test' => 'papi',
+    ];
+}
+
+$tests = [];
+$can_unlock = true;
+foreach ( $tests_blueprint as $idx => $t ) {
+    $is_unlocked = $can_unlock || $t['active'] || $t['complete'];
+    $t['number'] = str_pad( (string) ( $idx + 1 ), 2, '0', STR_PAD_LEFT );
+    $t['unlocked'] = $is_unlocked;
+    $tests[] = $t;
+
+    if ( ! $t['complete'] ) {
+        $can_unlock = false;
+    }
+}
 $completed_count = count( array_filter( $tests, static fn ( array $test ): bool => $test['complete'] ) );
 $test_count = count( $tests );
 $progress = 0 < $test_count ? (int) round( $completed_count / $test_count * 100 ) : 0;
@@ -148,7 +168,7 @@ $progress = 0 < $test_count ? (int) round( $completed_count / $test_count * 100 
                     <div class="daw-recruitment__info-box-icon" aria-hidden="true">i</div>
                     <div>
                         <strong>Sebelum memulai</strong>
-                        <p><?= 0 < $test_count ? 'Gunakan perangkat yang nyaman, koneksi internet stabil, dan tempat yang tenang. Tes Pauli berdurasi ' . esc_html( $pauli_duration_label ) . '; DISC dan PAPI tidak dibatasi waktu dan hanya menampilkan pengingat.' : 'Tes online sedang tidak tersedia atau belum diaktifkan oleh HR. Silakan periksa kembali jadwal di Tracking Lamaran atau hubungi HR.' ?></p>
+                        <p><?= 0 < $test_count ? 'Gunakan perangkat yang nyaman, koneksi internet stabil, dan tempat yang tenang. Selesaikan rangkaian tes secara bertahap sesuai petunjuk di setiap modul.' : 'Tes online sedang tidak tersedia atau belum diaktifkan oleh HR. Silakan periksa kembali jadwal di Tracking Lamaran atau hubungi HR.' ?></p>
                     </div>
                 </div>
             </section>
